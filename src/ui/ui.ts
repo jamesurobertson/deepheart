@@ -246,10 +246,8 @@ export class Ui {
     // Clicking the chamber: the treasure goblin first, then whichever monster is nearest.
     addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || this.modal || this.descending) return;
-      if (this.scene.busy) {
-        this.scene.skip();
-        return;
-      }
+      // Clicks do nothing while the party is on the stairs; the interlude plays out in full.
+      if (this.scene.busy) return;
       const t = e.target as HTMLElement;
       if (t.closest('button, .shop, .pnl, .dock, input, textarea')) return;
       if (this.game.raid && this.scene.hitRaider(e.clientX, e.clientY)) {
