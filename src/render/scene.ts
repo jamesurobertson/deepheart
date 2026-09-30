@@ -250,7 +250,8 @@ export class Scene {
   private cine: { phase: 'exit' | 'stairs' | 'arrive'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[] } | null = null;
   /** Black card in front of the camera for fades. */
   private fade: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-  private lastBossWin = -1;
+  /** Deepest zone reached this descent: entering a deeper one plays the staircase. */
+  private seenZone = 0;
   /** Called when the party arrives in the new zone (the UI shows the title card then). */
   onArrive: (() => void) | null = null;
 
@@ -1058,13 +1059,13 @@ export class Scene {
         }
         break;
       }
-      case 'bossWin':
-        this.lastBossWin = ev.floor;
-        break;
       case 'floor': {
         const z = zoneOf(ev.floor);
+        // First time into a deeper zone (however you got there): the staircase.
+        const deeper = z > this.seenZone;
+        this.seenZone = Math.max(this.seenZone, z);
         if (this.cine) this.cine.zone = z;
-        else if (z !== this.band && this.lastBossWin === ev.floor - 1 && this.settings.cinematics) this.startCinematic(z);
+        else if (deeper && this.settings.cinematics) this.startCinematic(z);
         else this.setBand(z);
         break;
       }
@@ -1129,6 +1130,7 @@ export class Scene {
     this.party = [];
     this.syncParty(game, true);
     this.setBand(zoneOf(game.s.floor));
+    this.seenZone = zoneOf(Math.max(game.s.floor, game.s.maxFloor - 1));
   }
 
   private addShake(v: number) {
