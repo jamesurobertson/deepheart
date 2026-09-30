@@ -17,8 +17,9 @@ const SPAWN_GAP = 0.12;
 const TRASH = 0.4;
 /** Every click deals this share of your companions' damage, before upgrades. */
 const CLICK_DPS = 0.05;
-const RAID_MIN = 60;
-const RAID_MAX = 150;
+/** Seconds between treasure goblins: rare enough to be a treat, not the engine of the game. */
+const RAID_MIN = 180;
+const RAID_MAX = 420;
 const RAID_STAY = 10;
 const FEVER_TIME = 10;
 const FEVER_CLICKS = 60;
