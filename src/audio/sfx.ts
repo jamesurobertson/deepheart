@@ -29,6 +29,8 @@ export class Sfx {
   private buffers = new Map<SfxName, AudioBuffer>();
   private last = new Map<SfxName, number>();
   private _muted = false;
+  /** Has the silent unlock sound been played yet (iOS)? */
+  private primed = false;
   private musicGain: GainNode | null = null;
   private musicRaw = new Map<Track, ArrayBuffer>();
   private musicBuf = new Map<Track, AudioBuffer>();
@@ -53,13 +55,24 @@ export class Sfx {
         if (this.ctx) this.decode(n);
       }).catch(() => { /* missing sound: play() just no-ops */ });
     }
+    // Browsers only let audio start inside a user gesture, and iOS only counts some of them
+    // (touch *end* / click, not touch start). Listen to all of them, and keep listening:
+    // phones can suspend audio again (calls, other apps) and a later tap brings it back.
     const unlock = () => {
       this.start();
-      removeEventListener('pointerdown', unlock);
-      removeEventListener('keydown', unlock);
+      const ctx = this.ctx;
+      if (!ctx) return;
+      if (ctx.state !== 'running' && !document.hidden) ctx.resume().catch(() => {});
+      if (!this.primed) {
+        // A silent one-sample sound played inside the gesture fully wakes iOS audio.
+        const src = ctx.createBufferSource();
+        src.buffer = ctx.createBuffer(1, 1, 22050);
+        src.connect(ctx.destination);
+        src.start(0);
+        this.primed = true;
+      }
     };
-    addEventListener('pointerdown', unlock);
-    addEventListener('keydown', unlock);
+    for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, unlock, { passive: true });
     // Go quiet while the tab is in the background; pick the music back up on return.
     document.addEventListener('visibilitychange', () => {
       if (!this.ctx) return;
@@ -135,6 +148,9 @@ export class Sfx {
 
   private start() {
     if (this.ctx) return;
+    // iPhones mute web audio when the ring/silent switch is on unless the page says it's media playback.
+    const nav = navigator as Navigator & { audioSession?: { type: string } };
+    if (nav.audioSession) nav.audioSession.type = 'playback';
     this.ctx = new AudioContext();
     this.master = this.ctx.createGain();
     this.master.gain.value = this._muted ? 0 : this.sfxVol;

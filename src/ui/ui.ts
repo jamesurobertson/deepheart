@@ -69,6 +69,7 @@ export class Ui {
   private touch = matchMedia('(pointer: coarse)').matches;
   private pressTimer = 0;
   private pressed = false;
+  private pressAt = { x: 0, y: 0 };
   private hudTop = 0;
 
   constructor(root: HTMLElement, game: Game, scene: Scene, hooks: UiHooks) {
@@ -105,7 +106,7 @@ export class Ui {
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute"></button>
       </nav>
       <aside class="shop">
-        <header class="shop-head" data-act="sheet"><h2>Your Party</h2><span class="shop-sub"></span><em class="shop-ready" hidden></em><span class="sheet-grip" aria-hidden="true"></span></header>
+        <header class="shop-head"><h2>Your Party</h2><span class="shop-sub"></span><em class="shop-ready" hidden></em><span class="sheet-grip" aria-hidden="true"></span></header>
         <section class="upgs">
           <div class="upgs-head"><h3>Upgrades</h3><button class="btn small buy-all" data-act="buyAll" hidden>Buy all</button></div>
           <div class="upg-grid"></div>
@@ -150,6 +151,7 @@ export class Ui {
     });
 
     this.bind();
+    this.bindSheet();
     this.syncMode();
     this.syncMute();
     this.layout();
@@ -184,13 +186,55 @@ export class Ui {
     this.scene.setViewport(sheet ? 0 : w - shop.left, sheet ? h - shop.top : 0, this.hudTop);
   }
 
-  private toggleSheet(open?: boolean) {
+  /** Portrait sheet: folded (header only), half (default) or full height. */
+  private setSheet(state: 'min' | 'half' | 'full') {
     const shop = this.el.shop;
-    shop.classList.toggle('min', open === undefined ? !shop.classList.contains('min') : !open);
-    this.hooks.sound(shop.classList.contains('min') ? 'close' : 'open', { vol: 0.4 });
+    const was = shop.classList.contains('min') ? 'min' : shop.classList.contains('full') ? 'full' : 'half';
+    shop.style.height = '';
+    shop.classList.toggle('min', state === 'min');
+    shop.classList.toggle('full', state === 'full');
+    if (state !== was) this.hooks.sound(state === 'min' ? 'close' : 'open', { vol: 0.4 });
     // Re-frame once the sheet has finished sliding (and once more in case the transition is skipped).
     shop.addEventListener('transitionend', () => this.layout(), { once: true });
     setTimeout(() => this.layout(), 400);
+  }
+
+  /** Drag the sheet's header to resize it; it snaps to folded / half / full. A tap toggles folded ↔ half. */
+  private bindSheet() {
+    const head = this.el.shop.querySelector('.shop-head') as HTMLElement;
+    let drag: { y: number; h: number; t: number; moved: boolean } | null = null;
+    head.addEventListener('pointerdown', (e) => {
+      if (!document.body.classList.contains('phone')) return;
+      drag = { y: e.clientY, h: this.el.shop.getBoundingClientRect().height, t: performance.now(), moved: false };
+      this.el.shop.classList.add('dragging');
+      try {
+        head.setPointerCapture(e.pointerId);
+      } catch { /* pointer already gone: the drag still works while it stays on the header */ }
+    });
+    head.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const dy = e.clientY - drag.y;
+      if (Math.abs(dy) > 6) drag.moved = true;
+      if (drag.moved) this.el.shop.style.height = `${Math.max(46, Math.min(innerHeight * 0.85, drag.h - dy))}px`;
+    });
+    const end = (e: PointerEvent) => {
+      if (!drag) return;
+      const d = drag;
+      drag = null;
+      this.el.shop.classList.remove('dragging');
+      const shop = this.el.shop;
+      const state = shop.classList.contains('min') ? 'min' : shop.classList.contains('full') ? 'full' : 'half';
+      if (!d.moved) return this.setSheet(state === 'min' ? 'half' : state === 'full' ? 'half' : 'min');
+      // Snap by where it was let go, nudged by a quick flick.
+      const h = shop.getBoundingClientRect().height;
+      const v = (d.y - e.clientY) / Math.max(1, performance.now() - d.t);
+      const target = h + v * 250;
+      const stops: [number, 'min' | 'half' | 'full'][] = [[46, 'min'], [innerHeight * 0.38, 'half'], [innerHeight * 0.78, 'full']];
+      stops.sort((a, b) => Math.abs(a[0] - target) - Math.abs(b[0] - target));
+      this.setSheet(stops[0][1]);
+    };
+    head.addEventListener('pointerup', end);
+    head.addEventListener('pointercancel', end);
   }
 
   // ---------- input ----------
@@ -311,12 +355,18 @@ export class Ui {
       clearTimeout(this.pressTimer);
       this.hideTip();
       if (!t) return;
+      this.pressAt = { x: e.clientX, y: e.clientY };
       this.pressTimer = window.setTimeout(() => {
         this.pressed = true;
         this.showTip(t);
         navigator.vibrate?.(10);
       }, 420);
     });
+    // A finger that moves is scrolling, not pressing.
+    r.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse' && Math.hypot(e.clientX - this.pressAt.x, e.clientY - this.pressAt.y) > 10) clearTimeout(this.pressTimer);
+    });
+    r.addEventListener('scroll', () => clearTimeout(this.pressTimer), true);
     const release = () => {
       clearTimeout(this.pressTimer);
       if (this.pressed) setTimeout(() => this.hideTip(), 1800);
@@ -343,7 +393,6 @@ export class Ui {
     const s = g.s.settings;
     switch (act) {
       case 'close': this.closeModal(); break;
-      case 'sheet': if (document.body.classList.contains('phone')) this.toggleSheet(); break;
       case 'sound':
         s.muted = !s.muted;
         this.syncMute();
@@ -434,7 +483,8 @@ export class Ui {
         if (ev.kind === 'dps') this.pop(s.x + (Math.random() - 0.5) * 30, s.y + s.h * 0.2, fmt(ev.amount), 'p-dps');
         else if (ev.kind === 'cleave' || ev.kind === 'auto') this.pop(s.x + (Math.random() - 0.5) * 40, s.y + s.h * 0.3, fmt(ev.amount), 'p-cleave');
         // Pop classes are prefixed so they can't collide with HUD classes (the Rampage meter is .fever).
-        else this.pop(ev.x ?? s.x, (ev.y ?? s.y) - 10, fmt(ev.amount), `p-${ev.kind}`);
+        // Numbers always rise from the monster that was hit, wherever you tapped.
+        else this.pop(s.x + (Math.random() - 0.5) * s.h * 0.5, s.y + s.h * 0.2, fmt(ev.amount), `p-${ev.kind}`);
         break;
       }
       case 'kill': {
@@ -712,7 +762,8 @@ export class Ui {
         chip.innerHTML = `<span class="buff-ico">${spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(b.name)}</b><small></small></span><em class="buff-bar"></em>`;
         box.appendChild(chip);
       }
-      const text = `${buffText(b)} · ${Math.ceil(b.t)}s`;
+      // Phones only have room for the countdown; the icon says which buff it is.
+      const text = document.body.classList.contains('phone') ? `${Math.ceil(b.t)}s` : `${buffText(b)} · ${Math.ceil(b.t)}s`;
       const small = chip.querySelector('small')!;
       if (small.textContent !== text) small.textContent = text;
       (chip.querySelector('.buff-bar') as HTMLElement).style.width = `${(b.t / b.dur) * 100}%`;
