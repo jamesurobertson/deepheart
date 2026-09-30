@@ -351,7 +351,7 @@ body.compact .rate .short { display: inline; }
 
 /* ---------- toasts ---------- */
 
-.toasts { position: absolute; left: 12px; bottom: 90px; display: flex; flex-direction: column-reverse; gap: 4px; width: 270px; }
+.toasts { position: absolute; z-index: 25; left: 12px; bottom: 90px; display: flex; flex-direction: column-reverse; gap: 4px; width: 270px; }
 .toast { display: flex; align-items: center; gap: 8px; padding: 4px 8px; animation: toastin 0.3s both; pointer-events: none !important; }
 .toast.out { animation: toastout 0.4s both; }
 .toast.trophy { border-image-source: var(--f-gold); }
@@ -391,7 +391,7 @@ body.compact .rate .short { display: inline; }
   border: 6px solid transparent; border-image: var(--f-btn) 2 fill / 6px stretch; min-height: 60px;
 }
 .aby-ico { grid-row: span 2; display: grid; place-items: center; }
-.aby b { font: 700 15px/1.05 'Pixelify Sans'; color: var(--text); }
+.aby b { font: 700 15px/1.05 'Pixelify Sans'; color: var(--text); min-width: 0; hyphens: auto; overflow-wrap: break-word; }
 .aby small { font: 400 18px/1 'Jersey 10'; color: var(--dim); display: inline-flex; gap: 4px; align-items: center; }
 .aby.owned { border-image-source: var(--f-gold); cursor: default; }
 .aby.owned small { color: var(--gold); }
@@ -586,7 +586,7 @@ body.phone .gold { font-size: 18px; }
 body.phone .dock { top: calc(6px + var(--safe-t)); bottom: auto; left: auto; right: calc(6px + var(--safe-r)); gap: 3px; }
 body.phone .dock-b { width: 38px; height: 38px; }
 body.phone .hud-top { top: calc(6px + var(--safe-t)); width: calc(100% - 16px - var(--safe-l) - var(--safe-r)); left: calc(8px + var(--safe-l)); gap: 2px; }
-body.phone .bank, body.phone .rate { max-width: calc(100% - 172px); }
+body.phone .bank, body.phone .rate { max-width: calc(100% - 214px); }
 body.phone .bank-v { font-size: 34px; }
 body.phone .bank-ico .px { zoom: 0.5; }
 body.phone .rate { font-size: 11px; }
@@ -639,3 +639,97 @@ body.compact .cur { width: auto; height: auto; aspect-ratio: 1; }
 @media (prefers-reduced-motion: reduce) {
   .bank-ico, .hint b, .raid-mark .px, .raid-mark b, .badge.hot { animation: none; }
 }
+
+/* ---------- relics, boss modifiers and the Heart ---------- */
+
+.glyph.g-heart { color: var(--ess); }
+.glyph.g-relic { color: #7fd8ff; }
+.m-head span .g-heart, .aby .g-heart, .heart-box .glyph, .heart-confirm .g-heart { color: var(--ess); }
+.badge.new { background: #10283a; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #7fd8ff, 0 0 12px rgba(127, 216, 255, 0.6); color: #e6f7ff; animation: hintbob 0.8s ease-in-out infinite; }
+
+/* Modifier chips: small, coloured, readable over the dungeon. */
+.mod {
+  display: inline-block; font: 400 10px/1 'Silkscreen'; font-style: normal; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--mc); padding: 2px 4px 3px; background: rgba(10, 5, 8, 0.85); box-shadow: 0 0 0 1px var(--ink), inset 0 0 0 1px color-mix(in srgb, var(--mc) 55%, transparent);
+}
+.floor-sub .mod { margin-left: 4px; font-size: 9px; padding: 1px 3px 2px; }
+.hp-mods { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 3px; white-space: nowrap; }
+.mods-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; color: var(--dim); }
+.mods-list .mod, .tt-l .mod { margin-right: 4px; vertical-align: 1px; }
+
+.pop.p-heal { font-size: 22px; color: #8cf07e; animation-name: popdps; animation-duration: 0.9s; }
+.pop.p-mod { font-size: 44px; color: #e4b4ff; z-index: 3; }
+
+/* Descend / Awaken tabs on the prestige screen. */
+.tabs { display: flex; gap: 6px; margin: -2px 0 10px; }
+.tab { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; font: 700 16px/1 'Pixelify Sans'; color: var(--dim); border: 6px solid transparent; border-image: var(--f-btn-down) 2 fill / 6px stretch; }
+.tab.on { color: var(--gold-hi); border-image-source: var(--f-btn-hi); }
+.tab .g-soul { color: var(--soul); }
+.tab.hot:not(.on) { box-shadow: 0 0 0 2px var(--ess), 0 0 14px rgba(255, 90, 126, 0.5); animation: hintbob 0.8s ease-in-out infinite; }
+.heart-bar i { background: linear-gradient(#ffb3c4, #d83a5e); }
+.aby.hrt.can { box-shadow: 0 0 0 2px var(--ess), 0 0 14px rgba(255, 90, 126, 0.45); }
+.aby .lv, .slot .lv {
+  font: 400 16px/1 'Jersey 10'; font-style: normal; color: var(--gold-hi); padding: 0 4px 1px; margin-left: 2px;
+  background: #24160c; box-shadow: 0 0 0 1px var(--ink), inset 0 0 0 1px #946a26;
+}
+.curtain.heart b { color: var(--ess); text-shadow: 0 0 30px rgba(255, 90, 126, 0.7); }
+
+/* Relic screen: the slots on top, the collection below. */
+.slots { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+.slot {
+  position: relative; width: 68px; height: 68px; display: grid; place-items: center;
+  border: 6px solid transparent; border-image: var(--f-cell) 2 fill / 6px stretch;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--rc, #473639) 70%, transparent), 0 0 16px color-mix(in srgb, var(--rc, #000) 35%, transparent);
+}
+.slot.empty { box-shadow: none; opacity: 0.7; }
+.slot.empty small { font: 400 10px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; }
+.slot .lv { position: absolute; right: -6px; bottom: -6px; }
+.rel-help { text-align: center; margin: 4px auto 12px; max-width: 520px; font-size: 14px; }
+.rel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.rel {
+  display: grid; grid-template-columns: 40px 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 8px; padding: 6px 8px; text-align: left; min-height: 60px;
+  border: 6px solid transparent; border-image: var(--f-btn) 2 fill / 6px stretch;
+  box-shadow: inset 3px 0 0 var(--rc);
+}
+.rel > .px { grid-row: span 2; justify-self: center; }
+.rel b { font: 700 15px/1.05 'Pixelify Sans'; color: var(--rc); text-shadow: var(--shadow); }
+.rel small { font: 400 17px/1 'Jersey 10'; color: var(--dim); }
+.rel.on { border-image-source: var(--f-gold); box-shadow: inset 3px 0 0 var(--rc), 0 0 0 2px color-mix(in srgb, var(--rc) 60%, transparent); }
+.rel.on small { color: var(--gold-hi); }
+.rel.unknown { opacity: 0.55; cursor: default; }
+.rel.unknown > .px { filter: brightness(0) opacity(0.6); }
+.rel.unknown b { color: var(--faint); }
+
+/* The loot card that rises when a boss drops a relic. */
+.loot {
+  position: absolute; left: 0; width: var(--free-w, 100%); top: calc(var(--free-h, 100%) * 0.3 + 96px);
+  display: flex; justify-content: center; pointer-events: none; z-index: 6;
+  opacity: 0; transform: translateY(20px) scale(0.9); transition: opacity 0.3s, transform 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.loot.in { opacity: 1; transform: none; }
+.loot > * { flex: none; }
+.loot-ico, .loot-t { background: rgba(12, 6, 10, 0.88); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--rc); }
+.loot-ico { width: 72px; height: 72px; display: grid; place-items: center; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--rc), 0 0 28px color-mix(in srgb, var(--rc) 70%, transparent); }
+.loot-t { display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 6px 14px 7px; max-width: 320px; }
+.loot-t small { font: 400 11px/1 'Silkscreen'; color: var(--rc); text-transform: uppercase; letter-spacing: 1px; }
+.loot-t b { font: 400 30px/0.9 'Jersey 10'; color: #fff; text-shadow: var(--outline); letter-spacing: 1px; }
+.loot-t em { font: 500 14px/1.15 'Pixelify Sans'; font-style: normal; color: var(--dim); }
+.loot.r3 .loot-ico { animation: legendary 1.2s ease-in-out infinite alternate; }
+@keyframes legendary { from { filter: brightness(1); } to { filter: brightness(1.35) drop-shadow(0 0 10px #ffb13d); } }
+
+.shop .modes .auto-buy { margin-left: auto; }
+.shop .modes .auto-buy.on { color: var(--green); }
+
+body.compact .loot { top: calc(var(--free-h, 100%) * 0.3 + 60px); }
+body.compact .loot-ico { width: 56px; height: 56px; }
+body.compact .loot-t b { font-size: 24px; }
+body.compact .loot-t em { font-size: 12px; }
+body.compact .rel-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+body.compact .rel b { font-size: 13px; }
+body.compact .slot { width: 58px; height: 58px; }
+body.compact .tab { min-height: 36px; font-size: 14px; }
+body.compact .rel-help, body.compact .mods-list { font-size: 13px; }
+/* Phone dock is a row along the top: badges hang underneath their button so they don't cover the neighbours. */
+body.phone .badge { top: auto; bottom: -11px; right: 50%; transform: translateX(50%); font-size: 13px; padding: 0 3px 1px; white-space: nowrap; z-index: 1; }
+body.phone .badge .glyph { display: none; }
+body.phone .badge.hot, body.phone .badge.new { animation: none; }

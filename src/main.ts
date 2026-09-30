@@ -100,7 +100,7 @@ async function boot() {
         for (const ev of game.events.splice(0)) {
           scene.handle(ev, game);
           ui.handle(ev);
-          if (ev.t === 'descend') scene.rebuild(game);
+          if (ev.t === 'descend' || ev.t === 'awaken') scene.rebuild(game);
         }
         scene.update(1 / 60, game);
         ui.frame(1 / 60);
@@ -184,7 +184,7 @@ async function boot() {
       scene.handle(ev, game);
       ui.handle(ev);
       playSound(sfx, ev);
-      if (ev.t === 'descend') scene.rebuild(game);
+      if (ev.t === 'descend' || ev.t === 'awaken') scene.rebuild(game);
     }
     // Big impacts briefly slow everything down.
     const stop = scene.takeHitstop();
@@ -242,6 +242,8 @@ function playSound(sfx: Sfx, ev: GameEvent) {
     case 'raidEscape': sfx.play('close', { vol: 0.5, rate: 0.8 }); break;
     case 'fever': if (ev.on) sfx.play('awaken', { vol: 0.8 }); break;
     case 'abyss': sfx.play('awaken', { vol: 0.6 }); break;
+    case 'heart': sfx.play('awaken', { vol: 0.6, rate: 0.8 }); break;
+    case 'split': sfx.play('bosskill', { vol: 0.6, rate: 1.3 }); break;
   }
 }
 

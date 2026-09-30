@@ -6,7 +6,8 @@ A browser clicker set in a pixel-art dungeon rendered in three.js. Monsters pour
 npm install
 npm run dev          # http://localhost:5173
 npm run build        # type-check + production build
-node scripts/balance.ts 3 5 30 1   # headless pacing sim: hours, clicks/sec, active minutes, descend ratio
+node scripts/balance.ts 8 5 30 0.3 # headless pacing sim: hours, clicks/sec, active minutes, descend ratio
+                                   # (env: TUNE='{"deepHp":1.17}' overrides pacing knobs, FAILS=1 / RELICS=1 log more)
 ```
 
 Handy URL flags: `?slot=name` keeps a separate save, `?speed=10` runs the game faster.
@@ -19,6 +20,13 @@ Handy URL flags: `?slot=name` keeps a separate save, `?speed=10` runs the game f
 - **Rampage:** clicking fast fills the meter. When it's full, clicks do ×5 and your party does ×2 for 10 seconds.
 - **Treasure goblins** dash across the room now and then. Catch one for gold, Bloodlust (×7 party damage), Frenzy (×77 clicks) or Gold Rush (×7 gold).
 - **Descend** (from floor 30): reset for souls (+2% damage each, more for every floor deeper) and spend them on abyss powers such as Phantom Blade (auto-clicks), Deep Stairs (start on floor 10) and more offline time.
+- **Boss modifiers** (from floor 30): zone bosses, and later mid-bosses, come Armored, Enraged, Regenerating, Splitting or Giant
+  (two at once from floor 100, three from 200). Each one has a relic that answers it.
+- **Relics** drop from bosses: 16 of them, common to legendary. A quarter of zone bosses drop one, and the first time you beat a zone
+  boss this deep always does. You keep them forever; finding one again levels it up. Three slots (five with Heart powers).
+- **Awaken the Heart** (from floor 120): give up your souls and abyss powers for heartstones, paid for the deepest floor you reached
+  since the last awakening. Heart powers: Heart of Fury (×10 damage per level, endless), Soul Siphon, more relic slots and drops,
+  weaker boss modifiers, keeping cheap abyss powers, and the Quartermaster (buys companions and upgrades for you).
 - **Trophies:** each gives +1% damage. Trophy upgrades multiply that. Many unlock **cursor skins** (21 weapons), picked in Options. Yes, there are trophies for letting treasure goblins escape.
 - **Zones:** every 10 floors is a new place with its own tiles, lighting, monsters, a mid-boss on floor 5 and a zone boss on floor 10:
   The Upper Halls, The Bone Crypts, The Overgrown Warrens (Troll Brute), The Sunken Tomb (Tomb Golem), The Rotting Deep (The Rotten King),
