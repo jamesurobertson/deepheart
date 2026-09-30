@@ -292,7 +292,8 @@ body.compact .rate .short { display: inline; }
   border: 6px solid transparent; border-image: var(--f-cell) 2 fill / 6px stretch;
   opacity: 0.55; filter: saturate(0.4);
 }
-.upg.can { opacity: 1; filter: none; box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.9), 0 0 12px rgba(242, 193, 78, 0.4); animation: popin 0.3s; }
+/* Affordable: the tile itself lights up (a glow outside it would be clipped by the scrolling grid). */
+.upg.can { opacity: 1; filter: none; border-image-source: var(--f-gold); box-shadow: inset 0 0 10px rgba(242, 193, 78, 0.45); animation: popin 0.3s; }
 .upg:hover { transform: translateY(-2px); }
 
 .ico { position: relative; display: grid; place-items: center; }

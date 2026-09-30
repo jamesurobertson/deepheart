@@ -725,7 +725,8 @@ export class Game {
     for (const e of this.effects()) if (e.t === 'raid' && e.effect) effect *= e.effect;
     const ev: GameEvent = { t: 'raidCatch', id: r.id, reward };
     if (reward === 'plunder') {
-      const amount = floorGold(this.s.floor) * this.goldMult() * (40 + Math.random() * 40);
+      // One to two floors' worth of kills: a nice haul, not a reason to stop playing and wait for goblins.
+      const amount = floorGold(this.s.floor) * this.goldMult() * (10 + Math.random() * 10);
       this.earn(amount);
       ev.amount = amount;
     } else {
