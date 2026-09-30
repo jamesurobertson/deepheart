@@ -71,6 +71,7 @@ export class Ui {
   private pressed = false;
   private pressAt = { x: 0, y: 0 };
   private hudTop = 0;
+  private strip = false;
 
   constructor(root: HTMLElement, game: Game, scene: Scene, hooks: UiHooks) {
     this.root = root;
@@ -106,7 +107,7 @@ export class Ui {
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute"></button>
       </nav>
       <aside class="shop">
-        <header class="shop-head"><h2>Your Party</h2><span class="shop-sub"></span><em class="shop-ready" hidden></em><span class="sheet-grip" aria-hidden="true"></span></header>
+        <header class="shop-head"><h2>Your Party</h2><span class="shop-sub"></span><span class="sheet-grip" aria-hidden="true"></span></header>
         <section class="upgs">
           <div class="upgs-head"><h3>Upgrades</h3><button class="btn small buy-all" data-act="buyAll" hidden>Buy all</button></div>
           <div class="upg-grid"></div>
@@ -132,7 +133,7 @@ export class Ui {
       down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
       fever: q('.fever'), feverBar: q('.fever i'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), raid: q('.raid-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
-      upgEmpty: q('.upgs-empty'), shopReady: q('.shop-ready'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
+      upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
     };
 
@@ -668,7 +669,12 @@ export class Ui {
 
     const rp = g.raid ? this.scene.raiderScreen() : null;
     this.el.raid.hidden = !rp;
-    if (rp) this.el.raid.style.transform = `translate(${rp.x}px, ${rp.y}px)`;
+    if (rp) {
+      this.el.raid.style.transform = `translate(${rp.x}px, ${rp.y}px)`;
+      // Keep the "catch it" label on screen when the goblin is near an edge.
+      this.el.raid.classList.toggle('edge-l', rp.x < 120);
+      this.el.raid.classList.toggle('edge-r', rp.x > innerWidth - 120);
+    }
 
     this.newsT -= dt;
     if (this.newsT <= 0) this.nextNews();
@@ -697,9 +703,6 @@ export class Ui {
     this.renderRows();
     this.renderUpgrades();
     this.el.shopSub.textContent = `${g.s.owned.filter((n) => n > 0).length} companions · ${g.s.upgrades.length} upgrades`;
-    const ready = this.rows.filter((r) => !r.hidden && r.classList.contains('can')).length + this.el.upgGrid.querySelectorAll('.upg.can').length;
-    this.el.shopReady.hidden = ready === 0;
-    this.el.shopReady.textContent = `${ready} ready`;
     if (document.body.classList.contains('compact')) {
       const hud = (this.el.fever.hidden ? this.el.floorBox : this.el.fever).getBoundingClientRect();
       if (Math.abs(Math.round(hud.bottom + 4) - this.hudTop) > 6) this.layout();
@@ -815,6 +818,13 @@ export class Ui {
       b.classList.toggle('can', can);
     });
     this.el.buyAll.hidden = affordable < 2;
+    // Folded phone sheet: a strip of just the upgrades you can buy right now (or nothing at all).
+    const strip = affordable > 0;
+    if (strip !== this.strip) {
+      this.strip = strip;
+      this.el.shop.classList.toggle('has-strip', strip);
+      if (this.el.shop.classList.contains('min')) setTimeout(() => this.layout(), 300);
+    }
   }
 
   // ---------- onboarding ----------
