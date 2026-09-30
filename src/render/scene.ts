@@ -1,0 +1,1024 @@
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import type { Atlas, Rect } from './atlas.ts';
+import { PixelSprite, blobShadow } from './sprite.ts';
+import { Fx, flameTexture } from './fx.ts';
+import { GradeShader, tiltShift } from './post.ts';
+import { COMPS, type Attack } from '../game/data.ts';
+import type { Game, GameEvent, Monster } from '../game/game.ts';
+
+const WALL_Z = -6;
+const STAIRS = new THREE.Vector3(7.5, 0, -4);
+/** Where the camera looks: between the party and the monsters. */
+const LOOK = new THREE.Vector3(0, 1.1, 0.5);
+
+interface Palette { torch: number; fog: number; hemi: number; wall: [number, number, number]; banner: string; goo: number }
+/** Every ten floors the dungeon changes colour. */
+const PALETTES: Palette[] = [
+  { torch: 0xff9a4a, fog: 0x0a0708, hemi: 0x6a5a78, wall: [0.5, 0.44, 0.46], banner: 'red', goo: 0.005 },
+  { torch: 0x5ad6c8, fog: 0x04090b, hemi: 0x4a6a78, wall: [0.38, 0.44, 0.48], banner: 'blue', goo: 0 },
+  { torch: 0xa6e06a, fog: 0x060906, hemi: 0x55704a, wall: [0.4, 0.46, 0.38], banner: 'green', goo: 0.03 },
+  { torch: 0xb485ff, fog: 0x08060d, hemi: 0x5a4a82, wall: [0.42, 0.38, 0.5], banner: 'yellow', goo: 0.06 },
+  { torch: 0xff5a3a, fog: 0x0b0505, hemi: 0x6a4a52, wall: [0.52, 0.34, 0.34], banner: 'red', goo: 0 },
+  { torch: 0x9cc0ff, fog: 0x05070c, hemi: 0x5a6a8a, wall: [0.4, 0.44, 0.56], banner: 'blue', goo: 0 },
+];
+
+/** Formation slots for companions, front to back. */
+const PARTY_SLOTS: [number, number][] = [
+  [-3, 0.8], [-3.4, -1.4], [-3.7, 2.6], [-4.4, -0.2], [-4.8, 1.7], [-5, -2.4], [-5.8, 0.8], [-6, 2.8],
+  [-6.2, -1.3], [-6.9, 1.9], [-7.2, -0.3], [-7.4, -2.5], [-8, 2.6], [-8.3, 0.8], [-8.8, -1.4], [-9.3, 1.6],
+];
+
+interface MonView {
+  id: number;
+  blood: string;
+  body: THREE.Group;
+  inner: THREE.Group;
+  sprite: PixelSprite;
+  idle: Rect[];
+  run: Rect[];
+  target: THREE.Vector3;
+  boss: boolean;
+  big: boolean;
+  flash: number;
+  squash: number;
+  knock: number;
+  /** Little hop when struck. */
+  hopY: number;
+  hopV: number;
+  /** Dying: seconds since death (-1 while alive). */
+  dead: number;
+  born: number;
+}
+
+interface CompView {
+  comp: number;
+  body: THREE.Group;
+  inner: THREE.Group;
+  sprite: PixelSprite;
+  idle: Rect[];
+  run: Rect[];
+  cd: number;
+  home: THREE.Vector3;
+  base: number;
+  /** Squash/stretch: negative = crouched (wind-up), positive = stretched (release). */
+  stretch: number;
+  act: CompAct | null;
+}
+
+/** What a companion is in the middle of doing. Melee: dash → strike → back. Ranged: wind-up → fire. */
+interface CompAct {
+  kind: Attack;
+  phase: 'windup' | 'dash' | 'strike' | 'back';
+  t: number;
+  target: number;
+}
+
+interface Shot {
+  mesh: THREE.Object3D;
+  from: THREE.Vector3;
+  to: THREE.Vector3;
+  target: number;
+  t: number;
+  dur: number;
+  arc: number;
+  kind: Attack;
+}
+
+interface RaiderView {
+  id: number;
+  group: THREE.Group;
+  sprite: PixelSprite;
+  from: -1 | 1;
+  light: THREE.PointLight;
+  state: 'run' | 'caught' | 'escape';
+  t: number;
+  sparkle: number;
+}
+
+interface Chest {
+  group: THREE.Group;
+  sprite: PixelSprite;
+  life: number;
+  opened: boolean;
+}
+
+/** Quad builder over the dungeon atlas. */
+class Quads {
+  pos: number[] = [];
+  uv: number[] = [];
+  nrm: number[] = [];
+  idx: number[] = [];
+  private atlas: Atlas;
+  constructor(atlas: Atlas) {
+    this.atlas = atlas;
+  }
+
+  quad(c: number[][], r: Rect, n: number[]) {
+    const [u0, v0, u1, v1] = this.atlas.uv(r);
+    const b = this.pos.length / 3;
+    for (const p of c) this.pos.push(...p);
+    this.uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
+    for (let i = 0; i < 4; i++) this.nrm.push(...n);
+    this.idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+  }
+
+  face(x: number, y: number, z: number, r: Rect, w = 1, h = 1) {
+    this.quad([[x, y, z], [x + w, y, z], [x + w, y + h, z], [x, y + h, z]], r, [0, 0, 1]);
+  }
+
+  top(x: number, y: number, z: number, r: Rect) {
+    this.quad([[x, y, z + 1], [x + 1, y, z + 1], [x + 1, y, z], [x, y, z]], r, [0, 1, 0]);
+  }
+
+  build() {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nrm, 3));
+    g.setIndex(this.idx);
+    return g;
+  }
+}
+
+function seeded(seed: number) {
+  let a = seed >>> 0 || 1;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function glowTexture(): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.3, 'rgba(255,255,255,0.5)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+const SHOT_COLOR: Record<Attack, number> = { arrow: 0xffe6b0, bolt: 0x9fe6ff, slash: 0xffffff, fire: 0xff8a3a, rune: 0x7dffb0, dark: 0xb46aff };
+const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
+
+const BONE = '#b8ae9e';
+
+/** What each monster bleeds: dark red for most, ooze for slugs and the undead, chips for bones, frost for the frozen. */
+function bloodOf(sprite: string): string {
+  if (sprite === 'skelet') return BONE;
+  if (sprite === 'ice_zombie') return '#6fb0d0';
+  if (sprite.includes('slug') || sprite === 'swampy') return '#4c7e1e';
+  if (sprite.includes('zombie')) return '#4a6420';
+  if (sprite === 'muddy') return '#5a3c20';
+  return '#7c0f16';
+}
+
+/**
+ * The chamber: an HD-2D dungeon room. Your companions hold the left side; monsters pour
+ * up the stairs on the right and take their places to be clicked to pieces.
+ */
+export class Scene {
+  readonly renderer: THREE.WebGLRenderer;
+  private scene = new THREE.Scene();
+  private camera = new THREE.PerspectiveCamera(30, 1, 0.1, 120);
+  private composer: EffectComposer;
+  private bloom: UnrealBloomPass;
+  private grade: ShaderPass;
+  private tiltH: ShaderPass;
+  private tiltV: ShaderPass;
+  private fx: Fx;
+  private atlas: Atlas;
+  private container: HTMLElement;
+  private glow = glowTexture();
+
+  private room: THREE.Group | null = null;
+  private wallMat: THREE.MeshLambertMaterial;
+  private floorMat: THREE.MeshLambertMaterial;
+  private hemi: THREE.HemisphereLight;
+  private key: THREE.DirectionalLight;
+  private torchLights: THREE.PointLight[] = [];
+  private flames: THREE.Mesh[] = [];
+  private flameMat: THREE.MeshBasicMaterial;
+  private palette = PALETTES[0];
+  private band = -1;
+
+  private mons = new Map<number, MonView>();
+  private party: CompView[] = [];
+  private shots: Shot[] = [];
+  private raider: RaiderView | null = null;
+  private leaving: RaiderView[] = [];
+  private chests: Chest[] = [];
+  private shake = 0;
+  private time = 0;
+  private fever = 0;
+  private hitstop = 0;
+  private view = { right: 0, bottom: 0 };
+  private camBase = new THREE.Vector3();
+  settings = { particles: true, shake: true, blood: true };
+
+  constructor(container: HTMLElement, atlas: Atlas) {
+    this.container = container;
+    this.atlas = atlas;
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.2;
+    container.appendChild(this.renderer.domElement);
+
+    this.scene.background = new THREE.Color(0x0a0708);
+    this.scene.fog = new THREE.Fog(0x0a0708, 22, 44);
+
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.45, 0.45, 0.85);
+    this.composer.addPass(this.bloom);
+    this.tiltH = new ShaderPass(tiltShift());
+    this.tiltV = new ShaderPass(tiltShift());
+    for (const p of [this.tiltH, this.tiltV]) {
+      p.uniforms.band.value = 0.3;
+      this.composer.addPass(p);
+    }
+    this.grade = new ShaderPass(GradeShader);
+    this.composer.addPass(this.grade);
+    this.composer.addPass(new OutputPass());
+
+    this.fx = new Fx(this.scene);
+    this.wallMat = new THREE.MeshLambertMaterial({ map: atlas.texture, alphaTest: 0.5 });
+    this.floorMat = new THREE.MeshLambertMaterial({ map: atlas.texture, alphaTest: 0.5, side: THREE.DoubleSide, color: new THREE.Color(1.1, 1.05, 1.02) });
+    this.flameMat = new THREE.MeshBasicMaterial({ map: flameTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+
+    this.hemi = new THREE.HemisphereLight(0x6a5a78, 0x120a0c, 1.5);
+    this.key = new THREE.DirectionalLight(0xffe2c0, 1.1);
+    this.key.position.set(-4, 10, 12);
+    this.scene.add(this.hemi, this.key);
+    for (let i = 0; i < 4; i++) {
+      const l = new THREE.PointLight(0xff9a4a, 5, 11, 1.6);
+      this.scene.add(l);
+      this.torchLights.push(l);
+    }
+    this.setBand(0);
+    this.resize();
+    addEventListener('resize', () => this.resize());
+  }
+
+  /** Space the UI covers on the right (desktop) or bottom (phone), so the fight centres in what's left. */
+  setViewport(right: number, bottom: number) {
+    this.view = { right, bottom };
+    this.resize();
+  }
+
+  private resize() {
+    const w = this.container.clientWidth || innerWidth;
+    const h = this.container.clientHeight || innerHeight;
+    this.renderer.setSize(w, h);
+    this.composer.setSize(w, h);
+    this.bloom.resolution.set(w, h);
+    const { right, bottom } = this.view;
+    const fullW = w + right;
+    const fullH = h + bottom;
+    this.camera.aspect = fullW / fullH;
+    this.camera.setViewOffset(fullW, fullH, right, bottom, w, h);
+    this.camera.updateProjectionMatrix();
+    // Fit the battle line (~17 units) across the free area, and ~8 up it.
+    const t = Math.tan(THREE.MathUtils.degToRad(15));
+    const freeW = Math.max(200, w - right);
+    const freeH = Math.max(200, h - bottom);
+    // Portrait screens can't fit the whole line at a readable size: show the heart of the fight.
+    const across = freeW < freeH ? 12 : 17;
+    const dist = Math.max((across * fullH) / (2 * t * freeW), (8 * fullH) / (2 * t * freeH));
+    this.camBase.set(LOOK.x, LOOK.y + dist * 0.26, LOOK.z + dist);
+    const fog = this.scene.fog as THREE.Fog;
+    fog.near = dist + 8;
+    fog.far = dist + 30;
+    this.tiltH.uniforms.step.value.set(1.1 / w, 0);
+    this.tiltV.uniforms.step.value.set(0, 1.1 / h);
+    this.tiltH.uniforms.focus.value = this.tiltV.uniforms.focus.value = 0.5 + (bottom / h) * 0.5;
+  }
+
+  // ---------- chamber ----------
+
+  private setBand(band: number) {
+    if (band === this.band) return;
+    this.band = band;
+    this.palette = PALETTES[band % PALETTES.length];
+    if (this.room) {
+      this.scene.remove(this.room);
+      this.room.traverse((o) => o instanceof THREE.Mesh && o.geometry.dispose());
+    }
+    this.room = this.buildRoom(band);
+    this.scene.add(this.room);
+    const p = this.palette;
+    (this.scene.background as THREE.Color).setHex(p.fog);
+    (this.scene.fog as THREE.Fog).color.setHex(p.fog);
+    this.hemi.color.setHex(p.hemi);
+    this.wallMat.color.setRGB(...p.wall);
+    for (const l of this.torchLights) l.color.setHex(p.torch);
+  }
+
+  private buildRoom(seed: number): THREE.Group {
+    const a = this.atlas;
+    const r = seeded(seed * 977 + 5);
+    const p = this.palette;
+    const wall = new Quads(a);
+    const floor = new Quads(a);
+    const floors = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => a.rect(`floor_${i}`));
+    const tile = () => (r() < 0.78 ? floors[0] : floors[1 + Math.floor(r() * 7)]);
+    const mid = a.rect('wall_mid');
+    const top = a.rect('wall_top_mid');
+    const banner = a.rect(`wall_banner_${p.banner}`);
+    const holes = [a.rect('wall_hole_1'), a.rect('wall_hole_2')];
+    const goo = a.rect('wall_goo');
+
+    for (let x = -24; x < 24; x++) {
+      for (let y = 0; y < 13; y++) {
+        const roll = r();
+        const rect = y === 12 ? top
+          : y === 5 && (x === -9 || x === -2 || x === 5 || x === 12) ? banner
+          : roll < 0.035 ? holes[Math.floor(r() * 2)]
+          : roll < 0.035 + p.goo ? goo : mid;
+        wall.face(x, y, WALL_Z, rect);
+      }
+      for (let z = WALL_Z; z < 9; z++) floor.top(x, 0, z, tile());
+    }
+    floor.top(Math.floor(STAIRS.x), 0.005, Math.floor(STAIRS.z), a.rect('floor_stairs'));
+
+    const column = a.rect('column');
+    for (const x of [-13, -5.5, 2, 9.5]) floor.face(x - 0.5, 0, WALL_Z + 0.35, column, 1, 3);
+    const skull = a.rect('skull');
+    const crate = a.rect('crate');
+    for (let i = 0; i < 10; i++) floor.face(-14 + r() * 28, 0, WALL_Z + 0.5 + r() * 0.6, r() < 0.6 ? skull : crate, 0.8, r() < 0.6 ? 0.8 : 1.2);
+
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(wall.build(), this.wallMat), new THREE.Mesh(floor.build(), this.floorMat));
+    this.flames = [];
+    [-12, -2, 6, 14].forEach((x, i) => {
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.8), this.flameMat);
+      f.position.set(x - 0.5, 4.3, WALL_Z + 0.1);
+      group.add(f);
+      this.flames.push(f);
+      this.torchLights[i].position.set(x - 0.5, 4.3, WALL_Z + 1.2);
+    });
+    return group;
+  }
+
+  // ---------- party ----------
+
+  /** Show one fighter per companion you've hired. */
+  syncParty(game: Game, instant = false) {
+    for (let i = 0; i < COMPS.length; i++) {
+      const has = this.party.find((p) => p.comp === i);
+      if (game.s.owned[i] > 0 && !has) this.addComp(i, instant);
+      if (game.s.owned[i] === 0 && has) {
+        this.scene.remove(has.body);
+        has.sprite.dispose();
+        this.party.splice(this.party.indexOf(has), 1);
+      }
+    }
+  }
+
+  private addComp(i: number, instant: boolean) {
+    const def = COMPS[i];
+    const { idle, run } = this.atlas.creature(def.sprite);
+    const sprite = new PixelSprite(this.atlas.texture, this.atlas.size, idle, { fps: 6 + Math.random() * 2 });
+    const body = new THREE.Group();
+    const inner = new THREE.Group();
+    const base = def.big ? 1 : 1.25;
+    inner.scale.setScalar(base);
+    inner.add(sprite.mesh);
+    body.add(inner, blobShadow(def.big ? 1.6 : 0.9));
+    const [x, z] = PARTY_SLOTS[i % PARTY_SLOTS.length];
+    const home = new THREE.Vector3(x, 0, z);
+    body.position.copy(instant ? home : new THREE.Vector3(-16, 0, z));
+    this.scene.add(body);
+    this.party.push({ comp: i, body, inner, sprite, idle, run, cd: Math.random(), home, base, stretch: 0, act: null });
+    if (!instant) this.fx.light(home.clone().setY(1.5), 0xffd070, 12, 0.5, 6);
+  }
+
+  private monsterPos(id: number): THREE.Vector3 | null {
+    const v = this.mons.get(id);
+    return v && v.dead < 0 ? v.body.position : null;
+  }
+
+  private updateParty(dt: number, game: Game) {
+    const targets = game.monsters.filter((m) => m.arrive <= 0);
+    const focus = targets[0];
+    const haste = 1 + this.fever;
+    for (const c of this.party) {
+      const def = COMPS[c.comp];
+      const p = c.body.position;
+      const a = c.act;
+      let moving = false;
+      if (!a) {
+        // Idle at home (walking back in if just hired), waiting for the next swing.
+        const d = c.home.clone().sub(p);
+        if (d.length() > 0.05) {
+          p.add(d.multiplyScalar(Math.min(1, dt * 3)));
+          moving = true;
+        }
+        c.cd -= dt * haste;
+        if (c.cd <= 0 && targets.length && game.dps() > 0) {
+          const t = Math.random() < 0.6 && focus ? focus : targets[Math.floor(Math.random() * targets.length)];
+          c.act = def.attack === 'slash' ? { kind: 'slash', phase: 'dash', t: 0, target: t.id } : { kind: def.attack, phase: 'windup', t: 0.14, target: t.id };
+        }
+      } else if (a.phase === 'windup') {
+        a.t -= dt * haste;
+        c.stretch = -1;
+        if (a.t <= 0) {
+          c.stretch = 1;
+          this.fire(c, a.kind, a.target);
+          this.endAct(c);
+        }
+      } else if (a.phase === 'dash') {
+        // Sprint up to the target and stop just in front of it.
+        let at = this.monsterPos(a.target);
+        if (!at && focus) {
+          a.target = focus.id;
+          at = this.monsterPos(focus.id);
+        }
+        if (!at) a.phase = 'back';
+        else {
+          const dest = at.clone().add(new THREE.Vector3(def.big ? -1.5 : -0.9, 0, 0.05));
+          const d = dest.sub(p);
+          const len = d.length();
+          const step = 15 * haste * dt;
+          if (len <= step) {
+            p.add(d);
+            a.phase = 'strike';
+            a.t = 0.18;
+            this.strike(c, a.target);
+          } else {
+            p.add(d.multiplyScalar(step / len));
+            c.sprite.flip = d.x < 0;
+            moving = true;
+            // Kick up dust as they run.
+            if (this.settings.particles && Math.random() < dt * 20) this.fx.burst(p.clone().setY(0.1), '#6a5a50', 1, 0.8, 0.06, 4);
+          }
+        }
+      } else if (a.phase === 'strike') {
+        a.t -= dt * haste;
+        if (a.t <= 0) a.phase = 'back';
+      } else if (a.phase === 'back') {
+        const d = c.home.clone().sub(p);
+        const len = d.length();
+        const step = 11 * haste * dt;
+        if (len <= step) {
+          p.copy(c.home);
+          c.sprite.flip = false;
+          this.endAct(c);
+        } else {
+          p.add(d.multiplyScalar(step / len));
+          c.sprite.flip = d.x < 0;
+          moving = true;
+        }
+      }
+      c.sprite.play(moving ? c.run : c.idle);
+      // Squash and stretch ease back to rest.
+      c.stretch += (0 - c.stretch) * Math.min(1, dt * (c.stretch < 0 ? 4 : 12));
+      const sx = 1 - c.stretch * 0.12;
+      const sy = 1 + c.stretch * 0.14;
+      c.inner.scale.set(c.base * sx, c.base * sy, c.base);
+      // Lean into the swing during a strike.
+      c.inner.rotation.z = a?.phase === 'strike' ? -0.25 : c.inner.rotation.z * 0.8;
+      c.sprite.update(dt);
+    }
+  }
+
+  private endAct(c: CompView) {
+    c.act = null;
+    c.cd = 0.8 + Math.random() * 0.9;
+  }
+
+  /** A melee companion's blow landing. */
+  private strike(c: CompView, id: number) {
+    const v = this.mons.get(id);
+    if (!v || v.dead >= 0) return;
+    const big = COMPS[c.comp].big;
+    const at = v.body.position.clone().setY(v.big ? 1.4 : 0.6);
+    c.stretch = 1;
+    this.fx.swipe(at, 0xfff0d8, big ? 1.5 : 0.95, Math.PI * (0.6 + Math.random() * 0.5));
+    this.fx.star(at.clone().setX(at.x - 0.2), 0xffffff, big ? 1.1 : 0.7);
+    this.react(v, big ? 0.6 : 0.3);
+    this.bleed(v, at, big ? 8 : 4, !!big);
+    if (big) {
+      this.fx.ring(v.body.position, 0xffd070, 2.2);
+      this.addShake(0.1);
+    }
+    if (this.settings.particles) this.fx.burst(at, '#ffffff', 4, 2.5, 0.06, 8, true);
+  }
+
+  /** A ranged companion lets loose. */
+  private fire(c: CompView, kind: Attack, id: number) {
+    const view = this.mons.get(id);
+    if (!view || view.dead >= 0) return;
+    const def = COMPS[c.comp];
+    const from = c.body.position.clone().add(new THREE.Vector3(0.35, def.big ? 1.6 : 0.95, 0.1));
+    const to = view.body.position.clone().setY(view.big ? 1.4 : 0.6);
+    this.fx.star(from, SHOT_COLOR[kind], 0.5, 0.12);
+    if (kind === 'bolt') {
+      // Staff crackles as the spell goes up.
+      if (this.settings.particles) this.fx.burst(from.clone().setY(from.y + 0.3), '#cfefff', 6, 2, 0.05, -2, true);
+      // Lightning is instant: straight to the impact.
+      this.impact({ mesh: new THREE.Object3D(), from, to, target: id, t: 1, dur: 0, arc: 0, kind });
+      return;
+    }
+    let mesh: THREE.Object3D;
+    if (kind === 'arrow') {
+      const s = new PixelSprite(this.atlas.texture, this.atlas.size, [this.atlas.rect('weapon_arrow')], { anchor: 'center' });
+      s.mesh.rotation.z = -Math.PI / 2;
+      mesh = new THREE.Group().add(s.mesh);
+    } else {
+      mesh = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(SHOT_COLOR[kind]).multiplyScalar(2.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+      mesh.scale.setScalar(kind === 'fire' ? 0.95 : kind === 'rune' ? 0.5 : 0.7);
+    }
+    mesh.position.copy(from);
+    this.scene.add(mesh);
+    const dist = from.distanceTo(to);
+    const speed = kind === 'arrow' ? 24 : kind === 'rune' ? 10 : 13;
+    this.shots.push({ mesh, from, to, target: id, t: 0, dur: dist / speed, arc: kind === 'arrow' ? 0.7 : kind === 'rune' ? 2.2 : 0.35, kind });
+  }
+
+  private updateShots(dt: number) {
+    for (let i = this.shots.length - 1; i >= 0; i--) {
+      const s = this.shots[i];
+      // Home in on the target if it's still standing.
+      const v = this.mons.get(s.target);
+      if (v && v.dead < 0) s.to.set(v.body.position.x, v.big ? 1.4 : 0.6, v.body.position.z);
+      s.t += dt / s.dur;
+      const t = Math.min(1, s.t);
+      s.mesh.position.lerpVectors(s.from, s.to, t);
+      s.mesh.position.y += Math.sin(t * Math.PI) * s.arc;
+      if (s.kind === 'dark') {
+        // Dark orbs corkscrew in.
+        const r = 0.35 * (1 - t);
+        s.mesh.position.y += Math.sin(t * Math.PI * 5) * r;
+        s.mesh.position.z += Math.cos(t * Math.PI * 5) * r;
+      }
+      if (s.kind === 'arrow') s.mesh.rotation.z = Math.atan2(Math.cos(t * Math.PI) * s.arc * Math.PI, s.from.distanceTo(s.to));
+      if (this.settings.particles) {
+        if (s.kind === 'fire' && Math.random() < 0.7) this.fx.burst(s.mesh.position.clone(), '#ff8a3a', 1, 0.8, 0.07, -1, true);
+        else if (s.kind === 'dark' && Math.random() < 0.5) this.fx.burst(s.mesh.position.clone(), '#b46aff', 1, 0.4, 0.05, 0, true);
+        else if (s.kind === 'arrow' && Math.random() < 0.5) this.fx.burst(s.mesh.position.clone(), '#fff2d0', 1, 0.2, 0.035, 0, true);
+      }
+      if (t >= 1) {
+        this.impact(s);
+        this.scene.remove(s.mesh);
+        s.mesh.traverse((o) => {
+          if (o instanceof THREE.Sprite) o.material.dispose();
+        });
+        this.shots.splice(i, 1);
+      }
+    }
+  }
+
+  private impact(s: Shot) {
+    const v = this.mons.get(s.target);
+    const at = s.to.clone();
+    if (v && v.dead < 0) {
+      this.react(v, s.kind === 'fire' ? 0.35 : 0.2);
+      if (s.kind === 'arrow' || s.kind === 'dark') this.bleed(v, at, 2, false);
+    }
+    const col = SHOT_COLOR[s.kind];
+    const parts = this.settings.particles;
+    switch (s.kind) {
+      case 'bolt':
+        // Called down from above onto the target, not zapped across the room.
+        this.fx.lightning(at, col);
+        this.addShake(0.04);
+        break;
+      case 'fire':
+        this.fx.star(at, 0xffc070, 1.1);
+        this.fx.ring(at.clone().setY(0), 0xff8a3a, 1.6, 0.3);
+        this.fx.light(at, 0xff8a3a, 14, 0.2, 6);
+        if (parts) this.fx.burst(at, '#ff8a3a', 14, 3.5, 0.07, 6, true);
+        break;
+      case 'dark':
+        this.fx.aura(at, col, 0.7, 0.3);
+        if (parts) this.fx.burst(at, '#b46aff', 8, 2.5, 0.06, 2, true);
+        break;
+      case 'rune':
+        this.fx.ring(at.clone().setY(0), col, 1.8, 0.45);
+        this.fx.pillar(at.clone().setY(0), col, 2.6, 0.4);
+        if (parts) this.fx.burst(at.clone().setY(0.2), '#7dffb0', 10, 3, 0.06, 6, true);
+        break;
+      default:
+        this.fx.star(at, 0xffffff, 0.6);
+        if (parts) this.fx.burst(at, hex(col), 4, 2, 0.05, 8, true);
+    }
+  }
+
+  /** Droplets spraying away from the blow, and sometimes a drip on the floor. */
+  private bleed(v: MonView, at: THREE.Vector3, n: number, heavy: boolean) {
+    if (!this.settings.blood) return;
+    // Thrown away from the party (to the right), landing as little stains.
+    this.fx.spray(at.clone().setX(at.x + 0.2), v.blood, n, 1, heavy ? 1.3 : 1);
+  }
+
+  /** Visible reaction to being hit: white flash, squash, knocked back, a little hop. */
+  private react(v: MonView, force: number) {
+    v.flash = Math.max(v.flash, 0.35 + force);
+    v.squash = Math.max(v.squash, force * 1.4);
+    v.knock = Math.max(v.knock, force * (v.boss ? 0.4 : 0.9));
+    if (!v.boss && v.hopY <= 0.001) v.hopV = 2 + force * 4;
+  }
+
+  // ---------- monsters ----------
+
+  private addMonster(m: Monster) {
+    const { idle, run } = this.atlas.creature(m.def.sprite);
+    const sprite = new PixelSprite(this.atlas.texture, this.atlas.size, run, { fps: 9, flip: true });
+    const body = new THREE.Group();
+    const inner = new THREE.Group();
+    inner.add(sprite.mesh);
+    body.add(inner, blobShadow(m.boss ? 2.2 : 0.9));
+    body.position.copy(STAIRS).add(new THREE.Vector3(Math.random() * 0.6, 0, Math.random() * 0.6));
+    body.scale.setScalar(0.01);
+    this.scene.add(body);
+    this.mons.set(m.id, { id: m.id, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x, 0, m.z), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0 });
+    if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(0.4), '#6a5a78', 6, 2, 0.08, 6);
+    if (m.boss) {
+      this.fx.light(STAIRS.clone().setY(2), 0xff4040, 30, 1, 12);
+      this.addShake(0.3);
+    }
+  }
+
+  private removeView(v: MonView) {
+    this.scene.remove(v.body);
+    v.sprite.dispose();
+    this.mons.delete(v.id);
+  }
+
+  private updateMonsters(dt: number, game: Game) {
+    const alive = new Set(game.monsters.map((m) => m.id));
+    for (const m of game.monsters) if (!this.mons.has(m.id)) this.addMonster(m);
+    for (const v of [...this.mons.values()]) {
+      if (v.dead >= 0) {
+        // Already shattered into pixels; keep the (hidden) view a moment so the UI can place gold on it.
+        v.dead += dt;
+        if (v.dead > 0.2) this.removeView(v);
+        continue;
+      }
+      if (!alive.has(v.id)) {
+        // Gone without dying (floor change): vanish in a puff.
+        if (this.settings.particles) this.fx.burst(v.body.position.clone().setY(0.5), '#6a5a78', 8, 2, 0.08, 6);
+        this.removeView(v);
+        continue;
+      }
+      v.born = Math.min(1, v.born + dt * 3);
+      v.body.scale.setScalar(v.born < 1 ? v.born * (1 + Math.sin(v.born * Math.PI) * 0.3) : 1);
+      const p = v.body.position;
+      const d = v.target.clone().sub(p).setY(0);
+      const len = d.length();
+      if (len > 0.05) {
+        p.add(d.multiplyScalar(Math.min(1, (v.boss ? 2.5 : 6) * dt / len)));
+        v.sprite.play(v.run);
+      } else v.sprite.play(v.idle);
+      v.flash = Math.max(0, v.flash - dt * 9);
+      v.squash = Math.max(0, v.squash - dt * 4);
+      v.knock = Math.max(0, v.knock - dt * 2.5);
+      v.hopV -= 30 * dt;
+      v.hopY = Math.max(0, v.hopY + v.hopV * dt);
+      if (v.hopY === 0) v.hopV = 0;
+      v.sprite.flash = v.flash;
+      const base = v.boss ? 1.7 : 1.2;
+      v.inner.scale.set(base * (1 + v.squash * 0.25), base * (1 - v.squash * 0.3), base);
+      v.inner.position.x = v.knock;
+      v.inner.position.y = v.hopY;
+      v.sprite.update(dt);
+    }
+  }
+
+  // ---------- treasure goblin ----------
+
+  private spawnRaider(id: number, from: -1 | 1) {
+    const { run } = this.atlas.creature('goblin');
+    const s = new PixelSprite(this.atlas.texture, this.atlas.size, run, { fps: 14 });
+    s.flip = from > 0;
+    s.mesh.material.emissive.setRGB(0.3, 0.22, 0);
+    const group = new THREE.Group();
+    const inner = new THREE.Group();
+    inner.scale.setScalar(1.5);
+    inner.add(s.mesh);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color(2, 1.6, 0.6), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.03;
+    const light = new THREE.PointLight(0xffd070, 10, 6, 1.5);
+    light.position.set(0, 1.4, 0.8);
+    group.add(inner, ring, light, blobShadow(0.9));
+    group.position.set(from * -14, 0, 4);
+    this.scene.add(group);
+    this.raider = { id, group, sprite: s, from, light, state: 'run', t: 0, sparkle: 0 };
+  }
+
+  private updateRaiders(dt: number, game: Game) {
+    const r = this.raider;
+    if (r && game.raid && game.raid.id === r.id) {
+      const t = game.raid.t;
+      // Zig-zags across the front of the chamber, taunting you.
+      r.group.position.x = r.from * -14 + r.from * 28 * t;
+      r.group.position.y = Math.abs(Math.sin(this.time * 10)) * 0.2;
+      r.group.position.z = 3.6 + Math.sin(t * Math.PI * 4) * 0.8;
+      r.light.intensity = 9 + Math.sin(this.time * 10) * 3;
+      r.sprite.update(dt);
+      r.sparkle -= dt;
+      if (r.sparkle <= 0 && this.settings.particles) {
+        r.sparkle = 0.1;
+        this.fx.burst(r.group.position.clone().setY(1.2), '#ffd070', 2, 1.2, 0.06, 1, true);
+      }
+    }
+    for (let i = this.leaving.length - 1; i >= 0; i--) {
+      const l = this.leaving[i];
+      l.t += dt;
+      if (l.state === 'caught') {
+        l.group.position.y += dt * (3 - l.t * 8);
+        l.group.rotation.z += dt * 9 * l.from;
+      } else {
+        l.group.position.x += l.from * dt * 8;
+        l.sprite.update(dt);
+      }
+      const fade = Math.max(0, 1 - l.t / 0.8);
+      l.group.traverse((o) => {
+        if (o instanceof THREE.Mesh && o.material instanceof THREE.Material) {
+          o.material.transparent = true;
+          o.material.opacity = Math.min(o.material.opacity, fade);
+        }
+      });
+      l.light.intensity *= 0.9;
+      if (l.t > 0.8) {
+        this.scene.remove(l.group);
+        l.sprite.dispose();
+        this.leaving.splice(i, 1);
+      }
+    }
+    for (let i = this.chests.length - 1; i >= 0; i--) {
+      const c = this.chests[i];
+      c.life -= dt;
+      if (!c.opened && c.life < 2.4) {
+        c.opened = true;
+        c.sprite.play(this.atlas.anim('chest_full_open'), 10, false);
+        const at = c.group.position.clone();
+        if (this.settings.particles) this.fx.burst(at.clone().setY(0.7), '#ffd070', 34, 5.5, 0.09, 9, true);
+        this.fx.beam(at.x, at.z, '#ffd070', 4);
+        this.fx.light(at.clone().setY(1.5), 0xffd070, 30, 0.6, 9);
+      }
+      c.sprite.update(dt);
+      if (c.life < 0.5) {
+        c.sprite.mesh.material.transparent = true;
+        c.sprite.mesh.material.opacity = c.life / 0.5;
+      }
+      if (c.life <= 0) {
+        this.scene.remove(c.group);
+        c.sprite.dispose();
+        this.chests.splice(i, 1);
+      }
+    }
+  }
+
+  raiderScreen(): { x: number; y: number } | null {
+    const r = this.raider;
+    return r ? this.toScreen(r.group.position.clone().setY(2.6)) : null;
+  }
+
+  hitRaider(x: number, y: number): boolean {
+    const r = this.raider;
+    if (!r) return false;
+    const c = this.toScreen(r.group.position.clone().setY(0.9));
+    const e = this.toScreen(r.group.position.clone().setY(2));
+    return Math.hypot(x - c.x, y - c.y) < Math.max(48, Math.abs(c.y - e.y) * 1.4);
+  }
+
+  // ---------- picking and screen positions ----------
+
+  private toScreen(v: THREE.Vector3) {
+    const p = v.clone().project(this.camera);
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return { x: rect.left + (p.x * 0.5 + 0.5) * rect.width, y: rect.top + (-p.y * 0.5 + 0.5) * rect.height };
+  }
+
+  /** Screen position of a monster's head (for numbers and health bars), and its on-screen height. */
+  screenOf(id: number): { x: number; y: number; h: number } | null {
+    const v = this.mons.get(id);
+    if (!v) return null;
+    const height = v.boss ? 3.5 : v.big ? 2.1 : 1.45;
+    const foot = this.toScreen(v.body.position);
+    const head = this.toScreen(v.body.position.clone().setY(height));
+    return { x: head.x, y: head.y, h: foot.y - head.y };
+  }
+
+  /** The living monster nearest the pointer, so every click lands on something. */
+  pick(x: number, y: number): number | null {
+    let best: number | null = null;
+    let bestD = Infinity;
+    for (const v of this.mons.values()) {
+      if (v.dead >= 0 || v.born < 0.5) continue;
+      const s = this.screenOf(v.id)!;
+      const cy = s.y + s.h * 0.5;
+      const dx = Math.max(0, Math.abs(x - s.x) - s.h * 0.35);
+      const dy = Math.max(0, Math.abs(y - cy) - s.h * 0.55);
+      const d = Math.hypot(dx, dy);
+      if (d < bestD) {
+        bestD = d;
+        best = v.id;
+      }
+    }
+    return best;
+  }
+
+  /** Is the pointer right on top of a monster? (for the cursor) */
+  overMonster(x: number, y: number) {
+    for (const v of this.mons.values()) {
+      if (v.dead >= 0) continue;
+      const s = this.screenOf(v.id)!;
+      if (Math.abs(x - s.x) < s.h * 0.45 && y > s.y - 6 && y < s.y + s.h + 6) return true;
+    }
+    return false;
+  }
+
+  // ---------- events ----------
+
+  handle(ev: GameEvent, game: Game) {
+    switch (ev.t) {
+      case 'hit': {
+        const v = this.mons.get(ev.id);
+        if (!v || v.dead >= 0 || ev.kind === 'dps') break;
+        const at = v.body.position.clone().setY(v.boss ? 1.7 : 0.7);
+        const parts = this.settings.particles;
+        if (ev.kind === 'cleave') {
+          this.fx.swipe(at, 0xffd0c0, v.boss ? 1.2 : 0.6);
+          this.react(v, 0.15);
+          break;
+        }
+        if (ev.kind === 'auto') {
+          // Phantom Blade: a ghostly blue cut.
+          this.fx.swipe(at, 0x9fd8ff, v.boss ? 1.3 : 0.75);
+          this.react(v, 0.15);
+          break;
+        }
+        const crit = ev.kind === 'crit';
+        const color = crit ? 0xffd070 : ev.kind === 'fever' ? 0xff7a9a : 0xfff0d8;
+        const size = (v.boss ? 1.8 : 1) * (crit ? 1.45 : 1);
+        const angle = Math.random() * Math.PI * 2;
+        this.fx.swipe(at, color, size, angle);
+        if (crit) {
+          // Crossed double cut, a burst ring and a moment of slow motion.
+          this.fx.swipe(at, color, size * 1.05, angle + Math.PI / 2, 0.2);
+          this.fx.star(at, 0xffffff, 1.8, 0.2);
+          this.fx.ring(v.body.position, 0xffd070, v.boss ? 4 : 2.6, 0.35);
+          this.fx.light(at, 0xffd070, 25, 0.25, 8);
+          this.addShake(0.15);
+          this.hitstop = Math.max(this.hitstop, 0.05);
+        } else this.fx.star(at, 0xffffff, 0.8);
+        if (parts) {
+          if (crit) this.fx.burst(at, '#ffd070', 12, 5, 0.06, 9, true);
+          this.bleed(v, at, crit ? 10 : 4, crit);
+        }
+        this.react(v, crit ? 0.8 : 0.45);
+        break;
+      }
+      case 'kill': {
+        const v = this.mons.get(ev.id);
+        if (!v || v.dead >= 0) break;
+        v.dead = 0;
+        v.body.visible = false;
+        const scale = v.boss ? 1.7 : 1.2;
+        const unit = scale / 16;
+        const r = v.sprite.rect;
+        const origin = v.body.position.clone().add(new THREE.Vector3(v.knock, v.hopY, 0.05));
+        // The monster bursts into its own pixels.
+        this.fx.shatter(origin, this.atlas.pixels(r, v.boss ? 1 : 1), r, unit, v.sprite.flip, 1, v.boss ? 1.4 : 1);
+        const at = origin.clone().setY(v.boss ? 1.4 : 0.6);
+        this.fx.star(at, 0xffffff, v.boss ? 2.5 : 1.1, 0.18);
+        if (this.settings.particles) {
+          this.fx.burst(at, '#ffd070', v.boss ? 30 : 5, v.boss ? 6 : 3, 0.06, 12, true);
+        }
+        if (this.settings.blood) {
+          this.fx.spray(at, v.blood, v.boss ? 30 : 10, 1, v.boss ? 1.5 : 1.1);
+          if (v.blood !== BONE) this.fx.bloodSplat(v.body.position.clone().setX(v.body.position.x + 0.25), v.blood, v.boss ? 2.2 : 1);
+        }
+        if (ev.boss) {
+          this.fx.shockwave(v.body.position.clone(), 8);
+          this.fx.pillar(v.body.position.clone(), 0xffd070, 10, 1.4);
+          this.fx.light(at, 0xffd070, 40, 0.8, 14);
+          this.addShake(0.45);
+          this.hitstop = 0.18;
+        }
+        break;
+      }
+      case 'floor':
+        this.setBand(Math.floor((ev.floor - 1) / 10));
+        break;
+      case 'bossFail':
+      case 'retreat':
+        this.addShake(0.2);
+        break;
+      case 'buyComp':
+        this.syncParty(game);
+        break;
+      case 'raidSpawn':
+        this.spawnRaider(ev.id, ev.from);
+        break;
+      case 'raidCatch': {
+        const r = this.raider;
+        if (!r) break;
+        this.raider = null;
+        r.state = 'caught';
+        r.t = 0;
+        this.leaving.push(r);
+        const at = r.group.position.clone();
+        if (this.settings.particles) this.fx.burst(at.clone().setY(1), '#ffffff', 22, 5, 0.09, 10, true);
+        this.fx.light(at.clone().setY(1.2), 0xffd070, 25, 0.4, 8);
+        this.addShake(0.15);
+        const s = new PixelSprite(this.atlas.texture, this.atlas.size, [this.atlas.anim('chest_full_open')[0]], { fps: 10 });
+        const g = new THREE.Group();
+        g.scale.setScalar(1.6);
+        g.add(s.mesh);
+        g.position.set(at.x, 0, at.z);
+        this.scene.add(g);
+        this.chests.push({ group: g, sprite: s, life: 3, opened: false });
+        break;
+      }
+      case 'raidEscape': {
+        const r = this.raider;
+        if (!r) break;
+        this.raider = null;
+        r.state = 'escape';
+        r.t = 0;
+        this.leaving.push(r);
+        break;
+      }
+      case 'fever':
+        if (ev.on) {
+          this.fx.shockwave(new THREE.Vector3(3, 0, 0), 10);
+          this.addShake(0.3);
+          for (const c of this.party) this.fx.aura(c.body.position.clone().setY(0.9), 0xff4060, 1, 0.6);
+        }
+        break;
+      case 'descend':
+        for (const v of [...this.mons.values()]) this.removeView(v);
+        break;
+    }
+  }
+
+  /** Rebuild everything from the game state (after loading or descending). */
+  rebuild(game: Game) {
+    for (const c of this.party) {
+      this.scene.remove(c.body);
+      c.sprite.dispose();
+    }
+    this.party = [];
+    this.syncParty(game, true);
+    this.setBand(Math.floor((game.s.floor - 1) / 10));
+  }
+
+  private addShake(v: number) {
+    if (this.settings.shake) this.shake = Math.max(this.shake, v);
+  }
+
+  /** Hit-stop requested by big impacts (the main loop slows time briefly). */
+  takeHitstop() {
+    const h = this.hitstop;
+    this.hitstop = 0;
+    return h;
+  }
+
+  // ---------- frame ----------
+
+  update(dt: number, game: Game) {
+    this.time += dt;
+    const fever = game.s.buffs.some((b) => b.id === 'fever');
+    this.fever += ((fever ? 1 : 0) - this.fever) * Math.min(1, dt * 4);
+
+    this.flames.forEach((f, i) => {
+      const fl = 0.85 + Math.sin(this.time * 13 + i * 2) * 0.08 + Math.sin(this.time * 7.3 + i) * 0.07;
+      f.scale.set(1, fl, 1);
+      this.torchLights[i].intensity = 6 * fl * (1 + this.fever * 0.5);
+    });
+
+    this.updateMonsters(dt, game);
+    this.updateParty(dt, game);
+    this.updateShots(dt);
+    this.updateRaiders(dt, game);
+    this.fx.update(dt);
+
+    const buffed = game.s.buffs.some((b) => b.id !== 'fever');
+    this.bloom.strength = 0.42 + this.fever * 0.3 + (buffed ? 0.12 : 0);
+    this.grade.uniforms.warmth.value = 0.06 + this.fever * 0.08;
+    this.grade.uniforms.vignette.value = 0.55 + this.fever * 0.25;
+
+    this.shake = Math.max(0, this.shake - dt * 1.6);
+    const sh = this.shake * this.shake * 2.2;
+    this.camera.position.set(this.camBase.x + (Math.random() - 0.5) * sh, this.camBase.y + (Math.random() - 0.5) * sh, this.camBase.z);
+    this.camera.lookAt(LOOK);
+    this.composer.render(dt);
+  }
+}

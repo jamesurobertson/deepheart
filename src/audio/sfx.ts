@@ -60,6 +60,12 @@ export class Sfx {
     };
     addEventListener('pointerdown', unlock);
     addEventListener('keydown', unlock);
+    // Go quiet while the tab is in the background; pick the music back up on return.
+    document.addEventListener('visibilitychange', () => {
+      if (!this.ctx) return;
+      if (document.hidden) this.ctx.suspend().catch(() => {});
+      else this.ctx.resume().catch(() => {});
+    });
   }
 
   get muted() {

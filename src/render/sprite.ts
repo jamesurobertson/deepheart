@@ -47,6 +47,11 @@ export class PixelSprite {
     this.show(this.loop ? ((f % n) + n) % n : Math.max(0, Math.min(f, n - 1)));
   }
 
+  /** The frame on screen right now (for effects that copy the sprite's pixels). */
+  get rect(): Rect {
+    return this.frames[Math.max(0, this.frame)];
+  }
+
   get done() {
     return !this.loop && Math.floor(this.t * this.fps) >= this.frames.length - 1;
   }

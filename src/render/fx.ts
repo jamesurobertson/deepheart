@@ -52,7 +52,211 @@ interface Wave {
   grow: number;
 }
 
+interface Swipe {
+  mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  life: number;
+  max: number;
+  from: number;
+  sweep: number;
+}
+
+interface Shard {
+  mesh: THREE.InstancedMesh;
+  pos: Float32Array;
+  vel: Float32Array;
+  spin: Float32Array;
+  size: number;
+  life: number;
+}
+
+interface Spray {
+  mesh: THREE.InstancedMesh<THREE.BoxGeometry, THREE.MeshLambertMaterial>;
+  pos: Float32Array;
+  vel: Float32Array;
+  size: Float32Array;
+  landed: Uint8Array;
+  life: number;
+}
+
+interface Stain {
+  mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshLambertMaterial>;
+  life: number;
+  max: number;
+}
+
+interface Strike {
+  group: THREE.Group;
+  target: THREE.Vector3;
+  color: THREE.Color;
+  height: number;
+  life: number;
+  max: number;
+  /** Time until the bolt re-forks (it flickers between shapes). */
+  next: number;
+}
+
 const CUBE = new THREE.BoxGeometry(1, 1, 1);
+/** Snap to the sprite pixel grid so bolts look drawn, not vector. */
+const snap = (v: number) => Math.round(v * 16) / 16;
+
+/** A jagged path from `a` to `b`: mostly vertical steps with sideways kinks. */
+function jag(a: THREE.Vector3, b: THREE.Vector3, steps: number, spread: number): THREE.Vector3[] {
+  const pts = [a.clone()];
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const p = a.clone().lerp(b, t);
+    p.x += (Math.random() - 0.5) * spread * Math.sin(t * Math.PI);
+    pts.push(new THREE.Vector3(snap(p.x), snap(p.y), p.z));
+  }
+  pts.push(b.clone());
+  return pts;
+}
+
+/**
+ * Flat ribbon of quads along a polyline (facing the camera), `w` wide. Vertex colours
+ * fade from full at `bottom` to black `fade` units above it (invisible, since it's additive).
+ */
+function ribbon(pts: THREE.Vector3[], w: number, bottom: number, fade: number): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const col: number[] = [];
+  const shade = (y: number) => Math.max(0, Math.min(1, 1 - (y - bottom) / fade)) ** 1.5;
+  const idx: number[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // Perpendicular in screen plane, plus a little overlap so joints don't gap.
+    const nx = (-dy / len) * w / 2;
+    const ny = (dx / len) * w / 2;
+    const ox = (dx / len) * w * 0.3;
+    const oy = (dy / len) * w * 0.3;
+    const base = pos.length / 3;
+    pos.push(a.x - nx - ox, a.y - ny - oy, a.z, a.x + nx - ox, a.y + ny - oy, a.z, b.x + nx + ox, b.y + ny + oy, b.z, b.x - nx + ox, b.y - ny + oy, b.z);
+    const ka = shade(a.y);
+    const kb = shade(b.y);
+    col.push(ka, ka, ka, ka, ka, ka, kb, kb, kb, kb, kb, kb);
+    idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  return g;
+}
+const MAX_SHATTERS = 10;
+const MAX_SPRAYS = 40;
+const MAX_STAINS = 50;
+const SPRAY_LIFE = 4;
+const STAIN_LIFE = 9;
+
+/**
+ * Pixel-art splat shapes, drawn once: a lumpy core, a few satellite droplets and a
+ * couple of streaks, in two tones (tinted per monster by the material colour).
+ */
+const SPLATS: THREE.Texture[] = (() => {
+  const out: THREE.Texture[] = [];
+  for (let v = 0; v < 6; v++) {
+    const n = 20;
+    const c = document.createElement('canvas');
+    c.width = c.height = n;
+    const g = c.getContext('2d')!;
+    let seed = v * 7919 + 17;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const cells = new Map<string, number>();
+    const put = (x: number, y: number, tone: number) => {
+      if (x < 0 || y < 0 || x >= n || y >= n) return;
+      const k = `${x},${y}`;
+      cells.set(k, Math.max(cells.get(k) ?? 0, tone));
+    };
+    // Core: a few overlapping rough discs.
+    for (let b = 0; b < 4; b++) {
+      const cx = 10 + (rnd() - 0.5) * 5;
+      const cy = 10 + (rnd() - 0.5) * 4;
+      const r = 2.2 + rnd() * 2.2;
+      for (let y = -5; y <= 5; y++) for (let x = -5; x <= 5; x++) {
+        if (x * x + y * y * 1.3 <= r * r + rnd() * 2) put(Math.round(cx + x), Math.round(cy + y), 1);
+      }
+    }
+    // Satellite droplets and streaks flung outward.
+    for (let d = 0; d < 7; d++) {
+      const a = rnd() * Math.PI * 2;
+      const dist = 5 + rnd() * 4;
+      const x = Math.round(10 + Math.cos(a) * dist);
+      const y = Math.round(10 + Math.sin(a) * dist * 0.8);
+      put(x, y, 1);
+      if (rnd() < 0.5) put(x + 1, y, 1);
+      if (rnd() < 0.4) for (let t = 1; t < 3; t++) put(Math.round(10 + Math.cos(a) * (dist - t)), Math.round(10 + Math.sin(a) * (dist - t) * 0.8), 1);
+    }
+    // Wet highlights inside the core.
+    for (const [k] of cells) {
+      const [x, y] = k.split(',').map(Number);
+      if (Math.hypot(x - 10, y - 10) < 3 && rnd() < 0.35) cells.set(k, 2);
+    }
+    for (const [k, tone] of cells) {
+      const [x, y] = k.split(',').map(Number);
+      g.fillStyle = tone === 2 ? '#ffffff' : '#c4c4c4';
+      g.fillRect(x, y, 1, 1);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.generateMipmaps = false;
+    out.push(t);
+  }
+  return out;
+})();
+const SPLAT_GEO = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+
+/** A crescent whose colour runs from dark (tail) to bright (head): additive, so the tail vanishes. */
+function crescent(size: number, arc: number): THREE.BufferGeometry {
+  const n = 22;
+  const pos: number[] = [];
+  const col: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const a = t * arc;
+    const thick = size * 0.38 * (0.15 + 0.85 * Math.sin(Math.PI * Math.min(1, t * 1.1)));
+    const r1 = size;
+    const r0 = size - thick;
+    pos.push(Math.cos(a) * r0, Math.sin(a) * r0, 0, Math.cos(a) * r1, Math.sin(a) * r1, 0);
+    const k = t ** 1.6;
+    col.push(k, k, k, k, k, k);
+    if (i < n) {
+      const b = i * 2;
+      idx.push(b, b + 1, b + 3, b, b + 3, b + 2);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  return g;
+}
+
+const STAR = (() => {
+  const g = new THREE.PlaneGeometry(1, 0.14);
+  const h = g.clone().rotateZ(Math.PI / 2);
+  const d1 = new THREE.PlaneGeometry(0.55, 0.1).rotateZ(Math.PI / 4);
+  const d2 = d1.clone().rotateZ(Math.PI / 2);
+  const merged = new THREE.BufferGeometry();
+  const parts = [g, h, d1, d2];
+  const pos: number[] = [];
+  const idx: number[] = [];
+  let base = 0;
+  for (const p of parts) {
+    const a = p.attributes.position.array;
+    for (let i = 0; i < a.length; i++) pos.push(a[i]);
+    const ix = p.index!.array;
+    for (let i = 0; i < ix.length; i++) idx.push(ix[i] + base);
+    base += a.length / 3;
+  }
+  merged.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  merged.setIndex(idx);
+  return merged;
+})();
 const dummy = new THREE.Object3D();
 
 /** Short-lived world effects: chunky pixel bursts, loot beams, lightning. */
@@ -65,6 +269,12 @@ export class Fx {
   private fallers: Faller[] = [];
   private flashes: Flash[] = [];
   private decals: Decal[] = [];
+  private swipes: Swipe[] = [];
+  private stars: Wave[] = [];
+  private shards: Shard[] = [];
+  private strikes: Strike[] = [];
+  private sprays: Spray[] = [];
+  private stains: Stain[] = [];
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -100,6 +310,67 @@ export class Fx {
     this.decals.push({ mesh, life: dur, max: dur });
   }
 
+  /**
+   * Blood (or ooze, or bone chips): chunky pixel droplets thrown away from a blow along
+   * `dirX`. They arc down, land, flatten into little stains on the floor and fade later.
+   */
+  spray(at: THREE.Vector3, color: THREE.ColorRepresentation, n: number, dirX = 1, power = 1) {
+    while (this.sprays.length >= MAX_SPRAYS) this.dropSpray(0);
+    const mesh = new THREE.InstancedMesh(CUBE, new THREE.MeshLambertMaterial({ color, transparent: true }), n);
+    const pos = new Float32Array(n * 3);
+    const vel = new Float32Array(n * 3);
+    const size = new Float32Array(n);
+    const shade = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      pos[i * 3] = at.x + (Math.random() - 0.5) * 0.15;
+      pos[i * 3 + 1] = at.y + (Math.random() - 0.5) * 0.15;
+      pos[i * 3 + 2] = at.z + (Math.random() - 0.5) * 0.15;
+      vel[i * 3] = dirX * (1 + Math.random() * 3) * power + (Math.random() - 0.5) * 1.2;
+      vel[i * 3 + 1] = (0.8 + Math.random() * 2.8) * power;
+      vel[i * 3 + 2] = (Math.random() - 0.5) * 2;
+      // Pixel-sized: one or two sprite pixels across.
+      size[i] = (Math.random() < 0.7 ? 1 : 2) / 16 * 1.2;
+      // A little tonal variety so it doesn't read as flat paint.
+      mesh.setColorAt(i, shade.setScalar(0.75 + Math.random() * 0.35));
+    }
+    mesh.instanceColor!.needsUpdate = true;
+    mesh.frustumCulled = false;
+    this.scene.add(mesh);
+    this.sprays.push({ mesh, pos, vel, size, landed: new Uint8Array(n), life: SPRAY_LIFE });
+  }
+
+  /** A pixel-art splat on the floor, tinted `color`, that fades out slowly. */
+  bloodSplat(at: THREE.Vector3, color: THREE.ColorRepresentation, size = 0.9) {
+    while (this.stains.length >= MAX_STAINS) this.dropStain(0);
+    const mesh = new THREE.Mesh(SPLAT_GEO, new THREE.MeshLambertMaterial({
+      map: SPLATS[Math.floor(Math.random() * SPLATS.length)], color, transparent: true, depthWrite: false, alphaTest: 0.1,
+      polygonOffset: true, polygonOffsetFactor: -2,
+    }));
+    // Snap to the floor's pixel grid so it sits in the tiles like it belongs there.
+    const px = size / 20;
+    mesh.position.set(Math.round(at.x / px) * px, 0.011 + Math.random() * 0.002, Math.round(at.z / px) * px);
+    mesh.rotation.y = Math.floor(Math.random() * 4) * (Math.PI / 2);
+    mesh.scale.set(size, 1, size);
+    mesh.renderOrder = 1;
+    this.scene.add(mesh);
+    this.stains.push({ mesh, life: STAIN_LIFE, max: STAIN_LIFE });
+  }
+
+  private dropSpray(i: number) {
+    const s = this.sprays[i];
+    this.scene.remove(s.mesh);
+    s.mesh.material.dispose();
+    s.mesh.dispose();
+    this.sprays.splice(i, 1);
+  }
+
+  private dropStain(i: number) {
+    const s = this.stains[i];
+    this.scene.remove(s.mesh);
+    s.mesh.material.dispose();
+    this.stains.splice(i, 1);
+  }
+
   /** Column of light (level-ups, awakenings). */
   pillar(at: THREE.Vector3, color: THREE.ColorRepresentation, height = 6, dur = 0.9) {
     const mesh = new THREE.Mesh(
@@ -123,6 +394,140 @@ export class Fx {
       this.scene.add(mesh);
       this.waves.push({ mesh, life: 0.22, max: 0.22, grow: 0.25 });
     }
+  }
+
+  /**
+   * A sword swipe: a bright crescent that sweeps through `at`, head leading, tail fading.
+   * `angle` is where the sweep starts (radians); crits pass `size` bigger.
+   */
+  swipe(at: THREE.Vector3, color: THREE.ColorRepresentation, size = 1.1, angle = Math.random() * Math.PI * 2, dur = 0.16) {
+    const arc = 2.3;
+    const mesh = new THREE.Mesh(
+      crescent(size, arc),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2.2), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    mesh.position.copy(at);
+    mesh.position.z += 0.5;
+    // Centre the arc on the target: rotate so the middle of the swing passes through it.
+    mesh.rotation.z = angle - arc / 2;
+    mesh.renderOrder = 5;
+    this.scene.add(mesh);
+    this.swipes.push({ mesh, life: dur, max: dur, from: mesh.rotation.z - 0.9, sweep: 1.3 });
+  }
+
+  /**
+   * Lightning striking down onto `target` from above: a pixel-jagged bolt with a white
+   * core and a coloured glow, a couple of branches, flickering between shapes, plus a
+   * flash of light and a scorch ring where it lands.
+   */
+  lightning(target: THREE.Vector3, color: THREE.ColorRepresentation = 0x9fe6ff, height = 5, dur = 0.24) {
+    const group = new THREE.Group();
+    this.scene.add(group);
+    const strike: Strike = { group, target: target.clone(), color: new THREE.Color(color), height, life: dur, max: dur, next: 0 };
+    this.forkStrike(strike);
+    this.strikes.push(strike);
+    this.light(target.clone().setY(target.y + 1), color, 30, dur + 0.1, 9);
+    this.ring(target.clone().setY(0), color, 1.6, 0.3);
+    this.star(target, 0xffffff, 1.3, 0.16);
+    this.burst(target, '#cfefff', 10, 3.5, 0.06, 6, true);
+  }
+
+  /** (Re)build the bolt's shape: called a few times per strike so it crackles. */
+  private forkStrike(s: Strike) {
+    for (const c of [...s.group.children]) {
+      s.group.remove(c);
+      const m = c as THREE.Mesh;
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    }
+    const end = s.target.clone().setZ(s.target.z + 0.35);
+    const top = end.clone().add(new THREE.Vector3((Math.random() - 0.5) * 1.6, s.height, 0));
+    const main = jag(top, end, 9, 1.1);
+    const paths = [main];
+    // Two short branches peeling off the main bolt.
+    for (let b = 0; b < 2; b++) {
+      const from = main[2 + Math.floor(Math.random() * 5)];
+      const to = from.clone().add(new THREE.Vector3((Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.8), -(0.8 + Math.random() * 1.2), 0));
+      paths.push(jag(from, to, 4, 0.5));
+    }
+    paths.forEach((pts, i) => {
+      const w = i === 0 ? 1 : 0.6;
+      const bottom = s.target.y;
+      const fade = s.height * 0.95;
+      const glow = new THREE.Mesh(ribbon(pts, 0.34 * w, bottom, fade), new THREE.MeshBasicMaterial({ vertexColors: true, color: s.color.clone().multiplyScalar(1.2), transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      const core = new THREE.Mesh(ribbon(pts, 0.1 * w, bottom, fade), new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(2.6, 2.6, 2.8), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      glow.renderOrder = 6;
+      core.renderOrder = 7;
+      s.group.add(glow, core);
+    });
+    s.next = 0.06;
+  }
+
+  /** A four-point twinkle at an impact point. */
+  star(at: THREE.Vector3, color: THREE.ColorRepresentation, size = 0.9, dur = 0.16) {
+    const mesh = new THREE.Mesh(STAR, new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    mesh.position.copy(at);
+    mesh.position.z += 0.6;
+    mesh.rotation.z = Math.random() * 0.6 - 0.3;
+    mesh.renderOrder = 6;
+    this.scene.add(mesh);
+    this.stars.push({ mesh, life: dur, max: dur, grow: size });
+  }
+
+  /** A flat ring expanding across the floor. */
+  ring(at: THREE.Vector3, color: THREE.ColorRepresentation, radius: number, dur = 0.35) {
+    const mesh = new THREE.Mesh(
+      new THREE.RingGeometry(0.8, 1, 40),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.8), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    mesh.position.copy(at).setY(0.04);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.scale.setScalar(0.4);
+    this.scene.add(mesh);
+    this.waves.push({ mesh, life: dur, max: dur, grow: radius });
+  }
+
+  /**
+   * Burst a sprite into its own pixels: each opaque pixel becomes a little cube that
+   * flies off (biased along `push`), bounces on the floor and fades.
+   */
+  shatter(origin: THREE.Vector3, pixels: { x: number; y: number; color: number }[], frame: { w: number; h: number }, unit: number, flip: boolean, push: number, power = 1) {
+    if (!pixels.length) return;
+    while (this.shards.length >= MAX_SHATTERS) this.dropShard(0);
+    const n = pixels.length;
+    // Lit like the sprites, so white pixels (bones) don't blow out in the bloom.
+    const mesh = new THREE.InstancedMesh(CUBE, new THREE.MeshLambertMaterial({ transparent: true }), n);
+    const pos = new Float32Array(n * 3);
+    const vel = new Float32Array(n * 3);
+    const spin = new Float32Array(n);
+    const c = new THREE.Color();
+    pixels.forEach((p, i) => {
+      const lx = (flip ? frame.w - p.x : p.x) - frame.w / 2;
+      const ly = frame.h - p.y;
+      pos[i * 3] = origin.x + lx * unit;
+      pos[i * 3 + 1] = origin.y + ly * unit;
+      pos[i * 3 + 2] = origin.z + (Math.random() - 0.5) * 0.2;
+      // Fly outward from the sprite's middle, mostly up and away from the blow.
+      const ox = lx / frame.w;
+      const oy = (ly - frame.h / 2) / frame.h;
+      vel[i * 3] = (ox * 4 + push * (1.5 + Math.random() * 2.5)) * power;
+      vel[i * 3 + 1] = (2.5 + oy * 3 + Math.random() * 3.5) * power;
+      vel[i * 3 + 2] = (Math.random() - 0.3) * 3 * power;
+      spin[i] = (Math.random() - 0.5) * 20;
+      mesh.setColorAt(i, c.setHex(p.color));
+    });
+    mesh.instanceColor!.needsUpdate = true;
+    mesh.frustumCulled = false;
+    this.scene.add(mesh);
+    this.shards.push({ mesh, pos, vel, spin, size: unit * 1.05, life: 1.3 });
+  }
+
+  private dropShard(i: number) {
+    const s = this.shards[i];
+    this.scene.remove(s.mesh);
+    (s.mesh.material as THREE.Material).dispose();
+    s.mesh.dispose();
+    this.shards.splice(i, 1);
   }
 
   /** Square "pixel" debris, the way sprites shatter in pixel games. */
@@ -262,6 +667,116 @@ export class Fx {
   }
 
   update(dt: number) {
+    for (let i = this.strikes.length - 1; i >= 0; i--) {
+      const st = this.strikes[i];
+      st.life -= dt;
+      st.next -= dt;
+      if (st.next <= 0 && st.life > 0.05) this.forkStrike(st);
+      const k = Math.max(0, st.life / st.max);
+      st.group.children.forEach((c, j) => {
+        const mat = (c as THREE.Mesh).material as THREE.MeshBasicMaterial;
+        mat.opacity = (j % 2 === 0 ? 0.55 : 1) * Math.min(1, k * 2.2);
+      });
+      if (st.life <= 0) {
+        for (const c of st.group.children) {
+          (c as THREE.Mesh).geometry.dispose();
+          ((c as THREE.Mesh).material as THREE.Material).dispose();
+        }
+        this.scene.remove(st.group);
+        this.strikes.splice(i, 1);
+      }
+    }
+    for (let i = this.swipes.length - 1; i >= 0; i--) {
+      const w = this.swipes[i];
+      w.life -= dt;
+      const k = 1 - Math.max(0, w.life) / w.max;
+      // Fast out, eased: the swing snaps through, then the trail lingers and fades.
+      const e = 1 - (1 - k) ** 3;
+      w.mesh.rotation.z = w.from + w.sweep * e;
+      w.mesh.scale.setScalar(0.85 + 0.3 * e);
+      w.mesh.material.opacity = k < 0.45 ? 1 : Math.max(0, 1 - (k - 0.45) / 0.55);
+      if (w.life <= 0) {
+        this.scene.remove(w.mesh);
+        w.mesh.geometry.dispose();
+        w.mesh.material.dispose();
+        this.swipes.splice(i, 1);
+      }
+    }
+    for (let i = this.stars.length - 1; i >= 0; i--) {
+      const st = this.stars[i];
+      st.life -= dt;
+      const k = 1 - Math.max(0, st.life) / st.max;
+      st.mesh.scale.setScalar(st.grow * Math.sin(Math.PI * Math.min(1, k * 1.2)));
+      st.mesh.rotation.z += dt * 3;
+      if (st.life <= 0) {
+        this.scene.remove(st.mesh);
+        (st.mesh.material as THREE.Material).dispose();
+        this.stars.splice(i, 1);
+      }
+    }
+    for (let i = this.shards.length - 1; i >= 0; i--) {
+      const sh = this.shards[i];
+      sh.life -= dt;
+      const n = sh.mesh.count;
+      const fade = Math.min(1, sh.life / 0.45);
+      for (let k = 0; k < n; k++) {
+        const o = k * 3;
+        sh.vel[o + 1] -= 22 * dt;
+        sh.pos[o] += sh.vel[o] * dt;
+        sh.pos[o + 1] += sh.vel[o + 1] * dt;
+        sh.pos[o + 2] += sh.vel[o + 2] * dt;
+        if (sh.pos[o + 1] < sh.size / 2) {
+          // Bounce and skid along the floor.
+          sh.pos[o + 1] = sh.size / 2;
+          sh.vel[o + 1] *= -0.35;
+          sh.vel[o] *= 0.7;
+          sh.vel[o + 2] *= 0.7;
+          sh.spin[k] *= 0.6;
+        }
+        dummy.position.set(sh.pos[o], sh.pos[o + 1], sh.pos[o + 2]);
+        dummy.rotation.set(0, 0, sh.spin[k] * (1.3 - sh.life));
+        dummy.scale.setScalar(sh.size * Math.max(0.05, fade));
+        dummy.updateMatrix();
+        sh.mesh.setMatrixAt(k, dummy.matrix);
+      }
+      sh.mesh.instanceMatrix.needsUpdate = true;
+      if (sh.life <= 0) this.dropShard(i);
+    }
+    for (let i = this.sprays.length - 1; i >= 0; i--) {
+      const sp = this.sprays[i];
+      sp.life -= dt;
+      const n = sp.mesh.count;
+      for (let k = 0; k < n; k++) {
+        const o = k * 3;
+        const sz = sp.size[k];
+        if (!sp.landed[k]) {
+          sp.vel[o + 1] -= 20 * dt;
+          sp.pos[o] += sp.vel[o] * dt;
+          sp.pos[o + 1] += sp.vel[o + 1] * dt;
+          sp.pos[o + 2] += sp.vel[o + 2] * dt;
+          if (sp.pos[o + 1] <= 0.012) {
+            // Land and stay: a flat pixel stain.
+            sp.pos[o + 1] = 0.012;
+            sp.landed[k] = 1;
+          }
+        }
+        dummy.position.set(sp.pos[o], sp.pos[o + 1], sp.pos[o + 2]);
+        dummy.rotation.set(0, 0, 0);
+        if (sp.landed[k]) dummy.scale.set(sz * 1.3, 0.004, sz * 1.1);
+        else dummy.scale.setScalar(sz);
+        dummy.updateMatrix();
+        sp.mesh.setMatrixAt(k, dummy.matrix);
+      }
+      sp.mesh.instanceMatrix.needsUpdate = true;
+      sp.mesh.material.opacity = Math.min(1, sp.life / 1.2);
+      if (sp.life <= 0) this.dropSpray(i);
+    }
+    for (let i = this.stains.length - 1; i >= 0; i--) {
+      const st = this.stains[i];
+      st.life -= dt;
+      st.mesh.material.opacity = Math.min(0.92, st.life / 2.5);
+      if (st.life <= 0) this.dropStain(i);
+    }
     for (const f of this.flashes) {
       f.life = Math.max(0, f.life - dt);
       const k = f.life / f.max;
@@ -270,7 +785,7 @@ export class Fx {
     for (let i = this.decals.length - 1; i >= 0; i--) {
       const d = this.decals[i];
       d.life -= dt;
-      (d.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(0.55, (d.life / d.max) * 0.8);
+      (d.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(0.7, (d.life / d.max) * 2);
       if (d.life <= 0) {
         this.scene.remove(d.mesh);
         d.mesh.geometry.dispose();
