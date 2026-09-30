@@ -12,7 +12,7 @@ export interface Icon {
   tier?: number;
 }
 
-export type Attack = 'arrow' | 'bolt' | 'slash' | 'fire' | 'rune' | 'dark';
+export type Attack = 'arrow' | 'bolt' | 'storm' | 'slash' | 'fire' | 'rune' | 'dark';
 
 export interface CompDef {
   id: string;
@@ -40,7 +40,7 @@ export const COMPS: CompDef[] = [
   c('shieldmaiden', 'Shieldmaiden', 'knight_f', 35_000, 976, 'slash', 'Her shield has killed more monsters than her sword.'),
   c('dancer', 'Blade Dancer', 'elf_m', 180_000, 3_725, 'slash', 'Fights like it is a performance. The monsters do not clap.'),
   c('runesmith', 'Runesmith', 'dwarf_f', 1e6, 10_859, 'rune', 'Carves runes into the floor. The floor explodes.'),
-  c('stormcaller', 'Stormcaller', 'wizzard_f', 6e6, 47_143, 'bolt', 'Brought her own weather. Down here, of all places.'),
+  c('stormcaller', 'Stormcaller', 'wizzard_f', 6e6, 47_143, 'storm', 'Brought her own weather. Down here, of all places.'),
   c('venomblade', 'Venomblade', 'lizard_f', 4e7, 186_000, 'dark', 'Every blade is poisoned. Every single one. She has a lot.'),
   c('doctor', 'Plague Doctor', 'doc', 3e8, 782_000, 'dark', 'Treats monsters with a strict regimen of dying.'),
   c('hollow', 'Hollow Knight', 'pumpkin_dude', 2.5e9, 3.7e6, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.'),

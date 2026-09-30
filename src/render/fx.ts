@@ -95,6 +95,91 @@ interface Strike {
   next: number;
 }
 
+/** Small pixel-art textures drawn once in code (crisp when scaled, like the sprites). */
+function pixelTexture(size: number, draw: (put: (x: number, y: number, c: string) => void) => void): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d')!;
+  draw((x, y, col) => {
+    g.fillStyle = col;
+    g.fillRect(x, y, 1, 1);
+  });
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  t.generateMipmaps = false;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** Concentric pixel ball: `rings` from outside in, e.g. dark orange → orange → yellow → white. */
+const ball = (size: number, rings: string[]) => pixelTexture(size, (put) => {
+  const c = (size - 1) / 2;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const d = Math.hypot(x - c, y - c) / (size / 2);
+    if (d > 1) continue;
+    put(x, y, rings[Math.min(rings.length - 1, Math.floor((1 - d) * rings.length * 1.15))]);
+  }
+});
+
+let texCache: { fire: THREE.Texture; void: THREE.Texture; rune: THREE.Texture } | null = null;
+/** Fireball, void orb and rune circle textures. */
+export function spellTextures() {
+  if (texCache) return texCache;
+  const fire = ball(12, ['#8a2a0a', '#e0541a', '#ff9a2e', '#ffd46a', '#fff6d0']);
+  const voidOrb = pixelTexture(12, (put) => {
+    const c = 5.5;
+    for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) {
+      const d = Math.hypot(x - c, y - c);
+      if (d > 5.8) continue;
+      put(x, y, d > 4.6 ? '#d9b3ff' : d > 3.6 ? '#9a4dff' : d > 2.2 ? '#3a0f6a' : '#12031f');
+    }
+    for (const [x, y] of [[3, 3], [8, 4], [4, 8]]) put(x, y, '#f4e6ff');
+  });
+  const rune = pixelTexture(32, (put) => {
+    const c = 15.5;
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      const d = Math.hypot(x - c, y - c);
+      if ((d > 13.6 && d < 15) || (d > 9.4 && d < 10.5)) put(x, y, '#ffffff');
+    }
+    // Six glyph marks between the rings and a diamond in the middle.
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      const gx = Math.round(c + Math.cos(a) * 12);
+      const gy = Math.round(c + Math.sin(a) * 12);
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1], [k % 2 ? 1 : -1, k % 2 ? 1 : -1]]) put(gx + dx, gy + dy, '#ffffff');
+    }
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (Math.abs(dx) + Math.abs(dy) === 4) put(Math.round(c + dx), Math.round(c + dy), '#ffffff');
+  });
+  texCache = { fire, void: voidOrb, rune };
+  return texCache;
+}
+
+interface Afterimage {
+  sprite: THREE.Sprite;
+  life: number;
+  max: number;
+  size: number;
+}
+
+interface RuneCast {
+  mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  t: number;
+  charge: number;
+  erupted: boolean;
+  onErupt: () => void;
+  color: THREE.Color;
+}
+
+interface Chain {
+  group: THREE.Group;
+  points: THREE.Vector3[];
+  color: THREE.Color;
+  life: number;
+  max: number;
+  next: number;
+}
+
 const CUBE = new THREE.BoxGeometry(1, 1, 1);
 /** Snap to the sprite pixel grid so bolts look drawn, not vector. */
 const snap = (v: number) => Math.round(v * 16) / 16;
@@ -273,6 +358,9 @@ export class Fx {
   private stars: Wave[] = [];
   private shards: Shard[] = [];
   private strikes: Strike[] = [];
+  private ghosts: Afterimage[] = [];
+  private runes: RuneCast[] = [];
+  private chains: Chain[] = [];
   private sprays: Spray[] = [];
   private stains: Stain[] = [];
 
@@ -461,6 +549,63 @@ export class Fx {
       s.group.add(glow, core);
     });
     s.next = 0.06;
+  }
+
+  /** A fading copy of a projectile left behind it (comet trails). */
+  afterimage(at: THREE.Vector3, map: THREE.Texture, color: THREE.ColorRepresentation, size: number, life = 0.2) {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map, color: new THREE.Color(color), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    sprite.position.copy(at);
+    sprite.scale.setScalar(size);
+    this.scene.add(sprite);
+    this.ghosts.push({ sprite, life, max: life, size });
+  }
+
+  /**
+   * A rune circle etches itself onto the floor, spins up and brightens, then erupts:
+   * `onErupt` fires at that moment (the caller adds the hit).
+   */
+  runeCircle(at: THREE.Vector3, color: THREE.ColorRepresentation, onErupt: () => void, radius = 1.1, charge = 0.35) {
+    const col = new THREE.Color(color);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2, radius * 2), new THREE.MeshBasicMaterial({ map: spellTextures().rune, color: col.clone().multiplyScalar(1.4), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.copy(at).setY(0.05);
+    mesh.scale.setScalar(0.2);
+    mesh.renderOrder = 2;
+    this.scene.add(mesh);
+    this.runes.push({ mesh, t: 0, charge, erupted: false, onErupt, color: col });
+  }
+
+  /** Lightning that jumps from point to point (chain lightning), flickering between shapes. */
+  chain(points: THREE.Vector3[], color: THREE.ColorRepresentation, dur = 0.26) {
+    const group = new THREE.Group();
+    this.scene.add(group);
+    const c: Chain = { group, points: points.map((p) => p.clone()), color: new THREE.Color(color), life: dur, max: dur, next: 0 };
+    this.forkChain(c);
+    this.chains.push(c);
+    for (const p of points.slice(1)) {
+      this.star(p, 0xffffff, 0.9, 0.14);
+      this.burst(p, '#e6d4ff', 5, 2.5, 0.05, 6, true);
+    }
+    this.light(points[Math.floor(points.length / 2)], color, 22, dur + 0.05, 9);
+  }
+
+  private forkChain(c: Chain) {
+    for (const o of [...c.group.children]) {
+      c.group.remove(o);
+      (o as THREE.Mesh).geometry.dispose();
+      ((o as THREE.Mesh).material as THREE.Material).dispose();
+    }
+    for (let i = 0; i < c.points.length - 1; i++) {
+      const a = c.points[i];
+      const b = c.points[i + 1];
+      const pts = jag(a, b, 7, 0.7);
+      const glow = new THREE.Mesh(ribbon(pts, 0.28, -99, 999), new THREE.MeshBasicMaterial({ vertexColors: true, color: c.color.clone().multiplyScalar(1.3), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      const core = new THREE.Mesh(ribbon(pts, 0.08, -99, 999), new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(2.6, 2.5, 2.9), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      glow.renderOrder = 6;
+      core.renderOrder = 7;
+      c.group.add(glow, core);
+    }
+    c.next = 0.05;
   }
 
   /** A four-point twinkle at an impact point. */
@@ -667,6 +812,62 @@ export class Fx {
   }
 
   update(dt: number) {
+    for (let i = this.ghosts.length - 1; i >= 0; i--) {
+      const g = this.ghosts[i];
+      g.life -= dt;
+      const k = Math.max(0, g.life / g.max);
+      g.sprite.material.opacity = k * 0.7;
+      g.sprite.scale.setScalar(g.size * (0.4 + 0.6 * k));
+      if (g.life <= 0) {
+        this.scene.remove(g.sprite);
+        g.sprite.material.dispose();
+        this.ghosts.splice(i, 1);
+      }
+    }
+    for (let i = this.runes.length - 1; i >= 0; i--) {
+      const r = this.runes[i];
+      r.t += dt;
+      if (!r.erupted) {
+        // Etch in, spin up, brighten.
+        const k = Math.min(1, r.t / r.charge);
+        r.mesh.scale.setScalar(0.2 + 0.8 * (1 - (1 - k) ** 3));
+        r.mesh.rotation.z += dt * (2 + k * 10);
+        r.mesh.material.color.copy(r.color).multiplyScalar(0.8 + k * 1.6);
+        if (k >= 1) {
+          r.erupted = true;
+          r.t = 0;
+          r.onErupt();
+        }
+      } else {
+        // After the eruption the circle flares out and fades.
+        const k = Math.min(1, r.t / 0.35);
+        r.mesh.scale.setScalar(1 + k * 0.5);
+        r.mesh.rotation.z += dt * 4;
+        r.mesh.material.opacity = 1 - k;
+        if (k >= 1) {
+          this.scene.remove(r.mesh);
+          r.mesh.geometry.dispose();
+          r.mesh.material.dispose();
+          this.runes.splice(i, 1);
+        }
+      }
+    }
+    for (let i = this.chains.length - 1; i >= 0; i--) {
+      const c = this.chains[i];
+      c.life -= dt;
+      c.next -= dt;
+      if (c.next <= 0 && c.life > 0.05) this.forkChain(c);
+      const k = Math.max(0, c.life / c.max);
+      c.group.children.forEach((o, j) => (((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = (j % 2 === 0 ? 0.6 : 1) * Math.min(1, k * 2)));
+      if (c.life <= 0) {
+        for (const o of c.group.children) {
+          (o as THREE.Mesh).geometry.dispose();
+          ((o as THREE.Mesh).material as THREE.Material).dispose();
+        }
+        this.scene.remove(c.group);
+        this.chains.splice(i, 1);
+      }
+    }
     for (let i = this.strikes.length - 1; i >= 0; i--) {
       const st = this.strikes[i];
       st.life -= dt;

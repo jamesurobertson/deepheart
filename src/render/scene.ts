@@ -6,8 +6,9 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import type { Atlas, Rect } from './atlas.ts';
 import { PixelSprite, blobShadow } from './sprite.ts';
-import { Fx, flameTexture } from './fx.ts';
+import { Fx, flameTexture, spellTextures } from './fx.ts';
 import { GradeShader, tiltShift } from './post.ts';
+import { STAIR, buildStairwell, stairPoint } from './stairwell.ts';
 import { COMPS, ZONES, zoneOf, type Attack, type Tiles } from '../game/data.ts';
 import type { Game, GameEvent, Monster } from '../game/game.ts';
 
@@ -180,7 +181,7 @@ function glowTexture(): THREE.Texture {
   return new THREE.CanvasTexture(c);
 }
 
-const SHOT_COLOR: Record<Attack, number> = { arrow: 0xffe6b0, bolt: 0x9fe6ff, slash: 0xffffff, fire: 0xff8a3a, rune: 0x7dffb0, dark: 0xb46aff };
+const SHOT_COLOR: Record<Attack, number> = { arrow: 0xffe6b0, bolt: 0x9fe6ff, storm: 0xc9a6ff, slash: 0xffffff, fire: 0xff8a3a, rune: 0x7dffb0, dark: 0xb46aff };
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 const BONE = '#b8ae9e';
@@ -244,7 +245,14 @@ export class Scene {
   private deep = 1;
   private look = LOOK.clone();
   private camBase = new THREE.Vector3();
-  settings = { particles: true, shake: true, blood: true };
+  settings = { particles: true, shake: true, blood: true, cinematics: true };
+  /** Zone-change interlude: the party leaves, descends a spiral staircase, arrives somewhere new. */
+  private cine: { phase: 'exit' | 'stairs' | 'arrive'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[] } | null = null;
+  /** Black card in front of the camera for fades. */
+  private fade: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  private lastBossWin = -1;
+  /** Called when the party arrives in the new zone (the UI shows the title card then). */
+  onArrive: (() => void) | null = null;
 
   constructor(container: HTMLElement, atlas: Atlas) {
     this.container = container;
@@ -287,6 +295,12 @@ export class Scene {
       this.scene.add(l);
       this.torchLights.push(l);
     }
+    this.fade = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthTest: false, depthWrite: false }));
+    this.fade.position.z = -0.2;
+    this.fade.renderOrder = 1000;
+    this.fade.visible = false;
+    this.camera.add(this.fade);
+    this.scene.add(this.camera);
     this.setBand(0);
     this.resize();
     addEventListener('resize', () => this.resize());
@@ -606,20 +620,46 @@ export class Scene {
       this.impact({ mesh: new THREE.Object3D(), from, to, target: id, t: 1, dur: 0, arc: 0, kind });
       return;
     }
+    if (kind === 'storm') {
+      // Chain lightning: from the staff to the target, then on to the two monsters nearest it.
+      const others = [...this.mons.values()].filter((m) => m.id !== id && m.dead < 0 && m.born >= 1)
+        .sort((a, b) => a.body.position.distanceTo(view.body.position) - b.body.position.distanceTo(view.body.position)).slice(0, 2);
+      const hops = [view, ...others];
+      this.fx.chain([from, ...hops.map((m) => m.body.position.clone().setY(m.height * 0.5))], SHOT_COLOR.storm);
+      for (const m of hops) this.react(m, 0.25);
+      this.addShake(0.03);
+      return;
+    }
+    if (kind === 'rune') {
+      // No projectile: a rune etches itself under the target and erupts.
+      if (this.settings.particles) this.fx.burst(from, '#7dffb0', 5, 1.5, 0.05, -1, true);
+      const foot = view.body.position.clone();
+      this.fx.runeCircle(foot, SHOT_COLOR.rune, () => {
+        const v = this.mons.get(id);
+        const at = (v && v.dead < 0 ? v.body.position : foot).clone();
+        this.impact({ mesh: new THREE.Object3D(), from, to: at.setY(0.6), target: id, t: 1, dur: 0, arc: 0, kind: 'rune' });
+      }, view.boss ? 2 : 1.1);
+      return;
+    }
     let mesh: THREE.Object3D;
     if (kind === 'arrow') {
       const s = new PixelSprite(this.atlas.texture, this.atlas.size, [this.atlas.rect('weapon_arrow')], { anchor: 'center' });
       s.mesh.rotation.z = -Math.PI / 2;
       mesh = new THREE.Group().add(s.mesh);
     } else {
-      mesh = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(SHOT_COLOR[kind]).multiplyScalar(2.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-      mesh.scale.setScalar(kind === 'fire' ? 0.95 : kind === 'rune' ? 0.5 : 0.7);
+      // Fireball / void orb: a crisp pixel core over a soft glow.
+      const tex = spellTextures();
+      const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: kind === 'fire' ? tex.fire : tex.void, color: new THREE.Color(1.25, 1.25, 1.25), transparent: true, depthWrite: false }));
+      core.scale.setScalar(kind === 'fire' ? 0.7 : 0.6);
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(SHOT_COLOR[kind]).multiplyScalar(1.2), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
+      halo.scale.setScalar(kind === 'fire' ? 1.2 : 1.2);
+      mesh = new THREE.Group().add(halo, core);
     }
     mesh.position.copy(from);
     this.scene.add(mesh);
     const dist = from.distanceTo(to);
-    const speed = kind === 'arrow' ? 24 : kind === 'rune' ? 10 : 13;
-    this.shots.push({ mesh, from, to, target: id, t: 0, dur: dist / speed, arc: kind === 'arrow' ? 0.7 : kind === 'rune' ? 2.2 : 0.35, kind });
+    const speed = kind === 'arrow' ? 24 : kind === 'fire' ? 12 : 10;
+    this.shots.push({ mesh, from, to, target: id, t: 0, dur: dist / speed, arc: kind === 'arrow' ? 0.7 : kind === 'fire' ? 0.6 : 0.3, kind });
   }
 
   private updateShots(dt: number) {
@@ -639,10 +679,20 @@ export class Scene {
         s.mesh.position.z += Math.cos(t * Math.PI * 5) * r;
       }
       if (s.kind === 'arrow') s.mesh.rotation.z = Math.atan2(Math.cos(t * Math.PI) * s.arc * Math.PI, s.from.distanceTo(s.to));
+      if (s.kind === 'fire' || s.kind === 'dark') {
+        // Comet trail of fading copies, plus embers / sparks.
+        const tex = spellTextures();
+        this.fx.afterimage(s.mesh.position, s.kind === 'fire' ? tex.fire : tex.void, s.kind === 'fire' ? 0xb05a20 : 0x8050c0, s.kind === 'fire' ? 0.55 : 0.5, 0.18);
+        (s.mesh.children[1] as THREE.Sprite).material.rotation = this.time * (s.kind === 'fire' ? 8 : -6);
+        s.mesh.children[0].scale.setScalar(1.2 * (0.9 + Math.sin(this.time * 30) * 0.12));
+      }
       if (this.settings.particles) {
-        if (s.kind === 'fire' && Math.random() < 0.7) this.fx.burst(s.mesh.position.clone(), '#ff8a3a', 1, 0.8, 0.07, -1, true);
-        else if (s.kind === 'dark' && Math.random() < 0.5) this.fx.burst(s.mesh.position.clone(), '#b46aff', 1, 0.4, 0.05, 0, true);
-        else if (s.kind === 'arrow' && Math.random() < 0.5) this.fx.burst(s.mesh.position.clone(), '#fff2d0', 1, 0.2, 0.035, 0, true);
+        if (s.kind === 'fire' && Math.random() < 0.6) this.fx.burst(s.mesh.position.clone(), '#ffb040', 1, 1, 0.06, -2, true);
+        else if (s.kind === 'dark' && Math.random() < 0.6) {
+          // Sparks circling the orb.
+          const a = this.time * 14;
+          this.fx.burst(s.mesh.position.clone().add(new THREE.Vector3(Math.cos(a) * 0.35, Math.sin(a) * 0.35, 0.1)), '#e0c0ff', 1, 0.3, 0.05, 0, true);
+        } else if (s.kind === 'arrow' && Math.random() < 0.5) this.fx.burst(s.mesh.position.clone(), '#fff2d0', 1, 0.2, 0.035, 0, true);
       }
       if (t >= 1) {
         this.impact(s);
@@ -671,19 +721,32 @@ export class Scene {
         this.addShake(0.04);
         break;
       case 'fire':
-        this.fx.star(at, 0xffc070, 1.1);
-        this.fx.ring(at.clone().setY(0), 0xff8a3a, 1.6, 0.3);
-        this.fx.light(at, 0xff8a3a, 14, 0.2, 6);
-        if (parts) this.fx.burst(at, '#ff8a3a', 14, 3.5, 0.07, 6, true);
+        // Burst of flame: bright flash, fiery ring on the floor, embers that fall back down.
+        this.fx.star(at, 0xffe0a0, 1.3, 0.18);
+        this.fx.ring(at.clone().setY(0), 0xff7a2a, 1.8, 0.35);
+        this.fx.light(at, 0xff8a3a, 18, 0.25, 7);
+        if (parts) {
+          this.fx.burst(at, '#ffcf5a', 10, 3.5, 0.07, 5, true);
+          this.fx.burst(at, '#ff5a1a', 12, 2.5, 0.08, 9, true);
+        }
         break;
       case 'dark':
-        this.fx.aura(at, col, 0.7, 0.3);
-        if (parts) this.fx.burst(at, '#b46aff', 8, 2.5, 0.06, 2, true);
+        // Collapse inward, then a violet pop.
+        this.fx.aura(at, col, 0.9, 0.25);
+        this.fx.star(at, 0xe0c0ff, 1, 0.16);
+        this.fx.light(at, col, 12, 0.2, 6);
+        if (parts) this.fx.burst(at, '#b46aff', 10, 2.8, 0.06, 1, true);
         break;
       case 'rune':
-        this.fx.ring(at.clone().setY(0), col, 1.8, 0.45);
-        this.fx.pillar(at.clone().setY(0), col, 2.6, 0.4);
-        if (parts) this.fx.burst(at.clone().setY(0.2), '#7dffb0', 10, 3, 0.06, 6, true);
+        // Eruption: a column of green light, a shockwave ring and chips of stone.
+        this.fx.pillar(at.clone().setY(0), 0x2f8a5a, 2.2, 0.35);
+        this.fx.ring(at.clone().setY(0), col, 2.2, 0.4);
+        this.fx.light(at, col, 12, 0.25, 7);
+        this.addShake(0.05);
+        if (parts) {
+          this.fx.burst(at.clone().setY(0.2), '#b8f5d2', 10, 4, 0.06, 6, true);
+          this.fx.burst(at.clone().setY(0.1), '#8a8078', 12, 4.5, 0.09, 16);
+        }
         break;
       default:
         this.fx.star(at, 0xffffff, 0.6);
@@ -995,9 +1058,16 @@ export class Scene {
         }
         break;
       }
-      case 'floor':
-        this.setBand(zoneOf(ev.floor));
+      case 'bossWin':
+        this.lastBossWin = ev.floor;
         break;
+      case 'floor': {
+        const z = zoneOf(ev.floor);
+        if (this.cine) this.cine.zone = z;
+        else if (z !== this.band && this.lastBossWin === ev.floor - 1 && this.settings.cinematics) this.startCinematic(z);
+        else this.setBand(z);
+        break;
+      }
       case 'bossFail':
       case 'retreat':
         this.addShake(0.2);
@@ -1072,6 +1142,153 @@ export class Scene {
     return h;
   }
 
+  // ---------- zone interlude ----------
+
+  /** True while the interlude holds the screen (the game pauses meanwhile). */
+  get busy() {
+    return !!this.cine && this.cine.phase !== 'arrive';
+  }
+
+  private startCinematic(zone: number) {
+    this.cine = { phase: 'exit', t: 0, zone, walkers: [], shadows: [], well: null, flames: [] };
+  }
+
+  /** Tap to skip: straight to the arrival. */
+  skip() {
+    if (this.cine && this.cine.phase !== 'arrive') this.arrive();
+  }
+
+  private descend() {
+    const c = this.cine!;
+    c.phase = 'stairs';
+    c.t = 0;
+    this.camera.fov = 60;
+    this.camera.updateProjectionMatrix();
+    // Dress the stairwell in the new zone's tiles and light.
+    const pal = PALETTES[c.zone % PALETTES.length];
+    const theme = ZONES[c.zone % ZONES.length].tiles;
+    const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : '';
+    const a = this.atlas;
+    const floors = theme === 'crypt' ? [a.rect('crypt_floor_1'), a.rect('crypt_floor_5')] : [a.rect(`${pre}floor_1`), a.rect(`${pre}floor_2`)];
+    this.wallMat.color.setRGB(...pal.wall);
+    this.floorMat.color.setRGB(...pal.floor);
+    this.flameMat.color.setHex(pal.torch).lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(1.4);
+    for (const l of this.torchLights) l.color.setHex(pal.torch);
+    (this.scene.background as THREE.Color).setHex(pal.fog);
+    const fog = this.scene.fog as THREE.Fog;
+    fog.color.setHex(pal.fog);
+    fog.near = 3;
+    fog.far = 16;
+    const well = buildStairwell(a, { wall: a.rect(`${pre}wall_mid`), floor: floors }, { wall: this.wallMat, floor: this.floorMat, flame: this.flameMat });
+    c.well = well.group;
+    c.flames = well.flames;
+    this.scene.add(well.group);
+    if (this.room) this.room.visible = false;
+    for (const p of this.party) p.body.visible = false;
+    // The walkers: up to five of your companions (or a lone squire).
+    const who = this.party.length ? this.party.slice(0, 5).map((p) => COMPS[p.comp].sprite) : ['knight_m'];
+    for (const sprite of who) {
+      const { run } = a.creature(sprite);
+      const w = new PixelSprite(a.texture, a.size, run, { fps: 10 });
+      w.mesh.scale.multiplyScalar(1.2);
+      this.scene.add(w.mesh);
+      c.walkers.push(w);
+      const sh = blobShadow(0.9);
+      this.scene.add(sh);
+      c.shadows.push(sh);
+    }
+  }
+
+  private arrive() {
+    const c = this.cine!;
+    if (c.well) {
+      this.scene.remove(c.well);
+      c.well.traverse((o) => {
+        if (o instanceof THREE.Mesh) o.geometry.dispose();
+      });
+    }
+    for (const w of c.walkers) {
+      this.scene.remove(w.mesh);
+      w.dispose();
+    }
+    for (const sh of c.shadows) this.scene.remove(sh);
+    c.walkers = [];
+    c.shadows = [];
+    this.hemi.intensity = 1.5;
+    for (const l of this.torchLights) l.distance = 11;
+    c.well = null;
+    c.phase = 'arrive';
+    c.t = 0;
+    this.camera.fov = 30;
+    this.band = -1;
+    this.setBand(c.zone);
+    if (this.room) this.room.visible = true;
+    // Everyone walks in from the left.
+    for (const p of this.party) {
+      p.body.visible = true;
+      p.act = null;
+      p.body.position.set(-16 - Math.random() * 2, 0, p.home.z);
+    }
+    this.resize();
+    this.onArrive?.();
+  }
+
+  private updateCinematic(dt: number) {
+    const c = this.cine!;
+    c.t += dt;
+    let fade = 0;
+    if (c.phase === 'exit') {
+      // March out to the right, toward the stairs.
+      for (const p of this.party) {
+        p.body.position.x += dt * 9;
+        p.sprite.flip = false;
+        p.sprite.play(p.run);
+        p.sprite.update(dt);
+      }
+      fade = Math.max(0, (c.t - 0.6) / 0.4);
+      if (c.t >= 1) this.descend();
+    } else if (c.phase === 'stairs') {
+      const dur = 3;
+      const lead = 2 + c.t * 8;
+      c.walkers.forEach((w, i) => {
+        const k = lead - i * 1.4;
+        const p = stairPoint(k, STAIR.walk + (i % 2 ? 0.5 : -0.3));
+        w.mesh.position.set(p.x, p.y + Math.abs(Math.sin((c.t + i) * 11)) * 0.06, p.z);
+        c.shadows[i].position.set(p.x, p.y + 0.02, p.z);
+        w.update(dt);
+      });
+      // The camera hangs in the open well, across from the party, turning to follow them round.
+      const head = stairPoint(lead);
+      const mid = stairPoint(lead - 2);
+      const aMid = (lead - 1.5) * STAIR.turn;
+      this.camera.position.set(-Math.cos(aMid) * 1.2, mid.y + 2.4, -Math.sin(aMid) * 1.2);
+      this.camera.lookAt(mid.x, mid.y + 0.1, mid.z);
+      // Billboards face the camera; flip them so they walk the way they're going on screen.
+      this.camera.updateMatrixWorld();
+      c.walkers.forEach((w, i) => {
+        w.mesh.rotation.set(0, Math.atan2(this.camera.position.x - w.mesh.position.x, this.camera.position.z - w.mesh.position.z), 0);
+        const now = w.mesh.position.clone().project(this.camera);
+        const next = stairPoint(lead - i * 1.4 + 0.5).project(this.camera);
+        w.flip = next.x < now.x;
+      });
+      // Torches flicker; two lights ride along with the party.
+      c.flames.forEach((f, i) => f.scale.set(1, 0.85 + Math.sin(this.time * 13 + i) * 0.12, 1));
+      this.torchLights[0].position.set(head.x, head.y + 1.8, head.z);
+      this.torchLights[1].position.copy(stairPoint(lead + 5, STAIR.outer - 0.6)).setY(head.y - 0.5);
+      this.torchLights[0].intensity = 14;
+      this.torchLights[1].intensity = 10;
+      this.torchLights[0].distance = this.torchLights[1].distance = 14;
+      this.hemi.intensity = 2.6;
+      fade = Math.max(0, 1 - c.t / 0.35, (c.t - (dur - 0.35)) / 0.35);
+      if (c.t >= dur) this.arrive();
+    } else {
+      fade = Math.max(0, 1 - c.t / 0.45);
+      if (c.t >= 1) this.cine = null;
+    }
+    this.fade.visible = fade > 0;
+    this.fade.material.opacity = Math.min(1, fade);
+  }
+
   // ---------- frame ----------
 
   update(dt: number, game: Game) {
@@ -1079,15 +1296,17 @@ export class Scene {
     const fever = game.s.buffs.some((b) => b.id === 'fever');
     this.fever += ((fever ? 1 : 0) - this.fever) * Math.min(1, dt * 4);
 
-    this.flames.forEach((f, i) => {
+    if (this.cine?.phase !== 'stairs') this.flames.forEach((f, i) => {
       const fl = 0.85 + Math.sin(this.time * 13 + i * 2) * 0.08 + Math.sin(this.time * 7.3 + i) * 0.07;
       f.scale.set(1, fl, 1);
       this.torchLights[i].intensity = 6 * fl * (1 + this.fever * 0.5);
     });
 
     for (const pr of this.props) pr.update(dt);
+    if (this.cine) this.updateCinematic(dt);
+    const holding = this.cine && this.cine.phase !== 'arrive';
     this.updateMonsters(dt, game);
-    this.updateParty(dt, game);
+    if (!holding) this.updateParty(dt, game);
     this.updateShots(dt);
     this.updateRaiders(dt, game);
     this.fx.update(dt);
@@ -1099,8 +1318,10 @@ export class Scene {
 
     this.shake = Math.max(0, this.shake - dt * 1.6);
     const sh = this.shake * this.shake * 2.2;
-    this.camera.position.set(this.camBase.x + (Math.random() - 0.5) * sh, this.camBase.y + (Math.random() - 0.5) * sh, this.camBase.z);
-    this.camera.lookAt(this.look);
+    if (this.cine?.phase !== 'stairs') {
+      this.camera.position.set(this.camBase.x + (Math.random() - 0.5) * sh, this.camBase.y + (Math.random() - 0.5) * sh, this.camBase.z);
+      this.camera.lookAt(this.look);
+    }
     this.composer.render(dt);
   }
 }
