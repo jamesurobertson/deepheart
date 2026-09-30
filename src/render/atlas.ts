@@ -77,6 +77,35 @@ export class Atlas {
     return { idle, run, hit };
   }
 
+  private data: ImageData | null = null;
+  private pixelCache = new Map<Rect, { x: number; y: number; color: number }[]>();
+
+  /** Opaque pixels of a frame (every `step`-th), for shatter effects. Cached per frame. */
+  pixels(r: Rect, step = 2): { x: number; y: number; color: number }[] {
+    const hit = this.pixelCache.get(r);
+    if (hit) return hit;
+    if (!this.data) {
+      const img = this.texture.image as HTMLImageElement;
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const g = c.getContext('2d')!;
+      g.drawImage(img, 0, 0);
+      this.data = g.getImageData(0, 0, c.width, c.height);
+    }
+    const out: { x: number; y: number; color: number }[] = [];
+    const d = this.data.data;
+    for (let y = 0; y < r.h; y += step) {
+      for (let x = 0; x < r.w; x += step) {
+        const i = ((r.y + y) * this.data.width + r.x + x) * 4;
+        if (d[i + 3] < 128) continue;
+        out.push({ x, y, color: (d[i] << 16) | (d[i + 1] << 8) | d[i + 2] });
+      }
+    }
+    this.pixelCache.set(r, out);
+    return out;
+  }
+
   /** UVs for a rect, optionally mirrored horizontally. */
   uv(r: Rect, flip = false): [number, number, number, number] {
     const u0 = r.x / this.size.w, u1 = (r.x + r.w) / this.size.w;
