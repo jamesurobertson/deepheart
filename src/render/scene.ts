@@ -20,14 +20,14 @@ const LOOK = new THREE.Vector3(0, 1.1, 0.5);
 interface Palette { torch: number; fog: number; hemi: number; wall: [number, number, number]; floor: [number, number, number]; banner: string; goo: number }
 /** Lighting per zone, in the same order as ZONES. Tiles with their own colour (jungle, tomb) get a lighter wash. */
 const PALETTES: Palette[] = [
-  { torch: 0xff9a4a, fog: 0x0a0708, hemi: 0x6a5a78, wall: [0.5, 0.44, 0.46], floor: [1.1, 1.05, 1.02], banner: 'red', goo: 0.005 }, // Upper Halls
-  { torch: 0x5ad6c8, fog: 0x04090b, hemi: 0x4a6a78, wall: [0.34, 0.5, 0.56], floor: [1.6, 2.2, 2.45], banner: 'blue', goo: 0 }, // Bone Crypts
-  { torch: 0xa6e06a, fog: 0x050904, hemi: 0x55704a, wall: [0.62, 0.7, 0.6], floor: [1.1, 1.2, 1.1], banner: 'green', goo: 0 }, // Overgrown Warrens
-  { torch: 0xffb35a, fog: 0x0c0806, hemi: 0x7a6450, wall: [0.62, 0.56, 0.5], floor: [1, 0.95, 0.88], banner: 'yellow', goo: 0 }, // Sunken Tomb
-  { torch: 0xb485ff, fog: 0x08060d, hemi: 0x5a4a82, wall: [0.42, 0.38, 0.5], floor: [1.9, 1.8, 2.1], banner: 'green', goo: 0.06 }, // Rotting Deep
-  { torch: 0x8af0d8, fog: 0x04070b, hemi: 0x5a70a0, wall: [0.5, 0.58, 0.72], floor: [0.95, 1.05, 1.2], banner: 'blue', goo: 0 }, // Enchanted Grove
-  { torch: 0xff5a3a, fog: 0x0b0505, hemi: 0x6a4a52, wall: [0.52, 0.34, 0.34], floor: [1.15, 0.95, 0.9], banner: 'red', goo: 0 }, // Demon Gate
-  { torch: 0x9cc0ff, fog: 0x05070c, hemi: 0x5a6a8a, wall: [0.42, 0.6, 0.9], floor: [0.85, 1.15, 1.7], banner: 'blue', goo: 0 }, // Frozen Vault
+  { torch: 0xff9a4a, fog: 0x0a0708, hemi: 0x6a5a78, wall: [0.66, 0.58, 0.6], floor: [1.1, 1.05, 1.02], banner: 'red', goo: 0 }, // Upper Halls
+  { torch: 0x5ad6c8, fog: 0x04090b, hemi: 0x4a6a78, wall: [0.46, 0.62, 0.68], floor: [0.92, 1.08, 1.18], banner: 'blue', goo: 0 }, // Bone Crypts
+  { torch: 0xa6e06a, fog: 0x050904, hemi: 0x55704a, wall: [1.6, 1.8, 1.5], floor: [1.6, 1.7, 1.5], banner: 'green', goo: 0 }, // Overgrown Warrens
+  { torch: 0xffb35a, fog: 0x0c0806, hemi: 0x7a6450, wall: [0.74, 0.66, 0.58], floor: [0.95, 0.9, 0.84], banner: 'yellow', goo: 0 }, // Sunken Tomb
+  { torch: 0xb485ff, fog: 0x08060d, hemi: 0x5a4a82, wall: [0.56, 0.5, 0.66], floor: [1, 0.94, 1.1], banner: 'green', goo: 0.025 }, // Rotting Deep
+  { torch: 0x8af0d8, fog: 0x04070b, hemi: 0x5a70a0, wall: [1.3, 1.55, 1.9], floor: [1.4, 1.55, 1.8], banner: 'blue', goo: 0 }, // Enchanted Grove
+  { torch: 0xff5a3a, fog: 0x0b0505, hemi: 0x6a4a52, wall: [0.7, 0.44, 0.44], floor: [1.15, 0.95, 0.9], banner: 'red', goo: 0 }, // Demon Gate
+  { torch: 0x9cc0ff, fog: 0x05070c, hemi: 0x5a6a8a, wall: [0.56, 0.72, 1], floor: [0.9, 1.1, 1.45], banner: 'blue', goo: 0 }, // Frozen Vault
 ];
 
 /** Formation slots for companions, front to back. */
@@ -250,8 +250,8 @@ export class Scene {
   private cine: { phase: 'exit' | 'stairs' | 'arrive'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[] } | null = null;
   /** Black card in front of the camera for fades. */
   private fade: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-  /** Deepest zone reached this descent: entering a deeper one plays the staircase. */
-  private seenZone = 0;
+  /** The floor we were last on: stepping down into a new zone plays the staircase. */
+  private lastFloor = 1;
   /** Called when the party arrives in the new zone (the UI shows the title card then). */
   onArrive: (() => void) | null = null;
 
@@ -385,42 +385,47 @@ export class Scene {
     const floor = new Quads(a);
     // Tile names for each theme. The jungle and tomb sets come from Omniboy's packs.
     const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : '';
-    const floors = theme === 'crypt'
-      ? Array.from({ length: 20 }, (_, i) => a.rect(`crypt_floor_${i + 1}`))
-      : [1, 2, 3, 4, 5, 6, 7, 8].map((i) => a.rect(`${pre}floor_${i}`));
-    const tile = () => (theme === 'crypt' ? floors[Math.floor(r() * floors.length)] : r() < 0.72 ? floors[0] : floors[1 + Math.floor(r() * 7)]);
+    const floors = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => a.rect(`${pre}floor_${i}`));
+    // Crypts: ordinary flagstones with the Dark Dungeon's cracked, older tiles worked in.
+    const cracked = Array.from({ length: 20 }, (_, i) => a.rect(`crypt_floor_${i + 1}`));
+    // Omniboy's floor_1 carries a leaf / sand tuft and 7-8 are open pits, so their rooms lay the
+    // plain floor_2 and only sprinkle the tuft; 3-6 are the cracked variations.
+    const plain = pre ? floors[1] : floors[0];
+    const worn = pre ? [floors[2], floors[3], floors[4], floors[5]] : floors.slice(1);
+    const tile = () => {
+      if (theme === 'crypt' && r() < 0.3) return cracked[Math.floor(r() * cracked.length)];
+      if (pre && r() < 0.03) return floors[0];
+      return r() < 0.72 ? plain : worn[Math.floor(r() * worn.length)];
+    };
     const mids = pre ? [a.rect(`${pre}wall_mid`), a.rect(`${pre}wall_mid_2`), a.rect(`${pre}wall_mid_3`)] : [a.rect('wall_mid')];
     const mid = () => mids[r() < 0.8 ? 0 : Math.floor(r() * mids.length)];
     const top = a.rect(pre ? `${pre}wall_top` : 'wall_top_mid');
     const banner = a.rect(`${pre}wall_banner_${p.banner}`);
-    const holes = [a.rect(`${pre}wall_hole_1`), a.rect(`${pre}wall_hole_2`)];
-    // Leafy walls in the jungle, carved walls in the tomb, goo elsewhere.
-    const deco = pre ? [1, 2, 3, 4, 5].map((i) => a.rect(`${pre}wall_deco_${i}`)) : [a.rect('wall_goo')];
-    const decoChance = pre ? 0.07 : p.goo;
-    // One fountain per room, set into the back wall, and (jungle / tomb) a pair of watching eyes.
+    // Whole-tile variations: worn bricks in the halls, leafy / carved bricks in the jungle and tomb.
+    // (The jungle/tomb "hole" tiles read as missing tiles, so they're not used.)
+    // (tomb_wall_deco_3 is blank in the source sheet.)
+    const variants = pre ? [1, 2, 4, 5].map((i) => a.rect(`${pre}wall_deco_${i}`)) : [a.rect('wall_hole_1'), a.rect('wall_hole_2')];
+    const variantChance = pre ? 0.06 : 0.03;
+    // Goo is an overlay (it has see-through parts), so it goes on top of a normal brick.
+    const goo = a.rect('wall_goo');
     const fountainX = -2;
-    const eyes = pre ? [-8 + Math.floor(r() * 3), 7 + Math.floor(r() * 4)] : [];
-    const skip = (x: number, y: number) => (x === fountainX && y <= 2) || (eyes.includes(x) && y === 3);
+    const bannerAt = (x: number, y: number) => y === 5 && (x === -9 || x === 5 || x === 12);
 
     for (let x = -24; x < 24; x++) {
       for (let y = 0; y < 13; y++) {
-        if (skip(x, y)) continue;
-        const roll = r();
-        const rect = y === 12 ? top
-          : y === 5 && (x === -9 || x === 5 || x === 12) ? banner
-          : roll < 0.035 ? holes[Math.floor(r() * 2)]
-          : roll < 0.035 + decoChance ? deco[Math.floor(r() * deco.length)] : mid();
+        const rect = y === 12 ? top : bannerAt(x, y) ? banner : x !== fountainX && r() < variantChance ? variants[Math.floor(r() * variants.length)] : mid();
         wall.face(x, y, WALL_Z, rect);
+        if (!pre && y > 0 && y < 11 && x !== fountainX && r() < p.goo) wall.face(x, y, WALL_Z + 0.01, goo);
       }
       for (let z = WALL_Z; z < 16; z++) floor.top(x, 0, z, tile());
     }
     floor.top(Math.floor(STAIRS.x), 0.005, Math.floor(STAIRS.z), a.rect('floor_stairs'));
 
-    // Animated scenery.
+    // Animated scenery: one wall fountain per room, drawn over the brick.
     const prop = (frames: Rect[], x: number, y: number, fps = 6) => {
       const sp = new PixelSprite(a.texture, a.size, frames, { fps });
       sp.mesh.material = this.wallMat;
-      sp.mesh.position.set(x + 0.5, y, WALL_Z + 0.01);
+      sp.mesh.position.set(x + 0.5, y, WALL_Z + 0.02);
       this.props.push(sp);
       return sp.mesh;
     };
@@ -428,7 +433,6 @@ export class Scene {
     if (pre) {
       const kind = theme === 'tomb' ? 'lava' : 'water';
       fountain.push(prop([a.rect(`${pre}fountain_top`)], fountainX, 2), prop(a.anim(`${pre}fountain_${kind}`), fountainX, 1), prop(a.anim(`${pre}fountain_${kind}_basin`), fountainX, 0));
-      for (const x of eyes) fountain.push(prop(a.anim(`${pre}wall_eyes`), x, 3, 1.5));
     } else {
       const c = seed % 2 ? 'blue' : 'red';
       fountain.push(prop([a.rect('wall_fountain_top_1')], fountainX, 2), prop(a.anim(`wall_fountain_mid_${c}`), fountainX, 1), prop(a.anim(`wall_fountain_basin_${c}`), fountainX, 0));
@@ -440,9 +444,13 @@ export class Scene {
       const pr = pillars[i % pillars.length];
       floor.face(x - 0.5, 0, WALL_Z + 0.35, pr, pr.w / 16, pre ? pr.h / 16 : 3);
     });
+    // A few bones along the foot of the wall, kept clear of the columns and fountain.
     const skull = a.rect('skull');
-    const crate = a.rect('crate');
-    for (let i = 0; i < 10; i++) floor.face(-14 + r() * 28, 0, WALL_Z + 0.5 + r() * 0.6, r() < 0.6 ? skull : crate, 0.8, r() < 0.6 ? 0.8 : 1.2);
+    for (let i = 0; i < 6; i++) {
+      const x = -14 + r() * 28;
+      if ([-13, -5.5, 2, 9.5, fountainX + 0.5].some((c) => Math.abs(c - x) < 1)) continue;
+      floor.face(x, 0, WALL_Z + 0.5 + r() * 0.6, skull, 0.7, 0.7);
+    }
 
     const group = new THREE.Group();
     group.add(new THREE.Mesh(wall.build(), this.wallMat), new THREE.Mesh(floor.build(), this.floorMat), ...fountain);
@@ -1061,9 +1069,9 @@ export class Scene {
       }
       case 'floor': {
         const z = zoneOf(ev.floor);
-        // First time into a deeper zone (however you got there): the staircase.
-        const deeper = z > this.seenZone;
-        this.seenZone = Math.max(this.seenZone, z);
+        // Going down into the next zone (however you got there): the staircase, every time.
+        const deeper = z > zoneOf(this.lastFloor);
+        this.lastFloor = ev.floor;
         if (this.cine) this.cine.zone = z;
         else if (deeper && this.settings.cinematics) this.startCinematic(z);
         else this.setBand(z);
@@ -1130,7 +1138,7 @@ export class Scene {
     this.party = [];
     this.syncParty(game, true);
     this.setBand(zoneOf(game.s.floor));
-    this.seenZone = zoneOf(Math.max(game.s.floor, game.s.maxFloor - 1));
+    this.lastFloor = game.s.floor;
   }
 
   private addShake(v: number) {
@@ -1169,7 +1177,7 @@ export class Scene {
     const theme = ZONES[c.zone % ZONES.length].tiles;
     const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : '';
     const a = this.atlas;
-    const floors = theme === 'crypt' ? [a.rect('crypt_floor_1'), a.rect('crypt_floor_5')] : [a.rect(`${pre}floor_1`), a.rect(`${pre}floor_2`)];
+    const floors = theme === 'crypt' ? [a.rect('crypt_floor_1'), a.rect('crypt_floor_5')] : [a.rect(`${pre}floor_${pre ? 2 : 1}`), a.rect(`${pre}floor_3`)];
     // Back wall dim, stairs bright: the flights have to stand out from the tower wall.
     this.wallMat.color.setRGB(...pal.wall).multiplyScalar(0.7);
     this.floorMat.color.setRGB(...pal.floor).multiplyScalar(1.15);
