@@ -149,6 +149,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .rate { display: flex; gap: 8px; font: 600 16px/1 'Pixelify Sans'; color: var(--dim); text-shadow: var(--outline); margin-top: 4px; }
 .rate b { font: 400 24px/1 'Jersey 10'; color: var(--text); font-weight: 400; }
 .rate .sep { color: var(--faint); }
+.rate i { font-style: normal; }
+.rate .short { display: none; }
+body.compact .rate .long { display: none; }
+body.compact .rate .short { display: inline; }
+.rate > span { white-space: nowrap; }
 .rate.boosted b { color: var(--gold-hi); animation: glowtext 0.8s infinite alternate; }
 
 .floor { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 6px; pointer-events: auto; }
@@ -463,33 +468,121 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 @keyframes curtainin { from { opacity: 0; } to { opacity: 1; } }
 @keyframes curtainout { from { opacity: 1; } to { opacity: 0; } }
 
-/* ---------- phones ---------- */
+/* ---------- small screens ----------
+   .compact: any small screen (phones either way up, small windows): a tight, left-aligned HUD,
+   icon-only buttons, slimmer pop-ups.
+   .phone: portrait phones: the party panel becomes a bottom sheet that can be collapsed. */
 
+:root { --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px); }
+html, body { -webkit-touch-callout: none; overscroll-behavior: none; }
+
+body.compact .hud-top { top: calc(8px + var(--safe-t)); left: calc(10px + var(--safe-l)); width: calc(var(--free-w, 100%) - 20px - var(--safe-l)); align-items: stretch; gap: 3px; text-align: left; }
+body.compact .bank { gap: 6px; }
+body.compact .bank-ico .px { zoom: 0.6; }
+body.compact .bank-v { font-size: 40px; text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 0 0 16px rgba(255, 190, 80, 0.4); }
+body.compact .rate { margin-top: 0; font-size: 12px; gap: 6px; }
+body.compact .rate b { font-size: 18px; }
+body.compact .floor { margin-top: 4px; width: 100%; max-width: 460px; padding: 2px 4px; gap: 4px; }
+body.compact .floor-mid { width: auto; flex: 1; min-width: 0; }
+body.compact .floor .btn.icon.sm { width: 38px; height: 38px; }
+body.compact .floor-n { font-size: 16px; white-space: nowrap; }
+body.compact .floor-sub { font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 6px; }
+body.compact .floor .auto { min-width: 0; min-height: 38px; font-size: 13px; }
+body.compact .fever { width: 100%; max-width: 460px; height: 12px; margin-top: 2px; }
+body.compact .fever span { font-size: 9px; line-height: 12px; letter-spacing: 1px; }
+body.compact .buffs { justify-content: flex-start; margin-top: 4px; gap: 4px; }
+body.compact .buff { padding: 2px 8px 4px 4px; }
+body.compact .buff b { font-size: 12px; }
+body.compact .buff small { font-size: 14px; }
+
+/* Buttons: an icon row. Top-right on portrait phones, bottom-left otherwise. */
+body.compact .dock { left: calc(8px + var(--safe-l)); bottom: calc(8px + var(--safe-b)); gap: 4px; }
+body.compact .dock-b { min-width: 0; width: 42px; height: 42px; padding: 0; }
+body.compact .dock-b span { display: none; }
+body.compact .dock-b .glyph { width: 18px; height: 18px; }
+body.compact .dock .mute { display: none; }
+body.compact .badge { top: -10px; right: -12px; font-size: 15px; padding: 1px 4px; }
+
+body.compact .toasts { left: calc(8px + var(--safe-l)); bottom: calc(60px + var(--safe-b)); width: min(260px, calc(var(--free-w, 100%) - 16px)); gap: 3px; }
+body.compact .toast { padding: 2px 6px; gap: 6px; }
+body.compact .toast:nth-child(n+3) { display: none; }
+body.compact .toast-ico { width: 24px; }
+body.compact .toast-ico .px { zoom: 0.7; }
+body.compact .toast-t { font-size: 12px; }
+body.compact .toast-t small { display: none; }
+
+body.compact .banner { top: calc(var(--free-h, 100%) * 0.5); }
+body.compact .banner b { font-size: 36px; }
+body.compact .banner span { font-size: 14px; }
+body.compact .ticker { display: none; }
+body.compact .raid-mark.first::after { font-size: 14px; top: -70px; padding: 4px 8px; }
+body.compact .hint b { font-size: 16px; padding: 6px 10px; }
+body.compact .tip { width: min(300px, calc(100vw - 16px)); }
+
+/* The party panel on a landscape phone / small window: narrower, tighter rows. */
+body.compact:not(.phone) { --shop-w: min(360px, 44vw); }
+body.compact .shop-head { padding: 8px 12px 6px calc(12px + 0px); }
+body.compact .shop-head h2 { font-size: 18px; }
+body.compact .upgs { padding: 6px 10px; }
+body.compact .upgs-head { margin-bottom: 4px; min-height: 24px; }
+body.compact .upg-grid { grid-template-columns: repeat(auto-fill, 46px); max-height: 96px; }
+body.compact .upg { width: 46px; height: 46px; }
+body.compact .upg .ico .px { zoom: 0.85; }
+body.compact .upgs-empty { display: none; }
+body.compact .modes { padding: 4px 10px; }
+body.compact .mode { min-width: 44px; min-height: 32px; font-size: 14px; }
+body.compact .gens { padding: 4px 6px calc(12px + var(--safe-b)); }
+body.compact .gen { height: 56px; gap: 8px; margin-bottom: 3px; }
+body.compact .gen-name { font-size: 16px; }
+body.compact .gen-lv { font-size: 24px; }
+body.compact .gold { font-size: 19px; }
+body.compact .shop { padding-right: var(--safe-r); }
+
+/* Portrait phones: party in a bottom sheet. Tap the header to fold it away and watch the fight. */
 body.phone { --shop-w: 100%; }
-body.phone .shop { top: auto; height: 46vh; width: 100%; border-left: 0; border-top: 4px solid var(--ink); box-shadow: inset 0 4px 0 #3b2b2e, 0 -8px 24px rgba(0, 0, 0, 0.5); }
-body.phone .shop-head { padding: 8px 12px 6px; }
-body.phone .upgs { padding: 6px 10px; }
-body.phone .upg-grid { max-height: 56px; }
-body.phone .upgs-empty { display: none; }
-body.phone .hud-top { top: 58px; }
-body.phone .bank-v { font-size: 48px; }
-body.phone .floor-mid { width: 150px; }
-body.phone .rate { font-size: 13px; }
-body.phone .bank-ico svg { width: 20px; height: 18px; }
-body.phone .dock { top: 8px; bottom: auto; left: 8px; right: 8px; justify-content: space-between; }
-body.phone .dock-b { min-width: 0; height: 40px; flex-direction: row; padding: 0 6px; }
-body.phone .dock-b span { display: none; }
-body.phone .toasts { top: auto; bottom: calc(100% - var(--free-h, 50%) + 8px); left: 8px; width: calc(100vw - 16px); }
-body.phone .toast:nth-child(n+3) { display: none; }
-body.phone .floor { gap: 4px; padding: 2px 4px; }
-body.phone .floor-sub { display: none; }
-body.phone .floor-n { white-space: nowrap; font-size: 16px; }
-body.phone .floor .auto { min-width: 0; }
-body.phone .hud-top { top: 56px; }
-body.phone .ticker { display: none; }
-body.phone .tip { width: min(300px, calc(100vw - 16px)); }
-body.phone .banner { top: calc(var(--free-h, 50%) * 0.62); }
-body.phone .banner b { font-size: 40px; }
+body.phone .shop {
+  top: auto; width: 100%; height: min(42vh, 42dvh); border-left: 0; border-top: 4px solid var(--ink);
+  box-shadow: inset 0 4px 0 #3b2b2e, 0 -8px 24px rgba(0, 0, 0, 0.5);
+  transition: height 0.25s cubic-bezier(.3, .8, .3, 1); padding-bottom: var(--safe-b);
+}
+body.phone .shop.min { height: calc(46px + var(--safe-b)); }
+body.phone .shop-head { position: relative; cursor: pointer; padding: 14px 12px 8px; align-items: center; gap: 8px; }
+body.phone .shop-head .shop-sub { margin-left: auto; }
+body.phone .sheet-grip { position: absolute; left: 50%; top: 4px; width: 36px; height: 4px; margin-left: -18px; background: #4a3a3c; box-shadow: 0 0 0 1px var(--ink); }
+body.phone .shop.min .shop-sub { display: none; }
+.shop-ready { display: none; font: 400 12px/1 'Silkscreen'; font-style: normal; color: var(--ink); background: var(--gold); padding: 3px 5px; box-shadow: 0 0 0 2px var(--ink); animation: hintbob 1s ease-in-out infinite; }
+body.phone .shop.min .shop-ready:not([hidden]) { display: inline-block; margin-left: auto; }
+body.phone .upg-grid { max-height: 50px; }
+body.phone .dock { top: calc(8px + var(--safe-t)); bottom: auto; left: auto; right: calc(8px + var(--safe-r)); }
+body.phone .hud-top { width: calc(100% - 20px - var(--safe-l) - var(--safe-r)); }
+/* Keep the gold and buttons on one line: the counter leaves room for the button row. */
+body.phone .bank, body.phone .rate { max-width: calc(100% - 190px); }
+body.phone .toasts { bottom: calc(100% - var(--free-h, 50%) + 8px); }
+/* Landscape phones: pop-ups sit in the button row, one at a time, so they don't cover the fight. */
+body.compact:not(.phone) .toasts { left: calc(196px + var(--safe-l)); bottom: calc(10px + var(--safe-b)); width: min(280px, calc(var(--free-w, 100%) - 206px)); }
+body.compact:not(.phone) .toast:nth-child(n+2) { display: none; }
+
+/* Modals fit the screen and scroll inside it. */
+body.compact .modal { width: calc(100vw - 16px - var(--safe-l) - var(--safe-r)); max-height: calc(100dvh - 16px - var(--safe-t) - var(--safe-b)); padding: 8px 8px 12px 12px; }
+body.compact .m-head { gap: 8px; padding-bottom: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+body.compact .m-head h2 { font-size: 22px; }
+body.compact .m-head span { font-size: 16px; order: 3; flex-basis: 100%; }
+body.compact .m-head .btn { position: absolute; right: 12px; top: 10px; }
+body.compact .modal { position: relative; }
+body.compact .tro-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
+body.compact .tro { width: auto; height: auto; aspect-ratio: 1; }
+body.compact .aby-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+body.compact .aby b { font-size: 13px; }
+body.compact .stats { gap: 4px 12px; font-size: 14px; }
+body.compact .stats dd { font-size: 18px; }
+body.compact .set label { flex-wrap: wrap; font-size: 14px; }
+body.compact .set input[type=range] { width: 100%; }
+body.compact .set-row .btn { font-size: 13px; min-height: 34px; padding: 0 6px; }
+body.compact .btn.big { font-size: 17px; min-height: 44px; padding: 0 12px; white-space: normal; }
+body.compact .curtain b { font-size: 60px; }
+body.compact .offline-v b { font-size: 48px; }
+body.compact .cursors { grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); }
+body.compact .cur { width: auto; height: auto; aspect-ratio: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .bank-ico, .hint b, .raid-mark .px, .raid-mark b, .badge.hot { animation: none; }

@@ -65,6 +65,11 @@ export class Ui {
   private bannerTimer = 0;
   private floorKey = '';
   private bladeSprite = '';
+  /** Touch screens: long-press shows a tooltip instead of hover. */
+  private touch = matchMedia('(pointer: coarse)').matches;
+  private pressTimer = 0;
+  private pressed = false;
+  private hudTop = 0;
 
   constructor(root: HTMLElement, game: Game, scene: Scene, hooks: UiHooks) {
     this.root = root;
@@ -74,7 +79,7 @@ export class Ui {
     root.innerHTML = `
       <div class="hud-top">
         <div class="bank"><span class="bank-ico">${sprite('coin', 5)}</span><b class="bank-v">0</b></div>
-        <div class="rate"><span><b class="dps-v">0</b> damage/sec</span><span class="sep">·</span><span><b class="click-v">1</b> per click</span></div>
+        <div class="rate"><span><b class="dps-v">0</b> <i class="long">damage/sec</i><i class="short">dps</i></span><span class="sep">·</span><span><b class="click-v">1</b> <i class="long">per click</i><i class="short">/click</i></span></div>
         <div class="floor pnl">
           <button class="btn icon sm" data-act="floorDown" aria-label="Previous floor">${G.left()}</button>
           <div class="floor-mid">
@@ -100,7 +105,7 @@ export class Ui {
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute"></button>
       </nav>
       <aside class="shop">
-        <header class="shop-head"><h2>Your Party</h2><span class="shop-sub"></span></header>
+        <header class="shop-head" data-act="sheet"><h2>Your Party</h2><span class="shop-sub"></span><em class="shop-ready" hidden></em><span class="sheet-grip" aria-hidden="true"></span></header>
         <section class="upgs">
           <div class="upgs-head"><h3>Upgrades</h3><button class="btn small buy-all" data-act="buyAll" hidden>Buy all</button></div>
           <div class="upg-grid"></div>
@@ -126,7 +131,7 @@ export class Ui {
       down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
       fever: q('.fever'), feverBar: q('.fever i'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), raid: q('.raid-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
-      upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
+      upgEmpty: q('.upgs-empty'), shopReady: q('.shop-ready'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
     };
 
@@ -155,14 +160,37 @@ export class Ui {
 
   // ---------- layout ----------
 
+  /**
+   * Three shapes: desktop (party panel on the right, roomy HUD), landscape phone (narrow
+   * panel, compact HUD) and portrait phone (compact HUD, party in a bottom sheet you can
+   * collapse). The camera then frames the fight in whatever space is left.
+   */
   private layout() {
-    const phone = innerWidth < 760;
-    document.body.classList.toggle('phone', phone);
+    const w = innerWidth;
+    const h = innerHeight;
+    const sheet = w < 760 && h > w;
+    const compact = sheet || h < 560 || w < 900;
+    const body = document.body.classList;
+    body.toggle('phone', sheet);
+    body.toggle('compact', compact);
     const shop = this.el.shop.getBoundingClientRect();
-    if (phone) this.scene.setViewport(0, innerHeight - shop.top);
-    else this.scene.setViewport(innerWidth - shop.left, 0);
-    this.root.style.setProperty('--free-w', phone ? `${innerWidth}px` : `${shop.left}px`);
-    this.root.style.setProperty('--free-h', phone ? `${shop.top}px` : `${innerHeight}px`);
+    const freeW = sheet ? w : shop.left;
+    const freeH = sheet ? shop.top : h;
+    this.root.style.setProperty('--free-w', `${freeW}px`);
+    this.root.style.setProperty('--free-h', `${freeH}px`);
+    // Frame the fight below the HUD (the floor bar is the last part that always shows).
+    const hud = (compact ? this.el.fever.hidden ? this.el.floorBox : this.el.fever : this.el.floorBox).getBoundingClientRect();
+    this.hudTop = compact ? Math.round(hud.bottom + 4) : 0;
+    this.scene.setViewport(sheet ? 0 : w - shop.left, sheet ? h - shop.top : 0, this.hudTop);
+  }
+
+  private toggleSheet(open?: boolean) {
+    const shop = this.el.shop;
+    shop.classList.toggle('min', open === undefined ? !shop.classList.contains('min') : !open);
+    this.hooks.sound(shop.classList.contains('min') ? 'close' : 'open', { vol: 0.4 });
+    // Re-frame once the sheet has finished sliding (and once more in case the transition is skipped).
+    shop.addEventListener('transitionend', () => this.layout(), { once: true });
+    setTimeout(() => this.layout(), 400);
   }
 
   // ---------- input ----------
@@ -208,6 +236,11 @@ export class Ui {
     });
 
     r.addEventListener('click', (e) => {
+      if (this.pressed) {
+        // That was a long-press to read the tooltip, not a purchase.
+        this.pressed = false;
+        return;
+      }
       const t = e.target as HTMLElement;
       const comp = t.closest<HTMLElement>('[data-comp]');
       if (comp) {
@@ -266,10 +299,31 @@ export class Ui {
     });
 
     r.addEventListener('pointerover', (e) => {
+      if (e.pointerType !== 'mouse') return;
       const t = (e.target as HTMLElement).closest<HTMLElement>('[data-tip]');
       if (!t || t === this.tipAnchor) return;
       this.showTip(t);
     });
+    // Touch: press and hold anything with a tooltip to read it (the tap that follows won't buy).
+    r.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') return;
+      const t = (e.target as HTMLElement).closest<HTMLElement>('[data-tip]');
+      clearTimeout(this.pressTimer);
+      this.hideTip();
+      if (!t) return;
+      this.pressTimer = window.setTimeout(() => {
+        this.pressed = true;
+        this.showTip(t);
+        navigator.vibrate?.(10);
+      }, 420);
+    });
+    const release = () => {
+      clearTimeout(this.pressTimer);
+      if (this.pressed) setTimeout(() => this.hideTip(), 1800);
+    };
+    r.addEventListener('pointerup', release);
+    r.addEventListener('pointercancel', release);
+    r.addEventListener('contextmenu', (e) => e.preventDefault());
     r.addEventListener('pointerout', (e) => {
       const t = (e.target as HTMLElement).closest<HTMLElement>('[data-tip]');
       const to = (e.relatedTarget as HTMLElement | null)?.closest?.('[data-tip]');
@@ -289,6 +343,13 @@ export class Ui {
     const s = g.s.settings;
     switch (act) {
       case 'close': this.closeModal(); break;
+      case 'sheet': if (document.body.classList.contains('phone')) this.toggleSheet(); break;
+      case 'sound':
+        s.muted = !s.muted;
+        this.syncMute();
+        this.hooks.settings();
+        this.renderModal();
+        break;
       case 'buyAll': if (g.buyAllUpgs()) this.hideTip(); break;
       case 'floorDown':
         if (g.goFloor(g.s.floor - 1)) g.s.auto = false;
@@ -544,7 +605,10 @@ export class Ui {
         this.el.bars.appendChild(bar);
         this.bars.set(m.id, bar);
       }
-      bar.style.transform = `translate(${Math.round(s.x)}px, ${Math.round(s.y - 8)}px)`;
+      // Keep bars on screen even when a big monster stands near the edge.
+      const half = m.boss ? 62 : 24;
+      const x = Math.min(innerWidth - half, Math.max(half, s.x));
+      bar.style.transform = `translate(${Math.round(x)}px, ${Math.round(Math.max(4, s.y - 8))}px)`;
       (bar.firstChild as HTMLElement).style.width = `${Math.max(0, m.hp / m.max) * 100}%`;
     }
     for (const [id, bar] of this.bars) if (!seen.has(id)) {
@@ -583,6 +647,13 @@ export class Ui {
     this.renderRows();
     this.renderUpgrades();
     this.el.shopSub.textContent = `${g.s.owned.filter((n) => n > 0).length} companions · ${g.s.upgrades.length} upgrades`;
+    const ready = this.rows.filter((r) => !r.hidden && r.classList.contains('can')).length + this.el.upgGrid.querySelectorAll('.upg.can').length;
+    this.el.shopReady.hidden = ready === 0;
+    this.el.shopReady.textContent = `${ready} ready`;
+    if (document.body.classList.contains('compact')) {
+      const hud = (this.el.fever.hidden ? this.el.floorBox : this.el.fever).getBoundingClientRect();
+      if (Math.abs(Math.round(hud.bottom + 4) - this.hudTop) > 6) this.layout();
+    }
 
     const pending = g.pendingSouls();
     const ab = this.el.abyssBadge;
@@ -713,7 +784,7 @@ export class Ui {
     if (state === this.hintState) return;
     this.hintState = state;
     this.el.hint.hidden = state !== 'click';
-    this.el.hint.innerHTML = '<b>Click the monsters!</b>';
+    this.el.hint.innerHTML = `<b>${this.touch ? 'Tap' : 'Click'} the monsters!</b>`;
     this.rows[0].classList.toggle('nudge', state === 'hire');
     this.el.raid.classList.toggle('first', state === 'raid');
   }
@@ -893,7 +964,7 @@ export class Ui {
         <div class="set">
           <label>Effects volume <input type="range" min="0" max="100" value="${Math.round(s.sfxVol * 100)}" data-set="sfxVol"></label>
           <label>Music volume <input type="range" min="0" max="100" value="${Math.round(s.musicVol * 100)}" data-set="musicVol"></label>
-          <div class="set-row">${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}
+          <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}
           <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button></div>
           <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
           <div class="cursors">${CURSORS.map((c) => {

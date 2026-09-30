@@ -35,6 +35,8 @@ const PARTY_SLOTS: [number, number][] = [
 
 interface MonView {
   id: number;
+  /** Spot x from the game, before squeezing for tall screens. */
+  spotX: number;
   blood: string;
   body: THREE.Group;
   inner: THREE.Group;
@@ -64,6 +66,8 @@ interface CompView {
   run: Rect[];
   cd: number;
   home: THREE.Vector3;
+  /** Formation x before squeezing for tall screens. */
+  homeX: number;
   base: number;
   /** Squash/stretch: negative = crouched (wind-up), positive = stretched (release). */
   stretch: number;
@@ -223,7 +227,11 @@ export class Scene {
   private time = 0;
   private fever = 0;
   private hitstop = 0;
-  private view = { right: 0, bottom: 0 };
+  /** Screen space covered by UI: the camera frames the fight in what's left. */
+  private view = { right: 0, bottom: 0, top: 0 };
+  /** Portrait screens pull the battle line together so both sides fit. */
+  private squeeze = 1;
+  private look = LOOK.clone();
   private camBase = new THREE.Vector3();
   settings = { particles: true, shake: true, blood: true };
 
@@ -231,7 +239,8 @@ export class Scene {
     this.container = container;
     this.atlas = atlas;
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    // Phones have tiny, dense screens and weaker GPUs: cap the resolution a bit lower there.
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, matchMedia('(pointer: coarse)').matches ? 1.5 : 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.2;
     container.appendChild(this.renderer.domElement);
@@ -273,8 +282,9 @@ export class Scene {
   }
 
   /** Space the UI covers on the right (desktop) or bottom (phone), so the fight centres in what's left. */
-  setViewport(right: number, bottom: number) {
-    this.view = { right, bottom };
+  setViewport(right: number, bottom: number, top = 0) {
+    if (right === this.view.right && bottom === this.view.bottom && top === this.view.top) return;
+    this.view = { right, bottom, top };
     this.resize();
   }
 
@@ -284,26 +294,32 @@ export class Scene {
     this.renderer.setSize(w, h);
     this.composer.setSize(w, h);
     this.bloom.resolution.set(w, h);
-    const { right, bottom } = this.view;
-    const fullW = w + right;
-    const fullH = h + bottom;
+    const { right, bottom, top } = this.view;
+    const freeW = Math.max(160, w - right);
+    const freeH = Math.max(140, h - bottom - top);
+    // Shift the frustum so its centre lands in the middle of the free area.
+    const cx = freeW / 2;
+    const cy = top + freeH / 2;
+    const fullW = 2 * Math.max(cx, w - cx);
+    const fullH = 2 * Math.max(cy, h - cy);
     this.camera.aspect = fullW / fullH;
-    this.camera.setViewOffset(fullW, fullH, right, bottom, w, h);
+    this.camera.setViewOffset(fullW, fullH, fullW / 2 - cx, fullH / 2 - cy, w, h);
     this.camera.updateProjectionMatrix();
-    // Fit the battle line (~17 units) across the free area, and ~8 up it.
+    // Wide screens show the whole battle line; tall ones squeeze it and zoom in.
+    const portrait = freeW < freeH * 1.1;
+    this.squeeze = portrait ? 0.5 : 1;
+    this.look.set(portrait ? -0.7 : 0, LOOK.y, LOOK.z);
+    const across = portrait ? 8.5 : 17;
+    const tall = portrait ? 6.5 : 8;
     const t = Math.tan(THREE.MathUtils.degToRad(15));
-    const freeW = Math.max(200, w - right);
-    const freeH = Math.max(200, h - bottom);
-    // Portrait screens can't fit the whole line at a readable size: show the heart of the fight.
-    const across = freeW < freeH ? 12 : 17;
-    const dist = Math.max((across * fullH) / (2 * t * freeW), (8 * fullH) / (2 * t * freeH));
-    this.camBase.set(LOOK.x, LOOK.y + dist * 0.26, LOOK.z + dist);
+    const dist = Math.max((across * fullH) / (2 * t * freeW), (tall * fullH) / (2 * t * freeH));
+    this.camBase.set(this.look.x, this.look.y + dist * 0.26, this.look.z + dist);
     const fog = this.scene.fog as THREE.Fog;
     fog.near = dist + 8;
     fog.far = dist + 30;
     this.tiltH.uniforms.step.value.set(1.1 / w, 0);
     this.tiltV.uniforms.step.value.set(0, 1.1 / h);
-    this.tiltH.uniforms.focus.value = this.tiltV.uniforms.focus.value = 0.5 + (bottom / h) * 0.5;
+    this.tiltH.uniforms.focus.value = this.tiltV.uniforms.focus.value = 1 - cy / h;
   }
 
   // ---------- chamber ----------
@@ -399,9 +415,10 @@ export class Scene {
     body.add(inner, blobShadow(def.big ? 1.6 : 0.9));
     const [x, z] = PARTY_SLOTS[i % PARTY_SLOTS.length];
     const home = new THREE.Vector3(x, 0, z);
+    home.x = x * this.squeeze;
     body.position.copy(instant ? home : new THREE.Vector3(-16, 0, z));
     this.scene.add(body);
-    this.party.push({ comp: i, body, inner, sprite, idle, run, cd: Math.random(), home, base, stretch: 0, act: null });
+    this.party.push({ comp: i, body, inner, sprite, idle, run, cd: Math.random(), home, homeX: x, base, stretch: 0, act: null });
     if (!instant) this.fx.light(home.clone().setY(1.5), 0xffd070, 12, 0.5, 6);
   }
 
@@ -415,6 +432,7 @@ export class Scene {
     const focus = targets[0];
     const haste = 1 + this.fever;
     for (const c of this.party) {
+      c.home.x = c.homeX * this.squeeze;
       const def = COMPS[c.comp];
       const p = c.body.position;
       const a = c.act;
@@ -644,7 +662,7 @@ export class Scene {
     body.position.copy(STAIRS).add(new THREE.Vector3(Math.random() * 0.6, 0, Math.random() * 0.6));
     body.scale.setScalar(0.01);
     this.scene.add(body);
-    this.mons.set(m.id, { id: m.id, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x, 0, m.z), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0 });
+    this.mons.set(m.id, { id: m.id, spotX: m.x, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0 });
     if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(0.4), '#6a5a78', 6, 2, 0.08, 6);
     if (m.boss) {
       this.fx.light(STAIRS.clone().setY(2), 0xff4040, 30, 1, 12);
@@ -674,6 +692,7 @@ export class Scene {
         this.removeView(v);
         continue;
       }
+      v.target.x = v.spotX * this.squeeze;
       v.born = Math.min(1, v.born + dt * 3);
       v.body.scale.setScalar(v.born < 1 ? v.born * (1 + Math.sin(v.born * Math.PI) * 0.3) : 1);
       const p = v.body.position;
@@ -1018,7 +1037,7 @@ export class Scene {
     this.shake = Math.max(0, this.shake - dt * 1.6);
     const sh = this.shake * this.shake * 2.2;
     this.camera.position.set(this.camBase.x + (Math.random() - 0.5) * sh, this.camBase.y + (Math.random() - 0.5) * sh, this.camBase.z);
-    this.camera.lookAt(LOOK);
+    this.camera.lookAt(this.look);
     this.composer.render(dt);
   }
 }
