@@ -558,7 +558,16 @@ export class Ui {
         }
         break;
       case 'bossWin': this.banner('Victory!', `Floor ${ev.floor} conquered`, 'win'); break;
-      case 'bossFail': this.banner('The boss held', 'Your party falls back to grow stronger', 'fail'); break;
+      case 'bossFail':
+        // The first wall: this is where the game teaches you to descend.
+        if (g.s.descents === 0 && ev.floor >= DESCEND_FLOOR && g.canDescend()) this.banner('The way down opens', 'Descend to come back stronger', 'fail');
+        else this.banner('The boss held', 'Your party falls back to grow stronger', 'fail');
+        break;
+      case 'souls': {
+        const s = this.scene.screenOf(ev.id);
+        if (s) this.pop(s.x, s.y + s.h * 0.1, `+${fmt(ev.souls)} souls`, 'p-soul');
+        break;
+      }
       case 'retreat': this.toast(`Floor ${ev.floor} is too tough for now. Falling back.`, 'skull'); break;
       case 'buyComp': this.rowCache[ev.comp] = ''; this.bump(this.rows[ev.comp]); break;
       case 'reveal': this.toast(`New companion for hire: <b>${COMPS[ev.comp].name}</b>`, COMPS[ev.comp].sprite); break;
@@ -809,7 +818,7 @@ export class Ui {
     }
 
     this.hints();
-    if (this.modal && ['trophies', 'abyss', 'heart', 'stats', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
+    if (this.modal && ['trophies', 'abyss', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
     this.refreshTip();
   }
 
@@ -1058,8 +1067,8 @@ export class Ui {
       const text: Record<string, string> = {
         trophies: `Trophies: ${g.s.trophies.length}/${TROPHIES.length}. Each gives +1% damage.`,
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
-        abyss: (g.canDescend() ? `Descend now for ${fmt(g.pendingSouls())} souls.` : `Reach floor ${DESCEND_FLOOR} to descend for souls.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
-        stats: 'Your numbers.',
+        abyss: (g.canDescend() ? `Descend now for ${fmt(g.pendingSouls())} souls.` : g.descendOpen() ? 'Beat a zone boss to bank souls.' : `The way down opens at the floor ${DESCEND_FLOOR} boss.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
+        stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
       };
@@ -1128,18 +1137,8 @@ export class Ui {
       html = head('The Heart', `${G.heart()} ${fmt(g.s.stones)} heartstones · ${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`) + this.tabs('heart') + this.heartHtml();
     } else if (name === 'relics') {
       html = head('Relics', `${g.relicsFound()} / ${RELICS.length} found · ${g.s.equipped.length} / ${g.relicSlots()} slots`) + this.relicsHtml();
-    } else if (name === 'stats') {
-      const s = g.s;
-      const rows: [string, string][] = [
-        ['Floor', `${s.floor} (deepest this descent ${s.maxFloor}, ever ${s.bestFloor})`], ['Party damage/sec', fmt(g.dps())], ['Click damage', fmt(g.clickDamage())],
-        ['Crit chance', `${Math.round(g.critChance() * 100)}% for ×${g.critMult()}`], ['Kills per second', g.killRate.toFixed(1)],
-        ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses killed', fmt(s.bosses)],
-        ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rampages', fmt(s.fevers)],
-        ['Descents', fmt(s.descents)], ['Souls', fmt(s.souls)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`],
-        ['Relics', `${g.relicsFound()} / ${RELICS.length}`], ['Awakenings', fmt(s.awakens)], ['Heartstones', fmt(s.stones)],
-        ['This descent', duration(s.runTime)], ['Time played', duration(s.playTime)],
-      ];
-      html = head('Stats') + `<dl class="stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
+    } else if (name === 'stats' || name === 'party' || name === 'records') {
+      html = head('Stats') + this.statTabs(name) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : this.recordsHtml());
     } else if (name === 'settings') {
       const s = g.s.settings;
       const tog = (act: string, on: boolean, label: string) => `<button class="btn toggle ${on ? 'on' : ''}" data-act="${act}">${label}: ${on ? 'On' : 'Off'}</button>`;
@@ -1171,13 +1170,17 @@ export class Ui {
   private abyssHtml(): string {
     const g = this.game;
     const pending = g.pendingSouls();
+    const next = g.nextBossSouls();
     const desc = g.canDescend()
-      ? `<p>Descending sends you back to the top with nothing but your souls, trophies and abyss powers.</p>
+      ? `<p>Descending sends you back to the top with your souls, relics, trophies and abyss powers.</p>
          <button class="btn primary big" data-act="descend">Descend for ${G.soul()} ${fmt(pending)} souls</button>
-         <p class="muted">+${fmt(Math.round(pending * g.soulPower() * 100))}% damage forever · each floor deeper earns 10% more souls</p>`
-      : `<p>Reach <b>floor ${DESCEND_FLOOR}</b> to descend. Deeper floors earn more souls.</p>
-         <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / DESCEND_FLOOR) * 100)}%"></i></div>
-         <p class="muted">Deepest this descent: floor ${g.s.maxFloor}</p>`;
+         <p class="muted">+${fmt(Math.round(pending * g.soulPower() * 100))}% damage forever · banked from the zone bosses you beat this descent · the floor ${next.floor} boss pays ${fmt(next.souls)} more</p>`
+      : !g.descendOpen()
+        ? `<p>Zone bosses (every 10th floor) pay souls. The way down opens at the <b>floor ${DESCEND_FLOOR}</b> boss.</p>
+           <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / DESCEND_FLOOR) * 100)}%"></i></div>
+           <p class="muted">Deepest this descent: floor ${g.s.maxFloor} · souls banked: ${fmt(pending)}</p>`
+        : `<p>Beat a zone boss (every 10th floor) to bank souls for your next descent.</p>
+           <p class="muted">The floor ${next.floor} boss pays ${fmt(next.souls)} souls.</p>`;
     const nodes = ABYSS.map((a) => {
       const owned = g.hasAbyss(a.id);
       const avail = g.abyssAvailable(a.id);
@@ -1188,6 +1191,114 @@ export class Ui {
     return `<div class="descend-box">${desc}</div>
       <h3>Abyss powers <span class="muted">${G.soul(1.5)} ${fmt(g.soulsFree())} to spend</span></h3>
       <div class="aby-grid">${nodes}</div>`;
+  }
+
+  private statTabs(on: string) {
+    const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
+    return `<nav class="tabs">${tab('stats', 'Bonuses')}${tab('party', 'Companions')}${tab('records', 'Records')}</nav>`;
+  }
+
+  /** Where every number comes from: each multiplier on its own line, then the total. */
+  private bonusHtml(): string {
+    const g = this.game;
+    const b = g.breakdown();
+    const p = b.parts;
+    const x = (v: number) => (v >= 1000 ? `×${fmt(v)}` : `×${Math.round(v * 100) / 100}`);
+    const pc = (v: number) => `${Math.round(v * 1000) / 10}%`;
+    const row = (label: string, value: string, note = '', off = false) => `<tr class="${off ? 'off' : ''}"><th>${label}${note ? `<small>${note}</small>` : ''}</th><td>${value}</td></tr>`;
+    const mul = (label: string, v: number, note: string, how = '') => row(label, x(v), v === 1 && how ? how : note, v === 1);
+    const total = (label: string, value: string) => `<tr class="tot"><th>${label}</th><td>${value}</td></tr>`;
+    const table = (title: string, rows: string) => `<section class="bd"><h3>${title}</h3><table>${rows}</table></section>`;
+    const relicName = (id: string) => RELIC_BY_ID.get(id)!.name;
+    const baseSum = b.baseComp.reduce((a, v) => a + v, 0);
+    const buffNames = (k: 'dps' | 'click' | 'gold') => g.s.buffs.filter((u) => u[k] > 1).map((u) => `${u.name} ×${u[k]}`).join(', ');
+    const soulsNote = `${fmt(g.s.souls)} souls × ${Math.round(g.soulPower() * 100)}% each`;
+    const allRows = (lead: string) =>
+      mul(`${lead}Upgrades`, p.upgrades, `+${Math.round((p.upgrades - 1) * 100)}% from tonics in the shop`, 'Tonics in the shop add to this') +
+      mul(`${lead}Trophies`, p.trophies, `${g.s.trophies.length} trophies`) +
+      mul(`${lead}Souls`, p.souls, soulsNote, 'Descend to earn souls') +
+      mul(`${lead}${relicName('shard')}`, p.shard, 'Legendary relic', 'A legendary relic') +
+      mul(`${lead}Heart of Fury`, p.fury, `level ${g.heartLv('fury')}`, 'A Heart power (awaken the Heart)');
+
+    const dps = table('Party damage per second',
+      row('Companions', fmt(baseSum), 'levels × tier upgrades × synergies (see Companions)') +
+      allRows('') +
+      mul(relicName('banner'), p.banner, 'Relic', 'A relic') +
+      mul('Buffs right now', b.buffDps, buffNames('dps'), 'Rampage, Bloodlust…') +
+      total('Damage per second', fmt(g.dps())));
+
+    const click = table('Click damage',
+      row('Base', '1') +
+      mul('Twin Blades', p.twin, 'Abyss power', 'An abyss power') +
+      mul(relicName('whet'), p.whet, 'Relic', 'A relic') +
+      mul('Blade upgrades', p.blades, `${g.s.upgrades.filter((id) => id.startsWith('clk')).length} bought`, 'Blades in the shop') +
+      row('All-damage bonuses', x(b.all), 'the same upgrades, trophies, souls, shard and fury as above') +
+      row('+ Share of party damage', `+${fmt(g.baseDps() * p.clickDps)}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} upgrades` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`) +
+      mul('Buffs right now', b.buffClick, buffNames('click'), 'Frenzy…') +
+      total('Per click', fmt(g.clickDamage())) +
+      row('During Rampage', x(g.feverMult()), 'clicks while the Rampage meter is full'));
+
+    const crit = table('Critical hits',
+      row('Chance', pc(g.critChance()), `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} upgrades` : ''}${p.critRelic ? ` + ${pc(p.critRelic)} ${relicName('hawk')}` : ''}`) +
+      row('Damage', x(g.critMult()), `×${p.critMultBase} base${p.critMultUpg > 1 ? ` × ${p.critMultUpg} upgrades` : ''}${p.critMultRelic > 1 ? ` × ${p.critMultRelic} ${relicName('razor')}` : ''}`) +
+      row('Cleave', g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? `clicks also hit every other monster${p.cleaveRelic ? ` (${pc(p.cleaveRelic)} from ${relicName('cleaver')})` : ''}` : 'Cleave upgrades and the Headsman\'s Cleaver', !g.cleave()));
+
+    const goldT = table('Gold',
+      mul('Upgrades', p.goldUpg, 'tonics in the shop') +
+      mul(relicName('purse'), p.goldRelic, 'Relic', 'A relic') +
+      mul('Buffs right now', b.buffGold, buffNames('gold'), 'Gold Rush') +
+      total('Gold from monsters', x(g.goldMult())));
+
+    const baseTime = g.hasAbyss('patience') ? 45 : 30;
+    const glass = Math.min(30, 3 * g.relic('time'));
+    const bane = g.heartLv('bane');
+    const boss = table('Bosses',
+      mul(`Damage to bosses (${relicName('slayer')})`, 1 + g.relic('boss'), 'Relic', 'A relic') +
+      row('Time to beat a boss', `${baseTime + glass}s`, `${baseTime}s${g.hasAbyss('patience') ? ' (Patient Hunter)' : ''}${glass ? ` + ${glass}s ${relicName('glass')}` : ''} · Enraged halves it, Giant adds half`) +
+      row('Armored blocks', pc(g.armor()), `of companion damage${g.relic('pierce') ? ` (${relicName('pick')} helps)` : ''}`) +
+      row('Regenerating heals', `${pc(g.regen())}/s`, g.relic('rot') ? `${relicName('rot')} helps` : 'of its health') +
+      row('Modifier strength', pc(g.modBite()), bane ? `Warden's Bane level ${bane}` : 'Warden\'s Bane (a Heart power) weakens them', !bane));
+
+    const next = g.nextBossSouls();
+    const offline = g.hasAbyss('night') ? 1 : g.hasAbyss('pulse') ? 0.5 : 0.25;
+    const souls = table('Souls and the Heart',
+      row('Each soul gives', `+${Math.round(g.soulPower() * 100)}% damage`, g.hasAbyss('crown') ? 'Crown of the Deep' : g.hasAbyss('roots') ? 'Deep Roots' : 'more with Deep Roots / Crown of the Deep') +
+      row('Souls', fmt(g.s.souls), `${fmt(g.soulsFree())} unspent`) +
+      row('Banked this descent', fmt(g.pendingSouls()), 'paid out when you descend') +
+      row(`Next zone boss (floor ${next.floor})`, `+${fmt(next.souls)}`, 'souls when beaten') +
+      mul('Soul gain', g.soulGainMult(), `${g.relic('souls') ? `${relicName('cage')} ` : ''}${g.heartLv('siphon') ? `Soul Siphon ${g.heartLv('siphon')}` : ''}`.trim(), 'Soul Cage (relic), Soul Siphon (Heart)') +
+      row('Heartstones', fmt(g.s.stones), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`) +
+      row('Offline speed', pc(offline), offline < 1 ? 'Restless Dead / Endless Night raise it' : 'Endless Night'));
+
+    return `<div class="bd-grid">${dps}${click}${crit}${goldT}${boss}${souls}</div>`;
+  }
+
+  private partyHtml(): string {
+    const g = this.game;
+    const b = g.breakdown();
+    const p = b.parts;
+    const total = g.baseDps();
+    const x = (v: number) => (v >= 1000 ? `×${fmt(v)}` : `×${Math.round(v * 100) / 100}`);
+    const rows = COMPS.map((c, i) => {
+      const lv = g.s.owned[i];
+      if (!lv) return '';
+      return `<tr><th><span class="bd-comp">${spriteFit(c.sprite, 24)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(p.tier[i])}</td><td>${x(p.syn[i])}</td><td>${fmt(g.compDps(i))}</td><td>${total ? ((g.compDps(i) / total) * 100).toFixed(1) : 0}%</td></tr>`;
+    }).join('');
+    return `<p class="muted bd-help">Each companion: level × base damage × tier upgrades × synergies, then every all-damage bonus (${x(b.all * p.banner)} right now) on top.</p>
+      <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Tiers</td><td>Synergy</td><td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
+  }
+
+  private recordsHtml(): string {
+    const g = this.game;
+    const s = g.s;
+    const rows: [string, string][] = [
+      ['Floor', `${s.floor} (deepest this descent ${s.maxFloor})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
+      ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses killed', fmt(s.bosses)],
+      ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rampages', fmt(s.fevers)],
+      ['Descents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ['Relics', `${g.relicsFound()} / ${RELICS.length}`],
+      ['This descent', duration(s.runTime)], ['Time played', duration(s.playTime)],
+    ];
+    return `<dl class="stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
   }
 
   private tabs(on: 'abyss' | 'heart') {
@@ -1317,7 +1428,7 @@ export class Ui {
     this.el.modal.innerHTML = `<header class="m-head"><h2>Descend?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
       <div class="confirm">
         <p>Your gold, companions and upgrades stay behind. You start again from the top. Relics and trophies come with you.</p>
-        <p>You gain <b>${G.soul()} ${fmt(pending)} souls</b>: +${fmt(Math.round(pending * g.soulPower() * 100))}% damage, forever.</p>
+        <p>You gain the <b>${G.soul()} ${fmt(pending)} souls</b> you banked from bosses: +${fmt(Math.round(pending * g.soulPower() * 100))}% damage, forever.</p>
         ${COMPS.some((c) => c.depth === g.s.descents + 1) ? `<p class="omen">Someone new waits for you down there…</p>` : ''}
         <div class="set-row"><button class="btn" data-act="abyssBack">Not yet</button><button class="btn primary big" data-act="descendGo">Descend</button></div>
       </div>`;
