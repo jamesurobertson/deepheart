@@ -5,15 +5,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 SRC=assets-src
 OUT=public/assets
-rm -rf "$OUT" && mkdir -p "$OUT/sprites" "$OUT/icons" "$OUT/sfx"
+rm -rf "$OUT" && mkdir -p "$OUT/sprites" "$OUT/sfx"
 
-D="$SRC/0x72_DungeonTilesetII_v1.7/0x72_DungeonTilesetII_v1.7"
-cp "$D/0x72_DungeonTilesetII_v1.7.png" "$OUT/sprites/dungeon.png"
-cp "$D/tile_list_v1.7" "$OUT/sprites/dungeon.txt"
-
-W="$SRC/16x16_weapons_rpg_icons/16x16 Weapons RPG Icons"
-for m in bronze iron steel gold; do cp "$W/$m-weapons.png" "$OUT/icons/weapons-$m.png"; done
-cp "$SRC/rpg-items.png" "$OUT/icons/items.png"
+# All sprites (DungeonTileset II + the add-on packs) are packed into one sheet.
+node scripts/build-atlas.ts
 
 # name -> source file (relative to assets-src). Swap freely; names are what the game uses.
 sfx() { ffmpeg -v error -y -i "$SRC/$2" -af "loudnorm=I=-${3:-18}:TP=-1.5,aresample=44100" -ac 1 -b:a 96k "$OUT/sfx/$1.mp3"; }
@@ -48,8 +43,20 @@ sfx bosskill  "$J/Hit jingles/jingles_HIT11.ogg" 17
 mkdir -p "$OUT/music"
 M="$SRC/chiptune-adventures"
 music() { ffmpeg -v error -y -i "$M/Juhani Junkala [Chiptune Adventures] $2.ogg" -af "loudnorm=I=-22:TP=-2" -b:a 128k -write_xing 1 "$OUT/music/$1.mp3"; }
-music stage1 "1. Stage 1"
-music stage2 "2. Stage 2"
+music halls "1. Stage 1"
 music boss "3. Boss Fight"
-music select "4. Stage Select"
+# One track per zone, plus a second boss theme for zone bosses. All CC0, from OpenGameArt:
+# Juhani Junkala "5 Chiptunes (Action)", Memoraphile "Spooky Dungeon", Wolfgang_ "Desert Theme",
+# Zane Little "Void Estate", The Art Bros "Dark Forest Waltz", Jonathan So "Fields of Ice".
+# Loaded one at a time by the game, so they're encoded a little smaller.
+X="$SRC/music-extra"
+zone() { ffmpeg -v error -y -i "$X/$2" -af "loudnorm=I=-22:TP=-2" -b:a 96k -write_xing 1 "$OUT/music/$1.mp3"; }
+zone crypts  "spooky-dungeon.mp3"
+zone warrens "juhani-level-1.mp3"
+zone tomb    "desert-theme.mp3"
+zone rotting "void-estate-haunted.ogg"
+zone grove   "dark-forest-waltz.ogg"
+zone demon   "juhani-level-3.mp3"
+zone frozen  "fields-of-ice.mp3"
+zone boss2   "juhani-level-2.mp3"
 du -sh "$OUT"/*
