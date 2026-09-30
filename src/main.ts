@@ -27,7 +27,7 @@ function load(): SaveState | null {
 }
 
 async function boot() {
-  const atlas = await Atlas.load(`${BASE}assets/sprites/dungeon.png`, `${BASE}assets/sprites/dungeon.txt`);
+  const atlas = await Atlas.load(`${BASE}assets/sprites/atlas.png`, `${BASE}assets/sprites/atlas.txt`);
   setAtlas(atlas);
 
   const saved = load();

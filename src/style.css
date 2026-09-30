@@ -158,8 +158,9 @@ body.compact .rate .short { display: inline; }
 
 .floor { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 6px; pointer-events: auto; }
 .floor .btn.icon.sm { width: 34px; height: 34px; min-height: 0; }
-.floor-mid { width: 230px; display: flex; flex-direction: column; gap: 4px; }
-.floor-name { display: flex; justify-content: space-between; align-items: baseline; }
+.floor-mid { width: 270px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.floor-name { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; white-space: nowrap; min-width: 0; }
+.floor-name .floor-sub { overflow: hidden; text-overflow: ellipsis; }
 .floor-n { font: 700 18px/1 'Pixelify Sans'; color: var(--gold-hi); text-shadow: var(--shadow); }
 .floor-sub { font: 400 11px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; letter-spacing: 1px; }
 .floor-bar { position: relative; height: 14px; background: #120a0c; box-shadow: 0 0 0 2px var(--ink), inset 0 2px 0 #000; }

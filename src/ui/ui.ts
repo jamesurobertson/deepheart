@@ -1027,7 +1027,7 @@ export class Ui {
           <p class="muted">The game saves itself every few seconds. Copy your save code to move it to another browser.</p>
           <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
           <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
-          <p class="credits muted">Art: 0x72 DungeonTileset II · Sounds: Kenney · Music: Juhani Junkala (all CC0)</p>
+          <p class="credits muted">Art: 0x72 DungeonTileset II, Superdark, Omniboy, Zoltan Kosina, Niji · Sounds: Kenney · Music: Juhani Junkala (all CC0)</p>
         </div>`;
     }
     if (soft && html === this.modalKey) return;
