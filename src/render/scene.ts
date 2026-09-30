@@ -8,7 +8,7 @@ import type { Atlas, Rect } from './atlas.ts';
 import { PixelSprite, blobShadow } from './sprite.ts';
 import { Fx, flameTexture } from './fx.ts';
 import { GradeShader, tiltShift } from './post.ts';
-import { COMPS, type Attack } from '../game/data.ts';
+import { COMPS, ZONES, zoneOf, type Attack, type Tiles } from '../game/data.ts';
 import type { Game, GameEvent, Monster } from '../game/game.ts';
 
 const WALL_Z = -6;
@@ -16,15 +16,17 @@ const STAIRS = new THREE.Vector3(7.5, 0, -4);
 /** Where the camera looks: between the party and the monsters. */
 const LOOK = new THREE.Vector3(0, 1.1, 0.5);
 
-interface Palette { torch: number; fog: number; hemi: number; wall: [number, number, number]; banner: string; goo: number }
-/** Every ten floors the dungeon changes colour. */
+interface Palette { torch: number; fog: number; hemi: number; wall: [number, number, number]; floor: [number, number, number]; banner: string; goo: number }
+/** Lighting per zone, in the same order as ZONES. Tiles with their own colour (jungle, tomb) get a lighter wash. */
 const PALETTES: Palette[] = [
-  { torch: 0xff9a4a, fog: 0x0a0708, hemi: 0x6a5a78, wall: [0.5, 0.44, 0.46], banner: 'red', goo: 0.005 },
-  { torch: 0x5ad6c8, fog: 0x04090b, hemi: 0x4a6a78, wall: [0.38, 0.44, 0.48], banner: 'blue', goo: 0 },
-  { torch: 0xa6e06a, fog: 0x060906, hemi: 0x55704a, wall: [0.4, 0.46, 0.38], banner: 'green', goo: 0.03 },
-  { torch: 0xb485ff, fog: 0x08060d, hemi: 0x5a4a82, wall: [0.42, 0.38, 0.5], banner: 'yellow', goo: 0.06 },
-  { torch: 0xff5a3a, fog: 0x0b0505, hemi: 0x6a4a52, wall: [0.52, 0.34, 0.34], banner: 'red', goo: 0 },
-  { torch: 0x9cc0ff, fog: 0x05070c, hemi: 0x5a6a8a, wall: [0.4, 0.44, 0.56], banner: 'blue', goo: 0 },
+  { torch: 0xff9a4a, fog: 0x0a0708, hemi: 0x6a5a78, wall: [0.5, 0.44, 0.46], floor: [1.1, 1.05, 1.02], banner: 'red', goo: 0.005 }, // Upper Halls
+  { torch: 0x5ad6c8, fog: 0x04090b, hemi: 0x4a6a78, wall: [0.34, 0.5, 0.56], floor: [1.6, 2.2, 2.45], banner: 'blue', goo: 0 }, // Bone Crypts
+  { torch: 0xa6e06a, fog: 0x050904, hemi: 0x55704a, wall: [0.62, 0.7, 0.6], floor: [1.1, 1.2, 1.1], banner: 'green', goo: 0 }, // Overgrown Warrens
+  { torch: 0xffb35a, fog: 0x0c0806, hemi: 0x7a6450, wall: [0.62, 0.56, 0.5], floor: [1, 0.95, 0.88], banner: 'yellow', goo: 0 }, // Sunken Tomb
+  { torch: 0xb485ff, fog: 0x08060d, hemi: 0x5a4a82, wall: [0.42, 0.38, 0.5], floor: [1.9, 1.8, 2.1], banner: 'green', goo: 0.06 }, // Rotting Deep
+  { torch: 0x8af0d8, fog: 0x04070b, hemi: 0x5a70a0, wall: [0.5, 0.58, 0.72], floor: [0.95, 1.05, 1.2], banner: 'blue', goo: 0 }, // Enchanted Grove
+  { torch: 0xff5a3a, fog: 0x0b0505, hemi: 0x6a4a52, wall: [0.52, 0.34, 0.34], floor: [1.15, 0.95, 0.9], banner: 'red', goo: 0 }, // Demon Gate
+  { torch: 0x9cc0ff, fog: 0x05070c, hemi: 0x5a6a8a, wall: [0.42, 0.6, 0.9], floor: [0.85, 1.15, 1.7], banner: 'blue', goo: 0 }, // Frozen Vault
 ];
 
 /** Formation slots for companions, front to back. */
@@ -35,6 +37,9 @@ const PARTY_SLOTS: [number, number][] = [
 
 interface MonView {
   id: number;
+  /** Sprite scale (sized from the art so big and small creatures both read) and resulting height. */
+  scale: number;
+  height: number;
   /** Spot x from the game, before squeezing for tall screens. */
   spotX: number;
   blood: string;
@@ -216,6 +221,8 @@ export class Scene {
   private flameMat: THREE.MeshBasicMaterial;
   private palette = PALETTES[0];
   private band = -1;
+  /** Animated scenery (fountains, eyes in the wall), rebuilt with the room. */
+  private props: PixelSprite[] = [];
 
   private mons = new Map<number, MonView>();
   private party: CompView[] = [];
@@ -332,51 +339,91 @@ export class Scene {
       this.scene.remove(this.room);
       this.room.traverse((o) => o instanceof THREE.Mesh && o.geometry.dispose());
     }
+    for (const pr of this.props) pr.dispose();
+    this.props = [];
     this.room = this.buildRoom(band);
     this.scene.add(this.room);
     const p = this.palette;
+    this.floorMat.color.setRGB(...p.floor);
     (this.scene.background as THREE.Color).setHex(p.fog);
     (this.scene.fog as THREE.Fog).color.setHex(p.fog);
     this.hemi.color.setHex(p.hemi);
     this.wallMat.color.setRGB(...p.wall);
     for (const l of this.torchLights) l.color.setHex(p.torch);
+    // Flames burn in the zone's colour: teal in the crypts, green in the jungle, and so on.
+    this.flameMat.color.setHex(p.torch).lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(1.4);
   }
 
   private buildRoom(seed: number): THREE.Group {
     const a = this.atlas;
     const r = seeded(seed * 977 + 5);
     const p = this.palette;
+    const theme: Tiles = ZONES[seed % ZONES.length].tiles;
     const wall = new Quads(a);
     const floor = new Quads(a);
-    const floors = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => a.rect(`floor_${i}`));
-    const tile = () => (r() < 0.78 ? floors[0] : floors[1 + Math.floor(r() * 7)]);
-    const mid = a.rect('wall_mid');
-    const top = a.rect('wall_top_mid');
-    const banner = a.rect(`wall_banner_${p.banner}`);
-    const holes = [a.rect('wall_hole_1'), a.rect('wall_hole_2')];
-    const goo = a.rect('wall_goo');
+    // Tile names for each theme. The jungle and tomb sets come from Omniboy's packs.
+    const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : '';
+    const floors = theme === 'crypt'
+      ? Array.from({ length: 20 }, (_, i) => a.rect(`crypt_floor_${i + 1}`))
+      : [1, 2, 3, 4, 5, 6, 7, 8].map((i) => a.rect(`${pre}floor_${i}`));
+    const tile = () => (theme === 'crypt' ? floors[Math.floor(r() * floors.length)] : r() < 0.72 ? floors[0] : floors[1 + Math.floor(r() * 7)]);
+    const mids = pre ? [a.rect(`${pre}wall_mid`), a.rect(`${pre}wall_mid_2`), a.rect(`${pre}wall_mid_3`)] : [a.rect('wall_mid')];
+    const mid = () => mids[r() < 0.8 ? 0 : Math.floor(r() * mids.length)];
+    const top = a.rect(pre ? `${pre}wall_top` : 'wall_top_mid');
+    const banner = a.rect(`${pre}wall_banner_${p.banner}`);
+    const holes = [a.rect(`${pre}wall_hole_1`), a.rect(`${pre}wall_hole_2`)];
+    // Leafy walls in the jungle, carved walls in the tomb, goo elsewhere.
+    const deco = pre ? [1, 2, 3, 4, 5].map((i) => a.rect(`${pre}wall_deco_${i}`)) : [a.rect('wall_goo')];
+    const decoChance = pre ? 0.07 : p.goo;
+    // One fountain per room, set into the back wall, and (jungle / tomb) a pair of watching eyes.
+    const fountainX = -2;
+    const eyes = pre ? [-8 + Math.floor(r() * 3), 7 + Math.floor(r() * 4)] : [];
+    const skip = (x: number, y: number) => (x === fountainX && y <= 2) || (eyes.includes(x) && y === 3);
 
     for (let x = -24; x < 24; x++) {
       for (let y = 0; y < 13; y++) {
+        if (skip(x, y)) continue;
         const roll = r();
         const rect = y === 12 ? top
-          : y === 5 && (x === -9 || x === -2 || x === 5 || x === 12) ? banner
+          : y === 5 && (x === -9 || x === 5 || x === 12) ? banner
           : roll < 0.035 ? holes[Math.floor(r() * 2)]
-          : roll < 0.035 + p.goo ? goo : mid;
+          : roll < 0.035 + decoChance ? deco[Math.floor(r() * deco.length)] : mid();
         wall.face(x, y, WALL_Z, rect);
       }
       for (let z = WALL_Z; z < 9; z++) floor.top(x, 0, z, tile());
     }
     floor.top(Math.floor(STAIRS.x), 0.005, Math.floor(STAIRS.z), a.rect('floor_stairs'));
 
-    const column = a.rect('column');
-    for (const x of [-13, -5.5, 2, 9.5]) floor.face(x - 0.5, 0, WALL_Z + 0.35, column, 1, 3);
+    // Animated scenery.
+    const prop = (frames: Rect[], x: number, y: number, fps = 6) => {
+      const sp = new PixelSprite(a.texture, a.size, frames, { fps });
+      sp.mesh.material = this.wallMat;
+      sp.mesh.position.set(x + 0.5, y, WALL_Z + 0.01);
+      this.props.push(sp);
+      return sp.mesh;
+    };
+    const fountain: THREE.Object3D[] = [];
+    if (pre) {
+      const kind = theme === 'tomb' ? 'lava' : 'water';
+      fountain.push(prop([a.rect(`${pre}fountain_top`)], fountainX, 2), prop(a.anim(`${pre}fountain_${kind}`), fountainX, 1), prop(a.anim(`${pre}fountain_${kind}_basin`), fountainX, 0));
+      for (const x of eyes) fountain.push(prop(a.anim(`${pre}wall_eyes`), x, 3, 1.5));
+    } else {
+      const c = seed % 2 ? 'blue' : 'red';
+      fountain.push(prop([a.rect('wall_fountain_top_1')], fountainX, 2), prop(a.anim(`wall_fountain_mid_${c}`), fountainX, 1), prop(a.anim(`wall_fountain_basin_${c}`), fountainX, 0));
+    }
+
+    // Columns (or statues) along the back wall, in front of the brick.
+    const pillars = pre ? [a.rect(`${pre}statue_1`), a.rect(`${pre}statue_2`)] : [a.rect('column')];
+    [-13, -5.5, 2, 9.5].forEach((x, i) => {
+      const pr = pillars[i % pillars.length];
+      floor.face(x - 0.5, 0, WALL_Z + 0.35, pr, pr.w / 16, pre ? pr.h / 16 : 3);
+    });
     const skull = a.rect('skull');
     const crate = a.rect('crate');
     for (let i = 0; i < 10; i++) floor.face(-14 + r() * 28, 0, WALL_Z + 0.5 + r() * 0.6, r() < 0.6 ? skull : crate, 0.8, r() < 0.6 ? 0.8 : 1.2);
 
     const group = new THREE.Group();
-    group.add(new THREE.Mesh(wall.build(), this.wallMat), new THREE.Mesh(floor.build(), this.floorMat));
+    group.add(new THREE.Mesh(wall.build(), this.wallMat), new THREE.Mesh(floor.build(), this.floorMat), ...fountain);
     this.flames = [];
     [-12, -2, 6, 14].forEach((x, i) => {
       const f = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.8), this.flameMat);
@@ -522,7 +569,7 @@ export class Scene {
     const v = this.mons.get(id);
     if (!v || v.dead >= 0) return;
     const big = COMPS[c.comp].big;
-    const at = v.body.position.clone().setY(v.big ? 1.4 : 0.6);
+    const at = v.body.position.clone().setY(v.height * 0.45);
     c.stretch = 1;
     this.fx.swipe(at, 0xfff0d8, big ? 1.5 : 0.95, Math.PI * (0.6 + Math.random() * 0.5));
     this.fx.star(at.clone().setX(at.x - 0.2), 0xffffff, big ? 1.1 : 0.7);
@@ -541,7 +588,7 @@ export class Scene {
     if (!view || view.dead >= 0) return;
     const def = COMPS[c.comp];
     const from = c.body.position.clone().add(new THREE.Vector3(0.35, def.big ? 1.6 : 0.95, 0.1));
-    const to = view.body.position.clone().setY(view.big ? 1.4 : 0.6);
+    const to = view.body.position.clone().setY(view.height * 0.45);
     this.fx.star(from, SHOT_COLOR[kind], 0.5, 0.12);
     if (kind === 'bolt') {
       // Staff crackles as the spell goes up.
@@ -571,7 +618,7 @@ export class Scene {
       const s = this.shots[i];
       // Home in on the target if it's still standing.
       const v = this.mons.get(s.target);
-      if (v && v.dead < 0) s.to.set(v.body.position.x, v.big ? 1.4 : 0.6, v.body.position.z);
+      if (v && v.dead < 0) s.to.set(v.body.position.x, v.height * 0.45, v.body.position.z);
       s.t += dt / s.dur;
       const t = Math.min(1, s.t);
       s.mesh.position.lerpVectors(s.from, s.to, t);
@@ -662,7 +709,12 @@ export class Scene {
     body.position.copy(STAIRS).add(new THREE.Vector3(Math.random() * 0.6, 0, Math.random() * 0.6));
     body.scale.setScalar(0.01);
     this.scene.add(body);
-    this.mons.set(m.id, { id: m.id, spotX: m.x, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0 });
+    // Ordinary monsters ~1.2× (tall ones capped at ~2 units); bosses ~3.4 units tall whatever their art.
+    const h = run[0].h / 16;
+    const scale = m.boss ? Math.max(1.5, Math.min(2.6, 3.4 / h)) : Math.min(1.2, 2.1 / h);
+    inner.scale.setScalar(scale);
+    if (m.def.tint !== undefined) sprite.mesh.material.color.setHex(m.def.tint);
+    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0 });
     if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(0.4), '#6a5a78', 6, 2, 0.08, 6);
     if (m.boss) {
       this.fx.light(STAIRS.clone().setY(2), 0xff4040, 30, 1, 12);
@@ -709,7 +761,7 @@ export class Scene {
       v.hopY = Math.max(0, v.hopY + v.hopV * dt);
       if (v.hopY === 0) v.hopV = 0;
       v.sprite.flash = v.flash;
-      const base = v.boss ? 1.7 : 1.2;
+      const base = v.scale;
       v.inner.scale.set(base * (1 + v.squash * 0.25), base * (1 - v.squash * 0.3), base);
       v.inner.position.x = v.knock;
       v.inner.position.y = v.hopY;
@@ -828,7 +880,7 @@ export class Scene {
   screenOf(id: number): { x: number; y: number; h: number } | null {
     const v = this.mons.get(id);
     if (!v) return null;
-    const height = v.boss ? 3.5 : v.big ? 2.1 : 1.45;
+    const height = v.height;
     const foot = this.toScreen(v.body.position);
     const head = this.toScreen(v.body.position.clone().setY(height));
     return { x: head.x, y: head.y, h: foot.y - head.y };
@@ -870,7 +922,7 @@ export class Scene {
       case 'hit': {
         const v = this.mons.get(ev.id);
         if (!v || v.dead >= 0 || ev.kind === 'dps') break;
-        const at = v.body.position.clone().setY(v.boss ? 1.7 : 0.7);
+        const at = v.body.position.clone().setY(v.height * 0.5);
         const parts = this.settings.particles;
         if (ev.kind === 'cleave') {
           this.fx.swipe(at, 0xffd0c0, v.boss ? 1.2 : 0.6);
@@ -909,13 +961,13 @@ export class Scene {
         if (!v || v.dead >= 0) break;
         v.dead = 0;
         v.body.visible = false;
-        const scale = v.boss ? 1.7 : 1.2;
+        const scale = v.scale;
         const unit = scale / 16;
         const r = v.sprite.rect;
         const origin = v.body.position.clone().add(new THREE.Vector3(v.knock, v.hopY, 0.05));
         // The monster bursts into its own pixels.
         this.fx.shatter(origin, this.atlas.pixels(r, v.boss ? 1 : 1), r, unit, v.sprite.flip, 1, v.boss ? 1.4 : 1);
-        const at = origin.clone().setY(v.boss ? 1.4 : 0.6);
+        const at = origin.clone().setY(v.height * 0.45);
         this.fx.star(at, 0xffffff, v.boss ? 2.5 : 1.1, 0.18);
         if (this.settings.particles) {
           this.fx.burst(at, '#ffd070', v.boss ? 30 : 5, v.boss ? 6 : 3, 0.06, 12, true);
@@ -934,7 +986,7 @@ export class Scene {
         break;
       }
       case 'floor':
-        this.setBand(Math.floor((ev.floor - 1) / 10));
+        this.setBand(zoneOf(ev.floor));
         break;
       case 'bossFail':
       case 'retreat':
@@ -996,7 +1048,7 @@ export class Scene {
     }
     this.party = [];
     this.syncParty(game, true);
-    this.setBand(Math.floor((game.s.floor - 1) / 10));
+    this.setBand(zoneOf(game.s.floor));
   }
 
   private addShake(v: number) {
@@ -1023,6 +1075,7 @@ export class Scene {
       this.torchLights[i].intensity = 6 * fl * (1 + this.fever * 0.5);
     });
 
+    for (const pr of this.props) pr.update(dt);
     this.updateMonsters(dt, game);
     this.updateParty(dt, game);
     this.updateShots(dt);

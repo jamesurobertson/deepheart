@@ -50,7 +50,7 @@ export const COMPS: CompDef[] = [
   c('demon', 'Bound Demon', 'big_demon', 1.5e13, 3e9, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 4, true),
 ];
 
-// ---------- monsters ----------
+// ---------- monsters and zones ----------
 
 export interface MonsterDef {
   sprite: string;
@@ -58,44 +58,93 @@ export interface MonsterDef {
   /** Health multiplier. */
   hp: number;
   big?: boolean;
+  /** Colour wash for variants (frost trolls and the like), as 0xRRGGBB. */
+  tint?: number;
 }
 
-const m = (sprite: string, name: string, hp = 1, big = false): MonsterDef => ({ sprite, name, hp, big });
+const m = (sprite: string, name: string, hp = 1, tint?: number): MonsterDef => ({ sprite, name, hp, tint });
 
-/** Each zone of 10 floors has its own name, colours (in the renderer) and crowd. */
-export const ZONES = ['The Upper Halls', 'The Bone Crypts', 'The Orc Warrens', 'The Rotting Deep', 'The Demon Gate', 'The Frozen Vault'];
+/** Tile theme a zone is built from (see the renderer). */
+export type Tiles = 'halls' | 'crypt' | 'jungle' | 'tomb';
 
-export const BANDS: MonsterDef[][] = [
-  [m('goblin', 'Goblin', 0.9), m('tiny_zombie', 'Rotling'), m('imp', 'Imp', 0.8), m('tiny_slug', 'Slug', 1.2)],
-  [m('skelet', 'Skeleton'), m('muddy', 'Mudling', 1.1), m('swampy', 'Bog Lurker', 1.2), m('goblin', 'Goblin', 0.9)],
-  [m('orc_warrior', 'Orc Warrior', 1.2), m('masked_orc', 'Masked Orc', 1.1), m('orc_shaman', 'Orc Shaman', 0.9), m('slug', 'Great Slug', 1.3)],
-  [m('zombie', 'Zombie', 1.1), m('ice_zombie', 'Frost Husk', 1.2), m('necromancer', 'Necromancer', 0.9), m('skelet', 'Skeleton')],
-  [m('chort', 'Chort'), m('wogol', 'Wogol', 1.1), m('imp', 'Imp', 0.8), m('masked_orc', 'Masked Orc', 1.2)],
-  [m('ice_zombie', 'Frost Husk', 1.2), m('skelet', 'Frozen Skeleton'), m('necromancer', 'Rime Witch', 0.9), m('tiny_zombie', 'Frostling', 0.8)],
+export interface ZoneDef {
+  name: string;
+  tiles: Tiles;
+  /** Crowd for ordinary floors. */
+  band: MonsterDef[];
+  /** Guards floor 5 of the zone. */
+  mid: MonsterDef;
+  /** Guards floor 10: beat it to move on to the next zone. */
+  boss: MonsterDef;
+}
+
+/**
+ * Ten floors per zone, each with its own look, crowd and bosses. After the last one the
+ * zones come round again, deeper and harder ("The Upper Halls II").
+ */
+export const ZONES: ZoneDef[] = [
+  {
+    name: 'The Upper Halls', tiles: 'halls',
+    band: [m('goblin', 'Goblin', 0.9), m('tiny_zombie', 'Rotling'), m('imp', 'Imp', 0.8), m('tiny_slug', 'Slug', 1.2), m('ef_bandit', 'Bandit')],
+    mid: m('ef_bear', 'Cave Bear'), boss: m('ogre', 'Ogre Chieftain'),
+  },
+  {
+    name: 'The Bone Crypts', tiles: 'crypt',
+    band: [m('skelet', 'Skeleton'), m('tiny_zombie', 'Rotling'), m('skelet', 'Bone Archer', 0.9), m('necromancer', 'Grave Priest', 0.9)],
+    mid: m('ef_golem', 'Bone Golem', 1, 0xd8d0c0), boss: m('necromancer', 'The Lich', 1, 0xb0a0ff),
+  },
+  {
+    name: 'The Overgrown Warrens', tiles: 'jungle',
+    band: [m('orc_warrior', 'Orc Warrior', 1.2), m('orc_shaman', 'Orc Shaman', 0.9), m('ef_wolf', 'Dire Wolf'), m('ef_smallmushroom', 'Sporeling', 0.8), m('ef_normalmushroom', 'Mushroom Folk')],
+    mid: m('ef_largemushroom', 'Elder Shroom'), boss: m('ef_troll', 'Troll Brute'),
+  },
+  {
+    name: 'The Sunken Tomb', tiles: 'tomb',
+    band: [m('ef_gnollscout', 'Gnoll Scout', 0.9), m('ef_gnollbrute', 'Gnoll Brute', 1.2), m('ef_gnollshaman', 'Gnoll Shaman'), m('masked_orc', 'Tomb Raider')],
+    mid: m('ef_gnolloverseer', 'Gnoll Overseer'), boss: m('ef_golem', 'Tomb Golem'),
+  },
+  {
+    name: 'The Rotting Deep', tiles: 'crypt',
+    band: [m('zombie', 'Zombie', 1.1), m('slug', 'Great Slug', 1.3), m('swampy', 'Bog Lurker', 1.2), m('muddy', 'Mudling', 1.1)],
+    mid: m('ogre', 'Bloated Ogre', 1, 0xa0c070), boss: m('big_zombie', 'The Rotten King'),
+  },
+  {
+    name: 'The Enchanted Grove', tiles: 'jungle',
+    band: [m('ef_centaur_m', 'Centaur'), m('ef_centaur_f', 'Centaur Archer', 0.9), m('ef_forestguardian', 'Grove Warden', 1.2), m('ef_wolf', 'Moon Wolf', 1, 0xc0c8ff)],
+    mid: m('ef_bear', 'Grove Bear', 1, 0xd0ffd0), boss: m('ef_ent', 'The Elder Ent'),
+  },
+  {
+    name: 'The Demon Gate', tiles: 'halls',
+    band: [m('chort', 'Chort'), m('wogol', 'Wogol', 1.1), m('imp', 'Imp', 0.8), m('masked_orc', 'Cultist', 1.2)],
+    mid: m('ogre', 'Hellfire Ogre', 1, 0xff9070), boss: m('big_demon', 'Pit Lord'),
+  },
+  {
+    name: 'The Frozen Vault', tiles: 'halls',
+    band: [m('ice_zombie', 'Frost Husk', 1.2), m('skelet', 'Frozen Skeleton', 1, 0xb0e0ff), m('ef_wolf', 'Frost Wolf', 1, 0xd0f0ff), m('necromancer', 'Rime Witch', 0.9, 0xa0d8ff)],
+    mid: m('ef_golem', 'Ice Golem', 1, 0xa8e0ff), boss: m('ef_troll', 'Frost Troll', 1, 0xa8d8ff),
+  },
 ];
 
 /** Zone index for a floor (0-based, keeps counting past the last zone). */
 export const zoneOf = (floor: number) => Math.floor((floor - 1) / 10);
 
-/** "The Orc Warrens", then "The Upper Halls II" once the zones come round again. */
+export const zoneFor = (floor: number) => ZONES[zoneOf(floor) % ZONES.length];
+
+/** "The Sunken Tomb", then "The Upper Halls II" once the zones come round again. */
 export function zoneName(floor: number): string {
   const z = zoneOf(floor);
   const lap = Math.floor(z / ZONES.length);
-  return ZONES[z % ZONES.length] + (lap ? ` ${['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][Math.min(lap - 1, 8)]}` : '');
+  return ZONES[z % ZONES.length].name + (lap ? ` ${['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][Math.min(lap - 1, 8)]}` : '');
 }
-
-export const BOSSES: MonsterDef[] = [
-  m('ogre', 'Ogre Chieftain', 1, true),
-  m('big_zombie', 'The Rotten King', 1, true),
-  m('big_demon', 'Pit Lord', 1, true),
-];
 
 export function bandFor(floor: number): MonsterDef[] {
-  return BANDS[zoneOf(floor) % BANDS.length];
+  return zoneFor(floor).band;
 }
 
+/** Floor 5 of a zone gets its mid-boss, floor 10 its zone boss. */
 export function bossFor(floor: number): MonsterDef {
-  return BOSSES[(Math.floor(floor / 5) - 1) % BOSSES.length];
+  const z = zoneFor(floor);
+  return floor % 10 === 0 ? z.boss : z.mid;
 }
 
 // ---------- upgrades ----------

@@ -20,7 +20,9 @@ Handy URL flags: `?slot=name` keeps a separate save, `?speed=10` runs the game f
 - **Treasure goblins** dash across the room now and then. Catch one for gold, Bloodlust (×7 party damage), Frenzy (×77 clicks) or Gold Rush (×7 gold).
 - **Descend** (from floor 30): reset for souls (+2% damage each, more for every floor deeper) and spend them on abyss powers such as Phantom Blade (auto-clicks), Deep Stairs (start on floor 10) and more offline time.
 - **Trophies:** each gives +1% damage. Trophy upgrades multiply that. Many unlock **cursor skins** (21 weapons), picked in Options. Yes, there are trophies for letting treasure goblins escape.
-- Every 10 floors the dungeon changes colour and monster roster.
+- **Zones:** every 10 floors is a new place with its own tiles, lighting, monsters, a mid-boss on floor 5 and a zone boss on floor 10:
+  The Upper Halls, The Bone Crypts, The Overgrown Warrens (Troll Brute), The Sunken Tomb (Tomb Golem), The Rotting Deep (The Rotten King),
+  The Enchanted Grove (The Elder Ent), The Demon Gate (Pit Lord) and The Frozen Vault (Frost Troll). Then they come round again, harder.
 
 Keys: Space/Enter clicks the front monster, Esc closes panels. Options can turn off blood, particles, screen shake and damage numbers.
 
@@ -34,7 +36,17 @@ Keys: Space/Enter clicks the front monster, Esc closes panels. Options can turn 
 
 The previous prototype (a MapleStory-style idle platformer) is tagged `platformer-v4` in git.
 
+## Sprites
+
+`node scripts/build-atlas.ts` packs everything into `public/assets/sprites/atlas.png` + `atlas.txt`: the DungeonTileset II
+sheet plus the add-on packs in `assets-src/` (zone tiles and creatures). Re-run it after adding art.
+
 ## Credits (all CC0)
 
-[0x72 DungeonTileset II](https://0x72.itch.io/dungeontileset-ii), [Kenney](https://kenney.nl) sound packs, and
+Art: [0x72 DungeonTileset II](https://0x72.itch.io/dungeontileset-ii),
+[Enchanted Forest Characters](https://superdark.itch.io/enchanted-forest-characters) by Superdark,
+[jungle & desert tiles](https://omniboy.itch.io/custom-dungeon-16x16-tileset) by Omniboy,
+[Dark Dungeon](https://kosinaz.itch.io/16x16-dark-dungeon-tileset) by Zoltan Kosina,
+[DungeonTileset II Extended](https://nijikokun.itch.io/dungeontileset-ii-extended) by Niji.
+Sound: [Kenney](https://kenney.nl) sound packs, and
 [Chiptune Adventures](https://opengameart.org/content/4-chiptunes-adventure) music by Juhani Junkala.
