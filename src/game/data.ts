@@ -536,7 +536,7 @@ export const TROPHIES = buildTrophies();
 export interface CursorDef {
   id: string;
   name: string;
-  /** Sprite to draw; 'auto' follows your best click upgrade. */
+  /** Sprite to draw. (With no cursor chosen, the setting is 'auto': your best click upgrade.) */
   sprite: string;
   /** Trophy that unlocks it (none = always available). */
   trophy?: string;
@@ -544,7 +544,6 @@ export interface CursorDef {
 
 /** Cursor skins, each unlocked by a trophy. Changed in Options. */
 export const CURSORS: CursorDef[] = [
-  { id: 'auto', name: 'Your Blade', sprite: 'auto' },
   { id: 'rusty', name: 'Rusty Sword', sprite: 'weapon_rusty_sword' },
   { id: 'machete', name: 'Machete', sprite: 'weapon_machete', trophy: 'kill0' },
   { id: 'mace', name: 'Mace', sprite: 'weapon_mace', trophy: 'clicks2' },
