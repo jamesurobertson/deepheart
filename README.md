@@ -1,6 +1,6 @@
 # Deepheart
 
-![Deepheart](docs/screenshots/boss-kill.jpg)
+![Deepheart](docs/banner.png)
 
 Click monsters to pieces, hire companions with their gold, and descend the dungeon for souls.
 **Play it at https://jamesurobertson.github.io/deepheart/**
