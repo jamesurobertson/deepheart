@@ -2,8 +2,8 @@
  * Headless pacing check: a greedy player clicks and buys whatever adds the most damage per gold.
  *   node scripts/balance.ts [hours=3] [clicksPerSec=5] [activeMinutes=30] [descendRatio=0]
  */
-import { Game, newSave } from '../src/game/game.ts';
-import { COMPS, UPGRADES } from '../src/game/data.ts';
+import { Game, TUNE, newSave } from '../src/game/game.ts';
+import { COMPS, HEART, UPGRADES } from '../src/game/data.ts';
 import { fmt, duration } from '../src/game/format.ts';
 
 const hours = Number(process.argv[2] ?? 3);
@@ -11,6 +11,7 @@ const cps = Number(process.argv[3] ?? 5);
 const activeMin = Number(process.argv[4] ?? 30);
 const descendRatio = Number(process.argv[5] ?? 0);
 
+if (process.env.TUNE) Object.assign(TUNE, JSON.parse(process.env.TUNE));
 const game = new Game(newSave());
 const DT = 0.1;
 let t = 0;
@@ -50,25 +51,61 @@ function shop() {
   }
 }
 
+/** A player's rough relic preference: raw power first, then the answers to boss modifiers. */
+const RELIC_PICK = ['shard', 'oath', 'banner', 'slayer', 'whet', 'glass', 'hilt', 'pick', 'rot', 'drum', 'razor', 'hawk', 'cleaver', 'cage', 'purse', 'bait'];
+function equipRelics() {
+  const want = RELIC_PICK.filter((id) => game.relicLv(id) > 0).slice(0, game.relicSlots());
+  game.s.equipped = want;
+  game.invalidate();
+}
+const awakenRatio = Number(process.env.AWAKEN ?? 1);
+let awakens = 0;
 let descents = 0;
+let failsLogged = 0;
 let lastHour = -1;
+let lastMax = 0;
+let lastProgress = 0;
+/** A player gives up on a descent after this long without a new deepest floor. */
+const STALL = Number(process.env.STALL ?? 120);
+const totalStones = () => game.s.stones + HEART.reduce((a, h) => { let c = 0; for (let l = 0; l < game.heartLv(h.id); l++) c += h.cost(l); return a + c; }, 0);
 while (t < hours * 3600) {
   if (t < activeUntil) {
     clickAcc += DT * cps;
     while (clickAcc >= 1) { clickAcc--; game.click(null, 0, 0); }
   }
   game.update(DT);
+  for (const ev of game.events) {
+    if (ev.t === 'relic') { equipRelics(); if (process.env.RELICS) console.log(`${duration(t).padStart(8)}  relic ${ev.id} lv${ev.lv} (floor ${ev.floor})`); }
+    if (ev.t === 'retreat' && process.env.FAILS) console.log(`${duration(t).padStart(8)}  retreat floor ${ev.floor}`);
+    if (ev.t === 'bossFail' && failsLogged++ < 400 && process.env.FAILS) console.log(`${duration(t).padStart(8)}  boss fail floor ${ev.floor} [${game.bossMods(ev.floor).join(',')}]`);
+  }
   if (game.raid && Math.random() < 0.05) game.catchRaid();
   shop();
   for (const f of [10, 20, 30, 40, 50, 60, 75, 100, 125, 150]) if (game.s.maxFloor >= f) mark(`floor ${f}`);
-  if (descendRatio && game.pendingSouls() >= Math.max(10, game.s.souls * descendRatio)) {
+  if (game.s.maxFloor > lastMax) { lastMax = game.s.maxFloor; lastProgress = t; }
+  const stalled = t - lastProgress > STALL;
+  if (descendRatio && stalled && game.pendingSouls() >= Math.max(10, game.s.souls * descendRatio)) {
+    lastProgress = t;
+    lastMax = 0;
     console.log(`${duration(t).padStart(8)}  DESCEND #${++descents} at floor ${game.s.maxFloor}: +${game.pendingSouls()} souls`);
     game.descend();
     activeUntil = t + 300;
     for (;;) { const a = game.abyssList().filter((x) => game.abyssAvailable(x.id)).sort((x, y) => x.cost - y.cost)[0]; if (!a || !game.buyAbyss(a.id)) break; }
   }
+  if (stalled && game.canAwaken() && game.pendingStones() >= Math.max(3, totalStones() * awakenRatio)) {
+    lastProgress = t;
+    lastMax = 0;
+    console.log(`${duration(t).padStart(8)}  AWAKEN #${++awakens} at floor ${game.s.maxFloor} (best ${game.s.bestFloor}): +${game.pendingStones()} stones`);
+    game.awaken();
+    activeUntil = t + 300;
+    for (;;) {
+      const h = HEART.filter((x) => !game.heartMaxed(x.id)).sort((x, y) => game.heartCost(x.id) - game.heartCost(y.id))[0];
+      if (!h || !game.buyHeart(h.id)) break;
+    }
+    equipRelics();
+  }
   const h = Math.floor(t / 1800) / 2;
-  if (h !== lastHour) { lastHour = h; console.log(`--- ${h}h: floor ${game.s.floor}/${game.s.maxFloor}, dps ${fmt(game.dps())}, click ${fmt(game.clickDamage())}, gold ${fmt(game.s.gold)}, kills ${game.s.kills}, souls ${game.s.souls}, upg ${game.s.upgrades.length}/${UPGRADES.length}, trophies ${game.s.trophies.length}, lv ${game.s.owned.join(',')}`); }
+  if (h !== lastHour) { lastHour = h; console.log(`--- ${h}h: floor ${game.s.floor}/${game.s.maxFloor}, dps ${fmt(game.dps())}, click ${fmt(game.clickDamage())}, gold ${fmt(game.s.gold)}, kills ${game.s.kills}, souls ${game.s.souls}, upg ${game.s.upgrades.length}/${UPGRADES.length}, trophies ${game.s.trophies.length}, relics ${game.relicsFound()} [${game.s.equipped.map((id) => id + game.relicLv(id)).join(' ')}], stones ${game.s.stones}, heart ${JSON.stringify(game.s.heart)}, lv ${game.s.owned.join(',')}`); }
   game.events.length = 0;
   t += DT;
 }

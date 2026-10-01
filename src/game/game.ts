@@ -1,6 +1,6 @@
 import {
-  ABYSS, ABYSS_BY_ID, COMPS, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor,
-  type Effect, type MonsterDef, type RaidReward, type Req, type TrophyReq, type UpgDef,
+  ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, COMPS, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
+  type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
 export const SAVE_VERSION = 2;
@@ -29,6 +29,13 @@ const OFFLINE_CAP = 72 * 3600;
 export const DESCEND_FLOOR = 30;
 const SOUL_FIRST = 10;
 const SOUL_GROWTH = 1.1;
+/**
+ * Pacing knobs, in one place (the balance script overrides them to search for good values).
+ * - Souls grow 10% a floor up to `soulTaper`, then only `soulLate` a floor: that's the wall.
+ * - Awakening at floor f pays stoneBase × stoneGrowth^(f − AWAKEN_FLOOR) heartstones.
+ * - Heart of Fury multiplies all damage by `fury` per level.
+ */
+export const TUNE = { soulTaper: 90, soulLate: 1.04, stoneBase: 5, stoneGrowth: 1.02, fury: 10, deepHp: 1.16 };
 
 export interface Buff {
   id: RaidReward | 'fever';
@@ -58,6 +65,8 @@ export interface Settings {
   cinematics: boolean;
   /** Cursor skin id (see CURSORS). */
   cursor: string;
+  /** Quartermaster: buy companions and upgrades automatically. */
+  autoBuy: boolean;
 }
 
 export interface SaveState {
@@ -99,6 +108,19 @@ export interface SaveState {
   runTime: number;
   startedAt: number;
   lastSave: number;
+  /** Relic levels by id (0 / missing = not found yet). */
+  relics: Record<string, number>;
+  /** Relic ids in your slots. */
+  equipped: string[];
+  /** Deepest boss floor ever beaten: beating a deeper zone boss always drops a relic. */
+  bossBest: number;
+  /** Heart power levels by id. */
+  heart: Record<string, number>;
+  /** Unspent heartstones. */
+  stones: number;
+  awakens: number;
+  /** Deepest floor since the last awakening (heartstones are paid for it). */
+  cycleBest: number;
   settings: Settings;
 }
 
@@ -109,7 +131,8 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, floorKills: 0, auto: true, failDps: 0, revealed: 0,
     bestDps: 0, playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto' },
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, cycleBest: 1,
+    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoBuy: true },
   };
 }
 
@@ -124,6 +147,10 @@ export interface Monster {
   z: number;
   /** Seconds until it reaches its spot; companions only hit monsters that have arrived. */
   arrive: number;
+  /** Boss modifiers. */
+  mods: ModId[];
+  /** One half of a boss that split. */
+  half?: boolean;
 }
 
 export type HitKind = 'click' | 'crit' | 'dps' | 'cleave' | 'auto' | 'fever';
@@ -146,7 +173,12 @@ export type GameEvent =
   | { t: 'raidEscape'; id: number }
   | { t: 'fever'; on: boolean }
   | { t: 'descend'; souls: number }
-  | { t: 'abyss'; id: string };
+  | { t: 'abyss'; id: string }
+  | { t: 'relic'; id: string; lv: number; floor: number; equipped: boolean }
+  | { t: 'split'; id: number; into: [number, number] }
+  | { t: 'heal'; id: number; amount: number }
+  | { t: 'awaken'; stones: number }
+  | { t: 'heart'; id: string; lv: number };
 
 export interface Raid {
   id: number;
@@ -169,7 +201,7 @@ export interface OfflineSummary {
 /** Health of an ordinary monster on a floor (the classic clicker curve). */
 export function floorHp(f: number): number {
   if (f <= 140) return 10 * (f - 1 + 1.55 ** (f - 1));
-  return floorHp(140) * 1.145 ** (f - 140);
+  return floorHp(140) * TUNE.deepHp ** (f - 140);
 }
 
 export function floorGold(f: number): number {
@@ -203,6 +235,8 @@ export class Game {
   private sinceClick = 99;
   /** DPS damage waiting to be shown as numbers, per monster. */
   private dpsShown = new Map<number, number>();
+  private healShown = new Map<number, number>();
+  private shopT = 0;
   private dpsFlush = 0;
   /** Recent kills per second, smoothed, for the stats. */
   killRate = 0;
@@ -211,6 +245,8 @@ export class Game {
 
   constructor(s: SaveState) {
     this.s = s;
+    // Saves from before awakening existed: the whole history counts as the first cycle.
+    if (s.cycleBest === undefined) s.cycleBest = s.bestFloor ?? 1;
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
@@ -248,6 +284,33 @@ export class Game {
     return out;
   }
 
+  heartLv(id: string) {
+    return this.s.heart[id] ?? 0;
+  }
+
+  relicLv(id: string) {
+    return this.s.relics[id] ?? 0;
+  }
+
+  relicSlots() {
+    return 3 + this.heartLv('hoard');
+  }
+
+  /** Level of the equipped relic with this effect (0 if none is slotted). */
+  relic(e: RelicEffect) {
+    let lv = 0;
+    for (const id of this.s.equipped) {
+      const d = RELIC_BY_ID.get(id);
+      if (d && d.effect === e) lv += this.relicLv(id);
+    }
+    return lv;
+  }
+
+  /** How much of a boss modifier's bite is left after Warden's Bane (1 → 0.25). */
+  modBite() {
+    return 1 - 0.25 * this.heartLv('bane');
+  }
+
   soulPower() {
     return this.hasAbyss('crown') ? 0.04 : this.hasAbyss('roots') ? 0.03 : 0.02;
   }
@@ -267,13 +330,13 @@ export class Game {
     const s = this.s;
     const effects = this.effects();
     const mult = COMPS.map(() => 1);
-    let click = this.hasAbyss('twin') ? 2 : 1;
-    let clickDps = CLICK_DPS;
+    let click = (this.hasAbyss('twin') ? 2 : 1) * (1 + this.relic('click'));
+    let clickDps = CLICK_DPS + 0.1 * this.relic('oath');
     let global = 0;
     let gold = 0;
-    let crit = BASE_CRIT;
-    let critMult = BASE_CRIT_MULT;
-    let cleave = 0;
+    let crit = BASE_CRIT + Math.min(0.3, 0.02 * this.relic('critChance'));
+    let critMult = BASE_CRIT_MULT * (1 + 0.5 * this.relic('critMult'));
+    let cleave = 0.2 * this.relic('cleave');
     for (const e of effects) {
       if (e.t === 'comp') mult[e.comp] *= e.mult;
       else if (e.t === 'click') click *= e.mult;
@@ -289,10 +352,11 @@ export class Game {
         mult[e.b] *= 1 + 0.01 * s.owned[e.a];
       }
     }
-    const all = (1 + global) * this.trophyMult() * this.soulMult();
-    const perComp = COMPS.map((c, i) => c.dps * s.owned[i] * mult[i] * all);
+    const all = (1 + global) * this.trophyMult() * this.soulMult() * (1 + this.relic('all')) * TUNE.fury ** this.heartLv('fury');
+    const party = 1 + 0.5 * this.relic('party');
+    const perComp = COMPS.map((c, i) => c.dps * s.owned[i] * mult[i] * all * party);
     const dps = perComp.reduce((a, b) => a + b, 0);
-    this.cache = { dps, perComp, click: click * all + dps * clickDps, crit, critMult, cleave, gold: 1 + gold };
+    this.cache = { dps, perComp, click: click * all + dps * clickDps, crit, critMult, cleave, gold: (1 + gold) * (1 + 0.5 * this.relic('gold')) };
     return this.cache;
   }
 
@@ -350,7 +414,7 @@ export class Game {
   feverMult() {
     let p = 5;
     for (const e of this.effects()) if (e.t === 'fever' && e.power) p *= e.power;
-    return p;
+    return p * (1 + 0.5 * this.relic('rampage'));
   }
 
   monsterGold(m: Monster) {
@@ -437,19 +501,40 @@ export class Game {
     const band = bandFor(this.s.floor);
     const def = band[Math.floor(Math.random() * band.length)];
     const hp = floorHp(this.s.floor) * def.hp * TRASH;
-    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.7, ...this.spot(false) };
+    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.7, mods: [], ...this.spot(false) };
     this.monsters.push(m);
     this.events.push({ t: 'spawn', id: m.id });
   }
 
+  /** Modifiers on this floor's boss. */
+  bossMods(floor = this.s.floor) {
+    return modsFor(floor);
+  }
+
   private spawnBoss() {
     const def = bossFor(this.s.floor);
-    const hp = floorHp(this.s.floor) * 8;
-    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, ...this.spot(true) };
+    const mods = this.bossMods();
+    const bite = this.modBite();
+    const giant = mods.includes('giant');
+    const hp = floorHp(this.s.floor) * 8 * (giant ? 1 + 2 * bite : 1);
+    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, ...this.spot(true) };
     this.monsters.push(m);
-    this.bossTimeMax = this.hasAbyss('patience') ? 45 : BOSS_TIME;
-    this.bossTime = this.bossTimeMax;
+    let time = (this.hasAbyss('patience') ? 45 : BOSS_TIME) + Math.min(30, 3 * this.relic('time'));
+    if (mods.includes('enraged')) time *= 1 - 0.5 * bite;
+    if (giant) time *= 1.5;
+    this.bossTimeMax = time;
+    this.bossTime = time;
     this.events.push({ t: 'spawn', id: m.id });
+  }
+
+  /** Share of companion damage an armored boss shrugs off. */
+  armor() {
+    return 0.75 * 0.7 ** this.relic('pierce') * this.modBite();
+  }
+
+  /** Share of its health a regenerating boss heals per second. */
+  regen() {
+    return 0.03 * 0.7 ** this.relic('rot') * this.modBite();
   }
 
   monster(id: number) {
@@ -458,6 +543,13 @@ export class Game {
 
   /** Damage a monster; returns overflow past its death. */
   private damage(m: Monster, amount: number, kind: HitKind, x?: number, y?: number): number {
+    if (m.boss) {
+      amount *= 1 + this.relic('boss');
+      if (kind === 'dps' && m.mods.includes('armored')) {
+        // Overkill passed on from a dead monster keeps its full value; only the boss's share is cut.
+        amount *= 1 - this.armor();
+      }
+    }
     const dealt = Math.min(m.hp, amount);
     m.hp -= amount;
     if (kind === 'dps') this.dpsShown.set(m.id, (this.dpsShown.get(m.id) ?? 0) + dealt);
@@ -484,11 +576,26 @@ export class Game {
     this.killAcc++;
     this.stuckT = 0;
     this.events.push({ t: 'kill', id: m.id, gold, boss: m.boss, by });
+    if (m.boss && m.mods.includes('split') && !m.half) {
+      // Two halves climb out of the body; the clock keeps running.
+      const frac = 0.5 * this.modBite() + 0.25 * (1 - this.modBite());
+      const mods = m.mods.filter((x) => x !== 'split');
+      const halves = [-1, 1].map((side): Monster => ({
+        id: this.seq++, def: m.def, hp: m.max * frac, max: m.max * frac, boss: true, half: true, arrive: 0.4, mods,
+        x: m.x + side * 1.1, z: m.z - side * 1,
+      }));
+      this.monsters.push(...halves);
+      this.events.push({ t: 'split', id: m.id, into: [halves[0].id, halves[1].id] });
+      for (const h of halves) this.events.push({ t: 'spawn', id: h.id });
+      return;
+    }
+    if (m.boss && this.monsters.some((x) => x.boss)) return;
     if (m.boss) {
       this.s.bosses++;
       this.bossTime = 0;
       this.unlockNext();
       this.events.push({ t: 'bossWin', floor: this.s.floor });
+      this.rollRelic(this.s.floor);
       if (this.s.auto) this.enterFloor(this.s.floor + 1);
       else this.enterFloor(this.s.floor);
     } else if (!this.bossFloor()) {
@@ -505,6 +612,7 @@ export class Game {
     if (s.floor + 1 > s.maxFloor) {
       s.maxFloor = s.floor + 1;
       s.bestFloor = Math.max(s.bestFloor, s.maxFloor);
+      s.cycleBest = Math.max(s.cycleBest, s.maxFloor);
     }
   }
 
@@ -649,7 +757,7 @@ export class Game {
   }
 
   private scheduleRaid() {
-    let f = this.hasAbyss('lure') ? 1.25 : 1;
+    let f = (this.hasAbyss('lure') ? 1.25 : 1) * (1 + 0.3 * this.relic('goblin'));
     for (const e of this.effects()) if (e.t === 'raid' && e.freq) f *= e.freq;
     this.s.raidTimer = (RAID_MIN + Math.random() * (RAID_MAX - RAID_MIN)) / f;
   }
@@ -663,12 +771,16 @@ export class Game {
   // ---------- prestige ----------
 
   soulsFor(floor: number) {
-    return floor < DESCEND_FLOOR ? 0 : Math.floor(SOUL_FIRST * SOUL_GROWTH ** (floor - DESCEND_FLOOR));
+    if (floor < DESCEND_FLOOR) return 0;
+    const early = Math.min(floor, TUNE.soulTaper) - DESCEND_FLOOR;
+    const late = Math.max(0, floor - TUNE.soulTaper);
+    return Math.floor(SOUL_FIRST * SOUL_GROWTH ** early * TUNE.soulLate ** late);
   }
 
   /** Souls a descent would grant right now (based on the deepest floor this descent). */
   pendingSouls() {
-    return this.soulsFor(this.s.maxFloor);
+    const base = this.soulsFor(this.s.maxFloor);
+    return Math.floor(base * (1 + 0.15 * this.relic('souls')) * (1 + this.heartLv('siphon')));
   }
 
   canDescend() {
@@ -678,9 +790,16 @@ export class Game {
   descend() {
     const gained = this.pendingSouls();
     if (gained < 1) return false;
+    this.s.souls += gained;
+    this.s.descents++;
+    this.resetRun();
+    this.events.push({ t: 'descend', souls: gained });
+    return true;
+  }
+
+  /** Back to the top: gold, companions and upgrades go; souls, relics and trophies stay. */
+  private resetRun() {
     const s = this.s;
-    s.souls += gained;
-    s.descents++;
     s.gold = 0;
     s.runGold = 0;
     s.owned = COMPS.map(() => 0);
@@ -699,8 +818,6 @@ export class Game {
     this.applyStartingParty();
     this.invalidate();
     this.enterFloor(start, true);
-    this.events.push({ t: 'descend', souls: gained });
-    return true;
   }
 
   private applyStartingParty() {
@@ -730,6 +847,135 @@ export class Game {
     return true;
   }
 
+  // ---------- relics ----------
+
+  /** Chance a boss on this floor drops a relic (a new deepest zone boss always does). */
+  relicChance(floor: number) {
+    if (floor % 10 === 0 && floor > this.s.bossBest) return 1;
+    return Math.min(1, (floor % 10 === 0 ? 0.25 : 0.08) * (1 + 0.5 * this.heartLv('hunter')));
+  }
+
+  private rollRelic(floor: number) {
+    const chance = this.relicChance(floor);
+    this.s.bossBest = Math.max(this.s.bossBest, floor);
+    if (Math.random() >= chance) return;
+    // Rarer relics get likelier the deeper you are.
+    const w = [55, 28, 13 + floor / 20, 3 + floor / 25];
+    let roll = Math.random() * w.reduce((a, b) => a + b, 0);
+    let rar = 0;
+    while (rar < 3 && roll >= w[rar]) roll -= w[rar++];
+    const pool = RELICS.filter((x) => x.rarity === rar);
+    const def = pool[Math.floor(Math.random() * pool.length)];
+    this.giveRelic(def.id, floor);
+  }
+
+  giveRelic(id: string, floor = this.s.floor) {
+    const lv = this.relicLv(id) + 1;
+    this.s.relics[id] = lv;
+    let equipped = this.s.equipped.includes(id);
+    if (!equipped && lv === 1 && this.s.equipped.length < this.relicSlots()) {
+      this.s.equipped.push(id);
+      equipped = true;
+    }
+    this.invalidate();
+    this.events.push({ t: 'relic', id, lv, floor, equipped });
+  }
+
+  /** Put a relic in a slot or take it out. Returns false when all slots are full. */
+  toggleRelic(id: string) {
+    const s = this.s;
+    const i = s.equipped.indexOf(id);
+    if (i >= 0) s.equipped.splice(i, 1);
+    else if (this.relicLv(id) > 0 && s.equipped.length < this.relicSlots()) s.equipped.push(id);
+    else return false;
+    this.invalidate();
+    return true;
+  }
+
+  relicsFound() {
+    return RELICS.filter((x) => this.relicLv(x.id) > 0).length;
+  }
+
+  rarityName(id: string) {
+    return RARITY[RELIC_BY_ID.get(id)!.rarity];
+  }
+
+  // ---------- the heart ----------
+
+  canAwaken() {
+    return this.pendingStones() >= 1;
+  }
+
+  /** Heartstones an awakening would pay: grows with the deepest floor since the last one. */
+  stonesFor(floor: number) {
+    return floor < AWAKEN_FLOOR ? 0 : Math.floor(TUNE.stoneBase * TUNE.stoneGrowth ** (floor - AWAKEN_FLOOR));
+  }
+
+  pendingStones() {
+    return this.stonesFor(Math.max(this.s.cycleBest, this.s.maxFloor));
+  }
+
+  awaken() {
+    if (!this.canAwaken()) return false;
+    const gained = this.pendingStones();
+    const s = this.s;
+    s.stones += gained;
+    s.awakens++;
+    s.cycleBest = 1;
+    s.souls = 0;
+    s.spentSouls = 0;
+    // Echoing Abyss keeps the cheap powers, free.
+    s.abyss = this.heartLv('echo') ? s.abyss.filter((id) => ABYSS_BY_ID.get(id)!.cost <= 100) : [];
+    this.abyssSet = new Set(s.abyss);
+    this.resetRun();
+    this.events.push({ t: 'awaken', stones: gained });
+    return true;
+  }
+
+  heartCost(id: string) {
+    const h = HEART_BY_ID.get(id)!;
+    return h.cost(this.heartLv(id));
+  }
+
+  heartMaxed(id: string) {
+    return this.heartLv(id) >= HEART_BY_ID.get(id)!.max;
+  }
+
+  buyHeart(id: string) {
+    const h = HEART_BY_ID.get(id);
+    if (!h || this.heartMaxed(id)) return false;
+    const cost = this.heartCost(id);
+    if (this.s.stones < cost) return false;
+    this.s.stones -= cost;
+    this.s.heart[id] = this.heartLv(id) + 1;
+    this.invalidate();
+    this.events.push({ t: 'heart', id, lv: this.s.heart[id] });
+    return true;
+  }
+
+  /** Quartermaster: spend gold the way a sensible player would (best damage per gold first). */
+  private autoShop() {
+    this.buyAllUpgs();
+    const mode = this.s.settings.buyMode;
+    this.s.settings.buyMode = 1;
+    for (let k = 0; k < 60; k++) {
+      let best = -1;
+      let bestScore = Infinity;
+      for (let i = 0; i < COMPS.length; i++) {
+        if (!this.compUnlocked(i) || i > this.s.revealed) continue;
+        const gain = this.compNext(i);
+        if (gain <= 0) continue;
+        const score = this.compCost(i) / gain;
+        if (score < bestScore) {
+          bestScore = score;
+          best = i;
+        }
+      }
+      if (best < 0 || this.compCost(best) > this.s.gold || !this.buyComp(best)) break;
+    }
+    this.s.settings.buyMode = mode;
+  }
+
   // ---------- trophies ----------
 
   private trophyMet(r: TrophyReq): boolean {
@@ -748,6 +994,8 @@ export class Game {
       case 'upgrades': return s.upgrades.length >= r.n;
       case 'dps': return this.baseDps() >= r.n;
       case 'missed': return s.missed >= r.n;
+      case 'relics': return this.relicsFound() >= r.n;
+      case 'awakens': return s.awakens >= r.n;
     }
   }
 
@@ -833,8 +1081,25 @@ export class Game {
     this.sinceClick += dt;
     if (this.sinceClick > 0.6 && !s.buffs.some((b) => b.id === 'fever')) s.fervor = Math.max(0, s.fervor - dt * 0.12);
 
+    // Regenerating bosses.
+    for (const m of this.monsters) {
+      if (!m.mods.includes('regen') || m.hp >= m.max) continue;
+      const heal = Math.min(m.max - m.hp, m.max * this.regen() * dt);
+      m.hp += heal;
+      this.healShown.set(m.id, (this.healShown.get(m.id) ?? 0) + heal);
+    }
+
+    // Quartermaster.
+    if (this.heartLv('quarter') && s.settings.autoBuy) {
+      this.shopT -= dt;
+      if (this.shopT <= 0) {
+        this.shopT = 0.5;
+        this.autoShop();
+      }
+    }
+
     // Phantom Blade.
-    const rate = this.hasAbyss('hands2') ? 10 : this.hasAbyss('hands') ? 3 : 0;
+    const rate = (this.hasAbyss('hands2') ? 10 : this.hasAbyss('hands') ? 3 : 0) + 2 * this.relic('phantom');
     if (rate) {
       this.autoClick += dt * rate;
       while (this.autoClick >= 1) {
@@ -872,6 +1137,8 @@ export class Game {
       this.dpsFlush = 0.35;
       for (const [id, amount] of this.dpsShown) if (this.monster(id)) this.events.push({ t: 'hit', id, amount, kind: 'dps' });
       this.dpsShown.clear();
+      for (const [id, amount] of this.healShown) if (this.monster(id)) this.events.push({ t: 'heal', id, amount });
+      this.healShown.clear();
     }
 
     this.killWindow += dt;

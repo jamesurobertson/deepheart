@@ -205,7 +205,8 @@ const DPS_CLICK: [string, string, number, number][] = [
   ['Hand of Ruin', 'weapon_double_axe', 75, 5e18],
 ];
 
-const RELICS: [string, string][] = [
+/** Shop tonics (flat damage / gold boosts). Not to be confused with boss relics. */
+const TONICS: [string, string][] = [
   ['Lucky Coin', 'coin'], ['Blood Vial', 'flask_red'], ['Grave Moss', 'flask_green'], ['Bone Charm', 'skull'],
   ['Crypt Honey', 'flask_big_yellow'], ['Widow Venom', 'flask_big_green'], ['Heartsblood', 'flask_big_red'], ['Drowned Silver', 'flask_blue'],
   ['Moonless Ink', 'flask_big_blue'], ['Kingsgold', 'coin'], ['Screaming Salt', 'flask_red'], ['Starmarrow', 'flask_big_yellow'],
@@ -256,7 +257,7 @@ function buildUpgrades(): UpgDef[] {
     id: `clv${k}`, name, desc: `Clicks also hit every other monster for ${Math.round(pct * 100)}% damage.`,
     cost, icon: { sprite: 'weapon_double_axe', tier: k }, effect: { t: 'cleave', pct }, req: { t: 'floor', n: floor },
   }));
-  RELICS.forEach(([name, sprite], k) => {
+  TONICS.forEach(([name, sprite], k) => {
     const gold = k % 3 === 0;
     const pct = gold ? 0.25 : k < 6 ? 0.1 : 0.25;
     const floor = 6 + k * 6;
@@ -330,6 +331,138 @@ export const ABYSS: AbyssDef[] = [
 ];
 export const ABYSS_BY_ID = new Map(ABYSS.map((a) => [a.id, a]));
 
+// ---------- boss modifiers ----------
+
+export type ModId = 'armored' | 'enraged' | 'regen' | 'split' | 'giant';
+
+export interface ModDef {
+  id: ModId;
+  name: string;
+  desc: string;
+  /** Relic that answers it. */
+  counter: string;
+  color: string;
+}
+
+export const MODS: ModDef[] = [
+  { id: 'armored', name: 'Armored', desc: 'Companions deal 75% less damage to it. Clicks hit in full.', counter: 'pick', color: '#9fb4c8' },
+  { id: 'enraged', name: 'Enraged', desc: 'Only half the time to beat it.', counter: 'glass', color: '#ff6a4a' },
+  { id: 'regen', name: 'Regenerating', desc: 'Heals 3% of its health every second.', counter: 'rot', color: '#7ee07a' },
+  { id: 'split', name: 'Splitting', desc: 'Splits in two when it falls. Both halves have to die in time.', counter: 'cleaver', color: '#d58aff' },
+  { id: 'giant', name: 'Giant', desc: 'Three times the health, and 50% more time.', counter: 'slayer', color: '#ffc24a' },
+];
+export const MOD_BY_ID = new Map(MODS.map((d) => [d.id, d]));
+
+/** Modifiers come round in this order, so each zone boss brings a different one. */
+const MOD_ORDER: ModId[] = ['giant', 'armored', 'split', 'regen', 'enraged'];
+
+/**
+ * Zone bosses pick up modifiers from floor 30 (two from 100, three from 200); the mid-bosses
+ * on floor 5 of each zone join in from 55 (two from 155). Always the same for a floor.
+ */
+export function modsFor(floor: number): ModId[] {
+  if (floor % 5 !== 0) return [];
+  const zone = floor % 10 === 0;
+  const n = zone ? (floor >= 200 ? 3 : floor >= 100 ? 2 : floor >= 30 ? 1 : 0) : floor >= 155 ? 2 : floor >= 55 ? 1 : 0;
+  const k = zone ? floor / 10 - 3 : (floor - 55) / 10 + 3;
+  // Steps of 2 through a list of 5 never repeat within three picks.
+  return Array.from({ length: n }, (_, j) => MOD_ORDER[(k + j * 2) % MOD_ORDER.length]);
+}
+
+// ---------- relics ----------
+
+export type Rarity = 0 | 1 | 2 | 3;
+export const RARITY = ['Common', 'Rare', 'Epic', 'Legendary'] as const;
+
+export type RelicEffect = 'click' | 'party' | 'gold' | 'boss' | 'time' | 'critMult' | 'critChance' | 'pierce' | 'rot' | 'rampage' | 'goblin' | 'souls' | 'phantom' | 'cleave' | 'all' | 'oath';
+
+export interface RelicDef {
+  id: string;
+  name: string;
+  icon: string;
+  rarity: Rarity;
+  effect: RelicEffect;
+  flavor: string;
+}
+
+const r = (id: string, name: string, icon: string, rarity: Rarity, effect: RelicEffect, flavor: string): RelicDef => ({ id, name, icon, rarity, effect, flavor });
+
+/** Boss drops. You keep them forever; finding one again raises its level. */
+export const RELICS: RelicDef[] = [
+  r('whet', 'Whetstone', 'weapon_knife', 0, 'click', 'A little spit, a little stone, a lot of edge.'),
+  r('banner', 'Tattered Banner', 'wall_banner_red', 0, 'party', 'Nobody remembers the army. The banner remembers.'),
+  r('purse', 'Goblin Purse', 'coin', 0, 'gold', 'Still warm. Still jingling. Still somehow full.'),
+  r('slayer', 'Giantslayer', 'weapon_spear', 0, 'boss', 'The bigger they are, the more of them there is to stab.'),
+  r('glass', 'Sandglass', 'flask_yellow', 1, 'time', 'The sand falls up if you ask nicely.'),
+  r('razor', 'Razor Edge', 'weapon_saw_sword', 1, 'critMult', 'Cuts on the way in. Cuts worse on the way out.'),
+  r('hawk', 'Hawk\'s Eye', 'weapon_bow', 1, 'critChance', 'Sees the soft spot. Every monster has one.'),
+  r('pick', 'Armorbreaker', 'weapon_big_hammer', 1, 'pierce', 'Plate is just a tin you open.'),
+  r('rot', 'Festering Blade', 'weapon_machete', 1, 'rot', 'Wounds it makes do not close. Ever.'),
+  r('drum', 'Blood Drum', 'flask_big_red', 2, 'rampage', 'Beat it once and the whole party sees red.'),
+  r('bait', 'Golden Bait', 'chest_full_open', 2, 'goblin', 'Goblins cannot resist. Goblins have never resisted anything.'),
+  r('cage', 'Soul Cage', 'skull', 2, 'souls', 'It hums when you go deeper.'),
+  r('hilt', 'Phantom Hilt', 'weapon_katana', 2, 'phantom', 'The sword is gone. The swinging is not.'),
+  r('cleaver', 'Headsman\'s Cleaver', 'weapon_cleaver', 2, 'cleave', 'One swing, many necks.'),
+  r('shard', 'Deepheart Shard', 'ui_heart_full', 3, 'all', 'A splinter of the thing at the bottom. It beats.'),
+  r('oath', 'Oathkeeper', 'weapon_golden_sword', 3, 'oath', 'Your hand, and the strength of everyone behind you.'),
+];
+export const RELIC_BY_ID = new Map(RELICS.map((x) => [x.id, x]));
+
+/** What a relic does at a level, in words. */
+export function relicText(def: RelicDef, lv: number): string {
+  const L = Math.max(1, lv);
+  switch (def.effect) {
+    case 'click': return `Clicks deal ×${1 + L} damage.`;
+    case 'party': return `Companions deal ×${fmtN(1 + 0.5 * L)} damage.`;
+    case 'gold': return `Monsters drop ×${fmtN(1 + 0.5 * L)} gold.`;
+    case 'boss': return `×${1 + L} damage to bosses.`;
+    case 'time': return `Bosses give you ${Math.min(30, 3 * L)} more seconds.`;
+    case 'critMult': return `Critical hits deal ×${fmtN(1 + 0.5 * L)} damage.`;
+    case 'critChance': return `+${Math.min(30, 2 * L)}% critical hit chance.`;
+    case 'pierce': return `Armored bosses block ${Math.round(75 * 0.7 ** L)}% of companion damage instead of 75%.`;
+    case 'rot': return `Regenerating bosses heal ${fmtN(3 * 0.7 ** L)}% a second instead of 3%.`;
+    case 'rampage': return `Rampage is ×${fmtN(1 + 0.5 * L)} stronger.`;
+    case 'goblin': return `Treasure goblins show up ${30 * L}% more often.`;
+    case 'souls': return `Descending earns ${15 * L}% more souls.`;
+    case 'phantom': return `A phantom blade clicks for you ${2 * L} times a second.`;
+    case 'cleave': return `Clicks also hit every other monster for ${20 * L}% damage.`;
+    case 'all': return `All damage ×${1 + L}.`;
+    case 'oath': return `Each click also deals ${10 * L}% of your party's damage per second.`;
+  }
+}
+
+const fmtN = (n: number) => (Math.round(n * 100) / 100).toString();
+
+// ---------- the heart (second prestige) ----------
+
+/** Awakening needs this deepest floor. */
+export const AWAKEN_FLOOR = 120;
+
+export interface HeartDef {
+  id: string;
+  name: string;
+  icon: string;
+  /** Cost of the next level, given levels owned. */
+  cost: (lv: number) => number;
+  max: number;
+  desc: (lv: number) => string;
+}
+
+export const HEART: HeartDef[] = [
+  { id: 'fury', name: 'Heart of Fury', icon: 'ui_heart_full', max: Infinity, cost: (l) => 2 ** l, desc: (l) => `All damage ×10 per level (now ×${fmtBig(10 ** l)}).` },
+  { id: 'siphon', name: 'Soul Siphon', icon: 'skull', max: Infinity, cost: (l) => Math.ceil(3 * 1.6 ** l), desc: (l) => `Descending earns +100% souls per level (now +${l * 100}%).` },
+  { id: 'hoard', name: 'Relic Hoard', icon: 'chest_full_open', max: 2, cost: (l) => [5, 25][l], desc: (l) => `One more relic slot (${3 + l} now).` },
+  { id: 'hunter', name: 'Relic Hunter', icon: 'weapon_bow_2', max: 4, cost: (l) => [3, 8, 20, 50][l], desc: (l) => `Bosses drop relics 50% more often per level (now +${l * 50}%).` },
+  { id: 'bane', name: 'Warden\'s Bane', icon: 'weapon_red_gem_sword', max: 3, cost: (l) => [4, 15, 60][l], desc: (l) => `Boss modifiers are 25% weaker per level (now ${l * 25}%).` },
+  { id: 'echo', name: 'Echoing Abyss', icon: 'flask_big_blue', max: 1, cost: () => 6, desc: () => 'Keep abyss powers that cost 100 souls or less when you awaken.' },
+  { id: 'quarter', name: 'Quartermaster', icon: 'coin', max: 1, cost: () => 4, desc: () => 'Your party hires itself: companions and upgrades are bought for you (toggle in the shop).' },
+];
+export const HEART_BY_ID = new Map(HEART.map((h) => [h.id, h]));
+
+function fmtBig(n: number) {
+  return n >= 1e6 ? n.toExponential(1).replace('e+', 'e') : String(n);
+}
+
 // ---------- trophies ----------
 
 export type TrophyReq =
@@ -345,7 +478,9 @@ export type TrophyReq =
   | { t: 'descents'; n: number }
   | { t: 'upgrades'; n: number }
   | { t: 'dps'; n: number }
-  | { t: 'missed'; n: number };
+  | { t: 'missed'; n: number }
+  | { t: 'relics'; n: number }
+  | { t: 'awakens'; n: number };
 
 export interface TrophyDef {
   id: string;
@@ -388,6 +523,8 @@ function buildTrophies(): TrophyDef[] {
     [250, 'The Goblins Thank You', 'Let 250 treasure goblins get away. There is a statue of you in Goblin Town.'],
   ];
   missed.forEach(([n, name, desc], k) => out.push({ id: `miss${k}`, name, desc, icon: { sprite: 'goblin', tier: k }, req: { t: 'missed', n } }));
+  [1, 4, 8, 12, 16].forEach((n, k) => out.push({ id: `rel${k}`, name: ['Finder', 'Collector', 'Curator', 'Reliquary', 'Every Last One'][k], desc: n === 1 ? 'Find a relic.' : n === 16 ? 'Find every relic.' : `Find ${n} different relics.`, icon: { sprite: 'chest_full_open', tier: k }, req: { t: 'relics', n } }));
+  [1, 3, 10, 25].forEach((n, k) => out.push({ id: `awk${k}`, name: ['It Wakes', 'Heartbeat', 'Drumming Deep', 'The Heart Remembers'][k], desc: `Awaken the Heart ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'ui_heart_full', tier: k }, req: { t: 'awakens', n } }));
   [10, 1e3, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21].forEach((n, k) => out.push({ id: `dps${k}`, name: ['Scrapper', 'Fighter', 'Warrior', 'Warlord', 'Army', 'Legion', 'Cataclysm', 'Apocalypse'][k], desc: `Reach ${n.toLocaleString('en-US')} damage per second.`, icon: { sprite: 'weapon_waraxe', tier: k }, req: { t: 'dps', n } }));
   return out;
 }

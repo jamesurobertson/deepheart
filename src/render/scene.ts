@@ -787,17 +787,27 @@ export class Scene {
     const inner = new THREE.Group();
     inner.add(sprite.mesh);
     body.add(inner, blobShadow(m.boss ? 2.2 : 0.9));
-    body.position.copy(STAIRS).add(new THREE.Vector3(Math.random() * 0.6, 0, Math.random() * 0.6));
+    // Halves of a split boss climb out where it fell; everything else comes up the stairs.
+    if (m.half) body.position.set(m.x * this.squeeze, 0, m.z * this.deep);
+    else body.position.copy(STAIRS).add(new THREE.Vector3(Math.random() * 0.6, 0, Math.random() * 0.6));
     body.scale.setScalar(0.01);
     this.scene.add(body);
     // Ordinary monsters ~1.2× (tall ones capped at ~2 units); bosses ~3.4 units tall whatever their art.
     const h = run[0].h / 16;
-    const scale = m.boss ? Math.max(1.5, Math.min(2.6, 3.4 / h)) : Math.min(1.2, 2.1 / h);
+    let scale = m.boss ? Math.max(1.5, Math.min(2.6, 3.4 / h)) : Math.min(1.2, 2.1 / h);
+    if (m.mods.includes('giant')) scale *= 1.3;
+    if (m.half) scale *= 0.7;
     inner.scale.setScalar(scale);
-    if (m.def.tint !== undefined) sprite.mesh.material.color.setHex(m.def.tint);
+    const tint = new THREE.Color(m.def.tint ?? 0xffffff);
+    // Modifiers show on the body: steel-grey armour, a red rage, a sickly green regrowth.
+    if (m.mods.includes('armored')) tint.multiply(new THREE.Color(0xb4c4dc));
+    if (m.mods.includes('enraged')) tint.multiply(new THREE.Color(0xff9a88));
+    if (m.mods.includes('regen')) tint.multiply(new THREE.Color(0xb8ffb0));
+    sprite.mesh.material.color.copy(tint);
+    if (m.half && this.settings.particles) this.fx.burst(body.position.clone().setY(1), '#d58aff', 14, 4, 0.08, 8);
     this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0 });
     if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(0.4), '#6a5a78', 6, 2, 0.08, 6);
-    if (m.boss) {
+    if (m.boss && !m.half) {
       this.fx.light(STAIRS.clone().setY(2), 0xff4040, 30, 1, 12);
       this.addShake(0.3);
     }
