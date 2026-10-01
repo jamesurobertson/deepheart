@@ -360,7 +360,9 @@ export class Ui {
       const cur = t.closest<HTMLElement>('[data-cursor]');
       if (cur) {
         if (!this.cursorOpen(cur.dataset.cursor!)) return this.deny(cur);
-        this.game.s.settings.cursor = cur.dataset.cursor!;
+        // Tapping the one you're wearing takes it off: back to your best bought blade.
+        const id = cur.dataset.cursor!;
+        this.game.s.settings.cursor = this.game.s.settings.cursor === id ? 'auto' : id;
         this.hooks.sound('equip', { vol: 0.5 });
         this.hooks.settings();
         this.renderModal();
@@ -697,10 +699,10 @@ export class Ui {
     return !!c && (!c.trophy || this.game.hasTrophy(c.trophy));
   }
 
-  /** The sprite for the chosen cursor; "Your Blade" follows your best click upgrade. */
+  /** The sprite for the chosen cursor; with none chosen, it follows your best click upgrade. */
   private cursorSprite(): string {
     const pick = CURSORS.find((c) => c.id === this.game.s.settings.cursor);
-    if (pick && pick.sprite !== 'auto' && this.cursorOpen(pick.id)) return pick.sprite;
+    if (pick && this.cursorOpen(pick.id)) return pick.sprite;
     return this.bestBlade();
   }
 
@@ -1047,8 +1049,8 @@ export class Ui {
     if (kind === 'cur') {
       const c = CURSORS.find((x) => x.id === id)!;
       const tro = c.trophy ? TROPHIES.find((x) => x.id === c.trophy) : undefined;
-      const how = c.sprite === 'auto' ? 'Shows the best blade you have bought.' : tro ? `${this.cursorOpen(c.id) ? 'Unlocked by' : 'Unlock with'} the trophy <b>${esc(tro.name)}</b>: ${esc(tro.desc)}` : 'Always available.';
-      return `<div class="tt-h"><b>${esc(c.name)}</b><span class="tt-own">${this.cursorOpen(c.id) ? (this.game.s.settings.cursor === c.id ? 'equipped' : 'cursor') : 'locked'}</span></div><p class="tt-d">${how}</p>`;
+      const how = tro ? `${this.cursorOpen(c.id) ? 'Unlocked by' : 'Unlock with'} the trophy <b>${esc(tro.name)}</b>: ${esc(tro.desc)}` : 'Always available.';
+      return `<div class="tt-h"><b>${esc(c.name)}</b><span class="tt-own">${this.cursorOpen(c.id) ? (this.game.s.settings.cursor === c.id ? 'equipped' : 'cursor') : 'locked'}</span></div><p class="tt-d">${how}</p>${this.game.s.settings.cursor === c.id ? '<p class="tt-f">Tap again to go back to your best bought blade.</p>' : ''}`;
     }
     if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Click fast to fill this. When it's full, your clicks deal ×${g.feverMult()} damage and your party hits twice as hard for a few seconds.</p>`;
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
@@ -1150,7 +1152,7 @@ export class Ui {
           <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
           <div class="cursors">${CURSORS.map((c) => {
             const open = this.cursorOpen(c.id);
-            const spr = c.sprite === 'auto' ? this.bestBlade() : c.sprite;
+            const spr = c.sprite;
             return `<button class="cur ${open ? '' : 'locked'} ${s.cursor === c.id ? 'on' : ''}" data-cursor="${c.id}" data-tip="cur:${c.id}">${spriteFit(spr, 36)}${open ? '' : `<span class="cur-lock">${G.lock()}</span>`}</button>`;
           }).join('')}</div>
           <h3>Save</h3>
