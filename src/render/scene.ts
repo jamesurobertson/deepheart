@@ -1163,11 +1163,6 @@ export class Scene {
     this.cine = { phase: 'exit', t: 0, zone, walkers: [], shadows: [], well: null, flames: [] };
   }
 
-  /** Tap to skip: straight to the arrival. */
-  skip() {
-    if (this.cine && this.cine.phase !== 'arrive') this.arrive();
-  }
-
   private descend() {
     const c = this.cine!;
     c.phase = 'stairs';

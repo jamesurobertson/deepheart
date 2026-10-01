@@ -23,7 +23,7 @@ Handy URL flags: `?slot=name` keeps a separate save, `?speed=10` runs the game f
 - **Zones:** every 10 floors is a new place with its own tiles, lighting, monsters, a mid-boss on floor 5 and a zone boss on floor 10:
   The Upper Halls, The Bone Crypts, The Overgrown Warrens (Troll Brute), The Sunken Tomb (Tomb Golem), The Rotting Deep (The Rotten King),
   The Enchanted Grove (The Elder Ent), The Demon Gate (Pit Lord) and The Frozen Vault (Frost Troll). Then they come round again, harder.
-  Beat a zone boss and your party marches down a spiral staircase into the next zone (tap to skip; can be turned off in Options).
+  Beat a zone boss and your party marches down a stair tower into the next zone (can be turned off in Options).
 
 Keys: Space/Enter clicks the front monster, Esc closes panels. Options can turn off blood, particles, screen shake and damage numbers.
 
