@@ -84,12 +84,12 @@ while (t < hours * 3600) {
   for (const f of [10, 20, 30, 40, 50, 60, 75, 100, 125, 150]) if (game.s.maxFloor >= f) mark(`floor ${f}`);
   if (game.s.maxFloor > lastMax) { lastMax = game.s.maxFloor; lastProgress = t; }
   const stalled = t - lastProgress > STALL;
-  if (descendRatio && stalled && game.pendingSouls() >= Math.max(10, game.s.souls * descendRatio)) {
+  if (descendRatio && stalled && game.canDescend() && game.pendingSouls() >= Math.max(10, game.s.souls * descendRatio)) {
     lastProgress = t;
     lastMax = 0;
     console.log(`${duration(t).padStart(8)}  DESCEND #${++descents} at floor ${game.s.maxFloor}: +${game.pendingSouls()} souls`);
     game.descend();
-    activeUntil = t + 300;
+    activeUntil = Math.max(activeUntil, t + 300);
     for (;;) { const a = game.abyssList().filter((x) => game.abyssAvailable(x.id)).sort((x, y) => x.cost - y.cost)[0]; if (!a || !game.buyAbyss(a.id)) break; }
   }
   if (stalled && game.canAwaken() && game.pendingStones() >= Math.max(3, totalStones() * awakenRatio)) {
@@ -97,7 +97,7 @@ while (t < hours * 3600) {
     lastMax = 0;
     console.log(`${duration(t).padStart(8)}  AWAKEN #${++awakens} at floor ${game.s.maxFloor} (best ${game.s.bestFloor}): +${game.pendingStones()} stones`);
     game.awaken();
-    activeUntil = t + 300;
+    activeUntil = Math.max(activeUntil, t + 300);
     for (;;) {
       const h = HEART.filter((x) => !game.heartMaxed(x.id)).sort((x, y) => game.heartCost(x.id) - game.heartCost(y.id))[0];
       if (!h || !game.buyHeart(h.id)) break;

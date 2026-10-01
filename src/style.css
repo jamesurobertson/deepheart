@@ -734,3 +734,31 @@ body.compact .rel-help, body.compact .mods-list { font-size: 13px; }
 body.phone .badge { top: auto; bottom: -11px; right: 50%; transform: translateX(50%); font-size: 13px; padding: 0 3px 1px; white-space: nowrap; z-index: 1; }
 body.phone .badge .glyph { display: none; }
 body.phone .badge.hot, body.phone .badge.new { animation: none; }
+
+/* ---------- stats: where every number comes from ---------- */
+
+.bd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 4px 18px; }
+.bd h3 { margin: 10px 0 6px; }
+.bd table { width: 100%; border-collapse: collapse; }
+.bd th { text-align: left; font: 600 14px/1.15 'Pixelify Sans'; color: var(--text); padding: 4px 8px 4px 0; vertical-align: top; }
+.bd th small { display: block; font: 400 12px/1.2 'Pixelify Sans'; color: var(--faint); margin-top: 1px; }
+.bd td { text-align: right; font: 400 20px/1 'Jersey 10'; color: var(--gold-hi); padding: 4px 0; vertical-align: top; white-space: nowrap; }
+.bd tr + tr { border-top: 1px solid #2d2224; }
+.bd tr.off th, .bd tr.off td { opacity: 0.45; }
+.bd tr.off td { color: var(--dim); }
+.bd tr.tot { border-top: 2px solid #5a3f2c; }
+.bd tr.tot th { color: var(--gold-hi); font-weight: 700; }
+.bd tr.tot td { font-size: 24px; color: #fff; }
+.bd.wide { overflow-x: auto; }
+.bd.wide thead td { font: 400 11px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; padding-bottom: 6px; }
+.bd.wide td { padding-left: 10px; font-size: 18px; }
+.bd-comp { display: inline-flex; align-items: center; gap: 6px; }
+.bd-help { font-size: 14px; margin: 0 0 8px; }
+.pop.p-soul { font-size: 30px; color: #d9c2ff; text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 0 0 16px rgba(179, 140, 255, 0.9); z-index: 3; }
+body.compact .bd-grid { grid-template-columns: 1fr; }
+body.compact .bd th { font-size: 13px; }
+body.compact .bd td { font-size: 18px; }
+body.compact .bd.wide td { padding-left: 6px; font-size: 15px; }
+/* Same height on every stats tab, so the tabs don't jump when you switch. */
+.modal.m-stats, .modal.m-party, .modal.m-records { height: min(700px, calc(100vh - 40px)); }
+body.compact .modal.m-stats, body.compact .modal.m-party, body.compact .modal.m-records { height: calc(100dvh - 16px - var(--safe-t) - var(--safe-b)); }

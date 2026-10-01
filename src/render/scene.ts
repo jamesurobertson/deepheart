@@ -247,6 +247,9 @@ export class Scene {
   private camBase = new THREE.Vector3();
   settings = { particles: true, shake: true, blood: true, cinematics: true };
   /** Zone-change interlude: the party leaves, descends a spiral staircase, arrives somewhere new. */
+  /** A pause (the loot card is up) before the staircase starts. */
+  private hold: { zone: number; t: number } | null = null;
+  private relicDropped = false;
   private cine: { phase: 'exit' | 'stairs' | 'arrive'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[] } | null = null;
   /** Black card in front of the camera for fades. */
   private fade: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
@@ -1077,14 +1080,21 @@ export class Scene {
         }
         break;
       }
+      case 'relic':
+        this.relicDropped = true;
+        break;
       case 'floor': {
         const z = zoneOf(ev.floor);
         // Going down into the next zone (however you got there): the staircase, every time.
         const deeper = z > zoneOf(this.lastFloor);
         this.lastFloor = ev.floor;
         if (this.cine) this.cine.zone = z;
+        else if (this.hold) this.hold.zone = z;
+        // A relic just dropped: let it sink in before the party heads for the stairs.
+        else if (deeper && this.settings.cinematics && this.relicDropped) this.hold = { zone: z, t: 2.4 };
         else if (deeper && this.settings.cinematics) this.startCinematic(z);
         else this.setBand(z);
+        this.relicDropped = false;
         break;
       }
       case 'bossFail':
@@ -1141,6 +1151,7 @@ export class Scene {
 
   /** Rebuild everything from the game state (after loading or descending). */
   rebuild(game: Game) {
+    this.hold = null;
     for (const c of this.party) {
       this.scene.remove(c.body);
       c.sprite.dispose();
@@ -1166,7 +1177,7 @@ export class Scene {
 
   /** True while the interlude holds the screen (the game pauses meanwhile). */
   get busy() {
-    return !!this.cine && this.cine.phase !== 'arrive';
+    return !!this.hold || (!!this.cine && this.cine.phase !== 'arrive');
   }
 
   private startCinematic(zone: number) {
@@ -1314,6 +1325,10 @@ export class Scene {
     });
 
     for (const pr of this.props) pr.update(dt);
+    if (this.hold && (this.hold.t -= dt) <= 0) {
+      this.startCinematic(this.hold.zone);
+      this.hold = null;
+    }
     if (this.cine) this.updateCinematic(dt);
     const holding = this.cine && this.cine.phase !== 'arrive';
     this.updateMonsters(dt, game);

@@ -19,7 +19,11 @@ Handy URL flags: `?slot=name` keeps a separate save, `?speed=10` runs the game f
 - **Floors:** kill 25 monsters to clear a floor. Every 5th floor is a timed boss. Lose to a boss and your party falls back to farm, then retries once it's 50% stronger (or press Auto).
 - **Rampage:** clicking fast fills the meter. When it's full, clicks do ×5 and your party does ×2 for 10 seconds.
 - **Treasure goblins** dash across the room now and then. Catch one for gold, Bloodlust (×7 party damage), Frenzy (×77 clicks) or Gold Rush (×7 gold).
-- **Descend** (from floor 30): reset for souls (+2% damage each, more for every floor deeper) and spend them on abyss powers such as Phantom Blade (auto-clicks), Deep Stairs (start on floor 10) and more offline time.
+- **Souls and descending:** zone bosses (every 10th floor) pay souls when you beat them, a lot more the deeper they are. The floor 30 boss
+  is the first wall: reaching it opens the way down. Descend to cash in the souls you banked this run (+2% damage each) and spend them
+  on abyss powers such as Phantom Blade (auto-clicks), Deep Stairs (start on floor 10) and more offline time. From floor 30 on, zone
+  bosses are walls; most runs end at one you can't beat yet.
+- **Stats** shows where every number comes from: each multiplier on damage, clicks, crits, gold, bosses and souls, plus a per-companion table.
 - **Boss modifiers** (from floor 30): zone bosses, and later mid-bosses, come Armored, Enraged, Regenerating, Splitting or Giant
   (two at once from floor 100, three from 200). Each one has a relic that answers it.
 - **Relics** drop from bosses: 16 of them, common to legendary. A quarter of zone bosses drop one, and the first time you beat a zone

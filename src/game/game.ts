@@ -26,17 +26,17 @@ const FEVER_CLICKS = 60;
 const BASE_CRIT = 0.04;
 const BASE_CRIT_MULT = 8;
 const OFFLINE_CAP = 72 * 3600;
-/** Descending needs this floor; it pays SOUL_FIRST souls, growing 10% per floor after. */
+/** The first time, the way down opens when you reach this floor's boss. */
 export const DESCEND_FLOOR = 30;
-const SOUL_FIRST = 10;
 const SOUL_GROWTH = 1.1;
 /**
  * Pacing knobs, in one place (the balance script overrides them to search for good values).
- * - Souls grow 10% a floor up to `soulTaper`, then only `soulLate` a floor: that's the wall.
+ * - Zone bosses pay `bossSouls` souls at floor 30, +10% a floor up to `soulTaper`, then only `soulLate`
+ *   a floor: that's the wall. Zone bosses have `zoneBoss`× the health of mid-bosses.
  * - Awakening at floor f pays stoneBase × stoneGrowth^(f − AWAKEN_FLOOR) heartstones.
  * - Heart of Fury multiplies all damage by `fury` per level.
  */
-export const TUNE = { soulTaper: 90, soulLate: 1.04, stoneBase: 5, stoneGrowth: 1.02, fury: 10, deepHp: 1.16 };
+export const TUNE = { soulTaper: 90, soulLate: 1.04, stoneBase: 5, stoneGrowth: 1.02, fury: 10, deepHp: 1.16, bossSouls: 20, zoneBoss: 2 };
 
 export interface Buff {
   id: RaidReward | 'fever';
@@ -96,8 +96,12 @@ export interface SaveState {
   floor: number;
   /** Highest floor unlocked this descent (you can go back to any floor up to it). */
   maxFloor: number;
-  /** Deepest floor ever. */
+  /** Deepest floor ever reached. */
   bestFloor: number;
+  /** Deepest floor ever cleared (floor trophies count these). */
+  bestCleared: number;
+  /** Souls banked this descent from zone bosses; paid out when you descend. */
+  runSouls: number;
   floorKills: number;
   /** Move on as soon as a floor is cleared. */
   auto: boolean;
@@ -120,7 +124,7 @@ export interface SaveState {
   /** Unspent heartstones. */
   stones: number;
   awakens: number;
-  /** Deepest floor since the last awakening (heartstones are paid for it). */
+  /** Deepest floor cleared since the last awakening (heartstones are paid for it). */
   cycleBest: number;
   settings: Settings;
 }
@@ -130,9 +134,9 @@ export function newSave(): SaveState {
     v: SAVE_VERSION, gold: 0, runGold: 0, totalGold: 0, kills: 0, bosses: 0, clicks: 0, crits: 0,
     owned: COMPS.map(() => 0), upgrades: [], abyss: [], trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
-    floor: 1, maxFloor: 1, bestFloor: 1, floorKills: 0, auto: true, failDps: 0, revealed: 0,
+    floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: 0, revealed: 0,
     bestDps: 0, playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, cycleBest: 1,
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, cycleBest: 0,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoBuy: true },
   };
 }
@@ -164,6 +168,7 @@ export type GameEvent =
   | { t: 'floor'; floor: number; boss: boolean }
   | { t: 'bossFail'; floor: number }
   | { t: 'bossWin'; floor: number }
+  | { t: 'souls'; id: number; floor: number; souls: number }
   | { t: 'retreat'; floor: number }
   | { t: 'buyComp'; comp: number; n: number }
   | { t: 'reveal'; comp: number }
@@ -180,6 +185,50 @@ export type GameEvent =
   | { t: 'heal'; id: number; amount: number }
   | { t: 'awaken'; stones: number }
   | { t: 'heart'; id: string; lv: number };
+
+/** Every multiplier behind the damage, crit and gold numbers, kept apart for the stats page. */
+export interface Parts {
+  /** Per companion: tier upgrades and synergies. */
+  tier: number[];
+  syn: number[];
+  twin: number;
+  whet: number;
+  blades: number;
+  upgrades: number;
+  trophies: number;
+  souls: number;
+  shard: number;
+  fury: number;
+  banner: number;
+  clickDps: number;
+  clickDpsUpg: number;
+  oath: number;
+  critBase: number;
+  critUpg: number;
+  critRelic: number;
+  critMultBase: number;
+  critMultUpg: number;
+  critMultRelic: number;
+  cleaveUpg: number;
+  cleaveRelic: number;
+  goldUpg: number;
+  goldRelic: number;
+}
+
+interface Computed {
+  dps: number;
+  perComp: number[];
+  /** Per companion before the all-damage bonuses. */
+  baseComp: number[];
+  parts: Parts;
+  /** Product of the all-damage bonuses (upgrades, trophies, souls, shard, fury). */
+  all: number;
+  click: number;
+  crit: number;
+  critMult: number;
+  cleave: number;
+  gold: number;
+}
 
 export interface Raid {
   id: number;
@@ -230,7 +279,7 @@ export class Game {
   private owned = new Set<string>();
   private abyssSet = new Set<string>();
   private trophySet = new Set<string>();
-  private cache: { dps: number; perComp: number[]; click: number; crit: number; critMult: number; cleave: number; gold: number } | null = null;
+  private cache: Computed | null = null;
   private trophyTimer = 0;
   private autoClick = 0;
   private sinceClick = 99;
@@ -247,7 +296,10 @@ export class Game {
   constructor(s: SaveState) {
     this.s = s;
     // Saves from before awakening existed: the whole history counts as the first cycle.
-    if (s.cycleBest === undefined) s.cycleBest = s.bestFloor ?? 1;
+    if (s.cycleBest === undefined) s.cycleBest = (s.bestFloor ?? 1) - 1;
+    if (s.bestCleared === undefined) s.bestCleared = (s.bestFloor ?? 1) - 1;
+    // Souls used to be paid for depth at descent time; carry what this descent was worth over.
+    if (s.runSouls === undefined) s.runSouls = Math.floor(10 * 1.1 ** (Math.min(s.maxFloor ?? 1, 90) - 30) * 1.04 ** Math.max(0, (s.maxFloor ?? 1) - 90));
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
@@ -330,35 +382,66 @@ export class Game {
   private compute() {
     const s = this.s;
     const effects = this.effects();
-    const mult = COMPS.map(() => 1);
-    let click = (this.hasAbyss('twin') ? 2 : 1) * (1 + this.relic('click'));
-    let clickDps = CLICK_DPS + 0.1 * this.relic('oath');
+    const tier = COMPS.map(() => 1);
+    const syn = COMPS.map(() => 1);
+    const twin = this.hasAbyss('twin') ? 2 : 1;
+    const whet = 1 + this.relic('click');
+    let blades = 1;
+    let clickDpsUpg = 0;
     let global = 0;
     let gold = 0;
-    let crit = BASE_CRIT + Math.min(0.3, 0.02 * this.relic('critChance'));
-    let critMult = BASE_CRIT_MULT * (1 + 0.5 * this.relic('critMult'));
-    let cleave = 0.2 * this.relic('cleave');
+    let critUpg = 0;
+    let critMultUpg = 1;
+    let cleaveUpg = 0;
     for (const e of effects) {
-      if (e.t === 'comp') mult[e.comp] *= e.mult;
-      else if (e.t === 'click') click *= e.mult;
-      else if (e.t === 'clickDps') clickDps += e.pct;
+      if (e.t === 'comp') tier[e.comp] *= e.mult;
+      else if (e.t === 'click') blades *= e.mult;
+      else if (e.t === 'clickDps') clickDpsUpg += e.pct;
       else if (e.t === 'global') global += e.pct;
       else if (e.t === 'gold') gold += e.pct;
       else if (e.t === 'crit') {
-        if (e.chance) crit += e.chance;
-        if (e.mult) critMult *= e.mult;
-      } else if (e.t === 'cleave') cleave += e.pct;
+        if (e.chance) critUpg += e.chance;
+        if (e.mult) critMultUpg *= e.mult;
+      } else if (e.t === 'cleave') cleaveUpg += e.pct;
       else if (e.t === 'syn') {
-        mult[e.a] *= 1 + 0.05 * s.owned[e.b];
-        mult[e.b] *= 1 + 0.01 * s.owned[e.a];
+        syn[e.a] *= 1 + 0.05 * s.owned[e.b];
+        syn[e.b] *= 1 + 0.01 * s.owned[e.a];
       }
     }
-    const all = (1 + global) * this.trophyMult() * this.soulMult() * (1 + this.relic('all')) * TUNE.fury ** this.heartLv('fury');
-    const party = 1 + 0.5 * this.relic('party');
-    const perComp = COMPS.map((c, i) => c.dps * s.owned[i] * mult[i] * all * party);
+    // Every multiplier, kept apart so the stats page can show where the numbers come from.
+    const parts: Parts = {
+      tier, syn, twin, whet, blades,
+      upgrades: 1 + global,
+      trophies: this.trophyMult(),
+      souls: this.soulMult(),
+      shard: 1 + this.relic('all'),
+      fury: TUNE.fury ** this.heartLv('fury'),
+      banner: 1 + 0.5 * this.relic('party'),
+      clickDps: CLICK_DPS + clickDpsUpg + 0.1 * this.relic('oath'),
+      clickDpsUpg, oath: 0.1 * this.relic('oath'),
+      critBase: BASE_CRIT, critUpg, critRelic: Math.min(0.3, 0.02 * this.relic('critChance')),
+      critMultBase: BASE_CRIT_MULT, critMultUpg, critMultRelic: 1 + 0.5 * this.relic('critMult'),
+      cleaveUpg, cleaveRelic: 0.2 * this.relic('cleave'),
+      goldUpg: 1 + gold, goldRelic: 1 + 0.5 * this.relic('gold'),
+    };
+    const all = parts.upgrades * parts.trophies * parts.souls * parts.shard * parts.fury;
+    const baseComp = COMPS.map((c, i) => c.dps * s.owned[i] * tier[i] * syn[i]);
+    const perComp = baseComp.map((b) => b * all * parts.banner);
     const dps = perComp.reduce((a, b) => a + b, 0);
-    this.cache = { dps, perComp, click: click * all + dps * clickDps, crit, critMult, cleave, gold: (1 + gold) * (1 + 0.5 * this.relic('gold')) };
+    const click = twin * whet * blades * all + dps * parts.clickDps;
+    this.cache = {
+      dps, perComp, baseComp, parts, all, click,
+      crit: parts.critBase + parts.critUpg + parts.critRelic,
+      critMult: parts.critMultBase * parts.critMultUpg * parts.critMultRelic,
+      cleave: parts.cleaveUpg + parts.cleaveRelic,
+      gold: parts.goldUpg * parts.goldRelic,
+    };
     return this.cache;
+  }
+
+  /** The pieces behind every number (for the stats page). */
+  breakdown() {
+    return { ...this.c, buffDps: this.buffMult('dps'), buffClick: this.buffMult('click'), buffGold: this.buffMult('gold') };
   }
 
   private get c() {
@@ -517,7 +600,9 @@ export class Game {
     const mods = this.bossMods();
     const bite = this.modBite();
     const giant = mods.includes('giant');
-    const hp = floorHp(this.s.floor) * 8 * (giant ? 1 + 2 * bite : 1);
+    // Zone bosses from floor 30 on are the walls; the first two just teach you what a boss is.
+    const zone = this.s.floor % 10 === 0 && this.s.floor >= DESCEND_FLOOR ? TUNE.zoneBoss : 1;
+    const hp = floorHp(this.s.floor) * 8 * zone * (giant ? 1 + 2 * bite : 1);
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, ...this.spot(true) };
     this.monsters.push(m);
     let time = (this.hasAbyss('patience') ? 45 : BOSS_TIME) + Math.min(30, 3 * this.relic('time'));
@@ -596,6 +681,11 @@ export class Game {
       this.bossTime = 0;
       this.unlockNext();
       this.events.push({ t: 'bossWin', floor: this.s.floor });
+      const souls = this.bossSouls(this.s.floor);
+      if (souls > 0) {
+        this.s.runSouls += souls;
+        this.events.push({ t: 'souls', id: m.id, floor: this.s.floor, souls });
+      }
       this.rollRelic(this.s.floor);
       if (this.s.auto) this.enterFloor(this.s.floor + 1);
       else this.enterFloor(this.s.floor);
@@ -610,10 +700,11 @@ export class Game {
 
   private unlockNext() {
     const s = this.s;
+    s.bestCleared = Math.max(s.bestCleared, s.floor);
+    s.cycleBest = Math.max(s.cycleBest, s.floor);
     if (s.floor + 1 > s.maxFloor) {
       s.maxFloor = s.floor + 1;
       s.bestFloor = Math.max(s.bestFloor, s.maxFloor);
-      s.cycleBest = Math.max(s.cycleBest, s.maxFloor);
     }
   }
 
@@ -772,27 +863,48 @@ export class Game {
 
   // ---------- prestige ----------
 
-  soulsFor(floor: number) {
-    if (floor < DESCEND_FLOOR) return 0;
+  /** Souls a zone boss on this floor pays when beaten (before relics and Heart powers). */
+  baseBossSouls(floor: number) {
+    if (floor % 10 !== 0) return 0;
+    if (floor < DESCEND_FLOOR) return [0, 5, 10][floor / 10];
     const early = Math.min(floor, TUNE.soulTaper) - DESCEND_FLOOR;
     const late = Math.max(0, floor - TUNE.soulTaper);
-    return Math.floor(SOUL_FIRST * SOUL_GROWTH ** early * TUNE.soulLate ** late);
+    return Math.floor(TUNE.bossSouls * SOUL_GROWTH ** early * TUNE.soulLate ** late);
   }
 
-  /** Souls a descent would grant right now (based on the deepest floor this descent). */
+  soulGainMult() {
+    return (1 + 0.15 * this.relic('souls')) * (1 + this.heartLv('siphon'));
+  }
+
+  bossSouls(floor: number) {
+    return Math.floor(this.baseBossSouls(floor) * this.soulGainMult());
+  }
+
+  /** Souls a descent would pay right now: everything banked from bosses this descent. */
   pendingSouls() {
-    const base = this.soulsFor(this.s.maxFloor);
-    return Math.floor(base * (1 + 0.15 * this.relic('souls')) * (1 + this.heartLv('siphon')));
+    return this.s.runSouls;
+  }
+
+  /** The way down opens at the floor 30 boss the first time; after that you can always go. */
+  descendOpen() {
+    return this.s.descents > 0 || this.s.maxFloor >= DESCEND_FLOOR;
+  }
+
+  /** The next zone boss you haven't beaten this descent, and what it pays. */
+  nextBossSouls() {
+    const floor = Math.max(10, Math.ceil(this.s.maxFloor / 10) * 10);
+    return { floor, souls: this.bossSouls(floor) };
   }
 
   canDescend() {
-    return this.pendingSouls() >= 1;
+    return this.descendOpen() && this.pendingSouls() >= 1;
   }
 
   descend() {
+    if (!this.canDescend()) return false;
     const gained = this.pendingSouls();
-    if (gained < 1) return false;
     this.s.souls += gained;
+    this.s.runSouls = 0;
     this.s.descents++;
     this.resetRun();
     this.events.push({ t: 'descend', souls: gained });
@@ -914,7 +1026,7 @@ export class Game {
   }
 
   pendingStones() {
-    return this.stonesFor(Math.max(this.s.cycleBest, this.s.maxFloor));
+    return this.stonesFor(this.s.cycleBest);
   }
 
   awaken() {
@@ -923,7 +1035,8 @@ export class Game {
     const s = this.s;
     s.stones += gained;
     s.awakens++;
-    s.cycleBest = 1;
+    s.cycleBest = 0;
+    s.runSouls = 0;
     s.souls = 0;
     s.spentSouls = 0;
     // Echoing Abyss keeps the cheap powers, free.
@@ -984,7 +1097,7 @@ export class Game {
     const s = this.s;
     switch (r.t) {
       case 'gold': return s.totalGold >= r.n;
-      case 'floor': return s.bestFloor >= r.n;
+      case 'floor': return s.bestCleared >= r.n;
       case 'kills': return s.kills >= r.n;
       case 'bosses': return s.bosses >= r.n;
       case 'own': return s.owned[r.comp] >= r.n;

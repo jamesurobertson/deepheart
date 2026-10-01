@@ -85,7 +85,7 @@ export interface ZoneDef {
 export const ZONES: ZoneDef[] = [
   {
     name: 'The Upper Halls', tiles: 'halls',
-    band: [m('goblin', 'Goblin', 0.9), m('tiny_zombie', 'Rotling'), m('imp', 'Imp', 0.8), m('tiny_slug', 'Slug', 1.2), m('ef_bandit', 'Bandit')],
+    band: [m('goblin', 'Goblin', 0.9), m('tiny_zombie', 'Rotling'), m('imp', 'Imp', 0.8), m('tiny_slug', 'Slug', 1.2), m('knight_m', 'Deserter', 1, 0xa89a9a)],
     mid: m('ef_bear', 'Cave Bear'), boss: m('ogre', 'Ogre Chieftain'),
   },
   {
@@ -498,7 +498,7 @@ const OWN_TITLES = ['Hired:', 'Loyal', 'Veteran', 'Legendary', 'Mythic', 'Eterna
 
 function buildTrophies(): TrophyDef[] {
   const out: TrophyDef[] = [];
-  FLOOR_AT.forEach((n, k) => out.push({ id: `fl${k}`, name: FLOOR_NAMES[k], desc: `Reach floor ${n}.`, icon: { sprite: 'floor_stairs', tier: Math.min(k, 10) }, req: { t: 'floor', n } }));
+  FLOOR_AT.forEach((n, k) => out.push({ id: `fl${k}`, name: FLOOR_NAMES[k], desc: `Clear floor ${n}.`, icon: { sprite: 'floor_stairs', tier: Math.min(k, 10) }, req: { t: 'floor', n } }));
   GOLD_NAMES.forEach((name, k) => {
     const n = 10 ** (2 + k * 4);
     out.push({ id: `gold${k}`, name, desc: `Collect ${n.toLocaleString('en-US')} gold in total.`, icon: { sprite: 'coin', tier: Math.min(k, 10) }, req: { t: 'gold', n } });
