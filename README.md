@@ -2,7 +2,7 @@
 
 ![Deepheart](public/og-image.png)
 
-Click monsters to pieces, hire companions with their gold, and descend the dungeon for souls.
+Fight monsters, hire companions with their gold, and descend the dungeon for souls.
 **Play it at https://jamesurobertson.github.io/deepheart/**
 
 ![Deepheart on desktop](docs/screenshots/carnage.jpg)
