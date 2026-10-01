@@ -516,6 +516,8 @@ body.compact .banner { top: calc(var(--free-h, 100%) * 0.5); }
 body.compact .banner b { font-size: 36px; }
 body.compact .banner span { font-size: 14px; }
 body.compact .ticker { display: none; }
+.raid-mark.first.edge-l::after { transform: translateX(-16px); }
+.raid-mark.first.edge-r::after { transform: translateX(calc(-100% + 16px)); }
 body.compact .raid-mark.first::after { font-size: 14px; top: -70px; padding: 4px 8px; }
 body.compact .hint b { font-size: 16px; padding: 6px 10px; }
 body.compact .tip { width: min(300px, calc(100vw - 16px)); }
@@ -555,8 +557,10 @@ body.phone .shop-head h2 { font-size: 17px; }
 body.phone .shop-head .shop-sub { margin-left: auto; font-size: 10px; }
 body.phone .sheet-grip { position: absolute; left: 50%; top: 4px; width: 40px; height: 4px; margin-left: -20px; background: #5a4648; box-shadow: 0 0 0 1px var(--ink); }
 body.phone .shop.min .shop-sub { display: none; }
-.shop-ready { display: none; font: 400 12px/1 'Silkscreen'; font-style: normal; color: var(--ink); background: var(--gold); padding: 3px 5px; box-shadow: 0 0 0 2px var(--ink); animation: hintbob 1s ease-in-out infinite; }
-body.phone .shop.min .shop-ready:not([hidden]) { display: inline-block; margin-left: auto; }
+/* Folded: just the header, plus a strip of affordable upgrades (tap to buy) when there are any. */
+body.phone .shop.min.has-strip { height: calc(44px + 52px + var(--safe-b)); }
+body.phone .shop.min .upg:not(.can) { display: none; }
+body.phone .shop.min .modes, body.phone .shop.min .gens { visibility: hidden; }
 /* Upgrades: one row that scrolls sideways. */
 body.phone .upgs { padding: 4px 8px; flex: none; }
 body.phone .upgs-head { display: none; }

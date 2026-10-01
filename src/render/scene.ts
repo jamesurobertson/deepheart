@@ -40,8 +40,9 @@ interface MonView {
   /** Sprite scale (sized from the art so big and small creatures both read) and resulting height. */
   scale: number;
   height: number;
-  /** Spot x from the game, before squeezing for tall screens. */
+  /** Spot from the game, before squeezing / spreading for tall screens. */
   spotX: number;
+  spotZ: number;
   blood: string;
   body: THREE.Group;
   inner: THREE.Group;
@@ -71,8 +72,9 @@ interface CompView {
   run: Rect[];
   cd: number;
   home: THREE.Vector3;
-  /** Formation x before squeezing for tall screens. */
+  /** Formation spot before squeezing / spreading for tall screens. */
   homeX: number;
+  homeZ: number;
   base: number;
   /** Squash/stretch: negative = crouched (wind-up), positive = stretched (release). */
   stretch: number;
@@ -238,6 +240,8 @@ export class Scene {
   private view = { right: 0, bottom: 0, top: 0 };
   /** Portrait screens pull the battle line together so both sides fit. */
   private squeeze = 1;
+  /** …and spreads it out in depth instead, which tall screens have plenty of room for. */
+  private deep = 1;
   private look = LOOK.clone();
   private camBase = new THREE.Vector3();
   settings = { particles: true, shake: true, blood: true };
@@ -314,13 +318,16 @@ export class Scene {
     this.camera.updateProjectionMatrix();
     // Wide screens show the whole battle line; tall ones squeeze it and zoom in.
     const portrait = freeW < freeH * 1.1;
-    this.squeeze = portrait ? 0.5 : 1;
-    this.look.set(portrait ? -0.7 : 0, LOOK.y, LOOK.z);
-    const across = portrait ? 8.5 : 17;
-    const tall = portrait ? 6.5 : 8;
+    this.squeeze = portrait ? 0.72 : 1;
+    this.deep = portrait ? 1.7 : 1;
+    this.look.set(portrait ? -0.9 : 0, LOOK.y, LOOK.z);
+    const across = portrait ? 10 : 17;
+    const tall = portrait ? 11 : 8;
     const t = Math.tan(THREE.MathUtils.degToRad(15));
     const dist = Math.max((across * fullH) / (2 * t * freeW), (tall * fullH) / (2 * t * freeH));
-    this.camBase.set(this.look.x, this.look.y + dist * 0.26, this.look.z + dist);
+    // Tall screens look down more steeply, so depth turns into usable vertical space.
+    const tilt = portrait ? 0.62 : 0.26;
+    this.camBase.set(this.look.x, this.look.y + dist * tilt, this.look.z + dist);
     const fog = this.scene.fog as THREE.Fog;
     fog.near = dist + 8;
     fog.far = dist + 30;
@@ -390,7 +397,7 @@ export class Scene {
           : roll < 0.035 + decoChance ? deco[Math.floor(r() * deco.length)] : mid();
         wall.face(x, y, WALL_Z, rect);
       }
-      for (let z = WALL_Z; z < 9; z++) floor.top(x, 0, z, tile());
+      for (let z = WALL_Z; z < 16; z++) floor.top(x, 0, z, tile());
     }
     floor.top(Math.floor(STAIRS.x), 0.005, Math.floor(STAIRS.z), a.rect('floor_stairs'));
 
@@ -463,9 +470,10 @@ export class Scene {
     const [x, z] = PARTY_SLOTS[i % PARTY_SLOTS.length];
     const home = new THREE.Vector3(x, 0, z);
     home.x = x * this.squeeze;
+    home.z = z * this.deep;
     body.position.copy(instant ? home : new THREE.Vector3(-16, 0, z));
     this.scene.add(body);
-    this.party.push({ comp: i, body, inner, sprite, idle, run, cd: Math.random(), home, homeX: x, base, stretch: 0, act: null });
+    this.party.push({ comp: i, body, inner, sprite, idle, run, cd: Math.random(), home, homeX: x, homeZ: z, base, stretch: 0, act: null });
     if (!instant) this.fx.light(home.clone().setY(1.5), 0xffd070, 12, 0.5, 6);
   }
 
@@ -480,6 +488,7 @@ export class Scene {
     const haste = 1 + this.fever;
     for (const c of this.party) {
       c.home.x = c.homeX * this.squeeze;
+      c.home.z = c.homeZ * this.deep;
       const def = COMPS[c.comp];
       const p = c.body.position;
       const a = c.act;
@@ -714,7 +723,7 @@ export class Scene {
     const scale = m.boss ? Math.max(1.5, Math.min(2.6, 3.4 / h)) : Math.min(1.2, 2.1 / h);
     inner.scale.setScalar(scale);
     if (m.def.tint !== undefined) sprite.mesh.material.color.setHex(m.def.tint);
-    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0 });
+    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0 });
     if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(0.4), '#6a5a78', 6, 2, 0.08, 6);
     if (m.boss) {
       this.fx.light(STAIRS.clone().setY(2), 0xff4040, 30, 1, 12);
@@ -745,6 +754,7 @@ export class Scene {
         continue;
       }
       v.target.x = v.spotX * this.squeeze;
+      v.target.z = v.spotZ * this.deep;
       v.born = Math.min(1, v.born + dt * 3);
       v.body.scale.setScalar(v.born < 1 ? v.born * (1 + Math.sin(v.born * Math.PI) * 0.3) : 1);
       const p = v.body.position;
