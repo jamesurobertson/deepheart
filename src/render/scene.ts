@@ -8,7 +8,7 @@ import type { Atlas, Rect } from './atlas.ts';
 import { PixelSprite, blobShadow } from './sprite.ts';
 import { Fx, flameTexture, spellTextures } from './fx.ts';
 import { GradeShader, tiltShift } from './post.ts';
-import { STAIR, buildStairwell, stairPoint } from './stairwell.ts';
+import { buildStairwell, stairPoint } from './stairwell.ts';
 import { COMPS, ZONES, zoneOf, type Attack, type Tiles } from '../game/data.ts';
 import type { Game, GameEvent, Monster } from '../game/game.ts';
 
@@ -1164,24 +1164,23 @@ export class Scene {
     const c = this.cine!;
     c.phase = 'stairs';
     c.t = 0;
-    this.camera.fov = 60;
-    this.camera.updateProjectionMatrix();
     // Dress the stairwell in the new zone's tiles and light.
     const pal = PALETTES[c.zone % PALETTES.length];
     const theme = ZONES[c.zone % ZONES.length].tiles;
     const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : '';
     const a = this.atlas;
     const floors = theme === 'crypt' ? [a.rect('crypt_floor_1'), a.rect('crypt_floor_5')] : [a.rect(`${pre}floor_1`), a.rect(`${pre}floor_2`)];
-    this.wallMat.color.setRGB(...pal.wall);
-    this.floorMat.color.setRGB(...pal.floor);
+    // Back wall dim, stairs bright: the flights have to stand out from the tower wall.
+    this.wallMat.color.setRGB(...pal.wall).multiplyScalar(0.7);
+    this.floorMat.color.setRGB(...pal.floor).multiplyScalar(1.15);
     this.flameMat.color.setHex(pal.torch).lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(1.4);
     for (const l of this.torchLights) l.color.setHex(pal.torch);
     (this.scene.background as THREE.Color).setHex(pal.fog);
     const fog = this.scene.fog as THREE.Fog;
     fog.color.setHex(pal.fog);
-    fog.near = 3;
-    fog.far = 16;
-    const well = buildStairwell(a, { wall: a.rect(`${pre}wall_mid`), floor: floors }, { wall: this.wallMat, floor: this.floorMat, flame: this.flameMat });
+    fog.near = 20;
+    fog.far = 50;
+    const well = buildStairwell(a, { wall: a.rect(`${pre}wall_mid`), top: a.rect(pre ? `${pre}wall_top` : 'wall_top_mid'), floor: floors }, { wall: this.wallMat, floor: this.floorMat, flame: this.flameMat });
     c.well = well.group;
     c.flames = well.flames;
     this.scene.add(well.group);
@@ -1217,11 +1216,11 @@ export class Scene {
     c.walkers = [];
     c.shadows = [];
     this.hemi.intensity = 1.5;
+    this.key.intensity = 1.1;
     for (const l of this.torchLights) l.distance = 11;
     c.well = null;
     c.phase = 'arrive';
     c.t = 0;
-    this.camera.fov = 30;
     this.band = -1;
     this.setBand(c.zone);
     if (this.room) this.room.visible = true;
@@ -1250,37 +1249,34 @@ export class Scene {
       fade = Math.max(0, (c.t - 0.6) / 0.4);
       if (c.t >= 1) this.descend();
     } else if (c.phase === 'stairs') {
-      const dur = 3;
-      const lead = 2 + c.t * 8;
+      const dur = 3.6;
+      const lead = 1 + c.t * 5.4;
       c.walkers.forEach((w, i) => {
-        const k = lead - i * 1.4;
-        const p = stairPoint(k, STAIR.walk + (i % 2 ? 0.5 : -0.3));
-        w.mesh.position.set(p.x, p.y + Math.abs(Math.sin((c.t + i) * 11)) * 0.06, p.z);
+        const at = lead - i * 1.25;
+        const p = stairPoint(at);
+        w.mesh.position.set(p.x, p.y + Math.abs(Math.sin((c.t + i) * 11)) * 0.05, p.z + i * 0.02);
+        w.mesh.rotation.set(0, 0, 0);
+        w.flip = stairPoint(at + 0.3).x < p.x;
         c.shadows[i].position.set(p.x, p.y + 0.02, p.z);
         w.update(dt);
       });
-      // The camera hangs in the open well, across from the party, turning to follow them round.
-      const head = stairPoint(lead);
-      const mid = stairPoint(lead - 2);
-      const aMid = (lead - 1.5) * STAIR.turn;
-      this.camera.position.set(-Math.cos(aMid) * 1.2, mid.y + 2.4, -Math.sin(aMid) * 1.2);
-      this.camera.lookAt(mid.x, mid.y + 0.1, mid.z);
-      // Billboards face the camera; flip them so they walk the way they're going on screen.
-      this.camera.updateMatrixWorld();
-      c.walkers.forEach((w, i) => {
-        w.mesh.rotation.set(0, Math.atan2(this.camera.position.x - w.mesh.position.x, this.camera.position.z - w.mesh.position.z), 0);
-        const now = w.mesh.position.clone().project(this.camera);
-        const next = stairPoint(lead - i * 1.4 + 0.5).project(this.camera);
-        w.flip = next.x < now.x;
-      });
-      // Torches flicker; two lights ride along with the party.
+      // Straight-on cutaway of the tower, panning down with the party.
+      const head = stairPoint(lead - 2);
+      const dist = this.camBase.z - this.look.z;
+      const y = head.y + 1.2;
+      this.camera.position.set(0, y + dist * 0.2, dist);
+      this.camera.lookAt(0, y, 0);
       c.flames.forEach((f, i) => f.scale.set(1, 0.85 + Math.sin(this.time * 13 + i) * 0.12, 1));
-      this.torchLights[0].position.set(head.x, head.y + 1.8, head.z);
-      this.torchLights[1].position.copy(stairPoint(lead + 5, STAIR.outer - 0.6)).setY(head.y - 0.5);
-      this.torchLights[0].intensity = 14;
-      this.torchLights[1].intensity = 10;
-      this.torchLights[0].distance = this.torchLights[1].distance = 14;
-      this.hemi.intensity = 2.6;
+      this.torchLights[0].position.set(head.x, head.y + 2, 2);
+      this.torchLights[1].position.copy(stairPoint(lead + 8)).add(new THREE.Vector3(0, 2, 1));
+      this.torchLights[0].intensity = 7;
+      this.torchLights[1].intensity = 6;
+      this.torchLights[0].distance = this.torchLights[1].distance = 12;
+      this.hemi.intensity = 1.7;
+      this.key.intensity = 1.4;
+      const fog = this.scene.fog as THREE.Fog;
+      fog.near = dist + 6;
+      fog.far = dist + 30;
       fade = Math.max(0, 1 - c.t / 0.35, (c.t - (dur - 0.35)) / 0.35);
       if (c.t >= dur) this.arrive();
     } else {
