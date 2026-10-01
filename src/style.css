@@ -259,12 +259,15 @@ body.compact .rate .short { display: inline; }
 .dock { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; align-items: flex-end; }
 .dock-b { position: relative; flex-direction: column; min-width: 76px; height: 64px; gap: 4px; padding: 4px 6px; font-size: 14px; }
 .dock-b .glyph { width: 20px; height: 20px; color: var(--gold); }
-.badge { display: inline-flex; align-items: center; gap: 3px;
-
-  position: absolute; top: -14px; right: -8px; font: 400 18px/1 'Jersey 10'; font-style: normal; padding: 2px 6px;
-  background: #3a2352; color: #eadcff; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--soul);
+.badge {
+  position: absolute; top: -14px; right: -8px; display: inline-flex; align-items: center; gap: 3px;
+  font: 400 19px/1 'Jersey 10'; font-style: normal; padding: 2px 6px 3px;
+  background: #24163a; color: #f4ecff; text-shadow: 1px 1px 0 var(--ink);
+  box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #7a5cb8;
 }
-.badge.hot { background: var(--soul); color: #1a0d2a; animation: hintbob 0.8s ease-in-out infinite; }
+.badge .glyph { color: #cdb6ff; }
+/* Worth descending now: gold edge and a glow, still light-on-dark so it stays readable. */
+.badge.hot { background: #3a2160; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--gold), 0 0 12px rgba(179, 140, 255, 0.8); animation: hintbob 0.8s ease-in-out infinite; }
 
 /* ---------- the shop ---------- */
 
@@ -378,7 +381,7 @@ body.compact .rate .short { display: inline; }
 .descend-box { text-align: center; padding: 8px 0 4px; }
 .descend-box p { margin: 6px 0; color: var(--dim); }
 .descend-box .btn { margin: 8px 0 2px; }
-.descend-box .glyph, .aby .glyph, .confirm .glyph, .badge .glyph { color: var(--soul); }
+.descend-box .glyph, .aby .glyph, .confirm .glyph { color: var(--soul); }
 .bar { height: 14px; background: #140c10; box-shadow: 0 0 0 2px var(--ink); margin: 10px auto; max-width: 420px; }
 .bar i { display: block; height: 100%; background: linear-gradient(#d6b8ff, #8a5cd8); }
 

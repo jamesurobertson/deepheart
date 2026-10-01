@@ -71,6 +71,7 @@ export class Ui {
   private pressed = false;
   private pressAt = { x: 0, y: 0 };
   private hudTop = 0;
+  private pendingZone = 0;
   private strip = false;
 
   constructor(root: HTMLElement, game: Game, scene: Scene, hooks: UiHooks) {
@@ -245,6 +246,10 @@ export class Ui {
     // Clicking the chamber: the treasure goblin first, then whichever monster is nearest.
     addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || this.modal || this.descending) return;
+      if (this.scene.busy) {
+        this.scene.skip();
+        return;
+      }
       const t = e.target as HTMLElement;
       if (t.closest('button, .shop, .pnl, .dock, input, textarea')) return;
       if (this.game.raid && this.scene.hitRaider(e.clientX, e.clientY)) {
@@ -419,6 +424,7 @@ export class Ui {
       case 'shake':
       case 'numbers':
       case 'blood':
+      case 'cinematics':
         s[act] = !s[act];
         this.hooks.settings();
         this.renderModal();
@@ -498,8 +504,9 @@ export class Ui {
       case 'floor':
         // Entering a new zone gets a title card.
         if (ev.floor % 10 === 1 && ev.floor > 1) {
-          const z = zoneOf(ev.floor);
-          this.banner(zoneName(ev.floor), `Floors ${z * 10 + 1}–${z * 10 + 10}`, 'zone');
+          // During the staircase interlude, the title card waits for the party to arrive.
+          if (this.scene.busy) this.pendingZone = ev.floor;
+          else this.zoneBanner(ev.floor);
         }
         if (ev.boss) {
           const boss = g.monsters.find((m) => m.boss);
@@ -543,6 +550,17 @@ export class Ui {
     ring.style.top = `${y}px`;
     ring.onanimationend = () => ring.remove();
     this.el.pops.appendChild(ring);
+  }
+
+  private zoneBanner(floor: number) {
+    const z = zoneOf(floor);
+    this.banner(zoneName(floor), `Floors ${z * 10 + 1}–${z * 10 + 10}`, 'zone');
+  }
+
+  /** The party has come down the stairs into a new zone. */
+  arrived() {
+    if (this.pendingZone) this.zoneBanner(this.pendingZone);
+    this.pendingZone = 0;
   }
 
   private bump(el: HTMLElement) {
@@ -626,9 +644,14 @@ export class Ui {
 
   /** The sprite for the chosen cursor; "Your Blade" follows your best click upgrade. */
   private cursorSprite(): string {
-    const g = this.game;
-    const pick = CURSORS.find((c) => c.id === g.s.settings.cursor);
+    const pick = CURSORS.find((c) => c.id === this.game.s.settings.cursor);
     if (pick && pick.sprite !== 'auto' && this.cursorOpen(pick.id)) return pick.sprite;
+    return this.bestBlade();
+  }
+
+  /** The best blade you've bought (click upgrades), or the starting knife. */
+  private bestBlade(): string {
+    const g = this.game;
     return ['weapon_anime_sword', 'weapon_knight_sword', 'weapon_lavish_sword', 'weapon_golden_sword', 'weapon_red_gem_sword', 'weapon_regular_sword', 'weapon_rusty_sword', 'weapon_knife']
       .find((_, k, all) => g.hasUpg(`clk${all.length - 1 - k}`)) ?? 'weapon_knife';
   }
@@ -1025,12 +1048,12 @@ export class Ui {
         <div class="set">
           <label>Effects volume <input type="range" min="0" max="100" value="${Math.round(s.sfxVol * 100)}" data-set="sfxVol"></label>
           <label>Music volume <input type="range" min="0" max="100" value="${Math.round(s.musicVol * 100)}" data-set="musicVol"></label>
-          <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}
+          <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
           <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button></div>
           <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
           <div class="cursors">${CURSORS.map((c) => {
             const open = this.cursorOpen(c.id);
-            const spr = c.sprite === 'auto' ? this.cursorSprite() : c.sprite;
+            const spr = c.sprite === 'auto' ? this.bestBlade() : c.sprite;
             return `<button class="cur ${open ? '' : 'locked'} ${s.cursor === c.id ? 'on' : ''}" data-cursor="${c.id}" data-tip="cur:${c.id}">${spriteFit(spr, 36)}${open ? '' : `<span class="cur-lock">${G.lock()}</span>`}</button>`;
           }).join('')}</div>
           <h3>Save</h3>

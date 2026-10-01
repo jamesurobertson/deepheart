@@ -54,6 +54,8 @@ export interface Settings {
   notation: 'short' | 'sci';
   buyMode: 1 | 10 | 100 | -1;
   blood: boolean;
+  /** Staircase interlude between zones. */
+  cinematics: boolean;
   /** Cursor skin id (see CURSORS). */
   cursor: string;
 }
@@ -107,7 +109,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, floorKills: 0, auto: true, failDps: 0, revealed: 0,
     bestDps: 0, playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cursor: 'auto' },
+    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto' },
   };
 }
 

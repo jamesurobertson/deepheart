@@ -45,6 +45,7 @@ async function boot() {
     scene.settings.particles = s.particles;
     scene.settings.shake = s.shake;
     scene.settings.blood = s.blood;
+    scene.settings.cinematics = s.cinematics;
   };
   const save = () => {
     if (resetting) return;
@@ -87,6 +88,7 @@ async function boot() {
   });
   applySettings();
   scene.rebuild(game);
+  scene.onArrive = () => ui.arrived();
   if (import.meta.env.DEV) {
     // step(n, click) advances n frames by hand: handy when the tab is in the background.
     const step = (n: number, click = false) => {
@@ -137,6 +139,8 @@ async function boot() {
     if (document.hidden) return;
     // A long gap while visible means the computer slept.
     if (gap > OFFLINE_AFTER) return catchUp(gap);
+    // The zone interlude pauses the fight (nothing is lost; it just waits).
+    if (scene.busy) return;
     acc += gap * SPEED * (freeze > 0 ? 0.1 : 1);
     while (acc >= STEP) {
       game.update(STEP);
