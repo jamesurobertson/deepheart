@@ -132,7 +132,7 @@ export type GameEvent =
   | { t: 'hit'; id: number; amount: number; kind: HitKind; x?: number; y?: number }
   | { t: 'click'; crit: boolean; x: number; y: number }
   | { t: 'spawn'; id: number }
-  | { t: 'kill'; id: number; gold: number; boss: boolean }
+  | { t: 'kill'; id: number; gold: number; boss: boolean; by: HitKind }
   | { t: 'floor'; floor: number; boss: boolean }
   | { t: 'bossFail'; floor: number }
   | { t: 'bossWin'; floor: number }
@@ -463,13 +463,13 @@ export class Game {
     if (kind === 'dps') this.dpsShown.set(m.id, (this.dpsShown.get(m.id) ?? 0) + dealt);
     else this.events.push({ t: 'hit', id: m.id, amount, kind, x, y });
     if (m.hp <= 0) {
-      this.kill(m);
+      this.kill(m, kind);
       return -m.hp;
     }
     return 0;
   }
 
-  private kill(m: Monster) {
+  private kill(m: Monster, by: HitKind) {
     const i = this.monsters.indexOf(m);
     if (i < 0) return;
     this.monsters.splice(i, 1);
@@ -483,7 +483,7 @@ export class Game {
     this.s.kills++;
     this.killAcc++;
     this.stuckT = 0;
-    this.events.push({ t: 'kill', id: m.id, gold, boss: m.boss });
+    this.events.push({ t: 'kill', id: m.id, gold, boss: m.boss, by });
     if (m.boss) {
       this.s.bosses++;
       this.bossTime = 0;

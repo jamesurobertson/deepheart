@@ -221,6 +221,8 @@ function playSound(sfx: Sfx, ev: GameEvent) {
       } else sfx.vary('hit', { vol: 0.4 });
       break;
     case 'kill':
+      // Phantom Blade kills stay quiet: at several a second the thud turns into a drone.
+      if (ev.by === 'auto' && !ev.boss) break;
       sfx.play(ev.boss ? 'bosskill' : 'kill', { vol: ev.boss ? 0.9 : 0.3, jitter: 0.15 });
       if (!ev.boss) sfx.play('coins', { vol: 0.12, rate: 1.3, jitter: 0.2 });
       break;
