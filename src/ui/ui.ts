@@ -735,10 +735,10 @@ export class Ui {
       this.el.auto.textContent = s.auto ? 'Auto: on' : 'Auto: off';
     }
     if (boss) {
-      const m = g.monsters.find((x) => x.boss);
-      const hp = m ? m.hp / m.max : 0;
-      this.el.floorBar.style.width = `${Math.max(0, hp) * 100}%`;
-      this.el.floorBarT.textContent = `${Math.max(0, g.bossTime).toFixed(1)}s`;
+      // The bar is the clock: it drains steadily. (The boss's health is the bar over its head.)
+      const left = Math.max(0, g.bossTime);
+      this.el.floorBar.style.width = `${(left / g.bossTimeMax) * 100}%`;
+      this.el.floorBarT.textContent = `${left.toFixed(1)}s`;
       this.el.floorBox.classList.toggle('urgent', g.bossTime < 8);
     } else {
       const k = Math.min(FLOOR_KILLS, s.floorKills);
@@ -1037,7 +1037,7 @@ export class Ui {
           <p class="muted">The game saves itself every few seconds. Copy your save code to move it to another browser.</p>
           <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
           <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
-          <p class="credits muted">Art: 0x72 DungeonTileset II, Superdark, Omniboy, Zoltan Kosina, Niji · Sounds: Kenney · Music: Juhani Junkala (all CC0)</p>
+          <p class="credits muted">Art: 0x72 DungeonTileset II, Superdark, Omniboy, Zoltan Kosina, Niji · Sounds: Kenney · Music: Juhani Junkala, Memoraphile, Wolfgang_, Zane Little, The Art Bros, Jonathan So (all CC0)</p>
         </div>`;
     }
     if (soft && html === this.modalKey) return;

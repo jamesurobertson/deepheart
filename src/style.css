@@ -164,7 +164,7 @@ body.compact .rate .short { display: inline; }
 .floor-n { font: 700 18px/1 'Pixelify Sans'; color: var(--gold-hi); text-shadow: var(--shadow); }
 .floor-sub { font: 400 11px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; letter-spacing: 1px; }
 .floor-bar { position: relative; height: 14px; background: #120a0c; box-shadow: 0 0 0 2px var(--ink), inset 0 2px 0 #000; }
-.floor-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(#ffe08a, #d0902f 60%, #8a5a1a); transition: width 0.15s; }
+.floor-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(#ffe08a, #d0902f 60%, #8a5a1a); transition: width 0.15s linear; }
 .floor-bar span { position: absolute; inset: 0; font: 400 16px/14px 'Jersey 10'; color: #fff; text-shadow: var(--outline); }
 .floor.is-boss .floor-bar i { background: linear-gradient(#ff8a7a, #c8302a 60%, #6a1210); }
 .floor.is-boss .floor-sub { color: var(--red); }

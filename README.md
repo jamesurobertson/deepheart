@@ -49,4 +49,7 @@ Art: [0x72 DungeonTileset II](https://0x72.itch.io/dungeontileset-ii),
 [Dark Dungeon](https://kosinaz.itch.io/16x16-dark-dungeon-tileset) by Zoltan Kosina,
 [DungeonTileset II Extended](https://nijikokun.itch.io/dungeontileset-ii-extended) by Niji.
 Sound: [Kenney](https://kenney.nl) sound packs, and
-[Chiptune Adventures](https://opengameart.org/content/4-chiptunes-adventure) music by Juhani Junkala.
+music (one track per zone): Juhani Junkala's [Chiptune Adventures](https://opengameart.org/content/4-chiptunes-adventure) and
+[5 Chiptunes (Action)](https://opengameart.org/node/55580), [Spooky Dungeon](https://opengameart.org/content/spooky-dungeon) by Memoraphile,
+[Desert Theme](https://opengameart.org/node/124080) by Wolfgang_, [Void Estate](https://opengameart.org/content/haunting-chiptune-loop-void-estate) by Zane Little,
+[Dark Forest Waltz](https://opengameart.org/content/10-track-modern-chiptune-demo) by The Art Bros and [Fields of Ice](https://opengameart.org/content/fields-of-ice) by Jonathan So.

@@ -1,6 +1,7 @@
 /**
  * Tiny Web Audio sound player. Files live in /assets/sfx (see scripts/build-assets.sh).
- * Buffers are fetched up front and decoded once the browser allows audio (first input).
+ * Sound effects are fetched up front; music tracks are fetched only when first needed
+ * (one per zone, so there's no point downloading all of them on a phone).
  */
 const NAMES = [
   'hit0', 'hit1', 'hit2', 'hit3', 'hit4', 'crit0', 'crit1', 'crit2', 'crit3', 'crit4',
@@ -10,7 +11,7 @@ const NAMES = [
 ] as const;
 export type SfxName = (typeof NAMES)[number];
 
-const TRACKS = ['stage1', 'stage2', 'boss', 'select'] as const;
+const TRACKS = ['halls', 'crypts', 'warrens', 'tomb', 'rotting', 'grove', 'demon', 'frozen', 'boss', 'boss2'] as const;
 export type Track = (typeof TRACKS)[number];
 const MUSIC_VOL = 0.45;
 const FADE = 1.2;
@@ -40,15 +41,11 @@ export class Sfx {
   private sfxVol = 0.8;
   private musicVol = 0.7;
 
+  private musicBase: string | undefined;
+  private fetching = new Set<Track>();
+
   constructor(base: string, musicBase?: string) {
-    if (musicBase) {
-      for (const t of TRACKS) {
-        fetch(`${musicBase}/${t}.mp3`).then((r) => r.arrayBuffer()).then((b) => {
-          this.musicRaw.set(t, b);
-          if (this.ctx) this.decodeTrack(t);
-        }).catch(() => { /* no music: game stays silent between effects */ });
-      }
-    }
+    this.musicBase = musicBase;
     for (const n of NAMES) {
       fetch(`${base}/${n}.mp3`).then((r) => r.arrayBuffer()).then((b) => {
         this.raw.set(n, b);
@@ -112,6 +109,16 @@ export class Sfx {
     this.musicGain.gain.setTargetAtTime(this._muted || !this._musicOn ? 0 : this.musicVol, this.ctx.currentTime, 0.15);
   }
 
+  /** Download a track the first time it's asked for. */
+  private fetchTrack(t: Track) {
+    if (!this.musicBase || this.fetching.has(t)) return;
+    this.fetching.add(t);
+    fetch(`${this.musicBase}/${t}.mp3`).then((r) => r.arrayBuffer()).then((b) => {
+      this.musicRaw.set(t, b);
+      if (this.ctx) this.decodeTrack(t);
+    }).catch(() => this.fetching.delete(t)); // try again next time it's wanted
+  }
+
   private decodeTrack(t: Track) {
     const raw = this.musicRaw.get(t);
     if (!raw || !this.ctx || this.musicBuf.has(t)) return;
@@ -124,6 +131,8 @@ export class Sfx {
   /** Switch the looping background track, crossfading from whatever is playing. */
   music(name: Track) {
     this.wanted = name;
+    // Fetch on first use (not while music is switched off).
+    if (this._musicOn && !this.musicRaw.has(name)) this.fetchTrack(name);
     if (!this.ctx || !this.musicGain || this.current?.name === name) return;
     const buf = this.musicBuf.get(name);
     if (!buf) return;

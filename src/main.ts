@@ -4,7 +4,8 @@ import { Atlas } from './render/atlas.ts';
 import { Scene } from './render/scene.ts';
 import { Ui } from './ui/ui.ts';
 import { setAtlas } from './ui/px.ts';
-import { Sfx } from './audio/sfx.ts';
+import { Sfx, type Track } from './audio/sfx.ts';
+import { zoneOf } from './game/data.ts';
 
 const params = new URLSearchParams(location.search);
 // ?slot=name keeps a separate save (handy for testing without touching your run).
@@ -104,7 +105,7 @@ async function boot() {
         if (i % 6 === 0) ui.update();
       }
     };
-    Object.assign(window, { game, scene, ui, step });
+    Object.assign(window, { game, scene, ui, sfx, step });
   }
 
   /** Time away: short breaks play out at full speed; longer ones pay the offline rate and say so. */
@@ -193,10 +194,17 @@ async function boot() {
       slow = 0.1;
       ui.update();
     }
-    sfx.music(game.bossFloor() || game.s.buffs.some((b) => b.id === 'fever') ? 'boss' : Math.floor((game.s.floor - 1) / 10) % 2 ? 'stage2' : 'stage1');
+    sfx.music(trackFor(game));
   };
   ui.update();
   requestAnimationFrame(frame);
+}
+
+/** Each zone has its own track; bosses get the boss themes (the zone boss the bigger one). */
+const ZONE_TRACKS: Track[] = ['halls', 'crypts', 'warrens', 'tomb', 'rotting', 'grove', 'demon', 'frozen'];
+function trackFor(game: Game): Track {
+  if (game.bossFloor()) return game.s.floor % 10 === 0 ? 'boss2' : 'boss';
+  return ZONE_TRACKS[zoneOf(game.s.floor) % ZONE_TRACKS.length];
 }
 
 /** Map game events to sounds. Volumes are hand-balanced against each other. */
