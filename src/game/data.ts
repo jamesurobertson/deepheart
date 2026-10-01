@@ -85,7 +85,7 @@ export interface ZoneDef {
 export const ZONES: ZoneDef[] = [
   {
     name: 'The Upper Halls', tiles: 'halls',
-    band: [m('goblin', 'Goblin', 0.9), m('tiny_zombie', 'Rotling'), m('imp', 'Imp', 0.8), m('tiny_slug', 'Slug', 1.2), m('knight_m', 'Deserter', 1, 0xa89a9a)],
+    band: [m('goblin', 'Goblin', 0.9), m('tiny_zombie', 'Rotling'), m('imp', 'Imp', 0.8), m('tiny_slug', 'Slug', 1.2), m('ef_bandit', 'Deserter')],
     mid: m('ef_bear', 'Cave Bear'), boss: m('ogre', 'Ogre Chieftain'),
   },
   {
