@@ -276,9 +276,9 @@ function buildUpgrades(): UpgDef[] {
     });
   });
   const raid: [string, string, number, number, Effect][] = [
-    ['Goblin Bait', 'Treasure goblins show up twice as often.', 3, 7_777, { t: 'raid', freq: 2 }],
-    ['Greedy Traps', 'Treasure goblins show up twice as often.', 17, 7.77e8, { t: 'raid', freq: 2 }],
-    ['Trophy Heads', 'Treasure rewards last twice as long.', 47, 7.77e13, { t: 'raid', effect: 2 }],
+    ['Goblin Bait', 'Treasure goblins show up 30% more often.', 3, 7_777, { t: 'raid', freq: 1.3 }],
+    ['Greedy Traps', 'Treasure goblins show up 30% more often.', 17, 7.77e8, { t: 'raid', freq: 1.3 }],
+    ['Trophy Heads', 'Treasure rewards last 50% longer.', 47, 7.77e13, { t: 'raid', effect: 1.5 }],
   ];
   raid.forEach(([name, desc, n, cost, effect], k) => out.push({ id: `raid${k}`, name, desc, cost, icon: { sprite: 'chest_full_open' }, effect, req: { t: 'raids', n } }));
   const trophy: [string, number, number][] = [

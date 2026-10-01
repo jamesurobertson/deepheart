@@ -194,6 +194,9 @@ export class Ui {
     const freeH = sheet ? shop.top : h;
     this.root.style.setProperty('--free-w', `${freeW}px`);
     this.root.style.setProperty('--free-h', `${freeH}px`);
+    // The news ticker starts where the dock ends (the dock grows as features are added).
+    const dock = this.root.querySelector('.dock')!.getBoundingClientRect();
+    this.root.style.setProperty('--dock-r', `${Math.round(dock.right + 20)}px`);
     // Frame the fight below the HUD (the floor bar is the last part that always shows).
     const hud = (compact ? this.el.fever.hidden ? this.el.floorBox : this.el.fever : this.el.floorBox).getBoundingClientRect();
     this.hudTop = compact ? Math.round(hud.bottom + 4) : 0;

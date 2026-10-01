@@ -226,11 +226,11 @@ body.compact .rate .short { display: inline; }
 .banner.zone span { color: var(--dim); font: 400 14px/1 'Silkscreen'; letter-spacing: 2px; text-transform: uppercase; }
 
 .ticker {
-  position: absolute; left: 440px; right: calc(100% - var(--free-w, 100%) + 20px); bottom: 26px;
+  position: absolute; left: var(--dock-r, 540px); right: calc(100% - var(--free-w, 100%) + 20px); bottom: 26px;
   pointer-events: none; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font: 500 15px/1.2 'Pixelify Sans'; color: #cdb8a8; text-shadow: var(--outline); font-style: italic;
 }
-@media (max-width: 1180px) { .ticker { display: none; } }
+@media (max-width: 1260px) { .ticker { display: none; } }
 .ticker span.in { animation: tickerin 11s both; }
 
 .pops { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
