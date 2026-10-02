@@ -357,15 +357,16 @@ export const MOD_BY_ID = new Map(MODS.map((d) => [d.id, d]));
 const MOD_ORDER: ModId[] = ['giant', 'armored', 'split', 'regen', 'enraged'];
 
 /**
- * Zone bosses pick up modifiers from floor 30 (two from 100, three from 200); the mid-bosses
- * on floor 5 of each zone join in from 55 (two from 155). Always the same for a floor.
+ * Zone bosses pick up modifiers from floor 30: two from 60, three from 120, four from 200. The
+ * mid-bosses on floor 5 of each zone join in from 55 (two from 120, three from 200). Always the
+ * same for a floor.
  */
 export function modsFor(floor: number): ModId[] {
   if (floor % 5 !== 0) return [];
   const zone = floor % 10 === 0;
-  const n = zone ? (floor >= 200 ? 3 : floor >= 100 ? 2 : floor >= 30 ? 1 : 0) : floor >= 155 ? 2 : floor >= 55 ? 1 : 0;
+  const n = zone ? (floor >= 200 ? 4 : floor >= 120 ? 3 : floor >= 60 ? 2 : floor >= 30 ? 1 : 0) : floor >= 200 ? 3 : floor >= 120 ? 2 : floor >= 55 ? 1 : 0;
   const k = zone ? floor / 10 - 3 : (floor - 55) / 10 + 3;
-  // Steps of 2 through a list of 5 never repeat within three picks.
+  // Steps of 2 through a list of 5 visit every modifier before repeating one.
   return Array.from({ length: n }, (_, j) => MOD_ORDER[(k + j * 2) % MOD_ORDER.length]);
 }
 

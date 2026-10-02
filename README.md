@@ -25,7 +25,7 @@ Handy URL flags: `?slot=name` keeps a separate save, `?speed=10` runs the game f
   bosses are walls; most runs end at one you can't beat yet.
 - **Stats** shows where every number comes from: each multiplier on damage, clicks, crits, gold, bosses and souls, plus a per-companion table.
 - **Boss modifiers** (from floor 30): zone bosses, and later mid-bosses, come Armored, Enraged, Regenerating, Splitting or Giant
-  (two at once from floor 100, three from 200). Each one has a relic that answers it.
+  (zone bosses stack two from floor 60, three from 120, four from 200). Each one has a relic that answers it.
 - **Relics** drop from bosses: 16 of them, common to legendary. A quarter of zone bosses drop one, and the first time you beat a zone
   boss this deep always does. You keep them forever; finding one again levels it up. Three slots (five with Heart powers).
 - **Awaken the Heart** (from floor 120): give up your souls and abyss powers for heartstones, paid for the deepest floor you reached
