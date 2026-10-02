@@ -1,5 +1,5 @@
 import {
-  ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, COMPS, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
+  ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
@@ -27,6 +27,25 @@ const RAID_MAX = 420;
 const RAID_STAY = 10;
 const FEVER_TIME = 10;
 const FEVER_CLICKS = 60;
+/** Clicks during a Rampage that push it to the next tier, and what each tier does. */
+const RAMPAGE_STEPS = [25, 60];
+const RAMPAGE_TIERS = [{ click: 1, dps: 2 }, { click: 2, dps: 3 }, { click: 5, dps: 4 }];
+const RAMPAGE_EXTEND = 3;
+/** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
+const CLUTCH_GOLD = 5;
+/** Share of ordinary monsters that come as champions: tougher, glowing, and full of gold. */
+const CHAMP_CHANCE = 1 / 40;
+const CHAMP_HP = 6;
+const CHAMP_GOLD = 8;
+/** Share of treasure goblins that are rainbow goblins; catching one opens the Goblin Vault. */
+const RAINBOW_CHANCE = 1 / 8;
+const VAULT_TIME = 20;
+const VAULT_ON = 16;
+const VAULT_GAP = 0.1;
+/** Hoarders take this many seconds of party damage each, so the room fills up and clicking them pays. */
+const VAULT_HP = 0.4;
+const VAULT_GOLD = 3;
+const HOARDER: MonsterDef = { sprite: 'goblin', name: 'Hoarder', hp: 1, tint: 0xffd85a };
 const BASE_CRIT = 0.04;
 const BASE_CRIT_MULT = 8;
 const OFFLINE_CAP = 72 * 3600;
@@ -131,6 +150,11 @@ export interface SaveState {
   /** Unspent heartstones. */
   stones: number;
   awakens: number;
+  /** Bosses beaten in the last seconds, champions slain, Goblin Vaults opened, highest Rampage tier reached. */
+  clutches: number;
+  champions: number;
+  vaults: number;
+  rampage: number;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
   cycleBest: number;
   settings: Settings;
@@ -143,7 +167,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: 0, revealed: 0,
     bestDps: 0, playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, cycleBest: 0,
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rampage: 0, cycleBest: 0,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoBuy: true },
   };
 }
@@ -163,6 +187,10 @@ export interface Monster {
   mods: ModId[];
   /** One half of a boss that split. */
   half?: boolean;
+  /** A champion: tougher, glowing, and full of gold. */
+  champ?: boolean;
+  /** A hoarder in the Goblin Vault: doesn't count toward the floor. */
+  vault?: boolean;
 }
 
 export type HitKind = 'click' | 'crit' | 'dps' | 'cleave' | 'auto' | 'fever';
@@ -171,18 +199,20 @@ export type GameEvent =
   | { t: 'hit'; id: number; amount: number; kind: HitKind; x?: number; y?: number }
   | { t: 'click'; crit: boolean; x: number; y: number }
   | { t: 'spawn'; id: number }
-  | { t: 'kill'; id: number; gold: number; boss: boolean; by: HitKind }
+  | { t: 'kill'; id: number; gold: number; boss: boolean; by: HitKind; champ?: boolean }
   | { t: 'floor'; floor: number; boss: boolean }
   | { t: 'sweep'; floor: number; gold: number }
   | { t: 'bossFail'; floor: number }
-  | { t: 'bossWin'; floor: number }
+  | { t: 'bossWin'; floor: number; clutch?: { left: number; gold: number } }
   | { t: 'souls'; id: number; floor: number; souls: number }
   | { t: 'retreat'; floor: number }
   | { t: 'buyComp'; comp: number; n: number }
   | { t: 'reveal'; comp: number }
   | { t: 'buyUpg'; id: string }
   | { t: 'trophy'; id: string }
-  | { t: 'raidSpawn'; id: number; from: -1 | 1 }
+  | { t: 'raidSpawn'; id: number; from: -1 | 1; rainbow: boolean }
+  | { t: 'rampage'; tier: number; click: number }
+  | { t: 'vault'; on: boolean; gold: number }
   | { t: 'raidCatch'; id: number; reward: RaidReward; amount?: number; buff?: Buff }
   | { t: 'raidEscape'; id: number }
   | { t: 'fever'; on: boolean }
@@ -244,6 +274,7 @@ export interface Raid {
   /** 0..1 across the chamber. */
   t: number;
   stay: number;
+  rainbow: boolean;
 }
 
 export interface OfflineSummary {
@@ -283,6 +314,13 @@ export class Game {
   private seq = 1;
   private spawnT = 0;
   private sweepT = 0;
+  /** Rampage tier (0–2) and clicks landed during this Rampage. */
+  rampageTier = 0;
+  private rampageClicks = 0;
+  /** The floor's monsters wait here while the Goblin Vault is open. */
+  private stash: Monster[] = [];
+  private vaultOn = false;
+  private vaultGold = 0;
   /** Seconds since the last kill: too long and your party falls back a floor. */
   private stuckT = 0;
   private owned = new Set<string>();
@@ -503,11 +541,16 @@ export class Game {
   feverMult() {
     let p = 5;
     for (const e of this.effects()) if (e.t === 'fever' && e.power) p *= e.power;
-    return p * (1 + 0.5 * this.relic('rampage'));
+    return p * (1 + 0.5 * this.relic('rampage')) * RAMPAGE_TIERS[this.rampageTier].click;
+  }
+
+  inVault() {
+    return this.s.buffs.some((b) => b.id === 'vault');
   }
 
   monsterGold(m: Monster) {
-    return Math.ceil(Math.max(1, floorGold(this.s.floor) * (m.boss ? 8 : TRASH)) * this.goldMult());
+    const k = m.boss ? 8 : TRASH * (m.champ ? CHAMP_GOLD : m.vault ? VAULT_GOLD : 1);
+    return Math.ceil(Math.max(1, floorGold(this.s.floor) * k) * this.goldMult());
   }
 
   // ---------- costs ----------
@@ -546,7 +589,9 @@ export class Game {
     this.monsters = [];
     this.spawnT = 0.3;
     this.bossTime = 0;
-    if (isBossFloor(f)) this.spawnBoss();
+    this.stash = [];
+    // During the Goblin Vault the boss waits until the vault closes.
+    if (isBossFloor(f) && !this.inVault()) this.spawnBoss();
     if (!quiet) this.events.push({ t: 'floor', floor: f, boss: isBossFloor(f) });
   }
 
@@ -589,10 +634,46 @@ export class Game {
   private spawn() {
     const band = bandFor(this.s.floor);
     const def = band[Math.floor(Math.random() * band.length)];
-    const hp = floorHp(this.s.floor) * def.hp * TRASH;
-    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.7, mods: [], ...this.spot(false) };
+    const champ = this.s.floor > 2 && Math.random() < CHAMP_CHANCE;
+    const hp = floorHp(this.s.floor) * def.hp * TRASH * (champ ? CHAMP_HP : 1);
+    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.7, mods: [], champ, ...this.spot(false) };
     this.monsters.push(m);
     this.events.push({ t: 'spawn', id: m.id });
+  }
+
+  private spawnHoarder() {
+    const hp = Math.max(floorHp(this.s.floor) * TRASH * 0.25, this.dps() * VAULT_HP);
+    const m: Monster = { id: this.seq++, def: HOARDER, hp, max: hp, boss: false, arrive: 0.4, mods: [], vault: true, ...this.spot(false) };
+    this.monsters.push(m);
+    this.events.push({ t: 'spawn', id: m.id });
+  }
+
+  /** The rainbow goblin's prize: the floor steps aside and the room fills with hoarders. */
+  private openVault() {
+    this.s.vaults++;
+    // Another rainbow goblin while the vault is open keeps it open longer.
+    const open = this.s.buffs.find((b) => b.id === 'vault');
+    if (open) {
+      open.t += VAULT_TIME;
+      open.dur += VAULT_TIME;
+      return;
+    }
+    this.vaultGold = 0;
+    this.stash = this.monsters;
+    this.monsters = [];
+    this.spawnT = 0;
+    this.addBuff({ id: 'vault', name: 'Goblin Vault', t: VAULT_TIME, dur: VAULT_TIME, dps: 1, click: 1, gold: 1 });
+    this.vaultOn = true;
+    this.events.push({ t: 'vault', on: true, gold: 0 });
+  }
+
+  private closeVault() {
+    this.vaultOn = false;
+    // Hoarders still standing slip away; the floor's own monsters climb back up the stairs.
+    this.monsters = this.stash.filter((m) => !m.vault).map((m) => ({ ...m, arrive: m.boss ? 1.5 : 0.7 }));
+    this.stash = [];
+    this.spawnT = 0.3;
+    this.events.push({ t: 'vault', on: false, gold: this.vaultGold });
   }
 
   /** Modifiers on this floor's boss. */
@@ -667,7 +748,12 @@ export class Game {
     this.s.kills++;
     this.killAcc++;
     this.stuckT = 0;
-    this.events.push({ t: 'kill', id: m.id, gold, boss: m.boss, by });
+    if (m.champ) this.s.champions++;
+    this.events.push({ t: 'kill', id: m.id, gold, boss: m.boss, by, champ: m.champ });
+    if (m.vault) {
+      this.vaultGold += gold;
+      return;
+    }
     if (m.boss && m.mods.includes('split') && !m.half) {
       // Two halves climb out of the body; the clock keeps running.
       const frac = 0.5 * this.modBite() + 0.25 * (1 - this.modBite());
@@ -684,9 +770,16 @@ export class Game {
     if (m.boss && this.monsters.some((x) => x.boss)) return;
     if (m.boss) {
       this.s.bosses++;
+      let clutch: { left: number; gold: number } | undefined;
+      if (this.bossTime > 0 && this.bossTime <= CLUTCH_SECONDS) {
+        const bonus = gold * (CLUTCH_GOLD - 1);
+        this.earn(bonus);
+        this.s.clutches++;
+        clutch = { left: this.bossTime, gold: bonus };
+      }
       this.bossTime = 0;
       this.unlockNext();
-      this.events.push({ t: 'bossWin', floor: this.s.floor });
+      this.events.push({ t: 'bossWin', floor: this.s.floor, clutch });
       const souls = this.bossSouls(this.s.floor);
       if (souls > 0) {
         this.s.runSouls += souls;
@@ -763,7 +856,8 @@ export class Game {
       if (crit) this.s.crits++;
       this.sinceClick = 0;
       this.events.push({ t: 'click', crit, x, y });
-      if (!fever) {
+      if (fever) this.pushRampage();
+      else {
         let fill = 1 / FEVER_CLICKS;
         for (const e of this.effects()) if (e.t === 'fever' && e.fill) fill *= e.fill;
         if (this.hasAbyss('dreams')) fill *= 1.5;
@@ -774,7 +868,25 @@ export class Game {
     return amount;
   }
 
+  /** Keep clicking through a Rampage and it climbs: ×5, ×10, ×25 clicks, more party damage, a little more time. */
+  private pushRampage() {
+    if (this.rampageTier >= RAMPAGE_STEPS.length) return;
+    if (++this.rampageClicks < RAMPAGE_STEPS[this.rampageTier]) return;
+    this.rampageTier++;
+    const b = this.s.buffs.find((x) => x.id === 'fever');
+    if (b) {
+      b.dps = RAMPAGE_TIERS[this.rampageTier].dps;
+      b.t += RAMPAGE_EXTEND;
+      b.dur += RAMPAGE_EXTEND;
+    }
+    this.s.rampage = Math.max(this.s.rampage, this.rampageTier);
+    this.invalidate();
+    this.events.push({ t: 'rampage', tier: this.rampageTier, click: this.feverMult() });
+  }
+
   private startFever() {
+    this.rampageTier = 0;
+    this.rampageClicks = 0;
     let dur = FEVER_TIME;
     for (const e of this.effects()) if (e.t === 'fever' && e.dur) dur *= e.dur;
     if (this.hasAbyss('dreams')) dur *= 1.5;
@@ -845,6 +957,12 @@ export class Game {
     if (!r) return false;
     this.raid = null;
     this.s.raids++;
+    if (r.rainbow) {
+      this.events.push({ t: 'raidCatch', id: r.id, reward: 'vault' });
+      this.openVault();
+      this.scheduleRaid();
+      return true;
+    }
     const reward = this.rollReward();
     let effect = 1;
     for (const e of this.effects()) if (e.t === 'raid' && e.effect) effect *= e.effect;
@@ -891,8 +1009,9 @@ export class Game {
 
   private spawnRaid() {
     const from = Math.random() < 0.5 ? -1 : 1;
-    this.raid = { id: this.seq++, from, t: 0, stay: RAID_STAY };
-    this.events.push({ t: 'raidSpawn', id: this.raid.id, from });
+    const rainbow = Math.random() < RAINBOW_CHANCE;
+    this.raid = { id: this.seq++, from, t: 0, stay: RAID_STAY, rainbow };
+    this.events.push({ t: 'raidSpawn', id: this.raid.id, from, rainbow });
   }
 
   // ---------- prestige ----------
@@ -954,6 +1073,9 @@ export class Game {
     s.upgrades = [];
     s.buffs = [];
     s.fervor = 0;
+    this.stash = [];
+    this.vaultOn = false;
+    this.rampageTier = 0;
     s.revealed = 0;
     s.runTime = 0;
     s.failDps = 0;
@@ -1145,6 +1267,10 @@ export class Game {
       case 'missed': return s.missed >= r.n;
       case 'relics': return this.relicsFound() >= r.n;
       case 'awakens': return s.awakens >= r.n;
+      case 'clutches': return s.clutches >= r.n;
+      case 'champions': return s.champions >= r.n;
+      case 'vaults': return s.vaults >= r.n;
+      case 'rampage': return s.rampage >= r.n;
     }
   }
 
@@ -1173,8 +1299,18 @@ export class Game {
     s.playTime += dt;
     s.runTime += dt;
 
+    const vault = this.inVault();
+    if (this.vaultOn && !vault) this.closeVault();
+    this.vaultOn = vault;
+
     // Keep the field full of monsters (bosses come alone).
-    if (!this.bossFloor()) {
+    if (vault) {
+      this.spawnT -= dt;
+      if (this.spawnT <= 0 && this.monsters.length < VAULT_ON) {
+        this.spawnHoarder();
+        this.spawnT = VAULT_GAP;
+      }
+    } else if (!this.bossFloor()) {
       this.spawnT -= dt;
       if (this.spawnT <= 0 && this.monsters.length < MAX_ON) {
         this.spawn();
@@ -1183,7 +1319,7 @@ export class Game {
     } else if (this.monsters.length === 0) this.spawnBoss();
 
     this.sweepT -= dt;
-    if (this.sweepT <= 0 && this.canSweep()) this.sweep();
+    if (!vault && this.sweepT <= 0 && this.canSweep()) this.sweep();
 
     // Companions chew through monsters front to back; overkill carries over.
     for (const m of this.monsters) m.arrive -= dt;
@@ -1196,7 +1332,7 @@ export class Game {
 
     // Too slow here: fall back to a floor you can farm, and push again once stronger.
     this.stuckT += dt;
-    if (!this.bossFloor() && this.stuckT > 20 && s.floor > 1) {
+    if (!vault && !this.bossFloor() && this.stuckT > 20 && s.floor > 1) {
       this.stuckT = 0;
       s.auto = false;
       s.failDps = this.dps();
@@ -1205,7 +1341,7 @@ export class Game {
     }
 
     // Boss timer.
-    if (this.bossFloor() && this.bossTime > 0) {
+    if (!vault && this.bossFloor() && this.bossTime > 0) {
       this.bossTime -= dt;
       if (this.bossTime <= 0) this.bossFailed();
     }
@@ -1221,6 +1357,8 @@ export class Game {
     for (const b of s.buffs.filter((x) => x.t <= 0)) {
       if (b.id === 'fever') {
         s.fervor = 0;
+        this.rampageTier = 0;
+        this.rampageClicks = 0;
         this.events.push({ t: 'fever', on: false });
       }
       expired = true;

@@ -438,6 +438,8 @@ const fmtN = (n: number) => (Math.round(n * 100) / 100).toString();
 
 /** Awakening needs this deepest floor. */
 export const AWAKEN_FLOOR = 120;
+/** A boss beaten with this many seconds or fewer left is a clutch kill. */
+export const CLUTCH_SECONDS = 3;
 
 export interface HeartDef {
   id: string;
@@ -481,7 +483,11 @@ export type TrophyReq =
   | { t: 'dps'; n: number }
   | { t: 'missed'; n: number }
   | { t: 'relics'; n: number }
-  | { t: 'awakens'; n: number };
+  | { t: 'awakens'; n: number }
+  | { t: 'clutches'; n: number }
+  | { t: 'champions'; n: number }
+  | { t: 'vaults'; n: number }
+  | { t: 'rampage'; n: number };
 
 export interface TrophyDef {
   id: string;
@@ -525,6 +531,10 @@ function buildTrophies(): TrophyDef[] {
   ];
   missed.forEach(([n, name, desc], k) => out.push({ id: `miss${k}`, name, desc, icon: { sprite: 'goblin', tier: k }, req: { t: 'missed', n } }));
   [1, 4, 8, 12, 16].forEach((n, k) => out.push({ id: `rel${k}`, name: ['Finder', 'Collector', 'Curator', 'Reliquary', 'Every Last One'][k], desc: n === 1 ? 'Find a relic.' : n === 16 ? 'Find every relic.' : `Find ${n} different relics.`, icon: { sprite: 'chest_full_open', tier: k }, req: { t: 'relics', n } }));
+  [1, 10, 50].forEach((n, k) => out.push({ id: `clutch${k}`, name: ['By a Hair', 'Nerves of Steel', 'Living on the Edge'][k], desc: `Beat ${n === 1 ? 'a boss' : `${n} bosses`} with ${CLUTCH_SECONDS} seconds or less on the clock.`, icon: { sprite: 'flask_yellow', tier: k }, req: { t: 'clutches', n } }));
+  [1, 25, 100].forEach((n, k) => out.push({ id: `champ${k}`, name: ['Champion Slayer', 'Crown Breaker', 'Champion of Champions'][k], desc: `Slay ${n === 1 ? 'a champion' : `${n} champions`}.`, icon: { sprite: 'weapon_red_gem_sword', tier: k }, req: { t: 'champions', n } }));
+  [1, 5, 20].forEach((n, k) => out.push({ id: `vault${k}`, name: ['Over the Rainbow', 'Vault Raider', 'Goblin Banker'][k], desc: `Open the Goblin Vault ${n === 1 ? 'once' : `${n} times`} (catch a rainbow goblin).`, icon: { sprite: 'chest_full_open', tier: k }, req: { t: 'vaults', n } }));
+  [1, 2].forEach((n, k) => out.push({ id: `rampage${k}`, name: ['Bloodrush', 'Unstoppable'][k], desc: `Keep clicking until a Rampage reaches ×${[10, 25][k]}.`, icon: { sprite: 'flask_big_red', tier: k + 1 }, req: { t: 'rampage', n } }));
   [1, 3, 10, 25].forEach((n, k) => out.push({ id: `awk${k}`, name: ['It Wakes', 'Heartbeat', 'Drumming Deep', 'The Heart Remembers'][k], desc: `Awaken the Heart ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'ui_heart_full', tier: k }, req: { t: 'awakens', n } }));
   [10, 1e3, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21].forEach((n, k) => out.push({ id: `dps${k}`, name: ['Scrapper', 'Fighter', 'Warrior', 'Warlord', 'Army', 'Legion', 'Cataclysm', 'Apocalypse'][k], desc: `Reach ${n.toLocaleString('en-US')} damage per second.`, icon: { sprite: 'weapon_waraxe', tier: k }, req: { t: 'dps', n } }));
   return out;
@@ -606,4 +616,4 @@ export const NEWS: News[] = [
   { text: 'A monster surrendered today. It was killed anyway. Rules are rules.' },
 ];
 
-export type RaidReward = 'plunder' | 'bloodlust' | 'heartstorm' | 'horde' | 'soulstorm';
+export type RaidReward = 'plunder' | 'bloodlust' | 'heartstorm' | 'horde' | 'soulstorm' | 'vault';

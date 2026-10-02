@@ -222,19 +222,25 @@ function playSound(sfx: Sfx, ev: GameEvent) {
       break;
     case 'kill':
       // Phantom Blade kills stay quiet: at several a second the thud turns into a drone.
-      if (ev.by === 'auto' && !ev.boss) break;
+      if (ev.by === 'auto' && !ev.boss && !ev.champ) break;
       sfx.play(ev.boss ? 'bosskill' : 'kill', { vol: ev.boss ? 0.9 : 0.3, jitter: 0.15 });
-      if (!ev.boss) sfx.play('coins', { vol: 0.12, rate: 1.3, jitter: 0.2 });
+      if (ev.champ) sfx.play('drop3', { vol: 0.7, rate: 1.2 });
+      else if (!ev.boss) sfx.play('coins', { vol: 0.12, rate: 1.3, jitter: 0.2 });
       break;
     case 'floor': if (ev.boss) sfx.play('boss', { vol: 0.8 }); break;
     case 'sweep': sfx.play('kill', { vol: 0.6, rate: 1.3, jitter: 0.1 }); break;
-    case 'bossWin': sfx.play('drop3', { vol: 0.8 }); break;
+    case 'bossWin':
+      sfx.play('drop3', { vol: 0.8 });
+      if (ev.clutch) sfx.play('mega', { vol: 0.8, rate: 0.8 });
+      break;
+    case 'rampage': sfx.play('mega', { vol: 0.6, rate: 1 + ev.tier * 0.2 }); break;
+    case 'vault': sfx.play(ev.on ? 'drop4' : 'coins', { vol: 0.8 }); break;
     case 'bossFail': sfx.play('death', { vol: 0.6 }); break;
     case 'buyComp': sfx.play('coins', { vol: 0.5, jitter: 0.08 }); break;
     case 'reveal': sfx.play('levelup', { vol: 0.5 }); break;
     case 'buyUpg': sfx.play('equip', { vol: 0.55, jitter: 0.05 }); break;
     case 'trophy': sfx.play('drop2', { vol: 0.55 }); break;
-    case 'raidSpawn': sfx.play('drop1', { vol: 0.7, rate: 1.2 }); break;
+    case 'raidSpawn': sfx.play(ev.rainbow ? 'awaken' : 'drop1', { vol: 0.7, rate: ev.rainbow ? 1.5 : 1.2 }); break;
     case 'raidCatch':
       sfx.play('kill', { vol: 0.6 });
       sfx.play('chest', { vol: 0.7 });

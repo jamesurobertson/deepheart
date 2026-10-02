@@ -222,6 +222,12 @@ body.compact .rate .short { display: inline; }
 .banner.boss b, .banner.fail b { color: #ff8a7a; }
 .banner.win b { color: var(--gold-hi); }
 .banner.loot b { color: #ffe08a; }
+.banner.clutch b { color: #fff3c4; font-size: 64px; text-shadow: 0 4px 0 var(--ink), 4px 0 0 var(--ink), -4px 0 0 var(--ink), 0 -4px 0 var(--ink), 0 0 34px rgba(255, 220, 120, 0.95); }
+.banner.fever.tier2 b { font-size: 60px; }
+.banner.rainbow b { animation: rainbow 1.2s linear infinite; }
+@keyframes rainbow { from { filter: hue-rotate(0deg) saturate(1.6); } to { filter: hue-rotate(360deg) saturate(1.6); } }
+.raid-mark.rainbow b { animation: rainbow 0.8s linear infinite; }
+.pop.p-champ { font-size: 24px; color: #fff0b8; white-space: nowrap; text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 0 0 14px rgba(255, 200, 80, 0.9); animation-name: popgold; animation-duration: 1.1s; z-index: 3; }
 .banner.zone b { color: #e8dcff; font-size: 56px; }
 .banner.zone span { color: var(--dim); font: 400 14px/1 'Silkscreen'; letter-spacing: 2px; text-transform: uppercase; }
 

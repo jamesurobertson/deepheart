@@ -62,6 +62,10 @@ interface MonView {
   /** Dying: seconds since death (-1 while alive). */
   dead: number;
   born: number;
+  /** Champions pulse gold and shed sparks; Goblin Vault hoarders glow softly. */
+  glow: 'champ' | 'hoard' | null;
+  /** A champion's gold ring at its feet. */
+  ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial> | null;
 }
 
 interface CompView {
@@ -110,6 +114,8 @@ interface RaiderView {
   state: 'run' | 'caught' | 'escape';
   t: number;
   sparkle: number;
+  rainbow: boolean;
+  ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
 }
 
 interface Chest {
@@ -800,6 +806,7 @@ export class Scene {
     let scale = m.boss ? Math.max(1.5, Math.min(2.6, 3.4 / h)) : Math.min(1.2, 2.1 / h);
     if (m.mods.includes('giant')) scale *= 1.3;
     if (m.half) scale *= 0.7;
+    if (m.champ) scale *= 1.35;
     inner.scale.setScalar(scale);
     const tint = new THREE.Color(m.def.tint ?? 0xffffff);
     // Modifiers show on the body: steel-grey armour, a red rage, a sickly green regrowth.
@@ -808,7 +815,14 @@ export class Scene {
     if (m.mods.includes('regen')) tint.multiply(new THREE.Color(0xb8ffb0));
     sprite.mesh.material.color.copy(tint);
     if (m.half && this.settings.particles) this.fx.burst(body.position.clone().setY(1), '#d58aff', 14, 4, 0.08, 8);
-    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0 });
+    let ring: MonView['ring'] = null;
+    if (m.champ) {
+      ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.75, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color(2, 1.5, 0.4), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.03;
+      body.add(ring);
+    }
+    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0, glow: m.champ ? 'champ' : m.vault ? 'hoard' : null, ring });
     if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(0.4), '#6a5a78', 6, 2, 0.08, 6);
     if (m.boss && !m.half) {
       this.fx.light(STAIRS.clone().setY(2), 0xff4040, 30, 1, 12);
@@ -819,6 +833,8 @@ export class Scene {
   private removeView(v: MonView) {
     this.scene.remove(v.body);
     v.sprite.dispose();
+    v.ring?.geometry.dispose();
+    v.ring?.material.dispose();
     this.mons.delete(v.id);
   }
 
@@ -856,6 +872,17 @@ export class Scene {
       v.hopY = Math.max(0, v.hopY + v.hopV * dt);
       if (v.hopY === 0) v.hopV = 0;
       v.sprite.flash = v.flash;
+      if (v.glow) {
+        const g = v.glow === 'champ' ? 0.22 + Math.sin(this.time * 7 + v.id) * 0.12 : 0.2;
+        if (v.ring) {
+          v.ring.material.opacity = 0.6 + g;
+          v.ring.scale.setScalar(1 + Math.sin(this.time * 7 + v.id) * 0.08);
+        }
+        v.sprite.mesh.material.emissive.setRGB(v.flash + g, v.flash + g * 0.75, v.flash + g * 0.2);
+        if (v.glow === 'champ' && this.settings.particles && Math.random() < dt * 8) {
+          this.fx.burst(p.clone().setY(v.height * (0.3 + Math.random() * 0.6)), '#ffd070', 1, 1.5, 0.06, 2, true);
+        }
+      }
       const base = v.scale;
       v.inner.scale.set(base * (1 + v.squash * 0.25), base * (1 - v.squash * 0.3), base);
       v.inner.position.x = v.knock;
@@ -866,7 +893,7 @@ export class Scene {
 
   // ---------- treasure goblin ----------
 
-  private spawnRaider(id: number, from: -1 | 1) {
+  private spawnRaider(id: number, from: -1 | 1, rainbow = false) {
     const { run } = this.atlas.creature('goblin');
     const s = new PixelSprite(this.atlas.texture, this.atlas.size, run, { fps: 14 });
     s.flip = from > 0;
@@ -883,7 +910,8 @@ export class Scene {
     group.add(inner, ring, light, blobShadow(0.9));
     group.position.set(from * -14, 0, 4);
     this.scene.add(group);
-    this.raider = { id, group, sprite: s, from, light, state: 'run', t: 0, sparkle: 0 };
+    if (rainbow) inner.scale.setScalar(1.8);
+    this.raider = { id, group, sprite: s, from, light, state: 'run', t: 0, sparkle: 0, rainbow, ring };
   }
 
   private updateRaiders(dt: number, game: Game) {
@@ -896,10 +924,19 @@ export class Scene {
       r.group.position.z = 3.6 + Math.sin(t * Math.PI * 4) * 0.8;
       r.light.intensity = 9 + Math.sin(this.time * 10) * 3;
       r.sprite.update(dt);
+      // The rainbow goblin cycles through every colour, and so does its glow.
+      const hue = (this.time * 0.9) % 1;
+      if (r.rainbow) {
+        r.sprite.mesh.material.color.setHSL(hue, 1, 0.7);
+        r.sprite.mesh.material.emissive.setHSL(hue, 1, 0.25);
+        r.light.color.setHSL(hue, 1, 0.6);
+        r.ring.material.color.setHSL(hue, 1, 0.6).multiplyScalar(2);
+      }
       r.sparkle -= dt;
       if (r.sparkle <= 0 && this.settings.particles) {
-        r.sparkle = 0.1;
-        this.fx.burst(r.group.position.clone().setY(1.2), '#ffd070', 2, 1.2, 0.06, 1, true);
+        r.sparkle = r.rainbow ? 0.05 : 0.1;
+        const spark = r.rainbow ? `#${new THREE.Color().setHSL((hue + Math.random() * 0.3) % 1, 1, 0.6).getHexString()}` : '#ffd070';
+        this.fx.burst(r.group.position.clone().setY(1.2), spark, 2, 1.2, 0.06, 1, true);
       }
     }
     for (let i = this.leaving.length - 1; i >= 0; i--) {
@@ -1076,6 +1113,12 @@ export class Scene {
           this.fx.spray(at, v.blood, v.boss ? 30 : 10, 1, v.boss ? 1.5 : 1.1);
           if (v.blood !== BONE) this.fx.bloodSplat(v.body.position.clone().setX(v.body.position.x + 0.25), v.blood, v.boss ? 2.2 : 1);
         }
+        if (ev.champ) {
+          this.fx.light(at, 0xffd070, 30, 0.6, 10);
+          if (this.settings.particles) this.fx.burst(at, '#ffd070', 26, 5, 0.08, 10, true);
+          this.addShake(0.2);
+          this.hitstop = Math.max(this.hitstop, 0.08);
+        }
         if (ev.boss) {
           this.fx.shockwave(v.body.position.clone(), 8);
           this.fx.pillar(v.body.position.clone(), 0xffd070, 10, 1.4);
@@ -1110,7 +1153,26 @@ export class Scene {
         this.syncParty(game);
         break;
       case 'raidSpawn':
-        this.spawnRaider(ev.id, ev.from);
+        this.spawnRaider(ev.id, ev.from, ev.rainbow);
+        break;
+      case 'bossWin':
+        // A clutch kill: the world holds its breath for a moment.
+        if (ev.clutch) {
+          this.hitstop = Math.max(this.hitstop, 0.5);
+          this.addShake(0.6);
+          this.fx.light(new THREE.Vector3(3 * this.squeeze, 2, 0), 0xfff0b0, 60, 1, 18);
+        }
+        break;
+      case 'rampage':
+        this.addShake(0.25 + ev.tier * 0.15);
+        this.fx.light(new THREE.Vector3(1.5 * this.squeeze, 2, 1), 0xff3050, 30 + ev.tier * 20, 0.8, 14);
+        break;
+      case 'vault':
+        if (ev.on) {
+          this.fx.light(STAIRS.clone().setY(2), 0xffd070, 60, 1.5, 20);
+          if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(1), '#ffd070', 60, 7, 0.1, 14, true);
+          this.addShake(0.4);
+        }
         break;
       case 'raidCatch': {
         const r = this.raider;

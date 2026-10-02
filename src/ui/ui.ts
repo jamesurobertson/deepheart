@@ -15,7 +15,7 @@ export interface UiHooks {
 }
 
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
-const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', soulstorm: 'Soul Storm!' };
+const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', soulstorm: 'Soul Storm!', vault: 'Goblin Vault!' };
 const MAX_POPS = 90;
 const RARITY_COLORS = ['#c9b8a0', '#5fa8ff', '#c77dff', '#ffb13d'];
 
@@ -34,6 +34,7 @@ function icon(i: Icon, box = 36): string {
 const gold = (n: number, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
 
 function buffText(b: Buff) {
+  if (b.id === 'vault') return 'hoarders everywhere';
   if (b.dps > 1 && b.click > 1) return `×${b.dps} damage`;
   if (b.dps > 1) return `×${b.dps} companion damage`;
   if (b.click > 1) return `×${b.click} click damage`;
@@ -67,6 +68,8 @@ export class Ui {
   private descending = false;
   private modalKey = '';
   private bannerTimer = 0;
+  private bannerQueued = 0;
+  private bannerAt = 0;
   private floorKey = '';
   private bladeSprite = '';
   /** Touch screens: long-press shows a tooltip instead of hover. */
@@ -539,8 +542,9 @@ export class Ui {
       case 'kill': {
         const s = this.scene.screenOf(ev.id);
         if (!s) break;
-        this.pop(s.x, s.y + s.h * 0.5, `+${fmt(ev.gold)}`, ev.boss ? 'p-gold p-big' : 'p-gold');
-        this.coinFly(s.x, s.y + s.h * 0.6, ev.boss ? 8 : 1);
+        this.pop(s.x, s.y + s.h * 0.5, `+${fmt(ev.gold)}`, ev.boss || ev.champ ? 'p-gold p-big' : 'p-gold');
+        if (ev.champ) this.pop(s.x, s.y - 10, 'CHAMPION!', 'p-champ');
+        this.coinFly(s.x, s.y + s.h * 0.6, ev.boss ? 8 : ev.champ ? 10 : 1);
         break;
       }
       case 'sweep': {
@@ -563,7 +567,10 @@ export class Ui {
           this.banner(`Boss: ${boss?.def.name ?? 'Guardian'}`, mods.length ? `${mods.join(' · ')} — ${time.toLowerCase()}` : time, 'boss');
         }
         break;
-      case 'bossWin': this.banner('Victory!', `Floor ${ev.floor} conquered`, 'win'); break;
+      case 'bossWin':
+        if (ev.clutch) this.banner('CLUTCH!', `${ev.clutch.left.toFixed(1)}s to spare · +${fmt(ev.clutch.gold)} bonus gold`, 'clutch');
+        else this.banner('Victory!', `Floor ${ev.floor} conquered`, 'win');
+        break;
       case 'bossFail':
         // The first wall: this is where the game teaches you to descend.
         if (g.s.descents === 0 && ev.floor >= DESCEND_FLOOR && g.canDescend()) this.banner('The way down opens', 'Descend to come back stronger', 'fail');
@@ -586,13 +593,19 @@ export class Ui {
         break;
       }
       case 'raidCatch': {
+        if (ev.reward === 'vault') break;
         const title = REWARD_TEXT[ev.reward];
         const line = ev.reward === 'plunder' ? `+${fmt(ev.amount ?? 0)} gold` : ev.buff ? `${buffText(ev.buff)} for ${Math.round(ev.buff.dur)}s` : '';
         this.banner(title, line, 'loot');
         break;
       }
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
-      case 'fever': if (ev.on) this.banner('RAMPAGE!', `Clicks ×${g.feverMult()} · Party damage ×2`, 'fever'); break;
+      case 'fever': if (ev.on) this.banner('RAMPAGE!', `Clicks ×${g.feverMult()} · Party damage ×2 · keep clicking!`, 'fever'); break;
+      case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, ev.tier >= 2 ? 'Unstoppable · party damage ×4' : 'Keep going · party damage ×3', `fever tier${ev.tier}`); break;
+      case 'vault':
+        if (ev.on) this.banner('GOBLIN VAULT!', 'The room fills with hoarders. Get them all!', 'loot rainbow');
+        else this.toast(`The vault closes. Haul: <b>+${fmt(ev.gold)} gold</b>`, 'chest_full_open', 'trophy');
+        break;
       case 'abyss': this.toast(`Abyss power: <b>${esc(ABYSS.find((a) => a.id === ev.id)!.name)}</b>`, 'flask_big_red'); break;
       case 'relic': this.showLoot(ev.id, ev.lv, ev.equipped); break;
       case 'heal': {
@@ -698,6 +711,14 @@ export class Ui {
   }
 
   private banner(title: string, sub: string, cls = '') {
+    // A victory gets its moment before the next boss's introduction takes over the banner.
+    const held = Date.now() - this.bannerAt < 1500 && /\b(win|clutch)\b/.test(this.el.banner.className);
+    if (held && cls === 'boss') {
+      clearTimeout(this.bannerQueued);
+      this.bannerQueued = window.setTimeout(() => this.banner(title, sub, cls), 1500 - (Date.now() - this.bannerAt));
+      return;
+    }
+    this.bannerAt = Date.now();
     const b = this.el.banner;
     b.className = `banner ${cls}`;
     b.querySelector('b')!.textContent = title;
@@ -764,6 +785,7 @@ export class Ui {
 
     const rp = g.raid ? this.scene.raiderScreen() : null;
     this.el.raid.hidden = !rp;
+    this.el.raid.classList.toggle('rainbow', !!g.raid?.rainbow);
     if (rp) {
       this.el.raid.style.transform = `translate(${rp.x}px, ${rp.y}px)`;
       // Keep the "catch it" label on screen when the goblin is near an edge.
@@ -845,7 +867,12 @@ export class Ui {
       this.el.auto.classList.toggle('on', s.auto);
       this.el.auto.textContent = s.auto ? 'Auto: on' : 'Auto: off';
     }
-    if (boss) {
+    if (boss && g.inVault()) {
+      // The boss steps aside for the vault; its clock is frozen.
+      this.el.floorBar.style.width = `${g.bossTimeMax ? (Math.max(0, g.bossTime) / g.bossTimeMax) * 100 : 100}%`;
+      this.el.floorBarT.textContent = 'Boss waits';
+      this.el.floorBox.classList.remove('urgent');
+    } else if (boss) {
       // The bar is the clock: it drains steadily. (The boss's health is the bar over its head.)
       const left = Math.max(0, g.bossTime);
       this.el.floorBar.style.width = `${(left / g.bossTimeMax) * 100}%`;
@@ -869,7 +896,7 @@ export class Ui {
     for (const b of active) {
       let chip = box.querySelector<HTMLElement>(`[data-buff="${b.id}"]`);
       if (!chip) {
-        const ico = b.id === 'bloodlust' ? 'flask_big_red' : b.id === 'heartstorm' ? 'weapon_golden_sword' : b.id === 'soulstorm' ? 'chest_mimic_open' : 'coin';
+        const ico = b.id === 'bloodlust' ? 'flask_big_red' : b.id === 'heartstorm' ? 'weapon_golden_sword' : b.id === 'soulstorm' ? 'chest_mimic_open' : b.id === 'vault' ? 'chest_full_open' : 'coin';
         chip = document.createElement('div');
         chip.className = `buff ${b.id}`;
         chip.dataset.buff = b.id;
@@ -1067,7 +1094,7 @@ export class Ui {
       const how = tro ? `${this.cursorOpen(c.id) ? 'Unlocked by' : 'Unlock with'} the trophy <b>${esc(tro.name)}</b>: ${esc(tro.desc)}` : 'Always available.';
       return `<div class="tt-h"><b>${esc(c.name)}</b><span class="tt-own">${this.cursorOpen(c.id) ? (this.game.s.settings.cursor === c.id ? 'equipped' : 'cursor') : 'locked'}</span></div><p class="tt-d">${how}</p>${this.game.s.settings.cursor === c.id ? '<p class="tt-f">Tap again to go back to your best bought blade.</p>' : ''}`;
     }
-    if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Click fast to fill this. When it's full, your clicks deal ×${g.feverMult()} damage and your party hits twice as hard for a few seconds.</p>`;
+    if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Click fast to fill this. When it's full, your clicks deal ×${g.feverMult()} damage and your party hits twice as hard for a few seconds. Keep clicking through it to push the Rampage to ×10 and then ×25.</p>`;
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
     if (kind === 'dock') {
       const text: Record<string, string> = {
@@ -1306,7 +1333,7 @@ export class Ui {
     const rows: [string, string][] = [
       ['Floor', `${s.floor} (deepest this descent ${s.maxFloor})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
       ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses killed', fmt(s.bosses)],
-      ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rampages', fmt(s.fevers)],
+      ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Goblin Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
       ['Descents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ['Relics', `${g.relicsFound()} / ${RELICS.length}`],
       ['This descent', duration(s.runTime)], ['Time played', duration(s.playTime)],
     ];
