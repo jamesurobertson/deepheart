@@ -543,6 +543,12 @@ export class Ui {
         this.coinFly(s.x, s.y + s.h * 0.6, ev.boss ? 8 : 1);
         break;
       }
+      case 'sweep': {
+        const at = this.scene.fieldScreen();
+        this.pop(at.x, at.y, `Swept! +${fmt(ev.gold)}`, 'p-gold p-sweep');
+        this.coinFly(at.x, at.y + 20, 4);
+        break;
+      }
       case 'floor':
         // Entering a new zone gets a title card.
         if (ev.floor % 10 === 1 && ev.floor > 1) {
@@ -1171,9 +1177,15 @@ export class Ui {
     const g = this.game;
     const pending = g.pendingSouls();
     const next = g.nextBossSouls();
+    // What a descent adds on top of the souls you already have: the number that says whether it's worth it.
+    const gain = (pending * g.soulPower()) / (1 + g.s.souls * g.soulPower());
+    const advice = gain >= 1 ? `<p class="advice good">A big step. Descending now is a great deal.</p>`
+      : gain >= 0.5 ? `<p class="advice good">Worth it: descending now makes you much stronger.</p>`
+        : `<p class="advice">Only +${Math.round(gain * 100)}% on top of what you have. Beat another zone boss first for a bigger leap.</p>`;
     const desc = g.canDescend()
       ? `<p>Descending sends you back to the top with your souls, relics, trophies and abyss powers.</p>
          <button class="btn primary big" data-act="descend">Descend for ${G.soul()} ${fmt(pending)} souls</button>
+         ${advice}
          <p class="muted">+${fmt(Math.round(pending * g.soulPower() * 100))}% damage forever · banked from the zone bosses you beat this descent · the floor ${next.floor} boss pays ${fmt(next.souls)} more</p>`
       : !g.descendOpen()
         ? `<p>Zone bosses (every 10th floor) pay souls. The way down opens at the <b>floor ${DESCEND_FLOOR}</b> boss.</p>

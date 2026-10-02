@@ -13,6 +13,10 @@ const BOSS_TIME = 30;
 /** Monsters on the field at once (more with upgrades). */
 const MAX_ON = 10;
 const SPAWN_GAP = 0.12;
+/** A party that could wipe the rest of a floor within this many seconds clears it in one sweep. */
+const SWEEP_SECONDS = 1;
+/** Seconds between swept floors, so a blitz through old floors still reads as one. */
+const SWEEP_GAP = 0.6;
 /** Ordinary monsters are a fraction of a floor's base health: many small kills. */
 const TRASH = 0.4;
 /** Every click deals this share of your companions' damage, before upgrades. */
@@ -31,12 +35,15 @@ export const DESCEND_FLOOR = 30;
 const SOUL_GROWTH = 1.1;
 /**
  * Pacing knobs, in one place (the balance script overrides them to search for good values).
- * - Zone bosses pay `bossSouls` souls at floor 30, +10% a floor up to `soulTaper`, then only `soulLate`
+ * - The floor 10 and 20 bosses pay `earlySouls` (enough that the first descent feels like a leap).
+ *   Zone bosses pay `bossSouls` souls at floor 30, +10% a floor up to `soulTaper`, then only `soulLate`
  *   a floor: that's the wall. Zone bosses have `zoneBoss`× the health of mid-bosses.
  * - Awakening at floor f pays stoneBase × stoneGrowth^(f − AWAKEN_FLOOR) heartstones.
  * - Heart of Fury multiplies all damage by `fury` per level.
+ * - Fury levels cost 2^n, so each floor deeper pays about fury^log2(stoneGrowth) more damage (×1.176 at 1.05).
+ *   Keep `deepHp` just above that: higher and every awakening takes longer to recover from, lower and it snowballs.
  */
-export const TUNE = { soulTaper: 90, soulLate: 1.04, stoneBase: 5, stoneGrowth: 1.02, fury: 10, deepHp: 1.16, bossSouls: 20, zoneBoss: 2 };
+export const TUNE = { earlySouls: [20, 60], soulTaper: 90, soulLate: 1.04, stoneBase: 5, stoneGrowth: 1.05, fury: 10, deepHp: 1.18, bossSouls: 50, zoneBoss: 2 };
 
 export interface Buff {
   id: RaidReward | 'fever';
@@ -124,7 +131,7 @@ export interface SaveState {
   /** Unspent heartstones. */
   stones: number;
   awakens: number;
-  /** Deepest floor cleared since the last awakening (heartstones are paid for it). */
+  /** Deepest floor reached since the last awakening (heartstones are paid for it). */
   cycleBest: number;
   settings: Settings;
 }
@@ -166,6 +173,7 @@ export type GameEvent =
   | { t: 'spawn'; id: number }
   | { t: 'kill'; id: number; gold: number; boss: boolean; by: HitKind }
   | { t: 'floor'; floor: number; boss: boolean }
+  | { t: 'sweep'; floor: number; gold: number }
   | { t: 'bossFail'; floor: number }
   | { t: 'bossWin'; floor: number }
   | { t: 'souls'; id: number; floor: number; souls: number }
@@ -274,6 +282,7 @@ export class Game {
   bossTimeMax = BOSS_TIME;
   private seq = 1;
   private spawnT = 0;
+  private sweepT = 0;
   /** Seconds since the last kill: too long and your party falls back a floor. */
   private stuckT = 0;
   private owned = new Set<string>();
@@ -296,7 +305,7 @@ export class Game {
   constructor(s: SaveState) {
     this.s = s;
     // Saves from before awakening existed: the whole history counts as the first cycle.
-    if (s.cycleBest === undefined) s.cycleBest = (s.bestFloor ?? 1) - 1;
+    if (s.cycleBest === undefined) s.cycleBest = s.bestFloor ?? 1;
     if (s.bestCleared === undefined) s.bestCleared = (s.bestFloor ?? 1) - 1;
     // Souls used to be paid for depth at descent time; carry what this descent was worth over.
     if (s.runSouls === undefined) s.runSouls = Math.floor(10 * 1.1 ** (Math.min(s.maxFloor ?? 1, 90) - 30) * 1.04 ** Math.max(0, (s.maxFloor ?? 1) - 90));
@@ -465,14 +474,10 @@ export class Game {
     return this.c.perComp[i];
   }
 
-  /** Damage one more level of this companion would add (before buffs). */
+  /** Damage one more level of this companion would add (before buffs). A companion's damage is linear in its own level. */
   compNext(i: number) {
-    this.s.owned[i]++;
-    this.cache = null;
-    const v = this.compute().perComp[i];
-    this.s.owned[i]--;
-    this.cache = null;
-    return v - this.compDps(i);
+    const c = this.c;
+    return COMPS[i].dps * c.parts.tier[i] * c.parts.syn[i] * c.all * c.parts.banner;
   }
 
   clickDamage() {
@@ -602,7 +607,8 @@ export class Game {
     const giant = mods.includes('giant');
     // Zone bosses from floor 30 on are the walls; the first two just teach you what a boss is.
     const zone = this.s.floor % 10 === 0 && this.s.floor >= DESCEND_FLOOR ? TUNE.zoneBoss : 1;
-    const hp = floorHp(this.s.floor) * 8 * zone * (giant ? 1 + 2 * bite : 1);
+    const first = this.s.floor <= 10 ? 0.5 : 1;
+    const hp = floorHp(this.s.floor) * 8 * zone * first * (giant ? 1 + 2 * bite : 1);
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, ...this.spot(true) };
     this.monsters.push(m);
     let time = (this.hasAbyss('patience') ? 45 : BOSS_TIME) + Math.min(30, 3 * this.relic('time'));
@@ -698,10 +704,38 @@ export class Game {
     }
   }
 
+  /** Strong enough to clear what's left of this floor at once (the toughest monster type counts for all of them). */
+  private canSweep() {
+    if (this.bossFloor() || this.s.floorKills >= FLOOR_KILLS) return false;
+    const toughest = Math.max(...bandFor(this.s.floor).map((d) => d.hp));
+    return this.dps() * SWEEP_SECONDS >= this.floorLeft() * floorHp(this.s.floor) * toughest * TRASH;
+  }
+
+  /** Clear the floor in one go: monsters on the field die as usual, the rest are paid out as if they had. */
+  private sweep() {
+    const s = this.s;
+    const floor = s.floor;
+    this.sweepT = SWEEP_GAP;
+    for (const m of [...this.monsters]) {
+      if (s.floor !== floor) return;
+      this.kill(m, 'dps');
+    }
+    if (s.floor !== floor || s.floorKills >= FLOOR_KILLS) return;
+    const left = FLOOR_KILLS - s.floorKills;
+    const gold = left * Math.ceil(Math.max(1, floorGold(floor) * TRASH) * this.goldMult());
+    this.earn(gold);
+    s.kills += left;
+    this.killAcc += left;
+    s.floorKills = FLOOR_KILLS;
+    this.events.push({ t: 'sweep', floor, gold });
+    this.unlockNext();
+    if (s.auto && floor + 1 <= s.maxFloor) this.enterFloor(floor + 1);
+  }
+
   private unlockNext() {
     const s = this.s;
     s.bestCleared = Math.max(s.bestCleared, s.floor);
-    s.cycleBest = Math.max(s.cycleBest, s.floor);
+    s.cycleBest = Math.max(s.cycleBest, s.floor + 1);
     if (s.floor + 1 > s.maxFloor) {
       s.maxFloor = s.floor + 1;
       s.bestFloor = Math.max(s.bestFloor, s.maxFloor);
@@ -866,7 +900,7 @@ export class Game {
   /** Souls a zone boss on this floor pays when beaten (before relics and Heart powers). */
   baseBossSouls(floor: number) {
     if (floor % 10 !== 0) return 0;
-    if (floor < DESCEND_FLOOR) return [0, 5, 10][floor / 10];
+    if (floor < DESCEND_FLOOR) return floor === 0 ? 0 : TUNE.earlySouls[floor / 10 - 1];
     const early = Math.min(floor, TUNE.soulTaper) - DESCEND_FLOOR;
     const late = Math.max(0, floor - TUNE.soulTaper);
     return Math.floor(TUNE.bossSouls * SOUL_GROWTH ** early * TUNE.soulLate ** late);
@@ -1147,6 +1181,9 @@ export class Game {
         this.spawnT = SPAWN_GAP;
       }
     } else if (this.monsters.length === 0) this.spawnBoss();
+
+    this.sweepT -= dt;
+    if (this.sweepT <= 0 && this.canSweep()) this.sweep();
 
     // Companions chew through monsters front to back; overkill carries over.
     for (const m of this.monsters) m.arrive -= dt;

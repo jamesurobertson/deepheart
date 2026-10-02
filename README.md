@@ -24,6 +24,7 @@ The project is built with:
 - Vite
 
 `node scripts/balance.ts 8 5 30 0.3` runs a headless pacing sim (hours, clicks/sec, active minutes, descend ratio).
+`npm run pace` simulates active, casual and idle players for 8 hours and fails if the game goes quiet for too long, the first descent pays too little, or replaying a run isn't clearly faster.
 `node scripts/build-atlas.ts` repacks the sprite atlas after adding art.
 
 ## Building for Production

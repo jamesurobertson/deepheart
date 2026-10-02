@@ -972,6 +972,11 @@ export class Scene {
   }
 
   /** Screen position of a monster's head (for numbers and health bars), and its on-screen height. */
+  /** Middle of the monster field on screen, for news about the whole floor. */
+  fieldScreen() {
+    return this.toScreen(new THREE.Vector3(3 * this.squeeze, 1.6, 0));
+  }
+
   screenOf(id: number): { x: number; y: number; h: number } | null {
     const v = this.mons.get(id);
     if (!v) return null;

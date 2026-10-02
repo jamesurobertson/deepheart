@@ -227,6 +227,7 @@ function playSound(sfx: Sfx, ev: GameEvent) {
       if (!ev.boss) sfx.play('coins', { vol: 0.12, rate: 1.3, jitter: 0.2 });
       break;
     case 'floor': if (ev.boss) sfx.play('boss', { vol: 0.8 }); break;
+    case 'sweep': sfx.play('kill', { vol: 0.6, rate: 1.3, jitter: 0.1 }); break;
     case 'bossWin': sfx.play('drop3', { vol: 0.8 }); break;
     case 'bossFail': sfx.play('death', { vol: 0.6 }); break;
     case 'buyComp': sfx.play('coins', { vol: 0.5, jitter: 0.08 }); break;

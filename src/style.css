@@ -247,6 +247,9 @@ body.compact .rate .short { display: inline; }
 .pop.p-cleave { font-size: 20px; color: #ffd0c8; opacity: 0.9; }
 .pop.p-gold { font-size: 22px; color: var(--gold-hi); animation-name: popgold; animation-duration: 1s; }
 .pop.p-gold.p-big { font-size: 40px; }
+.pop.p-gold.p-sweep { font-size: 30px; white-space: nowrap; }
+.advice { margin: 8px 0 0; color: var(--dim); }
+.advice.good { color: var(--green); }
 .coin-fly { position: absolute; pointer-events: none; z-index: 4; filter: drop-shadow(0 0 4px rgba(255, 200, 80, 0.8)); }
 
 .bars { position: fixed; inset: 0; pointer-events: none; }
