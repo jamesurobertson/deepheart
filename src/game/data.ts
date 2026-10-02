@@ -51,15 +51,16 @@ export const COMPS: CompDef[] = [
   c('doctor', 'Plague Doctor', 'doc', 1.8e11, 6.98e7, 'dark', 'Treats monsters with a strict regimen of dying.', 2),
   c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.6e12, 4.6e8, 'storm', 'Followed you home from the Frozen Vault. Will not leave. Brings its own blizzard.', 3),
   c('hollow', 'Hollow Knight', 'pumpkin_dude', 1.5e13, 3e9, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.', 4),
-  // The Heart's recruits: one more answers every time you awaken it.
-  c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 1.4e14, 2e10, 'dark', 'Broke every vow but one: never stop swinging.', 4, false, 1),
-  c('archmage', 'Archmage', 'cr_wizard', 1.3e15, 1.3e11, 'bolt', 'Older than the dungeon. Insists the dungeon was smaller back then.', 4, false, 2),
-  c('wraith', 'Bound Wraith', 'cr_crimson_wraith', 1.2e16, 8.5e11, 'dark', 'The Heart sent it. It hums a song nobody taught it.', 4, false, 3),
-  c('necro', 'Turncoat Necromancer', 'necromancer', 1.1e17, 5.5e12, 'dark', 'Used to raise these monsters. Now it lowers them.', 4, false, 4),
-  c('king', 'Exiled King', 'cr_king', 1e18, 3.6e13, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 4, false, 5),
-  c('angel', 'Fallen Angel', 'angel', 9e18, 2.3e14, 'fire', 'Fell from somewhere bright. Landed swinging.', 4, false, 6),
-  c('ogre', 'Tamed Ogre', 'ogre', 8e19, 1.5e15, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 4, true, 7),
-  c('demon', 'Bound Demon', 'big_demon', 7e20, 1e16, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 4, true, 8),
+  // The Heart's recruits: one more answers every time you awaken it. A gentler curve (×2 damage for ×4 cost),
+  // since every awakening already multiplies your power; steeper and the late game snowballs.
+  c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 6e13, 6e9, 'dark', 'Broke every vow but one: never stop swinging.', 4, false, 1),
+  c('archmage', 'Archmage', 'cr_wizard', 2.4e14, 1.2e10, 'bolt', 'Older than the dungeon. Insists the dungeon was smaller back then.', 4, false, 2),
+  c('wraith', 'Bound Wraith', 'cr_crimson_wraith', 9.6e14, 2.4e10, 'dark', 'The Heart sent it. It hums a song nobody taught it.', 4, false, 3),
+  c('necro', 'Turncoat Necromancer', 'necromancer', 3.8e15, 4.8e10, 'dark', 'Used to raise these monsters. Now it lowers them.', 4, false, 4),
+  c('king', 'Exiled King', 'cr_king', 1.5e16, 9.6e10, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 4, false, 5),
+  c('angel', 'Fallen Angel', 'angel', 6.1e16, 1.9e11, 'fire', 'Fell from somewhere bright. Landed swinging.', 4, false, 6),
+  c('ogre', 'Tamed Ogre', 'ogre', 2.5e17, 3.8e11, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 4, true, 7),
+  c('demon', 'Bound Demon', 'big_demon', 9.8e17, 7.7e11, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 4, true, 8),
 ];
 
 /** A companion's place in the roster, by id (so lists below don't break if the order changes). */
