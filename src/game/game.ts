@@ -1,6 +1,6 @@
 import Decimal from 'break_infinity.js';
 import {
-  ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
+  ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, HOARDERS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
@@ -46,7 +46,6 @@ const VAULT_GAP = 0.1;
 /** Hoarders take this many seconds of party damage each, so the room fills up and clicking them pays. */
 const VAULT_HP = 0.4;
 const VAULT_GOLD = 3;
-const HOARDER: MonsterDef = { sprite: 'goblin', name: 'Hoarder', hp: 1, tint: 0xffd85a };
 const BASE_CRIT = 0.04;
 const BASE_CRIT_MULT = 8;
 const OFFLINE_CAP = 72 * 3600;
@@ -582,7 +581,7 @@ export class Game {
   }
 
   compUnlocked(i: number) {
-    return this.s.descents >= COMPS[i].depth;
+    return this.s.descents >= COMPS[i].depth && this.s.awakens >= (COMPS[i].heart ?? 0);
   }
 
   // ---------- floors and monsters ----------
@@ -648,7 +647,8 @@ export class Game {
 
   private spawnHoarder() {
     const hp = Decimal.max(floorHp(this.s.floor).times(TRASH * 0.25), this.dps().times(VAULT_HP));
-    const m: Monster = { id: this.seq++, def: HOARDER, hp, max: hp, boss: false, arrive: 0.4, mods: [], vault: true, ...this.spot(false) };
+    const def = HOARDERS[Math.floor(Math.random() * HOARDERS.length)];
+    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.4, mods: [], vault: true, ...this.spot(false) };
     this.monsters.push(m);
     this.events.push({ t: 'spawn', id: m.id });
   }

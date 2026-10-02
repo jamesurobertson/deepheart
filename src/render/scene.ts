@@ -9,7 +9,7 @@ import { PixelSprite, blobShadow } from './sprite.ts';
 import { Fx, flameTexture, spellTextures } from './fx.ts';
 import { GradeShader, tiltShift } from './post.ts';
 import { buildStairwell, stairPoint } from './stairwell.ts';
-import { COMPS, ZONES, corruptionOf, zoneOf, type Attack, type Tiles } from '../game/data.ts';
+import { COMPS, ZONES, corruptionOf, tilesFor, zoneOf, type Attack, type CompDef, type Tiles } from '../game/data.ts';
 import type { Game, GameEvent, Monster } from '../game/game.ts';
 
 const WALL_Z = -6;
@@ -39,10 +39,15 @@ function corrupt(p: Palette, lap: number): Palette {
   return { ...p, torch: toward(p.torch, 0.85), hemi: toward(p.hemi, 0.75), fog: new THREE.Color(p.fog).lerp(c, 0.12).getHex(), wall: wash(p.wall), floor: wash(p.floor) };
 }
 
+/** Ordinary companions are drawn this many art pixels tall, whatever size their sprite is (big ones stay big). */
+const COMP_HEIGHT = 20;
+
 /** Formation slots for companions, front to back. */
 const PARTY_SLOTS: [number, number][] = [
   [-3, 0.8], [-3.4, -1.4], [-3.7, 2.6], [-4.4, -0.2], [-4.8, 1.7], [-5, -2.4], [-5.8, 0.8], [-6, 2.8],
   [-6.2, -1.3], [-6.9, 1.9], [-7.2, -0.3], [-7.4, -2.5], [-8, 2.6], [-8.3, 0.8], [-8.8, -1.4], [-9.3, 1.6],
+  // The Heart's recruits fill the gaps.
+  [-4.1, 3.7], [-5.5, -3.5], [-6.5, 0.1], [-7.7, 1.3], [-5.2, 3.8], [-8.5, -2.9], [-6.6, -3.6], [-9, 0.2],
 ];
 
 interface MonView {
@@ -398,7 +403,7 @@ export class Scene {
     const a = this.atlas;
     const r = seeded(seed * 977 + 5);
     const p = this.palette;
-    const theme: Tiles = ZONES[seed % ZONES.length].tiles;
+    const theme: Tiles = tilesFor(seed);
     const wall = new Quads(a);
     const floor = new Quads(a);
     // Tile names for each theme. The jungle and tomb sets come from Omniboy's packs.
@@ -498,13 +503,20 @@ export class Scene {
     }
   }
 
+  /** World scale for a companion: every ordinary one stands the same height, the big ones keep their bulk. */
+  private compScale(def: CompDef) {
+    if (def.big) return 1;
+    const h = Math.max(...this.atlas.creature(def.sprite).idle.map((f) => this.atlas.trimmed(f).h));
+    return 1.25 * (COMP_HEIGHT / h);
+  }
+
   private addComp(i: number, instant: boolean) {
     const def = COMPS[i];
     const { idle, run } = this.atlas.creature(def.sprite);
     const sprite = new PixelSprite(this.atlas.texture, this.atlas.size, idle, { fps: 6 + Math.random() * 2 });
     const body = new THREE.Group();
     const inner = new THREE.Group();
-    const base = def.big ? 1 : 1.25;
+    const base = this.compScale(def);
     inner.scale.setScalar(base);
     inner.add(sprite.mesh);
     body.add(inner, blobShadow(def.big ? 1.6 : 0.9));
@@ -674,13 +686,14 @@ export class Scene {
       s.mesh.rotation.z = -Math.PI / 2;
       mesh = new THREE.Group().add(s.mesh);
     } else {
-      // Fireball / void orb: a crisp pixel core over a soft glow.
-      const tex = spellTextures();
-      const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: kind === 'fire' ? tex.fire : tex.void, color: new THREE.Color(1.25, 1.25, 1.25), transparent: true, depthWrite: false }));
-      core.scale.setScalar(kind === 'fire' ? 0.7 : 0.6);
+      // Fireball / darkness bolt: DevWizard's animated pixel spell over a soft glow.
+      const spell = new PixelSprite(this.atlas.texture, this.atlas.size, this.atlas.anim(kind === 'fire' ? 'spell_fireball' : 'spell_darkness_bolt'), { fps: 14, anchor: 'center' });
+      spell.mesh.scale.setScalar(kind === 'fire' ? 1.1 : 1);
+      spell.mesh.material.emissive.setScalar(0.6);
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(SHOT_COLOR[kind]).multiplyScalar(1.2), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
-      halo.scale.setScalar(kind === 'fire' ? 1.2 : 1.2);
-      mesh = new THREE.Group().add(halo, core);
+      halo.scale.setScalar(1.2);
+      mesh = new THREE.Group().add(halo, spell.mesh);
+      mesh.userData.spell = spell;
     }
     mesh.position.copy(from);
     this.scene.add(mesh);
@@ -710,7 +723,7 @@ export class Scene {
         // Comet trail of fading copies, plus embers / sparks.
         const tex = spellTextures();
         this.fx.afterimage(s.mesh.position, s.kind === 'fire' ? tex.fire : tex.void, s.kind === 'fire' ? 0xb05a20 : 0x8050c0, s.kind === 'fire' ? 0.55 : 0.5, 0.18);
-        (s.mesh.children[1] as THREE.Sprite).material.rotation = this.time * (s.kind === 'fire' ? 8 : -6);
+        (s.mesh.userData.spell as PixelSprite | undefined)?.update(dt);
         s.mesh.children[0].scale.setScalar(1.2 * (0.9 + Math.sin(this.time * 30) * 0.12));
       }
       if (this.settings.particles) {
@@ -727,6 +740,7 @@ export class Scene {
         s.mesh.traverse((o) => {
           if (o instanceof THREE.Sprite) o.material.dispose();
         });
+        (s.mesh.userData.spell as PixelSprite | undefined)?.dispose();
         this.shots.splice(i, 1);
       }
     }
@@ -885,7 +899,7 @@ export class Scene {
       if (v.hopY === 0) v.hopV = 0;
       v.sprite.flash = v.flash;
       if (v.glow) {
-        const g = v.glow === 'champ' ? 0.22 + Math.sin(this.time * 7 + v.id) * 0.12 : 0.2;
+        const g = v.glow === 'champ' ? 0.22 + Math.sin(this.time * 7 + v.id) * 0.12 : 0.08;
         if (v.ring) {
           v.ring.material.opacity = 0.6 + g;
           v.ring.scale.setScalar(1 + Math.sin(this.time * 7 + v.id) * 0.08);
@@ -1145,14 +1159,14 @@ export class Scene {
         break;
       case 'floor': {
         const z = zoneOf(ev.floor);
-        // Going down into the next zone (however you got there): the staircase, every time.
+        // Going down into a zone you've never reached: the staircase.
         const deeper = z > zoneOf(this.lastFloor);
         this.lastFloor = ev.floor;
         if (this.cine) this.cine.zone = z;
         else if (this.hold) this.hold.zone = z;
-        // A relic just dropped: let it sink in before the party heads for the stairs.
-        else if (deeper && this.settings.cinematics && this.relicDropped) this.hold = { zone: z, t: 2.4 };
-        else if (deeper && this.settings.cinematics) this.startCinematic(z);
+        // Let the boss's light, gold and sparks settle (longer if a relic dropped) before the party heads for the stairs.
+        // Only for new depths: sweeping back through zones you've seen just changes the room.
+        else if (deeper && this.settings.cinematics && game.s.bestFloor <= ev.floor) this.hold = { zone: z, t: this.relicDropped ? 2.8 : 1.6 };
         else this.setBand(z);
         this.relicDropped = false;
         break;
@@ -1269,7 +1283,7 @@ export class Scene {
     c.t = 0;
     // Dress the stairwell in the new zone's tiles and light.
     const pal = corrupt(PALETTES[c.zone % PALETTES.length], Math.floor(c.zone / ZONES.length));
-    const theme = ZONES[c.zone % ZONES.length].tiles;
+    const theme = tilesFor(c.zone);
     const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : '';
     const a = this.atlas;
     const floors = theme === 'crypt' ? [a.rect('crypt_floor_1'), a.rect('crypt_floor_5')] : [a.rect(`${pre}floor_${pre ? 2 : 1}`), a.rect(`${pre}floor_3`)];
@@ -1289,12 +1303,12 @@ export class Scene {
     this.scene.add(well.group);
     if (this.room) this.room.visible = false;
     for (const p of this.party) p.body.visible = false;
-    // The walkers: up to five of your companions (or a lone squire).
-    const who = this.party.length ? this.party.slice(0, 5).map((p) => COMPS[p.comp].sprite) : ['knight_m'];
-    for (const sprite of who) {
-      const { run } = a.creature(sprite);
+    // The walkers: the whole party, two abreast (or a lone squire).
+    const who = this.party.length ? [...this.party].sort((x, y) => x.comp - y.comp).map((p) => COMPS[p.comp]) : [COMPS[0]];
+    for (const def of who) {
+      const { run } = a.creature(def.sprite);
       const w = new PixelSprite(a.texture, a.size, run, { fps: 10 });
-      w.mesh.scale.multiplyScalar(1.2);
+      w.mesh.scale.multiplyScalar(this.compScale(def) * 0.96);
       this.scene.add(w.mesh);
       c.walkers.push(w);
       const sh = blobShadow(0.9);
@@ -1352,19 +1366,26 @@ export class Scene {
       fade = Math.max(0, (c.t - 0.6) / 0.4);
       if (c.t >= 1) this.descend();
     } else if (c.phase === 'stairs') {
-      const dur = 3.6;
-      const lead = 1 + c.t * 5.4;
+      // Pairs file down the tower; the camera pans slower than they walk, so the whole column passes through view.
+      const pairs = Math.ceil(c.walkers.length / 2);
+      const gap = 1.05;
+      const walk = 5.4;
+      const pan = 3.2;
+      const tail = (pairs - 1) * gap;
+      const dur = Math.max(3.6, (tail + 3) / (walk - pan) + 0.6);
+      const lead = 1 + c.t * walk;
       c.walkers.forEach((w, i) => {
-        const at = lead - i * 1.25;
+        const side = i % 2;
+        const at = lead - Math.floor(i / 2) * gap - side * 0.4;
         const p = stairPoint(at);
-        w.mesh.position.set(p.x, p.y + Math.abs(Math.sin((c.t + i) * 11)) * 0.05, p.z + i * 0.02);
+        w.mesh.position.set(p.x, p.y + Math.abs(Math.sin((c.t + i) * 11)) * 0.05, p.z + 0.15 - side * 0.45);
         w.mesh.rotation.set(0, 0, 0);
         w.flip = stairPoint(at + 0.3).x < p.x;
-        c.shadows[i].position.set(p.x, p.y + 0.02, p.z);
+        c.shadows[i].position.set(p.x, p.y + 0.02, p.z + 0.15 - side * 0.45);
         w.update(dt);
       });
-      // Straight-on cutaway of the tower, panning down with the party.
-      const head = stairPoint(lead - 2);
+      // Straight-on cutaway of the tower, panning down with the column.
+      const head = stairPoint(Math.min(lead - 2, 1 + c.t * pan + Math.min(tail, 4)));
       const dist = this.camBase.z - this.look.z;
       const y = head.y + 1.2;
       this.camera.position.set(0, y + dist * 0.2, dist);

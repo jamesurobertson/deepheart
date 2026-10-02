@@ -1,6 +1,6 @@
 /**
  * Packs every sprite the game uses into one sheet: the 0x72 DungeonTileset II atlas plus
- * the CC0 add-on packs in assets-src (zone tilesets and the Enchanted Forest creatures).
+ * the CC0 add-on packs in assets-src (zone tilesets, Enchanted Forest and CR+ creatures, DevWizard's spells).
  *
  *   node scripts/build-atlas.ts
  *
@@ -194,6 +194,41 @@ for (const [zone, file] of [['jungle', 'omnibo_jungledungeon - copia.png'], ['to
       const kinds = f.anim === 'idle + walk' ? ['idle', 'run'] : f.anim === 'idle' ? ['idle'] : ['run'];
       for (const k of kinds) add(`${slug}_${k}_anim_f${f.n - 1}`, f.img, box.x, box.y, box.x2 - box.x, box.y2 - box.y);
     }
+  }
+}
+
+// CR+ characters (AnriTool, CC0): three groups of 16px-wide cells (castle, sea, snow), one character per row,
+// frames Idle1–4, Run1–4, Fall. Each character is cropped to the union of its frames so it stands still.
+{
+  const img = readPng(join(SRC, 'cr-tileset/Characters.png'));
+  const rows: [number, number][] = [[36, 64], [77, 96], [105, 128], [133, 160], [167, 192], [198, 224], [237, 256], [265, 288], [296, 320]];
+  const groups: [number, string[]][] = [
+    [0, ['purple_knight', 'crimson_wraith', 'plague_crow', 'gold_knight', 'king', 'gourd', 'skeleton', 'blue_wraith', 'wizard']],
+    [160, ['green_thief', 'pirate', 'pirate_captain', 'deckhand', 'skeleton_pirate', 'orc_pirate', 'slime']],
+    [320, ['beanie_kid', 'elf', 'frost_skeleton', 'frost_imp', 'santa', 'nutcracker', 'gingerbread', 'snowman', 'ice_ghost']],
+  ];
+  for (const [gx, names] of groups) {
+    names.forEach((name, r) => {
+      const [y0, y1] = rows[r];
+      let box: { x: number; y: number; x2: number; y2: number } | null = null;
+      for (let k = 0; k < 8; k++) {
+        const b = bbox(img, gx + k * 16, y0, 16, y1 - y0);
+        if (!b) continue;
+        const bx = b.x - (gx + k * 16);
+        box = box ? { x: Math.min(box.x, bx), y: Math.min(box.y, b.y), x2: Math.max(box.x2, bx + b.w), y2: Math.max(box.y2, b.y + b.h) } : { x: bx, y: b.y, x2: bx + b.w, y2: b.y + b.h };
+      }
+      if (!box) return;
+      for (let k = 0; k < 8; k++) add(`cr_${name}_${k < 4 ? 'idle' : 'run'}_anim_f${k % 4}`, img, gx + k * 16 + box.x, box.y, box.x2 - box.x, box.y2 - box.y);
+    });
+  }
+}
+
+// Pixel Art Spells (DevWizard, CC0): horizontal strips of 16px frames.
+{
+  const dir = join(SRC, 'pixelart-spells/Pixelart Spells/PNG Files');
+  for (const [file, name] of [['Fireball.png', 'fireball'], ['Darkness Bolt.png', 'darkness_bolt'], ['Magic Orb.png', 'magic_orb'], ['Ice Lance.png', 'ice_lance'], ['Light Bolt.png', 'light_bolt']]) {
+    const img = readPng(join(dir, file));
+    for (let k = 0; k < img.w / 16; k++) add(`spell_${name}_anim_f${k}`, img, k * 16, 0);
   }
 }
 

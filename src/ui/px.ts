@@ -24,11 +24,20 @@ export function sprite(name: string, scale = 2, cls = ''): string {
   return r ? cell(r, scale, cls) : '';
 }
 
-/** A sprite at the largest integer scale that fits a `box`-pixel square. */
+/** A sprite's visible pixels at the largest integer scale that fits a `box`-pixel square, so every icon fills its box alike. */
 export function spriteFit(name: string, box: number, cls = ''): string {
-  const r = rectFor(name);
-  if (!r) return '';
+  const full = rectFor(name);
+  if (!full) return '';
+  const r = atlas!.trimmed(full);
   return cell(r, Math.max(1, Math.floor(box / Math.max(r.w, r.h))), cls);
+}
+
+/** A character at a fixed on-screen height (fractional scale), so a roster of differently sized sprites lines up. */
+export function charFit(name: string, height: number, maxW = height * 1.2, cls = ''): string {
+  const full = rectFor(name);
+  if (!full) return '';
+  const r = atlas!.trimmed(full);
+  return cell(r, Math.min(height / r.h, maxW / r.w), cls);
 }
 
 /** Small hand-made pixel glyphs (drawn as SVG rects so they stay crisp). */

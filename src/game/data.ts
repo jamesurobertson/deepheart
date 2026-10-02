@@ -25,30 +25,49 @@ export interface CompDef {
   /** Needs this many descents before it can be hired. */
   depth: number;
   big?: boolean;
+  /** Needs this many awakenings of the Heart (the late recruits). */
+  heart?: number;
 }
 
-const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, depth = 0, big = false): CompDef =>
-  ({ id, name, sprite, cost, dps, attack, flavor, depth, big });
+const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, depth = 0, big = false, heart = 0): CompDef =>
+  ({ id, name, sprite, cost, dps, attack, flavor, depth, big, heart });
 
 /** Costs and damage follow the classic clicker curve: each companion ~5–8× the last. */
 export const COMPS: CompDef[] = [
+  // Plain adventurers first; the strange and the enormous come later, the Heart's recruits last of all.
   c('squire', 'Squire', 'knight_m', 10, 1, 'slash', 'Carries your bags. Occasionally hits things with them.'),
   c('ranger', 'Ranger', 'elf_f', 60, 5, 'arrow', 'Never misses. Well, rarely. Well, sometimes.'),
   c('brawler', 'Dwarf Brawler', 'dwarf_m', 300, 22, 'slash', 'Came for the gold. Stayed for the punching.'),
   c('apprentice', 'Apprentice', 'wizzard_m', 1_500, 74, 'bolt', 'Knows exactly one spell. It is lightning. It is enough.'),
   c('hunter', 'Lizard Hunter', 'lizard_m', 7_000, 245, 'arrow', 'Can smell a monster through three floors of stone.'),
   c('shieldmaiden', 'Shieldmaiden', 'knight_f', 35_000, 976, 'slash', 'Her shield has killed more monsters than her sword.'),
-  c('dancer', 'Blade Dancer', 'elf_m', 180_000, 3_725, 'slash', 'Fights like it is a performance. The monsters do not clap.'),
-  c('runesmith', 'Runesmith', 'dwarf_f', 1e6, 10_859, 'rune', 'Carves runes into the floor. The floor explodes.'),
-  c('stormcaller', 'Stormcaller', 'wizzard_f', 6e6, 47_143, 'storm', 'Brought her own weather. Down here, of all places.'),
-  c('venomblade', 'Venomblade', 'lizard_f', 4e7, 186_000, 'dark', 'Every blade is poisoned. Every single one. She has a lot.'),
-  c('doctor', 'Plague Doctor', 'doc', 3e8, 782_000, 'dark', 'Treats monsters with a strict regimen of dying.'),
-  c('hollow', 'Hollow Knight', 'pumpkin_dude', 2.5e9, 3.7e6, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.'),
-  c('angel', 'Fallen Angel', 'angel', 2e10, 1.63e7, 'fire', 'Fell from somewhere bright. Landed swinging.', 1),
-  c('necro', 'Turncoat Necromancer', 'necromancer', 1.8e11, 6.98e7, 'dark', 'Used to raise these monsters. Now it lowers them.', 2),
-  c('ogre', 'Tamed Ogre', 'ogre', 1.6e12, 4.6e8, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 3, true),
-  c('demon', 'Bound Demon', 'big_demon', 1.5e13, 3e9, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 4, true),
+  c('thief', 'Shadow Thief', 'cr_green_thief', 180_000, 3_725, 'arrow', 'Throws knives. Takes them back. Takes your purse too, then gives it back.'),
+  c('dancer', 'Blade Dancer', 'elf_m', 1e6, 10_859, 'slash', 'Fights like it is a performance. The monsters do not clap.'),
+  c('corsair', 'Corsair Captain', 'cr_pirate_captain', 6e6, 47_143, 'arrow', 'Sailed the underground sea. There is an underground sea. Do not ask.'),
+  c('runesmith', 'Runesmith', 'dwarf_f', 4e7, 186_000, 'rune', 'Carves runes into the floor. The floor explodes.'),
+  c('paladin', 'Paladin', 'cr_gold_knight', 3e8, 782_000, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
+  c('stormcaller', 'Stormcaller', 'wizzard_f', 2.5e9, 3.7e6, 'storm', 'Brought her own weather. Down here, of all places.'),
+  c('venomblade', 'Venomblade', 'lizard_f', 2e10, 1.63e7, 'dark', 'Every blade is poisoned. Every single one. She has a lot.', 1),
+  c('doctor', 'Plague Doctor', 'doc', 1.8e11, 6.98e7, 'dark', 'Treats monsters with a strict regimen of dying.', 2),
+  c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.6e12, 4.6e8, 'storm', 'Followed you home from the Frozen Vault. Will not leave. Brings its own blizzard.', 3),
+  c('hollow', 'Hollow Knight', 'pumpkin_dude', 1.5e13, 3e9, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.', 4),
+  // The Heart's recruits: one more answers every time you awaken it.
+  c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 1.4e14, 2e10, 'dark', 'Broke every vow but one: never stop swinging.', 4, false, 1),
+  c('archmage', 'Archmage', 'cr_wizard', 1.3e15, 1.3e11, 'bolt', 'Older than the dungeon. Insists the dungeon was smaller back then.', 4, false, 2),
+  c('wraith', 'Bound Wraith', 'cr_crimson_wraith', 1.2e16, 8.5e11, 'dark', 'The Heart sent it. It hums a song nobody taught it.', 4, false, 3),
+  c('necro', 'Turncoat Necromancer', 'necromancer', 1.1e17, 5.5e12, 'dark', 'Used to raise these monsters. Now it lowers them.', 4, false, 4),
+  c('king', 'Exiled King', 'cr_king', 1e18, 3.6e13, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 4, false, 5),
+  c('angel', 'Fallen Angel', 'angel', 9e18, 2.3e14, 'fire', 'Fell from somewhere bright. Landed swinging.', 4, false, 6),
+  c('ogre', 'Tamed Ogre', 'ogre', 8e19, 1.5e15, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 4, true, 7),
+  c('demon', 'Bound Demon', 'big_demon', 7e20, 1e16, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 4, true, 8),
 ];
+
+/** A companion's place in the roster, by id (so lists below don't break if the order changes). */
+export const compIndex = (id: string) => {
+  const i = COMPS.findIndex((x) => x.id === id);
+  if (i < 0) throw new Error(`no companion ${id}`);
+  return i;
+};
 
 // ---------- monsters and zones ----------
 
@@ -76,6 +95,8 @@ export interface ZoneDef {
   mid: MonsterDef;
   /** Guards floor 10: beat it to move on to the next zone. */
   boss: MonsterDef;
+  /** Newcomers that join the crowd once the zones come round again (CR+ characters). */
+  lap: MonsterDef[];
 }
 
 /**
@@ -87,41 +108,49 @@ export const ZONES: ZoneDef[] = [
     name: 'The Upper Halls', tiles: 'halls',
     band: [m('goblin', 'Goblin', 0.9), m('tiny_zombie', 'Rotling'), m('imp', 'Imp', 0.8), m('tiny_slug', 'Slug', 1.2), m('ef_bandit', 'Deserter')],
     mid: m('ef_bear', 'Cave Bear'), boss: m('ogre', 'Ogre Chieftain'),
+    lap: [m('cr_crimson_wraith', 'Crimson Wraith'), m('cr_plague_crow', 'Plague Crow', 0.9), m('cr_purple_knight', 'Fallen Knight', 1.2)],
   },
   {
     name: 'The Bone Crypts', tiles: 'crypt',
     band: [m('skelet', 'Skeleton'), m('tiny_zombie', 'Rotling'), m('skelet', 'Bone Archer', 0.9), m('necromancer', 'Grave Priest', 0.9)],
     mid: m('ef_golem', 'Bone Golem', 1, 0xd8d0c0), boss: m('necromancer', 'The Lich', 1, 0xb0a0ff),
+    lap: [m('cr_skeleton', 'Grave Walker'), m('cr_blue_wraith', 'Pale Wraith'), m('cr_frost_skeleton', 'Hooded Bones', 0.9, 0xd0c8ff)],
   },
   {
     name: 'The Overgrown Warrens', tiles: 'jungle',
     band: [m('orc_warrior', 'Orc Warrior', 1.2), m('orc_shaman', 'Orc Shaman', 0.9), m('ef_wolf', 'Dire Wolf'), m('ef_smallmushroom', 'Sporeling', 0.8), m('ef_normalmushroom', 'Mushroom Folk')],
     mid: m('ef_largemushroom', 'Elder Shroom'), boss: m('ef_troll', 'Troll Brute'),
+    lap: [m('cr_orc_pirate', 'Orc Raider', 1.2), m('cr_slime', 'Moss Slime', 0.8), m('cr_green_thief', 'Warren Thief')],
   },
   {
     name: 'The Sunken Tomb', tiles: 'tomb',
     band: [m('ef_gnollscout', 'Gnoll Scout', 0.9), m('ef_gnollbrute', 'Gnoll Brute', 1.2), m('ef_gnollshaman', 'Gnoll Shaman'), m('masked_orc', 'Tomb Raider')],
     mid: m('ef_gnolloverseer', 'Gnoll Overseer'), boss: m('ef_golem', 'Tomb Golem'),
+    lap: [m('cr_pirate', 'Drowned Pirate'), m('cr_pirate_captain', 'Drowned Captain', 1.2), m('cr_skeleton_pirate', 'Bone Corsair')],
   },
   {
     name: 'The Rotting Deep', tiles: 'crypt',
     band: [m('zombie', 'Zombie', 1.1), m('slug', 'Great Slug', 1.3), m('swampy', 'Bog Lurker', 1.2), m('muddy', 'Mudling', 1.1)],
     mid: m('ogre', 'Bloated Ogre', 1, 0xa0c070), boss: m('big_zombie', 'The Rotten King'),
+    lap: [m('cr_slime', 'Rot Slime', 1, 0xc0a0ff), m('cr_plague_crow', 'Carrion Crow'), m('cr_gourd', 'Rotten Gourd', 1.1, 0xc0d090)],
   },
   {
     name: 'The Enchanted Grove', tiles: 'jungle',
     band: [m('ef_centaur_m', 'Centaur'), m('ef_centaur_f', 'Centaur Archer', 0.9), m('ef_forestguardian', 'Grove Warden', 1.2), m('ef_wolf', 'Moon Wolf', 1, 0xc0c8ff)],
     mid: m('ef_bear', 'Grove Bear', 1, 0xd0ffd0), boss: m('ef_ent', 'The Elder Ent'),
+    lap: [m('cr_gourd', 'Gourd Knight', 1.1), m('cr_green_thief', 'Grove Bandit'), m('cr_wizard', 'Mad Hermit', 0.9)],
   },
   {
     name: 'The Demon Gate', tiles: 'halls',
     band: [m('chort', 'Chort'), m('wogol', 'Wogol', 1.1), m('imp', 'Imp', 0.8), m('masked_orc', 'Cultist', 1.2)],
     mid: m('ogre', 'Hellfire Ogre', 1, 0xff9070), boss: m('big_demon', 'Pit Lord'),
+    lap: [m('cr_gold_knight', 'Gilded Zealot', 1.2), m('cr_purple_knight', 'Fallen Knight', 1.2), m('cr_king', 'Damned King', 1.1)],
   },
   {
     name: 'The Frozen Vault', tiles: 'halls',
     band: [m('ice_zombie', 'Frost Husk', 1.2), m('skelet', 'Frozen Skeleton', 1, 0xb0e0ff), m('ef_wolf', 'Frost Wolf', 1, 0xd0f0ff), m('necromancer', 'Rime Witch', 0.9, 0xa0d8ff)],
     mid: m('ef_golem', 'Ice Golem', 1, 0xa8e0ff), boss: m('ef_troll', 'Frost Troll', 1, 0xa8d8ff),
+    lap: [m('cr_frost_imp', 'Frost Imp', 0.9), m('cr_snowman', 'Snow Brute', 1.2), m('cr_ice_ghost', 'Rime Ghost'), m('cr_nutcracker', 'Tin Soldier')],
   },
 ];
 
@@ -158,9 +187,24 @@ export function zoneName(floor: number): string {
   return `The ${corruptionOf(lap).name} ${base}${extra}`;
 }
 
+/** A zone's crowd: on later laps its newcomers push in alongside two of the originals. */
 export function bandFor(floor: number): MonsterDef[] {
-  return zoneFor(floor).band;
+  const z = zoneFor(floor);
+  return lapOf(floor) ? [...z.lap, ...z.band.slice(0, 2)] : z.band;
 }
+
+/** Each lap builds the zones from a different tileset, so a repeat zone is a new place, not a recolour. */
+const THEMES: Tiles[] = ['halls', 'crypt', 'jungle', 'tomb'];
+/** How far each lap shifts the tileset: the first repeat jumps furthest (dungeon stone ↔ jungle and desert). */
+const THEME_SHIFT = [0, 2, 1, 3];
+export function tilesFor(zone: number): Tiles {
+  const lap = Math.floor(zone / ZONES.length);
+  const base = ZONES[zone % ZONES.length].tiles;
+  return THEMES[(THEMES.indexOf(base) + THEME_SHIFT[lap % THEME_SHIFT.length]) % THEMES.length];
+}
+
+/** Treasure-laden pirates who fill the Goblin Vault. */
+export const HOARDERS: MonsterDef[] = [m('cr_pirate', 'Hoarder'), m('cr_deckhand', 'Hoarder'), m('cr_pirate_captain', 'Hoard Captain'), m('cr_skeleton_pirate', 'Bone Hoarder')];
 
 /** Floor 5 of a zone gets its mid-boss, floor 10 its zone boss. */
 export function bossFor(floor: number): MonsterDef {
@@ -234,10 +278,10 @@ const TONICS: [string, string][] = [
   ['Choir Ash', 'skull'], ['Witchglass', 'flask_big_blue'], ['Liquid Night', 'flask_big_green'], ['Oathbreaker Oil', 'flask_big_red'],
 ];
 
-const SYNERGIES: [number, number, string][] = [
-  [1, 4, 'Hunting Party'], [0, 5, 'Shield Wall'], [3, 8, 'Twin Storms'], [2, 7, 'Forge Brothers'],
-  [6, 9, 'Blades in the Dark'], [10, 13, 'Plague and Grave'], [11, 12, 'Burning Halo'], [14, 15, 'Bound Together'],
-];
+const SYNERGIES: [number, number, string][] = ([
+  ['ranger', 'hunter', 'Hunting Party'], ['squire', 'shieldmaiden', 'Shield Wall'], ['apprentice', 'stormcaller', 'Twin Storms'], ['brawler', 'runesmith', 'Forge Brothers'],
+  ['dancer', 'venomblade', 'Blades in the Dark'], ['doctor', 'necro', 'Plague and Grave'], ['hollow', 'angel', 'Burning Halo'], ['ogre', 'demon', 'Bound Together'],
+] as const).map(([a, b, name]) => [compIndex(a), compIndex(b), name]);
 
 const CRITS: [string, number, number, Effect][] = [
   ['Keen Eye', 5, 1_000, { t: 'crit', chance: 0.03 }],
@@ -618,19 +662,19 @@ export interface News {
 export const NEWS: News[] = [
   { text: 'The stairs go down. They always go down.', when: (s) => s.floor < 5 },
   { text: 'Somewhere far below, something is beating like a drum.', when: (s) => s.floor < 20 },
-  { text: 'Your Squire asks if the dungeon has a bottom. You do not answer.', when: (s) => s.owned[0] > 0 },
-  { text: 'The Ranger has started keeping a tally on the wall. The wall is full.', when: (s) => s.owned[1] > 10 },
-  { text: 'The dwarf insists on punching the bosses personally.', when: (s) => s.owned[2] > 0 },
-  { text: 'The Apprentice set his own beard on fire again. It still counts as damage.', when: (s) => s.owned[3] > 0 },
-  { text: 'The Lizard Hunter claims she can hear the dungeon breathing.', when: (s) => s.owned[4] > 0 },
-  { text: 'Shieldmaiden reports the shield is "fine". It is mostly dents now.', when: (s) => s.owned[5] > 0 },
-  { text: 'Stormcaller forecasts: lightning, with a chance of more lightning.', when: (s) => s.owned[8] > 0 },
-  { text: 'The Plague Doctor keeps taking notes on the monsters. And on you.', when: (s) => s.owned[10] > 0 },
-  { text: 'The Hollow Knight has not spoken once. Its pumpkin grinned wider today.', when: (s) => s.owned[11] > 0 },
-  { text: 'The angel will not say what it fell from. Only what it fell toward.', when: (s) => s.owned[12] > 0 },
-  { text: 'The Turncoat Necromancer apologises to each monster before it dies.', when: (s) => s.owned[13] > 0 },
-  { text: 'Pebble the ogre has adopted a slug. Nobody has the heart to tell him.', when: (s) => s.owned[14] > 0 },
-  { text: 'The demon keeps asking to renegotiate the contract.', when: (s) => s.owned[15] > 0 },
+  { text: 'Your Squire asks if the dungeon has a bottom. You do not answer.', when: (s) => s.owned[compIndex('squire')] > 0 },
+  { text: 'The Ranger has started keeping a tally on the wall. The wall is full.', when: (s) => s.owned[compIndex('ranger')] > 10 },
+  { text: 'The dwarf insists on punching the bosses personally.', when: (s) => s.owned[compIndex('brawler')] > 0 },
+  { text: 'The Apprentice set his own beard on fire again. It still counts as damage.', when: (s) => s.owned[compIndex('apprentice')] > 0 },
+  { text: 'The Lizard Hunter claims she can hear the dungeon breathing.', when: (s) => s.owned[compIndex('hunter')] > 0 },
+  { text: 'Shieldmaiden reports the shield is "fine". It is mostly dents now.', when: (s) => s.owned[compIndex('shieldmaiden')] > 0 },
+  { text: 'Stormcaller forecasts: lightning, with a chance of more lightning.', when: (s) => s.owned[compIndex('stormcaller')] > 0 },
+  { text: 'The Plague Doctor keeps taking notes on the monsters. And on you.', when: (s) => s.owned[compIndex('doctor')] > 0 },
+  { text: 'The Hollow Knight has not spoken once. Its pumpkin grinned wider today.', when: (s) => s.owned[compIndex('hollow')] > 0 },
+  { text: 'The angel will not say what it fell from. Only what it fell toward.', when: (s) => s.owned[compIndex('angel')] > 0 },
+  { text: 'The Turncoat Necromancer apologises to each monster before it dies.', when: (s) => s.owned[compIndex('necro')] > 0 },
+  { text: 'Pebble the ogre has adopted a slug. Nobody has the heart to tell him.', when: (s) => s.owned[compIndex('ogre')] > 0 },
+  { text: 'The demon keeps asking to renegotiate the contract.', when: (s) => s.owned[compIndex('demon')] > 0 },
   { text: 'A goblin was seen running off with a sack bigger than itself.', when: (s) => s.raids > 0 },
   { text: 'The goblins have started a union. It meets at the bottom of the dungeon.', when: (s) => s.raids > 10 },
   { text: 'Bards in the town above sing about you. The songs are getting darker.', when: (s) => s.kills > 1000 },

@@ -4,7 +4,7 @@ import { duration, fmt, setNotation } from '../game/format.ts';
 import { DESCEND_FLOOR, FLOOR_KILLS, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Scene } from '../render/scene.ts';
 import type { SfxName } from '../audio/sfx.ts';
-import { G, sprite, spriteFit } from './px.ts';
+import { G, charFit, sprite, spriteFit } from './px.ts';
 
 export interface UiHooks {
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
@@ -33,6 +33,10 @@ function icon(i: Icon, box = 36): string {
 }
 
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
+
+/** What it takes to meet a companion who hasn't joined yet. */
+const meetText = (def: { depth: number; heart?: number }, descents: number) =>
+  descents < def.depth ? `Descend ${def.depth}× to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
 
 /** A relic's stars, as little gold glyphs after its name. */
 const starsOf = (lv: number) => (relicStars(lv) ? ` <span class="stars">${'★'.repeat(relicStars(lv))}</span>` : '');
@@ -164,7 +168,7 @@ export class Ui {
       row.dataset.comp = String(i);
       row.dataset.tip = `comp:${i}`;
       row.innerHTML = `
-        <span class="gen-ico">${spriteFit(c.sprite, 48)}</span>
+        <span class="gen-ico">${charFit(c.sprite, 40)}</span>
         <span class="gen-mid"><b class="gen-name"></b><span class="gen-cost"></span></span>
         <span class="gen-right"><b class="gen-lv"></b><small class="gen-dps"></small></span>`;
       this.el.gens.appendChild(row);
@@ -942,7 +946,7 @@ export class Ui {
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
       row.querySelector('.gen-name')!.innerHTML = `${name}${q.n > 1 && !locked && !mystery ? ` <small>×${q.n}</small>` : ''}`;
-      row.querySelector('.gen-cost')!.innerHTML = locked ? `<span class="need">${G.lock()} Descend ${def.depth}× to meet them</span>` : gold(q.cost, can ? 'ok' : 'no');
+      row.querySelector('.gen-cost')!.innerHTML = locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.descents)}</span>` : gold(q.cost, can ? 'ok' : 'no');
       row.querySelector('.gen-lv')!.textContent = lv ? `Lv ${lv}` : '';
       row.querySelector('.gen-dps')!.textContent = lv ? `${fmt(g.compDps(i))} dps` : '';
     });
@@ -1046,12 +1050,12 @@ export class Ui {
     if (kind === 'comp') {
       const i = Number(id);
       const def = COMPS[i];
-      if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. Descend ${def.depth} time${def.depth > 1 ? 's' : ''} to meet them.</p>`;
+      if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. ${meetText(def, g.s.descents)}.</p>`;
       if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">A new companion is on their way. Earn more gold to meet them.</p>`;
       const q = g.compQuote(i);
       const next = g.compNext(i).times(q.n);
       const share = g.baseDps().gt(0) ? g.compDps(i).div(g.baseDps()).toNumber() : 0;
-      return `<div class="tt-h">${spriteFit(def.sprite, 32)}<b>${def.name}</b><span class="tt-own">level ${g.s.owned[i]}</span></div>
+      return `<div class="tt-h">${charFit(def.sprite, 30)}<b>${def.name}</b><span class="tt-own">level ${g.s.owned[i]}</span></div>
         <div class="tt-cost">${gold(q.cost, g.s.gold.gte(q.cost) ? 'ok' : 'no')}${q.n > 1 ? ` for ${q.n} levels` : ''}</div>
         <ul class="tt-l">
           ${g.s.owned[i] ? `<li>Deals <b>${fmt(g.compDps(i))}</b> damage/sec (${(share * 100).toFixed(1)}% of your party)</li>` : ''}
@@ -1199,7 +1203,7 @@ export class Ui {
           <p class="muted">The game saves itself every few seconds. Copy your save code to move it to another browser.</p>
           <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
           <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
-          <p class="credits muted">Art: 0x72 DungeonTileset II, Superdark, Omniboy, Zoltan Kosina, Niji · Sounds: Kenney · Music: Juhani Junkala, Memoraphile, Wolfgang_, Zane Little, The Art Bros, Jonathan So (all CC0)</p>
+          <p class="credits muted">Art: 0x72 DungeonTileset II, Superdark, Omniboy, Zoltan Kosina, Niji, AnriTool, DevWizard · Sounds: Kenney · Music: Juhani Junkala, Memoraphile, Wolfgang_, Zane Little, The Art Bros, Jonathan So (all CC0)</p>
         </div>`;
     }
     if (soft && html === this.modalKey) return;
@@ -1332,7 +1336,7 @@ export class Ui {
     const rows = COMPS.map((c, i) => {
       const lv = g.s.owned[i];
       if (!lv) return '';
-      return `<tr><th><span class="bd-comp">${spriteFit(c.sprite, 24)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(p.tier[i])}</td><td>${x(p.syn[i])}</td><td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? g.compDps(i).div(total).times(100).toNumber().toFixed(1) : 0}%</td></tr>`;
+      return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(p.tier[i])}</td><td>${x(p.syn[i])}</td><td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? g.compDps(i).div(total).times(100).toNumber().toFixed(1) : 0}%</td></tr>`;
     }).join('');
     return `<p class="muted bd-help">Each companion: level × base damage × tier upgrades × synergies, then every all-damage bonus (${x(b.all.times(p.banner))} right now) on top.</p>
       <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Tiers</td><td>Synergy</td><td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
@@ -1399,7 +1403,7 @@ export class Ui {
       return `<button class="rel ${on ? 'on' : ''}" data-relic="${d.id}" data-tip="rel:${d.id}" style="--rc:${RARITY_COLORS[d.rarity]}">
         ${spriteFit(d.icon, 32)}<b>${esc(d.name)}${starsOf(lv)}</b><small>Level ${lv}${on ? ' · equipped' : ''}</small></button>`;
     }).join('');
-    const counters = MODS.map((m) => `<li>${modChips([m.id])} ${esc(m.desc)} <span class="muted">Answer: ${esc(RELIC_BY_ID.get(m.counter)!.name)}</span></li>`).join('');
+    const counters = MODS.map((m) => `<li>${modChips([m.id])} ${esc(m.desc)}</li>`).join('');
     return `<div class="slots">${slots}</div>
       <p class="muted rel-help">Bosses drop relics: a quarter of zone bosses, some mid-bosses, and always the first time you beat a zone boss this deep. Finding one again levels it up. Tap a relic to slot it in or out.</p>
       <div class="rel-grid">${cards}</div>
@@ -1437,6 +1441,7 @@ export class Ui {
         <p>Your souls (<b>${G.soul()} ${fmt(g.s.souls)}</b>) and abyss powers${g.heartLv('echo') ? ' (except the cheap ones)' : ''} are given to the Heart, along with this descent.</p>
         <p>You gain <b>${G.heart()} ${fmt(g.pendingStones())} heartstones</b> to spend on Heart powers, forever.</p>
         <p class="muted">Relics, trophies, heartstones and the companions you've met all stay.</p>
+        ${COMPS.some((c) => c.heart === g.s.awakens + 1) ? `<p class="omen">Someone new will answer the Heart…</p>` : ''}
         <div class="set-row"><button class="btn" data-act="heartBack">Not yet</button><button class="btn primary big" data-act="awakenGo">Awaken</button></div>
       </div>`;
   }
