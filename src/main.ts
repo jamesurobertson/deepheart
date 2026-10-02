@@ -119,7 +119,7 @@ async function boot() {
     }
     const o = game.applyOffline(seconds);
     game.events.length = 0;
-    if (o.gold > 0) ui.showOffline(o);
+    if (o.gold.gt(0)) ui.showOffline(o);
     save();
   };
   if (saved) {

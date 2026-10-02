@@ -22,6 +22,7 @@ The project is built with:
 - three.js
 - TypeScript
 - Vite
+- break_infinity.js (gold, damage and costs go far past 1e308)
 
 `node scripts/balance.ts 8 5 30 0.3` runs a headless pacing sim (hours, clicks/sec, active minutes, descend ratio).
 `npm run pace` simulates active, casual and idle players for 8 hours and fails if the game goes quiet for too long, the first descent pays too little, or replaying a run isn't clearly faster.

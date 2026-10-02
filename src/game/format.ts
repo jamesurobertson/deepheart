@@ -1,3 +1,5 @@
+import Decimal from 'break_infinity.js';
+
 const SUFFIXES = [
   '', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc',
   'UDc', 'DDc', 'TDc', 'QaDc', 'QiDc', 'SxDc', 'SpDc', 'OcDc', 'NoDc', 'Vg',
@@ -14,8 +16,19 @@ export function setNotation(n: 'short' | 'sci') {
   notation = n;
 }
 
+/** Past this, a Decimal is shown from its own mantissa and exponent rather than converted to a number. */
+const HUGE = 1e300;
+
+/** A Decimal's mantissa isn't exact in binary, so 123456789 can come back as 123456788.99999999: snap it. */
+const snap = (n: number) => (Math.abs(n - Math.round(n)) < 1e-6 * Math.max(1, Math.abs(n)) ? Math.round(n) : n);
+
+/** "1.23e450" for numbers too big for a plain float. */
+const sciOf = (d: Decimal, digits: number) => `${d.mantissa.toFixed(digits)}e${d.exponent}`;
+
 /** Human-friendly big number: 1234 -> 1.23K, past the suffix list -> 1.23e99. */
-export function fmt(n: number): string {
+export function fmt(value: number | Decimal): string {
+  if (value instanceof Decimal) return value.abs().lt(HUGE) ? fmt(snap(value.toNumber())) : (value.lt(0) ? '-' : '') + sciOf(value.abs(), 2);
+  const n = value;
   if (!Number.isFinite(n)) return '∞';
   if (n < 0) return '-' + fmt(-n);
   if (n < 1000) return n < 10 && n % 1 !== 0 ? (Math.floor(n * 10) / 10).toFixed(1) : Math.floor(n).toString();
@@ -29,7 +42,9 @@ export function fmt(n: number): string {
 }
 
 /** Big number with the unit spelled out, for the main counter: "1.234 million". */
-export function fmtLong(n: number): { value: string; unit: string } {
+export function fmtLong(value: number | Decimal): { value: string; unit: string } {
+  if (value instanceof Decimal) return value.lt(HUGE) ? fmtLong(snap(value.toNumber())) : { value: sciOf(value, 3), unit: '' };
+  const n = value;
   if (!Number.isFinite(n)) return { value: '∞', unit: '' };
   if (n < 1e6) return { value: Math.floor(n).toLocaleString('en-US'), unit: '' };
   const tier = Math.floor(Math.log10(n) / 3);

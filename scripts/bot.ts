@@ -2,6 +2,7 @@
  * A simulated player for the headless pacing tools: clicks for a while, buys whatever adds the most damage per gold,
  * slots the best relics, and prestiges once it stops making progress.
  */
+import Decimal from 'break_infinity.js';
 import { Game, newSave, type GameEvent } from '../src/game/game.ts';
 import { COMPS, HEART } from '../src/game/data.ts';
 
@@ -162,20 +163,21 @@ export class Sim {
 
   private power() {
     const { game } = this;
-    return game.baseDps() + game.clickDamage() * (this.active ? this.profile.cps : 0);
+    return game.baseDps().plus(game.clickDamage().times(this.active ? this.profile.cps : 0));
   }
 
   private shop() {
     const { game } = this;
     for (let k = 0; k < 100; k++) {
-      let best: { buy: () => boolean; cost: number; score: number } | null = null;
+      // Scores are log10(gold per damage), so absurdly big numbers still compare.
+      let best: { buy: () => boolean; cost: Decimal; score: number } | null = null;
       const p = this.power();
       for (let i = 0; i < COMPS.length; i++) {
         if (!game.compUnlocked(i) || i > game.s.revealed) continue;
         const cost = game.compCost(i);
         const gain = game.compNext(i);
-        if (gain <= 0) continue;
-        const score = cost / gain;
+        if (gain.lte(0)) continue;
+        const score = cost.div(gain).log10();
         if (!best || score < best.score) {
           best = {
             buy: () => {
@@ -190,16 +192,16 @@ export class Sim {
         }
       }
       for (const u of game.shopUpgrades()) {
-        const cost = game.upgCost(u);
+        const cost = new Decimal(game.upgCost(u));
         const e = u.effect;
-        let gain = p * 0.05;
+        let gain = p.times(0.05);
         if (e.t === 'comp') gain = game.compDps(e.comp);
-        else if (e.t === 'click') gain = this.active ? game.clickDamage() * this.profile.cps : 0.001;
-        else if (e.t === 'global') gain = p * e.pct;
-        const score = cost / Math.max(gain, 1e-9);
+        else if (e.t === 'click') gain = this.active ? game.clickDamage().times(this.profile.cps) : new Decimal(0.001);
+        else if (e.t === 'global') gain = p.times(e.pct);
+        const score = cost.div(Decimal.max(gain, 1e-9)).log10();
         if (!best || score < best.score) best = { buy: () => game.buyUpg(u.id), cost, score };
       }
-      if (!best || best.cost > game.s.gold) return;
+      if (!best || best.cost.gt(game.s.gold)) return;
       best.buy();
     }
   }

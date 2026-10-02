@@ -542,7 +542,7 @@ export class Scene {
           moving = true;
         }
         c.cd -= dt * haste;
-        if (c.cd <= 0 && targets.length && game.dps() > 0) {
+        if (c.cd <= 0 && targets.length && game.dps().gt(0)) {
           const t = Math.random() < 0.6 && focus ? focus : targets[Math.floor(Math.random() * targets.length)];
           c.act = def.attack === 'slash' ? { kind: 'slash', phase: 'dash', t: 0, target: t.id } : { kind: def.attack, phase: 'windup', t: 0.14, target: t.id };
         }

@@ -1,3 +1,4 @@
+import Decimal from 'break_infinity.js';
 import {
   ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
@@ -98,9 +99,10 @@ export interface Settings {
 
 export interface SaveState {
   v: number;
-  gold: number;
-  runGold: number;
-  totalGold: number;
+  /** Gold, damage and costs outgrow ordinary numbers deep down, so they're Decimals (saved as strings). */
+  gold: Decimal;
+  runGold: Decimal;
+  totalGold: Decimal;
   kills: number;
   bosses: number;
   clicks: number;
@@ -132,9 +134,9 @@ export interface SaveState {
   /** Move on as soon as a floor is cleared. */
   auto: boolean;
   /** Damage when a boss last beat you: auto retries once you're 50% stronger. */
-  failDps: number;
+  failDps: Decimal;
   revealed: number;
-  bestDps: number;
+  bestDps: Decimal;
   playTime: number;
   runTime: number;
   startedAt: number;
@@ -162,11 +164,11 @@ export interface SaveState {
 
 export function newSave(): SaveState {
   return {
-    v: SAVE_VERSION, gold: 0, runGold: 0, totalGold: 0, kills: 0, bosses: 0, clicks: 0, crits: 0,
+    v: SAVE_VERSION, gold: new Decimal(0), runGold: new Decimal(0), totalGold: new Decimal(0), kills: 0, bosses: 0, clicks: 0, crits: 0,
     owned: COMPS.map(() => 0), upgrades: [], abyss: [], trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
-    floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: 0, revealed: 0,
-    bestDps: 0, playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
+    floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
+    bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
     relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rampage: 0, cycleBest: 0,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoBuy: true },
   };
@@ -175,8 +177,8 @@ export function newSave(): SaveState {
 export interface Monster {
   id: number;
   def: MonsterDef;
-  hp: number;
-  max: number;
+  hp: Decimal;
+  max: Decimal;
   boss: boolean;
   /** Where it stands in the chamber (world units). */
   x: number;
@@ -196,14 +198,14 @@ export interface Monster {
 export type HitKind = 'click' | 'crit' | 'dps' | 'cleave' | 'auto' | 'fever';
 
 export type GameEvent =
-  | { t: 'hit'; id: number; amount: number; kind: HitKind; x?: number; y?: number }
+  | { t: 'hit'; id: number; amount: Decimal; kind: HitKind; x?: number; y?: number }
   | { t: 'click'; crit: boolean; x: number; y: number }
   | { t: 'spawn'; id: number }
-  | { t: 'kill'; id: number; gold: number; boss: boolean; by: HitKind; champ?: boolean }
+  | { t: 'kill'; id: number; gold: Decimal; boss: boolean; by: HitKind; champ?: boolean }
   | { t: 'floor'; floor: number; boss: boolean }
-  | { t: 'sweep'; floor: number; gold: number }
+  | { t: 'sweep'; floor: number; gold: Decimal }
   | { t: 'bossFail'; floor: number }
-  | { t: 'bossWin'; floor: number; clutch?: { left: number; gold: number } }
+  | { t: 'bossWin'; floor: number; clutch?: { left: number; gold: Decimal } }
   | { t: 'souls'; id: number; floor: number; souls: number }
   | { t: 'retreat'; floor: number }
   | { t: 'buyComp'; comp: number; n: number }
@@ -212,15 +214,15 @@ export type GameEvent =
   | { t: 'trophy'; id: string }
   | { t: 'raidSpawn'; id: number; from: -1 | 1; rainbow: boolean }
   | { t: 'rampage'; tier: number; click: number }
-  | { t: 'vault'; on: boolean; gold: number }
-  | { t: 'raidCatch'; id: number; reward: RaidReward; amount?: number; buff?: Buff }
+  | { t: 'vault'; on: boolean; gold: Decimal }
+  | { t: 'raidCatch'; id: number; reward: RaidReward; amount?: Decimal; buff?: Buff }
   | { t: 'raidEscape'; id: number }
   | { t: 'fever'; on: boolean }
   | { t: 'descend'; souls: number }
   | { t: 'abyss'; id: string }
   | { t: 'relic'; id: string; lv: number; floor: number; equipped: boolean; star: number }
   | { t: 'split'; id: number; into: [number, number] }
-  | { t: 'heal'; id: number; amount: number }
+  | { t: 'heal'; id: number; amount: Decimal }
   | { t: 'awaken'; stones: number }
   | { t: 'heart'; id: string; lv: number };
 
@@ -236,7 +238,7 @@ export interface Parts {
   trophies: number;
   souls: number;
   shard: number;
-  fury: number;
+  fury: Decimal;
   banner: number;
   clickDps: number;
   clickDpsUpg: number;
@@ -254,14 +256,14 @@ export interface Parts {
 }
 
 interface Computed {
-  dps: number;
-  perComp: number[];
+  dps: Decimal;
+  perComp: Decimal[];
   /** Per companion before the all-damage bonuses. */
   baseComp: number[];
   parts: Parts;
   /** Product of the all-damage bonuses (upgrades, trophies, souls, shard, fury). */
-  all: number;
-  click: number;
+  all: Decimal;
+  click: Decimal;
   crit: number;
   critMult: number;
   cleave: number;
@@ -279,7 +281,7 @@ export interface Raid {
 
 export interface OfflineSummary {
   seconds: number;
-  gold: number;
+  gold: Decimal;
   kills: number;
   /** Share of full speed: 1 when the tab stayed open, the offline rate when it was closed. */
   pct: number;
@@ -288,13 +290,13 @@ export interface OfflineSummary {
 }
 
 /** Health of an ordinary monster on a floor (the classic clicker curve). */
-export function floorHp(f: number): number {
-  if (f <= 140) return 10 * (f - 1 + 1.55 ** (f - 1));
-  return floorHp(140) * TUNE.deepHp ** (f - 140);
+export function floorHp(f: number): Decimal {
+  if (f <= 140) return new Decimal(10 * (f - 1 + 1.55 ** (f - 1)));
+  return floorHp(140).times(Decimal.pow(TUNE.deepHp, f - 140));
 }
 
-export function floorGold(f: number): number {
-  return Math.max(1, Math.ceil(floorHp(f) / 15));
+export function floorGold(f: number): Decimal {
+  return Decimal.max(1, floorHp(f).div(15).ceil());
 }
 
 export const isBossFloor = (f: number) => f % BOSS_EVERY === 0;
@@ -320,7 +322,7 @@ export class Game {
   /** The floor's monsters wait here while the Goblin Vault is open. */
   private stash: Monster[] = [];
   private vaultOn = false;
-  private vaultGold = 0;
+  private vaultGold = new Decimal(0);
   /** Seconds since the last kill: too long and your party falls back a floor. */
   private stuckT = 0;
   private owned = new Set<string>();
@@ -331,8 +333,8 @@ export class Game {
   private autoClick = 0;
   private sinceClick = 99;
   /** DPS damage waiting to be shown as numbers, per monster. */
-  private dpsShown = new Map<number, number>();
-  private healShown = new Map<number, number>();
+  private dpsShown = new Map<number, Decimal>();
+  private healShown = new Map<number, Decimal>();
   private shopT = 0;
   private dpsFlush = 0;
   /** Recent kills per second, smoothed, for the stats. */
@@ -350,6 +352,8 @@ export class Game {
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
+    // Saved as plain numbers (older saves) or strings (Decimal's JSON form).
+    for (const k of ['gold', 'runGold', 'totalGold', 'failDps', 'bestDps'] as const) s[k] = new Decimal(s[k] ?? 0);
     while (s.owned.length < COMPS.length) s.owned.push(0);
     this.owned = new Set(s.upgrades);
     this.abyssSet = new Set(s.abyss);
@@ -462,7 +466,7 @@ export class Game {
       trophies: this.trophyMult(),
       souls: this.soulMult(),
       shard: 1 + this.relic('all'),
-      fury: TUNE.fury ** this.heartLv('fury'),
+      fury: Decimal.pow(TUNE.fury, this.heartLv('fury')),
       banner: 1 + 0.5 * this.relic('party'),
       clickDps: CLICK_DPS + clickDpsUpg + 0.1 * this.relic('oath'),
       clickDpsUpg, oath: 0.1 * this.relic('oath'),
@@ -471,11 +475,11 @@ export class Game {
       cleaveUpg, cleaveRelic: 0.2 * this.relic('cleave'),
       goldUpg: 1 + gold, goldRelic: 1 + 0.5 * this.relic('gold'),
     };
-    const all = parts.upgrades * parts.trophies * parts.souls * parts.shard * parts.fury;
+    const all = parts.fury.times(parts.upgrades * parts.trophies * parts.souls * parts.shard);
     const baseComp = COMPS.map((c, i) => c.dps * s.owned[i] * tier[i] * syn[i]);
-    const perComp = baseComp.map((b) => b * all * parts.banner);
-    const dps = perComp.reduce((a, b) => a + b, 0);
-    const click = twin * whet * blades * all + dps * parts.clickDps;
+    const perComp = baseComp.map((b) => all.times(b * parts.banner));
+    const dps = perComp.reduce((a, b) => a.plus(b), new Decimal(0));
+    const click = all.times(twin * whet * blades).plus(dps.times(parts.clickDps));
     this.cache = {
       dps, perComp, baseComp, parts, all, click,
       crit: parts.critBase + parts.critUpg + parts.critRelic,
@@ -505,7 +509,7 @@ export class Game {
   }
 
   dps() {
-    return this.c.dps * this.buffMult('dps');
+    return this.c.dps.times(this.buffMult('dps'));
   }
 
   compDps(i: number) {
@@ -515,11 +519,11 @@ export class Game {
   /** Damage one more level of this companion would add (before buffs). A companion's damage is linear in its own level. */
   compNext(i: number) {
     const c = this.c;
-    return COMPS[i].dps * c.parts.tier[i] * c.parts.syn[i] * c.all * c.parts.banner;
+    return c.all.times(COMPS[i].dps * c.parts.tier[i] * c.parts.syn[i] * c.parts.banner);
   }
 
   clickDamage() {
-    return this.c.click * this.buffMult('click');
+    return this.c.click.times(this.buffMult('click'));
   }
 
   critChance() {
@@ -550,7 +554,7 @@ export class Game {
 
   monsterGold(m: Monster) {
     const k = m.boss ? 8 : TRASH * (m.champ ? CHAMP_GOLD : m.vault ? VAULT_GOLD : 1);
-    return Math.ceil(Math.max(1, floorGold(this.s.floor) * k) * this.goldMult());
+    return Decimal.max(1, floorGold(this.s.floor).times(k)).times(this.goldMult()).ceil();
   }
 
   // ---------- costs ----------
@@ -561,14 +565,15 @@ export class Game {
 
   compCost(i: number, n = 1) {
     const k = this.s.owned[i];
-    return Math.ceil(this.compBase(i) * COST_GROWTH ** k * (COST_GROWTH ** n - 1) / (COST_GROWTH - 1));
+    return Decimal.pow(COST_GROWTH, k).times(Decimal.pow(COST_GROWTH, n).minus(1)).times(this.compBase(i) / (COST_GROWTH - 1)).ceil();
   }
 
-  compQuote(i: number): { n: number; cost: number } {
+  compQuote(i: number): { n: number; cost: Decimal } {
     const mode = this.s.settings.buyMode;
     if (mode > 0) return { n: mode, cost: this.compCost(i, mode) };
-    const base = this.compBase(i) * COST_GROWTH ** this.s.owned[i];
-    const n = Math.max(1, Math.floor(Math.log(this.s.gold * (COST_GROWTH - 1) / base + 1) / Math.log(COST_GROWTH)));
+    const base = Decimal.pow(COST_GROWTH, this.s.owned[i]).times(this.compBase(i));
+    // Most levels affordable: solve base × (g^n − 1) / (g − 1) ≤ gold for n.
+    const n = Math.max(1, Math.floor(this.s.gold.times(COST_GROWTH - 1).div(base).plus(1).log10() / Math.log10(COST_GROWTH)));
     return { n, cost: this.compCost(i, n) };
   }
 
@@ -635,14 +640,14 @@ export class Game {
     const band = bandFor(this.s.floor);
     const def = band[Math.floor(Math.random() * band.length)];
     const champ = this.s.floor > 2 && Math.random() < CHAMP_CHANCE;
-    const hp = floorHp(this.s.floor) * def.hp * TRASH * (champ ? CHAMP_HP : 1);
+    const hp = floorHp(this.s.floor).times(def.hp * TRASH * (champ ? CHAMP_HP : 1));
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.7, mods: [], champ, ...this.spot(false) };
     this.monsters.push(m);
     this.events.push({ t: 'spawn', id: m.id });
   }
 
   private spawnHoarder() {
-    const hp = Math.max(floorHp(this.s.floor) * TRASH * 0.25, this.dps() * VAULT_HP);
+    const hp = Decimal.max(floorHp(this.s.floor).times(TRASH * 0.25), this.dps().times(VAULT_HP));
     const m: Monster = { id: this.seq++, def: HOARDER, hp, max: hp, boss: false, arrive: 0.4, mods: [], vault: true, ...this.spot(false) };
     this.monsters.push(m);
     this.events.push({ t: 'spawn', id: m.id });
@@ -658,13 +663,13 @@ export class Game {
       open.dur += VAULT_TIME;
       return;
     }
-    this.vaultGold = 0;
+    this.vaultGold = new Decimal(0);
     this.stash = this.monsters;
     this.monsters = [];
     this.spawnT = 0;
     this.addBuff({ id: 'vault', name: 'Goblin Vault', t: VAULT_TIME, dur: VAULT_TIME, dps: 1, click: 1, gold: 1 });
     this.vaultOn = true;
-    this.events.push({ t: 'vault', on: true, gold: 0 });
+    this.events.push({ t: 'vault', on: true, gold: new Decimal(0) });
   }
 
   private closeVault() {
@@ -689,7 +694,7 @@ export class Game {
     // Zone bosses from floor 30 on are the walls; the first two just teach you what a boss is.
     const zone = this.s.floor % 10 === 0 && this.s.floor >= DESCEND_FLOOR ? TUNE.zoneBoss : 1;
     const first = this.s.floor <= 10 ? 0.5 : 1;
-    const hp = floorHp(this.s.floor) * 8 * zone * first * (giant ? 1 + 2 * bite : 1);
+    const hp = floorHp(this.s.floor).times(8 * zone * first * (giant ? 1 + 2 * bite : 1));
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, ...this.spot(true) };
     this.monsters.push(m);
     let time = (this.hasAbyss('patience') ? 45 : BOSS_TIME) + Math.min(30, 3 * this.relic('time'));
@@ -715,23 +720,23 @@ export class Game {
   }
 
   /** Damage a monster; returns overflow past its death. */
-  private damage(m: Monster, amount: number, kind: HitKind, x?: number, y?: number): number {
+  private damage(m: Monster, amount: Decimal, kind: HitKind, x?: number, y?: number): Decimal {
     if (m.boss) {
-      amount *= 1 + this.relic('boss');
+      amount = amount.times(1 + this.relic('boss'));
       if (kind === 'dps' && m.mods.includes('armored')) {
         // Overkill passed on from a dead monster keeps its full value; only the boss's share is cut.
-        amount *= 1 - this.armor();
+        amount = amount.times(1 - this.armor());
       }
     }
-    const dealt = Math.min(m.hp, amount);
-    m.hp -= amount;
-    if (kind === 'dps') this.dpsShown.set(m.id, (this.dpsShown.get(m.id) ?? 0) + dealt);
+    const dealt = Decimal.min(m.hp, amount);
+    m.hp = m.hp.minus(amount);
+    if (kind === 'dps') this.dpsShown.set(m.id, (this.dpsShown.get(m.id) ?? new Decimal(0)).plus(dealt));
     else this.events.push({ t: 'hit', id: m.id, amount, kind, x, y });
-    if (m.hp <= 0) {
+    if (m.hp.lte(0)) {
       this.kill(m, kind);
-      return -m.hp;
+      return m.hp.neg();
     }
-    return 0;
+    return new Decimal(0);
   }
 
   private kill(m: Monster, by: HitKind) {
@@ -751,7 +756,7 @@ export class Game {
     if (m.champ) this.s.champions++;
     this.events.push({ t: 'kill', id: m.id, gold, boss: m.boss, by, champ: m.champ });
     if (m.vault) {
-      this.vaultGold += gold;
+      this.vaultGold = this.vaultGold.plus(gold);
       return;
     }
     if (m.boss && m.mods.includes('split') && !m.half) {
@@ -759,7 +764,7 @@ export class Game {
       const frac = 0.5 * this.modBite() + 0.25 * (1 - this.modBite());
       const mods = m.mods.filter((x) => x !== 'split');
       const halves = [-1, 1].map((side): Monster => ({
-        id: this.seq++, def: m.def, hp: m.max * frac, max: m.max * frac, boss: true, half: true, arrive: 0.4, mods,
+        id: this.seq++, def: m.def, hp: m.max.times(frac), max: m.max.times(frac), boss: true, half: true, arrive: 0.4, mods,
         x: m.x + side * 1.1, z: m.z - side * 1,
       }));
       this.monsters.push(...halves);
@@ -770,9 +775,9 @@ export class Game {
     if (m.boss && this.monsters.some((x) => x.boss)) return;
     if (m.boss) {
       this.s.bosses++;
-      let clutch: { left: number; gold: number } | undefined;
+      let clutch: { left: number; gold: Decimal } | undefined;
       if (this.bossTime > 0 && this.bossTime <= CLUTCH_SECONDS) {
-        const bonus = gold * (CLUTCH_GOLD - 1);
+        const bonus = gold.times(CLUTCH_GOLD - 1);
         this.earn(bonus);
         this.s.clutches++;
         clutch = { left: this.bossTime, gold: bonus };
@@ -801,7 +806,7 @@ export class Game {
   private canSweep() {
     if (this.bossFloor() || this.s.floorKills >= FLOOR_KILLS) return false;
     const toughest = Math.max(...bandFor(this.s.floor).map((d) => d.hp));
-    return this.dps() * SWEEP_SECONDS >= this.floorLeft() * floorHp(this.s.floor) * toughest * TRASH;
+    return this.dps().times(SWEEP_SECONDS).gte(floorHp(this.s.floor).times(this.floorLeft() * toughest * TRASH));
   }
 
   /** Clear the floor in one go: monsters on the field die as usual, the rest are paid out as if they had. */
@@ -815,7 +820,7 @@ export class Game {
     }
     if (s.floor !== floor || s.floorKills >= FLOOR_KILLS) return;
     const left = FLOOR_KILLS - s.floorKills;
-    const gold = left * Math.ceil(Math.max(1, floorGold(floor) * TRASH) * this.goldMult());
+    const gold = Decimal.max(1, floorGold(floor).times(TRASH)).times(this.goldMult()).ceil().times(left);
     this.earn(gold);
     s.kills += left;
     this.killAcc += left;
@@ -843,14 +848,14 @@ export class Game {
   /** Click a monster (or, if it's gone, whatever's in front). `x, y` are screen coords for numbers. */
   click(id: number | null, x: number, y: number, auto = false) {
     const target = (id !== null ? this.monster(id) : undefined) ?? this.focus();
-    if (!target) return 0;
+    if (!target) return new Decimal(0);
     const crit = !auto && Math.random() < this.critChance();
     const fever = this.s.buffs.some((b) => b.id === 'fever');
-    let amount = this.clickDamage() * (crit ? this.critMult() : 1);
-    if (fever) amount *= this.feverMult();
+    let amount = this.clickDamage().times(crit ? this.critMult() : 1);
+    if (fever) amount = amount.times(this.feverMult());
     const others = this.cleave() > 0 ? this.monsters.filter((m) => m !== target) : [];
     this.damage(target, amount, auto ? 'auto' : crit ? 'crit' : fever ? 'fever' : 'click', x, y);
-    for (const m of others) if (this.monsters.includes(m)) this.damage(m, amount * this.cleave(), 'cleave');
+    for (const m of others) if (this.monsters.includes(m)) this.damage(m, amount.times(this.cleave()), 'cleave');
     if (!auto) {
       this.s.clicks++;
       if (crit) this.s.crits++;
@@ -907,8 +912,8 @@ export class Game {
   buyComp(i: number) {
     if (!this.compUnlocked(i)) return false;
     const { n, cost } = this.compQuote(i);
-    if (this.s.gold < cost) return false;
-    this.s.gold -= cost;
+    if (this.s.gold.lt(cost)) return false;
+    this.s.gold = this.s.gold.minus(cost);
     this.s.owned[i] += n;
     this.invalidate();
     this.events.push({ t: 'buyComp', comp: i, n });
@@ -919,8 +924,8 @@ export class Game {
     const u = UPG_BY_ID.get(id);
     if (!u || this.owned.has(id)) return false;
     const cost = this.upgCost(u);
-    if (this.s.gold < cost) return false;
-    this.s.gold -= cost;
+    if (this.s.gold.lt(cost)) return false;
+    this.s.gold = this.s.gold.minus(cost);
     this.s.upgrades.push(id);
     this.owned.add(id);
     this.invalidate();
@@ -969,7 +974,7 @@ export class Game {
     const ev: GameEvent = { t: 'raidCatch', id: r.id, reward };
     if (reward === 'plunder') {
       // One to two floors' worth of kills: a nice haul, not a reason to stop playing and wait for goblins.
-      const amount = floorGold(this.s.floor) * this.goldMult() * (10 + Math.random() * 10);
+      const amount = floorGold(this.s.floor).times(this.goldMult() * (10 + Math.random() * 10));
       this.earn(amount);
       ev.amount = amount;
     } else {
@@ -1067,8 +1072,8 @@ export class Game {
   /** Back to the top: gold, companions and upgrades go; souls, relics and trophies stay. */
   private resetRun() {
     const s = this.s;
-    s.gold = 0;
-    s.runGold = 0;
+    s.gold = new Decimal(0);
+    s.runGold = new Decimal(0);
     s.owned = COMPS.map(() => 0);
     s.upgrades = [];
     s.buffs = [];
@@ -1078,7 +1083,7 @@ export class Game {
     this.rampageTier = 0;
     s.revealed = 0;
     s.runTime = 0;
-    s.failDps = 0;
+    s.failDps = new Decimal(0);
     s.auto = true;
     this.owned.clear();
     this.raid = null;
@@ -1237,14 +1242,15 @@ export class Game {
       for (let i = 0; i < COMPS.length; i++) {
         if (!this.compUnlocked(i) || i > this.s.revealed) continue;
         const gain = this.compNext(i);
-        if (gain <= 0) continue;
-        const score = this.compCost(i) / gain;
+        if (gain.lte(0)) continue;
+        // Gold per point of damage, compared as a power of ten so huge numbers stay comparable.
+        const score = this.compCost(i).div(gain).log10();
         if (score < bestScore) {
           bestScore = score;
           best = i;
         }
       }
-      if (best < 0 || this.compCost(best) > this.s.gold || !this.buyComp(best)) break;
+      if (best < 0 || this.compCost(best).gt(this.s.gold) || !this.buyComp(best)) break;
     }
     this.s.settings.buyMode = mode;
   }
@@ -1254,7 +1260,7 @@ export class Game {
   private trophyMet(r: TrophyReq): boolean {
     const s = this.s;
     switch (r.t) {
-      case 'gold': return s.totalGold >= r.n;
+      case 'gold': return s.totalGold.gte(r.n);
       case 'floor': return s.bestCleared >= r.n;
       case 'kills': return s.kills >= r.n;
       case 'bosses': return s.bosses >= r.n;
@@ -1265,7 +1271,7 @@ export class Game {
       case 'fevers': return s.fevers >= r.n;
       case 'descents': return s.descents >= r.n;
       case 'upgrades': return s.upgrades.length >= r.n;
-      case 'dps': return this.baseDps() >= r.n;
+      case 'dps': return this.baseDps().gte(r.n);
       case 'missed': return s.missed >= r.n;
       case 'relics': return this.relicsFound() >= r.n;
       case 'awakens': return s.awakens >= r.n;
@@ -1291,10 +1297,10 @@ export class Game {
 
   // ---------- time ----------
 
-  private earn(n: number) {
-    this.s.gold += n;
-    this.s.runGold += n;
-    this.s.totalGold += n;
+  private earn(n: Decimal) {
+    this.s.gold = this.s.gold.plus(n);
+    this.s.runGold = this.s.runGold.plus(n);
+    this.s.totalGold = this.s.totalGold.plus(n);
   }
 
   update(dt: number) {
@@ -1326,8 +1332,8 @@ export class Game {
 
     // Companions chew through monsters front to back; overkill carries over.
     for (const m of this.monsters) m.arrive -= dt;
-    let dmg = this.dps() * dt;
-    for (let k = 0; k < 20 && dmg > 0; k++) {
+    let dmg = this.dps().times(dt);
+    for (let k = 0; k < 20 && dmg.gt(0); k++) {
       const m = this.focus();
       if (!m) break;
       dmg = this.damage(m, dmg, 'dps');
@@ -1349,8 +1355,8 @@ export class Game {
       if (this.bossTime <= 0) this.bossFailed();
     }
     // Retry a boss on your own once you're clearly stronger.
-    if (!s.auto && s.failDps > 0 && this.dps() >= s.failDps * 1.5 + 1) {
-      s.failDps = 0;
+    if (!s.auto && s.failDps.gt(0) && this.dps().gte(s.failDps.times(1.5).plus(1))) {
+      s.failDps = new Decimal(0);
       this.setAuto(true);
     }
 
@@ -1376,10 +1382,10 @@ export class Game {
 
     // Regenerating bosses.
     for (const m of this.monsters) {
-      if (!m.mods.includes('regen') || m.hp >= m.max) continue;
-      const heal = Math.min(m.max - m.hp, m.max * this.regen() * dt);
-      m.hp += heal;
-      this.healShown.set(m.id, (this.healShown.get(m.id) ?? 0) + heal);
+      if (!m.mods.includes('regen') || m.hp.gte(m.max)) continue;
+      const heal = Decimal.min(m.max.minus(m.hp), m.max.times(this.regen() * dt));
+      m.hp = m.hp.plus(heal);
+      this.healShown.set(m.id, (this.healShown.get(m.id) ?? new Decimal(0)).plus(heal));
     }
 
     // Quartermaster.
@@ -1418,7 +1424,7 @@ export class Game {
     // Reveal companions as you get close to affording them.
     for (let i = s.revealed; i < COMPS.length; i++) {
       if (!this.compUnlocked(i)) break;
-      if (s.owned[i] > 0 || s.runGold >= COMPS[i].cost * 0.3) {
+      if (s.owned[i] > 0 || s.runGold.gte(COMPS[i].cost * 0.3)) {
         s.revealed = i + 1;
         if (i > 0) this.events.push({ t: 'reveal', comp: i });
       } else break;
@@ -1441,7 +1447,7 @@ export class Game {
       this.killWindow = 0;
     }
 
-    s.bestDps = Math.max(s.bestDps, this.baseDps());
+    s.bestDps = Decimal.max(s.bestDps, this.baseDps());
     this.trophyTimer -= dt;
     if (this.trophyTimer <= 0) {
       this.trophyTimer = 0.5;
@@ -1467,9 +1473,9 @@ export class Game {
     this.s.buffs = this.s.buffs.filter((b) => (b.t -= secs) > 0);
     this.invalidate();
     const f = isBossFloor(this.s.floor) ? Math.max(1, this.s.floor - 1) : this.s.floor;
-    const perSec = Math.min(1 / SPAWN_GAP, this.baseDps() / (floorHp(f) * TRASH));
+    const perSec = Math.min(1 / SPAWN_GAP, this.baseDps().div(floorHp(f).times(TRASH)).toNumber());
     const kills = Math.floor(perSec * secs * pct);
-    const gold = kills * floorGold(f) * TRASH * this.c.gold;
+    const gold = floorGold(f).times(kills * TRASH * this.c.gold);
     this.earn(gold);
     this.s.kills += kills;
     this.s.playTime += secs;

@@ -1,4 +1,5 @@
 import { ABYSS, AWAKEN_FLOOR, COMPS, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { DESCEND_FLOOR, FLOOR_KILLS, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Scene } from '../render/scene.ts';
@@ -31,7 +32,7 @@ function icon(i: Icon, box = 36): string {
   return `<span class="ico">${spriteFit(i.sprite, box)}${sub}${tier}</span>`;
 }
 
-const gold = (n: number, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
+const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
 
 /** A relic's stars, as little gold glyphs after its name. */
 const starsOf = (lv: number) => (relicStars(lv) ? ` <span class="stars">${'★'.repeat(relicStars(lv))}</span>` : '');
@@ -62,7 +63,8 @@ export class Ui {
   private pops: HTMLElement[] = [];
   private coins = 0;
   private bars = new Map<number, HTMLElement>();
-  private shown = 0;
+  /** Gold on the counter, easing toward the real bank. */
+  private shown = new Decimal(0);
   private newsT = 0;
   private newsIdx = -1;
   private modal: string | null = null;
@@ -760,7 +762,7 @@ export class Ui {
   frame(dt: number) {
     const g = this.game;
     const bank = g.s.gold;
-    this.shown = bank < this.shown || bank - this.shown < 1 ? bank : this.shown + (bank - this.shown) * Math.min(1, dt * 10);
+    this.shown = bank.lt(this.shown) || bank.minus(this.shown).lt(1) ? bank : this.shown.plus(bank.minus(this.shown).times(Math.min(1, dt * 10)));
     this.el.bank.textContent = fmt(this.shown);
 
     // Health bars over wounded monsters.
@@ -782,7 +784,7 @@ export class Ui {
       const half = m.boss ? 62 : 24;
       const x = Math.min(innerWidth - half, Math.max(half, s.x));
       bar.style.transform = `translate(${Math.round(x)}px, ${Math.round(Math.max(4, s.y - 8))}px)`;
-      (bar.firstChild as HTMLElement).style.width = `${Math.max(0, m.hp / m.max) * 100}%`;
+      (bar.firstChild as HTMLElement).style.width = `${Math.max(0, m.hp.div(m.max).toNumber()) * 100}%`;
     }
     for (const [id, bar] of this.bars) if (!seen.has(id)) {
       bar.remove();
@@ -930,12 +932,12 @@ export class Ui {
       const mystery = i === revealed && i > 0 && g.s.owned[i] === 0;
       const locked = !g.compUnlocked(i);
       const q = g.compQuote(i);
-      const can = !locked && !mystery && g.s.gold >= q.cost;
+      const can = !locked && !mystery && g.s.gold.gte(q.cost);
       row.classList.toggle('can', can);
       row.classList.toggle('mystery', mystery || locked);
-      row.style.setProperty('--prog', `${Math.min(1, g.s.gold / q.cost) * 100}%`);
+      row.style.setProperty('--prog', `${Math.min(1, g.s.gold.div(q.cost).toNumber()) * 100}%`);
       const lv = g.s.owned[i];
-      const key = [mystery, locked, q.n, q.cost, lv, can, g.s.settings.notation, Math.round(Math.log10(g.compDps(i) + 1) * 20)].join('|');
+      const key = [mystery, locked, q.n, q.cost.toString(), lv, can, g.s.settings.notation, Math.round(g.compDps(i).plus(1).log10() * 20)].join('|');
       if (key === this.rowCache[i]) return;
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
@@ -957,7 +959,7 @@ export class Ui {
     }
     let affordable = 0;
     this.el.upgGrid.querySelectorAll<HTMLElement>('.upg').forEach((b) => {
-      const can = g.s.gold >= g.upgCost(UPG_BY_ID.get(b.dataset.upg!)!);
+      const can = g.s.gold.gte(g.upgCost(UPG_BY_ID.get(b.dataset.upg!)!));
       if (can) affordable++;
       b.classList.toggle('can', can);
     });
@@ -1047,10 +1049,10 @@ export class Ui {
       if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. Descend ${def.depth} time${def.depth > 1 ? 's' : ''} to meet them.</p>`;
       if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">A new companion is on their way. Earn more gold to meet them.</p>`;
       const q = g.compQuote(i);
-      const next = g.compNext(i) * q.n;
-      const share = g.baseDps() > 0 ? g.compDps(i) / g.baseDps() : 0;
+      const next = g.compNext(i).times(q.n);
+      const share = g.baseDps().gt(0) ? g.compDps(i).div(g.baseDps()).toNumber() : 0;
       return `<div class="tt-h">${spriteFit(def.sprite, 32)}<b>${def.name}</b><span class="tt-own">level ${g.s.owned[i]}</span></div>
-        <div class="tt-cost">${gold(q.cost, g.s.gold >= q.cost ? 'ok' : 'no')}${q.n > 1 ? ` for ${q.n} levels` : ''}</div>
+        <div class="tt-cost">${gold(q.cost, g.s.gold.gte(q.cost) ? 'ok' : 'no')}${q.n > 1 ? ` for ${q.n} levels` : ''}</div>
         <ul class="tt-l">
           ${g.s.owned[i] ? `<li>Deals <b>${fmt(g.compDps(i))}</b> damage/sec (${(share * 100).toFixed(1)}% of your party)</li>` : ''}
           <li>Next ${q.n > 1 ? `${q.n} levels` : 'level'}: <b class="up">+${fmt(next)}</b> damage/sec</li>
@@ -1063,7 +1065,7 @@ export class Ui {
       if (!u) return '';
       const cost = g.upgCost(u);
       return `<div class="tt-h">${icon(u.icon, 32)}<b>${esc(u.name)}</b><span class="tt-own">upgrade</span></div>
-        <div class="tt-cost">${gold(cost, g.s.gold >= cost ? 'ok' : 'no')}</div>
+        <div class="tt-cost">${gold(cost, g.s.gold.gte(cost) ? 'ok' : 'no')}</div>
         <p class="tt-d">${esc(u.desc)}</p>${this.upgPreview(u)}`;
     }
     if (kind === 'tro') {
@@ -1119,10 +1121,10 @@ export class Ui {
   private upgPreview(u: UpgDef): string {
     const g = this.game;
     const e = u.effect;
-    let gain = 0;
+    let gain = new Decimal(0);
     if (e.t === 'comp') gain = g.compDps(e.comp);
-    else if (e.t === 'global') gain = g.baseDps() * e.pct;
-    if (gain <= 0) return '';
+    else if (e.t === 'global') gain = g.baseDps().times(e.pct);
+    if (gain.lte(0)) return '';
     return `<p class="tt-gain">≈ +${fmt(gain)} damage/sec</p>`;
   }
 
@@ -1248,10 +1250,13 @@ export class Ui {
     const g = this.game;
     const b = g.breakdown();
     const p = b.parts;
-    const x = (v: number) => (v >= 1000 ? `×${fmt(v)}` : `×${Math.round(v * 100) / 100}`);
+    const x = (v: number | Decimal) => (new Decimal(v).gte(1000) ? `×${fmt(v)}` : `×${Math.round(new Decimal(v).toNumber() * 100) / 100}`);
     const pc = (v: number) => `${Math.round(v * 1000) / 10}%`;
     const row = (label: string, value: string, note = '', off = false) => `<tr class="${off ? 'off' : ''}"><th>${label}${note ? `<small>${note}</small>` : ''}</th><td>${value}</td></tr>`;
-    const mul = (label: string, v: number, note: string, how = '') => row(label, x(v), v === 1 && how ? how : note, v === 1);
+    const mul = (label: string, v: number | Decimal, note: string, how = '') => {
+      const one = new Decimal(v).eq(1);
+      return row(label, x(v), one && how ? how : note, one);
+    };
     const total = (label: string, value: string) => `<tr class="tot"><th>${label}</th><td>${value}</td></tr>`;
     const table = (title: string, rows: string) => `<section class="bd"><h3>${title}</h3><table>${rows}</table></section>`;
     const relicName = (id: string) => RELIC_BY_ID.get(id)!.name;
@@ -1278,7 +1283,7 @@ export class Ui {
       mul(relicName('whet'), p.whet, 'Relic', 'A relic') +
       mul('Blade upgrades', p.blades, `${g.s.upgrades.filter((id) => id.startsWith('clk')).length} bought`, 'Blades in the shop') +
       row('All-damage bonuses', x(b.all), 'the same upgrades, trophies, souls, shard and fury as above') +
-      row('+ Share of party damage', `+${fmt(g.baseDps() * p.clickDps)}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} upgrades` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`) +
+      row('+ Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} upgrades` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`) +
       mul('Buffs right now', b.buffClick, buffNames('click'), 'Frenzy…') +
       total('Per click', fmt(g.clickDamage())) +
       row('During Rampage', x(g.feverMult()), 'clicks while the Rampage meter is full'));
@@ -1323,13 +1328,13 @@ export class Ui {
     const b = g.breakdown();
     const p = b.parts;
     const total = g.baseDps();
-    const x = (v: number) => (v >= 1000 ? `×${fmt(v)}` : `×${Math.round(v * 100) / 100}`);
+    const x = (v: number | Decimal) => (new Decimal(v).gte(1000) ? `×${fmt(v)}` : `×${Math.round(new Decimal(v).toNumber() * 100) / 100}`);
     const rows = COMPS.map((c, i) => {
       const lv = g.s.owned[i];
       if (!lv) return '';
-      return `<tr><th><span class="bd-comp">${spriteFit(c.sprite, 24)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(p.tier[i])}</td><td>${x(p.syn[i])}</td><td>${fmt(g.compDps(i))}</td><td>${total ? ((g.compDps(i) / total) * 100).toFixed(1) : 0}%</td></tr>`;
+      return `<tr><th><span class="bd-comp">${spriteFit(c.sprite, 24)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(p.tier[i])}</td><td>${x(p.syn[i])}</td><td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? g.compDps(i).div(total).times(100).toNumber().toFixed(1) : 0}%</td></tr>`;
     }).join('');
-    return `<p class="muted bd-help">Each companion: level × base damage × tier upgrades × synergies, then every all-damage bonus (${x(b.all * p.banner)} right now) on top.</p>
+    return `<p class="muted bd-help">Each companion: level × base damage × tier upgrades × synergies, then every all-damage bonus (${x(b.all.times(p.banner))} right now) on top.</p>
       <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Tiers</td><td>Synergy</td><td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
   }
 
@@ -1449,7 +1454,7 @@ export class Ui {
     this.hooks.sound('awaken', { vol: 0.9 });
     setTimeout(() => {
       g.awaken();
-      this.shown = 0;
+      this.shown = new Decimal(0);
       this.rowCache.fill('');
       this.upgKey = '';
       this.floorKey = '';
@@ -1493,7 +1498,7 @@ export class Ui {
     this.hooks.sound('descend', { vol: 0.8 });
     setTimeout(() => {
       g.descend();
-      this.shown = 0;
+      this.shown = new Decimal(0);
       this.rowCache.fill('');
       this.upgKey = '';
       this.floorKey = '';
