@@ -8,7 +8,7 @@
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { TUNE } from '../src/game/game.ts';
-import { COMPS, UPGRADES } from '../src/game/data.ts';
+import { COMPS, UPGRADES, relicStars } from '../src/game/data.ts';
 import { duration } from '../src/game/format.ts';
 import { Sim, seedRandom, type Profile } from './bot.ts';
 
@@ -19,7 +19,7 @@ const PROFILES: Record<string, Profile & { earlyGap?: number }> = {
   idle: { cps: 1, activeMin: 3, descendRatio: 0, descendGain: 0.5, awakenRatio: 1, stall: 300, catchRate: 0.01, earlyGap: 10 * 60 },
 };
 
-/** The targets. A gap is time with nothing you've never had before: floor, companion, relic, upgrade, abyss or Heart power. */
+/** The targets. A gap is time with nothing you've never had before: floor, companion, relic or relic star, upgrade, abyss or Heart power. */
 const TARGET = {
   /** Longest gap allowed when it starts in the first hour (before any awakening), and after that. */
   earlyGap: 5 * 60,
@@ -134,6 +134,7 @@ function simulate(name: string, hours: number): Report {
       for (const id of game.s.upgrades) firstTime(t, `u:${id}`, 'new upgrade');
       for (const id of game.s.abyss) firstTime(t, `a:${id}`, 'new abyss power');
       for (const id of Object.keys(game.s.heart)) firstTime(t, `h:${id}`, 'new Heart power');
+      for (const [id, lv] of Object.entries(game.s.relics)) if (relicStars(lv)) firstTime(t, `s:${id}:${relicStars(lv)}`, 'relic star');
       if (game.s.upgrades.length === UPGRADES.length) allUpgradesAt ??= t;
       if (Math.floor(t / 900) !== Math.floor((t - sim.dt) / 900)) curve.push([t, game.s.bestFloor]);
     },

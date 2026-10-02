@@ -1,4 +1,4 @@
-import { ABYSS, AWAKEN_FLOOR, COMPS, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABYSS, AWAKEN_FLOOR, COMPS, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { DESCEND_FLOOR, FLOOR_KILLS, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Scene } from '../render/scene.ts';
@@ -32,6 +32,9 @@ function icon(i: Icon, box = 36): string {
 }
 
 const gold = (n: number, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
+
+/** A relic's stars, as little gold glyphs after its name. */
+const starsOf = (lv: number) => (relicStars(lv) ? ` <span class="stars">${'★'.repeat(relicStars(lv))}</span>` : '');
 
 function buffText(b: Buff) {
   if (b.id === 'vault') return 'hoarders everywhere';
@@ -607,7 +610,7 @@ export class Ui {
         else this.toast(`The vault closes. Haul: <b>+${fmt(ev.gold)} gold</b>`, 'chest_full_open', 'trophy');
         break;
       case 'abyss': this.toast(`Abyss power: <b>${esc(ABYSS.find((a) => a.id === ev.id)!.name)}</b>`, 'flask_big_red'); break;
-      case 'relic': this.showLoot(ev.id, ev.lv, ev.equipped); break;
+      case 'relic': this.showLoot(ev.id, ev.lv, ev.equipped, ev.star); break;
       case 'heal': {
         if (!g.s.settings.numbers) break;
         const s = this.scene.screenOf(ev.id);
@@ -639,7 +642,10 @@ export class Ui {
 
   private zoneBanner(floor: number) {
     const z = zoneOf(floor);
-    this.banner(zoneName(floor), `Floors ${z * 10 + 1}–${z * 10 + 10}`, 'zone');
+    const lap = lapOf(floor);
+    // The first zone of a new lap says what's changed.
+    const sub = lap && z % 8 === 0 ? `Everything returns ${corruptionOf(lap).name.toLowerCase()} · floors ${z * 10 + 1}–${z * 10 + 10}` : `Floors ${z * 10 + 1}–${z * 10 + 10}`;
+    this.banner(zoneName(floor), sub, `zone lap${Math.min(lap, 4)}`);
   }
 
   /** The party has come down the stairs into a new zone. */
@@ -860,7 +866,7 @@ export class Ui {
       this.el.floorN.textContent = `Floor ${s.floor}`;
       const mods = boss ? g.bossMods() : [];
       if (mods.length) this.el.floorSub.innerHTML = `Boss ${modChips(mods)}`;
-      else this.el.floorSub.textContent = boss ? 'Boss' : zoneName(s.floor);
+      else this.el.floorSub.textContent = boss ? 'Boss' : zoneName(s.floor).replace(/^The /, '');
       this.el.floorBox.classList.toggle('is-boss', boss);
       (this.el.down as HTMLButtonElement).disabled = s.floor <= 1;
       (this.el.up as HTMLButtonElement).disabled = s.floor >= s.maxFloor;
@@ -1386,7 +1392,7 @@ export class Ui {
       if (!lv) return `<span class="rel unknown" data-tip="rel:${d.id}" style="--rc:${RARITY_COLORS[d.rarity]}">${spriteFit(d.icon, 32)}<b>???</b><small>${RARITY[d.rarity]}</small></span>`;
       const on = g.s.equipped.includes(d.id);
       return `<button class="rel ${on ? 'on' : ''}" data-relic="${d.id}" data-tip="rel:${d.id}" style="--rc:${RARITY_COLORS[d.rarity]}">
-        ${spriteFit(d.icon, 32)}<b>${esc(d.name)}</b><small>Level ${lv}${on ? ' · equipped' : ''}</small></button>`;
+        ${spriteFit(d.icon, 32)}<b>${esc(d.name)}${starsOf(lv)}</b><small>Level ${lv}${on ? ' · equipped' : ''}</small></button>`;
     }).join('');
     const counters = MODS.map((m) => `<li>${modChips([m.id])} ${esc(m.desc)} <span class="muted">Answer: ${esc(RELIC_BY_ID.get(m.counter)!.name)}</span></li>`).join('');
     return `<div class="slots">${slots}</div>
@@ -1397,17 +1403,18 @@ export class Ui {
   }
 
   /** The reward card that slides up when a boss drops a relic. */
-  private showLoot(id: string, lv: number, equipped: boolean) {
+  private showLoot(id: string, lv: number, equipped: boolean, star = 0) {
     const d = RELIC_BY_ID.get(id)!;
     if (this.modal !== 'relics') this.newRelics++;
     const el = this.el.loot;
     el.hidden = false;
     el.style.setProperty('--rc', RARITY_COLORS[d.rarity]);
-    el.className = `loot r${d.rarity}`;
-    el.innerHTML = `<span class="loot-ico">${spriteFit(d.icon, 48)}</span><span class="loot-t"><small>${lv === 1 ? `New ${RARITY[d.rarity]} relic` : `${RARITY[d.rarity]} relic · level ${lv}`}</small><b>${esc(d.name)}</b><em>${esc(relicText(d, lv))}${lv === 1 && !equipped ? ' (slots full)' : ''}</em></span>`;
+    el.className = `loot r${d.rarity}${star ? ' starred' : ''}`;
+    const head = star ? `Relic star! ${'★'.repeat(star)} · level ${lv}` : lv === 1 ? `New ${RARITY[d.rarity]} relic` : `${RARITY[d.rarity]} relic · level ${lv}`;
+    el.innerHTML = `<span class="loot-ico">${spriteFit(d.icon, 48)}</span><span class="loot-t"><small>${head}</small><b>${esc(d.name)}${starsOf(lv)}</b><em>${esc(relicText(d, lv))}${star ? ' (a quarter stronger)' : ''}${lv === 1 && !equipped ? ' (slots full)' : ''}</em></span>`;
     void el.offsetWidth;
     el.classList.add('in');
-    this.hooks.sound(d.rarity >= 2 ? 'drop4' : 'drop2', { vol: 0.7 });
+    this.hooks.sound(d.rarity >= 2 || star ? 'drop4' : 'drop2', { vol: 0.7 });
     clearTimeout(this.lootTimer);
     this.lootTimer = window.setTimeout(() => {
       el.classList.remove('in');

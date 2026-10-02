@@ -1,5 +1,5 @@
 import {
-  ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
+  ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
@@ -218,7 +218,7 @@ export type GameEvent =
   | { t: 'fever'; on: boolean }
   | { t: 'descend'; souls: number }
   | { t: 'abyss'; id: string }
-  | { t: 'relic'; id: string; lv: number; floor: number; equipped: boolean }
+  | { t: 'relic'; id: string; lv: number; floor: number; equipped: boolean; star: number }
   | { t: 'split'; id: number; into: [number, number] }
   | { t: 'heal'; id: number; amount: number }
   | { t: 'awaken'; stones: number }
@@ -401,7 +401,7 @@ export class Game {
     let lv = 0;
     for (const id of this.s.equipped) {
       const d = RELIC_BY_ID.get(id);
-      if (d && d.effect === e) lv += this.relicLv(id);
+      if (d && d.effect === e) lv += relicPower(this.relicLv(id));
     }
     return lv;
   }
@@ -1148,7 +1148,9 @@ export class Game {
       equipped = true;
     }
     this.invalidate();
-    this.events.push({ t: 'relic', id, lv, floor, equipped });
+    // A new star on this level up (0 if none).
+    const star = relicStars(lv) > relicStars(lv - 1) ? relicStars(lv) : 0;
+    this.events.push({ t: 'relic', id, lv, floor, equipped, star });
   }
 
   /** Put a relic in a slot or take it out. Returns false when all slots are full. */
@@ -1271,6 +1273,7 @@ export class Game {
       case 'champions': return s.champions >= r.n;
       case 'vaults': return s.vaults >= r.n;
       case 'rampage': return s.rampage >= r.n;
+      case 'stars': return Object.values(s.relics).some((lv) => relicStars(lv) >= r.n);
     }
   }
 

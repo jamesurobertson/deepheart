@@ -130,11 +130,32 @@ export const zoneOf = (floor: number) => Math.floor((floor - 1) / 10);
 
 export const zoneFor = (floor: number) => ZONES[zoneOf(floor) % ZONES.length];
 
-/** "The Sunken Tomb", then "The Upper Halls II" once the zones come round again. */
+/** "The Sunken Tomb", then "The Corrupted Sunken Tomb" once the zones come round again. */
+/** Every lap through the eight zones comes back darker, washed in its own colour. */
+export const CORRUPTION: { name: string; tint: number }[] = [
+  { name: '', tint: 0xffffff },
+  { name: 'Corrupted', tint: 0xc89cff },
+  { name: 'Abyssal', tint: 0xff8a8a },
+  { name: 'Hollow', tint: 0x9cffd2 },
+  { name: 'Eternal', tint: 0xffd890 },
+];
+
+/** Laps completed through the eight zones by this floor (0 for floors 1–80). */
+export function lapOf(floor: number): number {
+  return Math.floor(zoneOf(floor) / ZONES.length);
+}
+
+export function corruptionOf(lap: number) {
+  return CORRUPTION[Math.min(lap, CORRUPTION.length - 1)];
+}
+
 export function zoneName(floor: number): string {
   const z = zoneOf(floor);
-  const lap = Math.floor(z / ZONES.length);
-  return ZONES[z % ZONES.length].name + (lap ? ` ${['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][Math.min(lap - 1, 8)]}` : '');
+  const lap = lapOf(floor);
+  const base = ZONES[z % ZONES.length].name.replace(/^The /, '');
+  if (!lap) return ZONES[z % ZONES.length].name;
+  const extra = lap >= CORRUPTION.length ? ` ${['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][Math.min(lap - CORRUPTION.length, 8)]}` : '';
+  return `The ${corruptionOf(lap).name} ${base}${extra}`;
 }
 
 export function bandFor(floor: number): MonsterDef[] {
@@ -410,8 +431,14 @@ export const RELICS: RelicDef[] = [
 export const RELIC_BY_ID = new Map(RELICS.map((x) => [x.id, x]));
 
 /** What a relic does at a level, in words. */
+/** Relic levels that earn a star; each star makes the relic a quarter stronger. */
+export const RELIC_STARS = [5, 15, 40, 100];
+export const relicStars = (lv: number) => RELIC_STARS.filter((n) => lv >= n).length;
+/** The level a relic works at: its own level, plus a quarter per star. */
+export const relicPower = (lv: number) => lv + Math.floor((lv * relicStars(lv)) / 4);
+
 export function relicText(def: RelicDef, lv: number): string {
-  const L = Math.max(1, lv);
+  const L = Math.max(1, relicPower(lv));
   switch (def.effect) {
     case 'click': return `Clicks deal ×${1 + L} damage.`;
     case 'party': return `Companions deal ×${fmtN(1 + 0.5 * L)} damage.`;
@@ -487,7 +514,8 @@ export type TrophyReq =
   | { t: 'clutches'; n: number }
   | { t: 'champions'; n: number }
   | { t: 'vaults'; n: number }
-  | { t: 'rampage'; n: number };
+  | { t: 'rampage'; n: number }
+  | { t: 'stars'; n: number };
 
 export interface TrophyDef {
   id: string;
@@ -534,6 +562,8 @@ function buildTrophies(): TrophyDef[] {
   [1, 10, 50].forEach((n, k) => out.push({ id: `clutch${k}`, name: ['By a Hair', 'Nerves of Steel', 'Living on the Edge'][k], desc: `Beat ${n === 1 ? 'a boss' : `${n} bosses`} with ${CLUTCH_SECONDS} seconds or less on the clock.`, icon: { sprite: 'flask_yellow', tier: k }, req: { t: 'clutches', n } }));
   [1, 25, 100].forEach((n, k) => out.push({ id: `champ${k}`, name: ['Champion Slayer', 'Crown Breaker', 'Champion of Champions'][k], desc: `Slay ${n === 1 ? 'a champion' : `${n} champions`}.`, icon: { sprite: 'weapon_red_gem_sword', tier: k }, req: { t: 'champions', n } }));
   [1, 5, 20].forEach((n, k) => out.push({ id: `vault${k}`, name: ['Over the Rainbow', 'Vault Raider', 'Goblin Banker'][k], desc: `Open the Goblin Vault ${n === 1 ? 'once' : `${n} times`} (catch a rainbow goblin).`, icon: { sprite: 'chest_full_open', tier: k }, req: { t: 'vaults', n } }));
+  [1, 2, 3, 4].forEach((n, k) => out.push({ id: `star${k}`, name: ['Polished', 'Gleaming', 'Radiant', 'Mythic'][k], desc: `Raise a relic to ${'★'.repeat(n)} (level ${RELIC_STARS[k]}).`, icon: { sprite: 'chest_full_open', tier: k + 1 }, req: { t: 'stars', n } }));
+  [1, 2, 3, 4].forEach((n, k) => out.push({ id: `lap${k}`, name: ['Corruption', 'The Abyss Looks Back', 'Hollowed Out', 'Eternity'][k], desc: `Reach floor ${n * 80 + 1}, where the zones return ${CORRUPTION[n].name.toLowerCase()}.`, icon: { sprite: 'skull', tier: k + 1 }, req: { t: 'floor', n: n * 80 } }));
   [1, 2].forEach((n, k) => out.push({ id: `rampage${k}`, name: ['Bloodrush', 'Unstoppable'][k], desc: `Keep clicking until a Rampage reaches ×${[10, 25][k]}.`, icon: { sprite: 'flask_big_red', tier: k + 1 }, req: { t: 'rampage', n } }));
   [1, 3, 10, 25].forEach((n, k) => out.push({ id: `awk${k}`, name: ['It Wakes', 'Heartbeat', 'Drumming Deep', 'The Heart Remembers'][k], desc: `Awaken the Heart ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'ui_heart_full', tier: k }, req: { t: 'awakens', n } }));
   [10, 1e3, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21].forEach((n, k) => out.push({ id: `dps${k}`, name: ['Scrapper', 'Fighter', 'Warrior', 'Warlord', 'Army', 'Legion', 'Cataclysm', 'Apocalypse'][k], desc: `Reach ${n.toLocaleString('en-US')} damage per second.`, icon: { sprite: 'weapon_waraxe', tier: k }, req: { t: 'dps', n } }));

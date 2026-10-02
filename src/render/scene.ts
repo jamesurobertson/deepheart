@@ -9,7 +9,7 @@ import { PixelSprite, blobShadow } from './sprite.ts';
 import { Fx, flameTexture, spellTextures } from './fx.ts';
 import { GradeShader, tiltShift } from './post.ts';
 import { buildStairwell, stairPoint } from './stairwell.ts';
-import { COMPS, ZONES, zoneOf, type Attack, type Tiles } from '../game/data.ts';
+import { COMPS, ZONES, corruptionOf, zoneOf, type Attack, type Tiles } from '../game/data.ts';
 import type { Game, GameEvent, Monster } from '../game/game.ts';
 
 const WALL_Z = -6;
@@ -29,6 +29,15 @@ const PALETTES: Palette[] = [
   { torch: 0xff5a3a, fog: 0x0b0505, hemi: 0x6a4a52, wall: [0.7, 0.44, 0.44], floor: [1.15, 0.95, 0.9], banner: 'red', goo: 0 }, // Demon Gate
   { torch: 0x9cc0ff, fog: 0x05070c, hemi: 0x5a6a8a, wall: [0.56, 0.72, 1], floor: [0.9, 1.1, 1.45], banner: 'blue', goo: 0 }, // Frozen Vault
 ];
+
+/** A zone's palette on a later lap: torches, light and stone pulled toward the lap's colour, the dark a shade deeper. */
+function corrupt(p: Palette, lap: number): Palette {
+  if (!lap) return p;
+  const c = new THREE.Color(corruptionOf(lap).tint);
+  const toward = (hex: number, k: number) => new THREE.Color(hex).lerp(c, k).getHex();
+  const wash = (v: [number, number, number]): [number, number, number] => [v[0] * (0.3 + 0.7 * c.r), v[1] * (0.3 + 0.7 * c.g), v[2] * (0.3 + 0.7 * c.b)];
+  return { ...p, torch: toward(p.torch, 0.85), hemi: toward(p.hemi, 0.75), fog: new THREE.Color(p.fog).lerp(c, 0.12).getHex(), wall: wash(p.wall), floor: wash(p.floor) };
+}
 
 /** Formation slots for companions, front to back. */
 const PARTY_SLOTS: [number, number][] = [
@@ -365,7 +374,7 @@ export class Scene {
   private setBand(band: number) {
     if (band === this.band) return;
     this.band = band;
-    this.palette = PALETTES[band % PALETTES.length];
+    this.palette = corrupt(PALETTES[band % PALETTES.length], Math.floor(band / ZONES.length));
     if (this.room) {
       this.scene.remove(this.room);
       this.room.traverse((o) => o instanceof THREE.Mesh && o.geometry.dispose());
@@ -813,6 +822,9 @@ export class Scene {
     if (m.mods.includes('armored')) tint.multiply(new THREE.Color(0xb4c4dc));
     if (m.mods.includes('enraged')) tint.multiply(new THREE.Color(0xff9a88));
     if (m.mods.includes('regen')) tint.multiply(new THREE.Color(0xb8ffb0));
+    // Later laps: everything that climbs the stairs wears the corruption's colour.
+    const lap = Math.floor(this.band / ZONES.length);
+    if (lap && !m.vault) tint.lerp(tint.clone().multiply(new THREE.Color(corruptionOf(lap).tint)), 0.7);
     sprite.mesh.material.color.copy(tint);
     if (m.half && this.settings.particles) this.fx.burst(body.position.clone().setY(1), '#d58aff', 14, 4, 0.08, 8);
     let ring: MonView['ring'] = null;
@@ -1256,7 +1268,7 @@ export class Scene {
     c.phase = 'stairs';
     c.t = 0;
     // Dress the stairwell in the new zone's tiles and light.
-    const pal = PALETTES[c.zone % PALETTES.length];
+    const pal = corrupt(PALETTES[c.zone % PALETTES.length], Math.floor(c.zone / ZONES.length));
     const theme = ZONES[c.zone % ZONES.length].tiles;
     const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : '';
     const a = this.atlas;
