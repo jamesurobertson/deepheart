@@ -1513,6 +1513,8 @@ export class Ui {
       c.className = 'curtain out';
       this.descending = false;
       this.hooks.sound('drop4', { vol: 0.7 });
+      // Straight to the shop for the new souls.
+      this.openModal('abyss');
     }, 2600);
     setTimeout(() => (c.hidden = true), 3600);
   }
