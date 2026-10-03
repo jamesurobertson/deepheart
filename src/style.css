@@ -180,7 +180,7 @@ body.compact .rate .short { display: inline; }
 .fever span { position: absolute; inset: 0; font: 400 12px/16px 'Silkscreen'; color: #ffd6de; text-shadow: var(--outline); letter-spacing: 2px; text-transform: uppercase; }
 .fever.on { animation: fevershake 0.15s infinite; }
 .fever.on i { background: linear-gradient(#fff0a8, #ff9a2e 50%, #ff2a4a); transition: none; }
-.fever.on span::after { content: '!'; }
+.fever.on span { color: #fff6d8; letter-spacing: 1px; }
 
 .buffs { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
 .buff {
@@ -218,12 +218,12 @@ body.compact .rate .short { display: inline; }
 .banner b { font: 400 64px/0.9 'Jersey 10'; color: var(--gold-hi); text-shadow: 0 4px 0 var(--ink), 4px 0 0 var(--ink), -4px 0 0 var(--ink), 0 -4px 0 var(--ink), 0 0 30px rgba(255, 200, 80, 0.6); letter-spacing: 2px; }
 .banner span { font: 700 20px/1 'Pixelify Sans'; color: #fff; text-shadow: var(--outline); }
 .banner.bump { animation: bannerin 2.6s both; }
-.banner.fever b { color: #ff7a92; text-shadow: 0 4px 0 var(--ink), 4px 0 0 var(--ink), -4px 0 0 var(--ink), 0 -4px 0 var(--ink), 0 0 30px rgba(255, 40, 80, 0.8); }
+.banner.rampage b { color: #ff7a92; text-shadow: 0 4px 0 var(--ink), 4px 0 0 var(--ink), -4px 0 0 var(--ink), 0 -4px 0 var(--ink), 0 0 30px rgba(255, 40, 80, 0.8); }
 .banner.boss b, .banner.fail b { color: #ff8a7a; }
 .banner.win b { color: var(--gold-hi); }
 .banner.loot b { color: #ffe08a; }
 .banner.clutch b { color: #fff3c4; font-size: 64px; text-shadow: 0 4px 0 var(--ink), 4px 0 0 var(--ink), -4px 0 0 var(--ink), 0 -4px 0 var(--ink), 0 0 34px rgba(255, 220, 120, 0.95); }
-.banner.fever.tier2 b { font-size: 60px; }
+.banner.rampage.tier2 b { font-size: 60px; }
 .banner.rainbow b { animation: rainbow 1.2s linear infinite; }
 @keyframes rainbow { from { filter: hue-rotate(0deg) saturate(1.6); } to { filter: hue-rotate(360deg) saturate(1.6); } }
 .raid-mark.rainbow b { animation: rainbow 0.8s linear infinite; }
@@ -614,7 +614,8 @@ body.phone .floor-bar span { font-size: 13px; line-height: 11px; }
 body.phone .floor .auto { min-height: 34px; font-size: 12px; padding: 0 6px; }
 body.phone .fever { height: 5px; margin-top: 1px; box-shadow: 0 0 0 1px var(--ink); }
 body.phone .fever span { display: none; }
-body.phone .fever.on { height: 8px; }
+body.phone .fever.on { height: 12px; }
+body.phone .fever.on span { display: block; font-size: 8px; line-height: 12px; }
 /* Buffs: icon + seconds only, floating at the top-right of the fight. */
 body.phone .buffs { position: absolute; right: 0; top: 100%; margin-top: 6px; flex-direction: column; align-items: flex-end; }
 body.phone .buff { padding: 2px 6px 3px 2px; gap: 3px; }
@@ -734,8 +735,6 @@ body.compact .cur { width: auto; height: auto; aspect-ratio: 1; }
 .loot.r3 .loot-ico { animation: legendary 1.2s ease-in-out infinite alternate; }
 @keyframes legendary { from { filter: brightness(1); } to { filter: brightness(1.35) drop-shadow(0 0 10px #ffb13d); } }
 
-.shop .modes .auto-buy { margin-left: auto; }
-.shop .modes .auto-buy.on { color: var(--green); }
 
 body.compact .loot { top: calc(var(--free-h, 100%) * 0.3 + 60px); }
 body.compact .loot-ico { width: 56px; height: 56px; }

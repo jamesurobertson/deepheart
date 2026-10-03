@@ -33,11 +33,10 @@ const RAMPAGE_STEPS = [25, 60];
 const RAMPAGE_TIERS = [{ click: 1, dps: 2 }, { click: 2, dps: 3 }, { click: 5, dps: 4 }];
 const RAMPAGE_EXTEND = 3;
 /** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
-const CLUTCH_GOLD = 5;
-/** Share of ordinary monsters that come as champions: tougher, glowing, and full of gold. */
-const CHAMP_CHANCE = 1 / 40;
+const CLUTCH_GOLD = 1.5;
+/** A champion turns up about as often as a treasure goblin: tougher, glowing, and worth a little more than a goblin's plunder. */
 const CHAMP_HP = 6;
-const CHAMP_GOLD = 8;
+const CHAMP_GOLD = 50;
 /** Share of treasure goblins that are rainbow goblins; catching one opens the Goblin Vault. */
 const RAINBOW_CHANCE = 1 / 8;
 const VAULT_TIME = 20;
@@ -92,8 +91,6 @@ export interface Settings {
   cinematics: boolean;
   /** Cursor skin id (see CURSORS). */
   cursor: string;
-  /** Quartermaster: buy companions and upgrades automatically. */
-  autoBuy: boolean;
 }
 
 export interface SaveState {
@@ -169,7 +166,7 @@ export function newSave(): SaveState {
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
     relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rampage: 0, cycleBest: 0,
-    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoBuy: true },
+    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto' },
   };
 }
 
@@ -318,6 +315,7 @@ export class Game {
   /** Rampage tier (0–2) and clicks landed during this Rampage. */
   rampageTier = 0;
   private rampageClicks = 0;
+  private champT = RAID_MIN + Math.random() * (RAID_MAX - RAID_MIN);
   /** The floor's monsters wait here while the Goblin Vault is open. */
   private stash: Monster[] = [];
   private vaultOn = false;
@@ -334,7 +332,6 @@ export class Game {
   /** DPS damage waiting to be shown as numbers, per monster. */
   private dpsShown = new Map<number, Decimal>();
   private healShown = new Map<number, Decimal>();
-  private shopT = 0;
   private dpsFlush = 0;
   /** Recent kills per second, smoothed, for the stats. */
   killRate = 0;
@@ -348,6 +345,11 @@ export class Game {
     if (s.bestCleared === undefined) s.bestCleared = (s.bestFloor ?? 1) - 1;
     // Souls used to be paid for depth at descent time; carry what this descent was worth over.
     if (s.runSouls === undefined) s.runSouls = Math.floor(10 * 1.1 ** (Math.min(s.maxFloor ?? 1, 90) - 30) * 1.04 ** Math.max(0, (s.maxFloor ?? 1) - 90));
+    // Auto-hire (the Quartermaster Heart power) is gone; whoever bought it gets the heartstones back.
+    if (s.heart?.quarter) {
+      s.stones = (s.stones ?? 0) + 4;
+      delete s.heart.quarter;
+    }
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
@@ -547,6 +549,13 @@ export class Game {
     return p * (1 + 0.5 * this.relic('rampage')) * RAMPAGE_TIERS[this.rampageTier].click;
   }
 
+  /** Clicks still needed for the next Rampage tier and the click multiplier it brings (null at the top tier). */
+  rampageNext(): { left: number; mult: number } | null {
+    if (this.rampageTier >= RAMPAGE_STEPS.length) return null;
+    const base = this.feverMult() / RAMPAGE_TIERS[this.rampageTier].click;
+    return { left: RAMPAGE_STEPS[this.rampageTier] - this.rampageClicks, mult: base * RAMPAGE_TIERS[this.rampageTier + 1].click };
+  }
+
   inVault() {
     return this.s.buffs.some((b) => b.id === 'vault');
   }
@@ -638,7 +647,8 @@ export class Game {
   private spawn() {
     const band = bandFor(this.s.floor);
     const def = band[Math.floor(Math.random() * band.length)];
-    const champ = this.s.floor > 2 && Math.random() < CHAMP_CHANCE;
+    const champ = this.s.floor > 2 && this.champT <= 0;
+    if (champ) this.champT = RAID_MIN + Math.random() * (RAID_MAX - RAID_MIN);
     const hp = floorHp(this.s.floor).times(def.hp * TRASH * (champ ? CHAMP_HP : 1));
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.7, mods: [], champ, ...this.spot(false) };
     this.monsters.push(m);
@@ -1147,11 +1157,7 @@ export class Game {
   giveRelic(id: string, floor = this.s.floor) {
     const lv = this.relicLv(id) + 1;
     this.s.relics[id] = lv;
-    let equipped = this.s.equipped.includes(id);
-    if (!equipped && lv === 1 && this.s.equipped.length < this.relicSlots()) {
-      this.s.equipped.push(id);
-      equipped = true;
-    }
+    const equipped = this.s.equipped.includes(id);
     this.invalidate();
     // A new star on this level up (0 if none).
     const star = relicStars(lv) > relicStars(lv - 1) ? relicStars(lv) : 0;
@@ -1229,30 +1235,6 @@ export class Game {
     this.invalidate();
     this.events.push({ t: 'heart', id, lv: this.s.heart[id] });
     return true;
-  }
-
-  /** Quartermaster: spend gold the way a sensible player would (best damage per gold first). */
-  private autoShop() {
-    this.buyAllUpgs();
-    const mode = this.s.settings.buyMode;
-    this.s.settings.buyMode = 1;
-    for (let k = 0; k < 60; k++) {
-      let best = -1;
-      let bestScore = Infinity;
-      for (let i = 0; i < COMPS.length; i++) {
-        if (!this.compUnlocked(i) || i > this.s.revealed) continue;
-        const gain = this.compNext(i);
-        if (gain.lte(0)) continue;
-        // Gold per point of damage, compared as a power of ten so huge numbers stay comparable.
-        const score = this.compCost(i).div(gain).log10();
-        if (score < bestScore) {
-          bestScore = score;
-          best = i;
-        }
-      }
-      if (best < 0 || this.compCost(best).gt(this.s.gold) || !this.buyComp(best)) break;
-    }
-    this.s.settings.buyMode = mode;
   }
 
   // ---------- trophies ----------
@@ -1388,15 +1370,6 @@ export class Game {
       this.healShown.set(m.id, (this.healShown.get(m.id) ?? new Decimal(0)).plus(heal));
     }
 
-    // Quartermaster.
-    if (this.heartLv('quarter') && s.settings.autoBuy) {
-      this.shopT -= dt;
-      if (this.shopT <= 0) {
-        this.shopT = 0.5;
-        this.autoShop();
-      }
-    }
-
     // Phantom Blade.
     const rate = (this.hasAbyss('hands2') ? 10 : this.hasAbyss('hands') ? 3 : 0) + 2 * this.relic('phantom');
     if (rate) {
@@ -1418,6 +1391,7 @@ export class Game {
       }
     } else if (s.kills > 15) {
       s.raidTimer -= dt;
+      this.champT -= dt;
       if (s.raidTimer <= 0) this.spawnRaid();
     }
 

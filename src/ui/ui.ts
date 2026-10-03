@@ -139,7 +139,6 @@ export class Ui {
         <div class="modes">
           <span>Hire</span>
           <button class="btn mode" data-mode="1">×1</button><button class="btn mode" data-mode="10">×10</button><button class="btn mode" data-mode="100">×100</button><button class="btn mode" data-mode="-1">Max</button>
-          <button class="btn small auto-buy" data-act="autoBuy" data-tip="autoBuy" hidden>Auto</button>
         </div>
         <div class="gens"></div>
       </aside>
@@ -155,11 +154,11 @@ export class Ui {
       bank: q('.bank-v'), bankIco: q('.bank-ico'), dps: q('.dps-v'), click: q('.click-v'), rate: q('.rate'),
       floorN: q('.floor-n'), floorSub: q('.floor-sub'), floorBar: q('.floor-bar i'), floorBarT: q('.floor-bar span'), floorBox: q('.floor'),
       down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
-      fever: q('.fever'), feverBar: q('.fever i'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), raid: q('.raid-mark'),
+      fever: q('.fever'), feverBar: q('.fever i'), feverLabel: q('.fever span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), raid: q('.raid-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
       upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
-      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'), autoBuy: q('.auto-buy'),
+      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'),
     };
 
     COMPS.forEach((c, i) => {
@@ -510,10 +509,6 @@ export class Ui {
       case 'awaken': this.renderAwakenConfirm(); break;
       case 'awakenGo': this.doAwaken(); break;
       case 'heartBack': this.modal = 'heart'; this.renderModal(); break;
-      case 'autoBuy':
-        g.s.settings.autoBuy = !g.s.settings.autoBuy;
-        this.hooks.sound('toggle', { vol: 0.5 });
-        break;
       case 'descendGo': this.doDescend(); break;
       case 'abyssBack': this.modal = 'abyss'; this.renderModal(); break;
     }
@@ -609,8 +604,8 @@ export class Ui {
         break;
       }
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
-      case 'fever': if (ev.on) this.banner('RAMPAGE!', `Clicks ×${g.feverMult()} · Party damage ×2 · keep clicking!`, 'fever'); break;
-      case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, ev.tier >= 2 ? 'Unstoppable · party damage ×4' : 'Keep going · party damage ×3', `fever tier${ev.tier}`); break;
+      case 'fever': if (ev.on) this.banner('RAMPAGE!', `Clicks ×${fmt(g.feverMult())} · party damage ×2 · ${g.rampageNext()?.left ?? 0} clicks to ×${fmt(g.rampageNext()?.mult ?? 0)}`, 'rampage'); break;
+      case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, ev.tier >= 2 ? 'Unstoppable · party damage ×4' : 'Keep going · party damage ×3', `rampage tier${ev.tier}`); break;
       case 'vault':
         if (ev.on) this.banner('GOBLIN VAULT!', 'The room fills with hoarders. Get them all!', 'loot rainbow');
         else this.toast(`The vault closes. Haul: <b>+${fmt(ev.gold)} gold</b>`, 'chest_full_open', 'trophy');
@@ -827,6 +822,10 @@ export class Ui {
     this.el.fever.hidden = g.s.clicks < 1 && !fever;
     this.el.fever.classList.toggle('on', !!fever);
     this.el.feverBar.style.width = `${(fever ? fever.t / fever.dur : g.s.fervor) * 100}%`;
+    // While it runs, the meter says where the Rampage stands and how far the next step is.
+    const next = fever ? g.rampageNext() : null;
+    const label = !fever ? 'Rampage' : next ? `×${fmt(g.feverMult())} · ${next.left} more for ×${fmt(next.mult)}` : `×${fmt(g.feverMult())} · max!`;
+    if (this.el.feverLabel.textContent !== label) this.el.feverLabel.textContent = label;
 
     this.renderBuffs(g.s.buffs);
     this.renderRows();
@@ -850,12 +849,6 @@ export class Ui {
     const rb = this.el.relicBadge;
     rb.hidden = this.newRelics < 1;
     rb.textContent = `+${this.newRelics}`;
-    const quarter = g.heartLv('quarter') > 0;
-    this.el.autoBuy.hidden = !quarter;
-    if (quarter) {
-      this.el.autoBuy.classList.toggle('on', g.s.settings.autoBuy);
-      this.el.autoBuy.textContent = g.s.settings.autoBuy ? 'Auto: on' : 'Auto: off';
-    }
 
     this.hints();
     if (this.modal && ['trophies', 'abyss', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
@@ -1097,9 +1090,8 @@ export class Ui {
     if (kind === 'floor') {
       const mods = g.bossFloor() ? g.bossMods() : [];
       if (!mods.length) return `<div class="tt-h"><b>Floor ${g.s.floor}</b><span class="tt-own">${esc(zoneName(g.s.floor))}</span></div><p class="tt-d">${g.bossFloor() ? `Beat the boss before the clock runs out.` : `Kill ${FLOOR_KILLS} monsters to clear the floor.`}</p>${g.s.floor < 30 ? '<p class="tt-f">From floor 30, bosses start showing up with modifiers.</p>' : ''}`;
-      return `<div class="tt-h"><b>Floor ${g.s.floor} boss</b></div><ul class="tt-l">${mods.map((m) => { const d = MOD_BY_ID.get(m)!; return `<li>${modChips([m])} ${esc(d.desc)} <span class="muted">Answer: ${esc(RELIC_BY_ID.get(d.counter)!.name)}</span></li>`; }).join('')}</ul>`;
+      return `<div class="tt-h"><b>Floor ${g.s.floor} boss</b></div><ul class="tt-l">${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
     }
-    if (kind === 'autoBuy') return `<div class="tt-h"><b>Quartermaster</b></div><p class="tt-d">${g.s.settings.autoBuy ? 'On: companions and upgrades are bought for you, best value first.' : 'Off: you do the shopping.'}</p>`;
     if (kind === 'cur') {
       const c = CURSORS.find((x) => x.id === id)!;
       const tro = c.trophy ? TROPHIES.find((x) => x.id === c.trophy) : undefined;
@@ -1420,7 +1412,7 @@ export class Ui {
     el.style.setProperty('--rc', RARITY_COLORS[d.rarity]);
     el.className = `loot r${d.rarity}${star ? ' starred' : ''}`;
     const head = star ? `Relic star! ${'★'.repeat(star)} · level ${lv}` : lv === 1 ? `New ${RARITY[d.rarity]} relic` : `${RARITY[d.rarity]} relic · level ${lv}`;
-    el.innerHTML = `<span class="loot-ico">${spriteFit(d.icon, 48)}</span><span class="loot-t"><small>${head}</small><b>${esc(d.name)}${starsOf(lv)}</b><em>${esc(relicText(d, lv))}${star ? ' (a quarter stronger)' : ''}${lv === 1 && !equipped ? ' (slots full)' : ''}</em></span>`;
+    el.innerHTML = `<span class="loot-ico">${spriteFit(d.icon, 48)}</span><span class="loot-t"><small>${head}</small><b>${esc(d.name)}${starsOf(lv)}</b><em>${esc(relicText(d, lv))}${star ? ' (a quarter stronger)' : ''}${lv === 1 && !equipped ? ' · equip it in Relics' : ''}</em></span>`;
     void el.offsetWidth;
     el.classList.add('in');
     this.hooks.sound(d.rarity >= 2 || star ? 'drop4' : 'drop2', { vol: 0.7 });

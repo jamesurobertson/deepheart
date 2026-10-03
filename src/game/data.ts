@@ -530,7 +530,6 @@ export const HEART: HeartDef[] = [
   { id: 'hunter', name: 'Relic Hunter', icon: 'weapon_bow_2', max: 4, cost: (l) => [3, 8, 20, 50][l], desc: (l) => `Bosses drop relics 50% more often per level (now +${l * 50}%).` },
   { id: 'bane', name: 'Warden\'s Bane', icon: 'weapon_red_gem_sword', max: 3, cost: (l) => [4, 15, 60][l], desc: (l) => `Boss modifiers are 25% weaker per level (now ${l * 25}%).` },
   { id: 'echo', name: 'Echoing Abyss', icon: 'flask_big_blue', max: 1, cost: () => 6, desc: () => 'Keep abyss powers that cost 100 souls or less when you awaken.' },
-  { id: 'quarter', name: 'Quartermaster', icon: 'coin', max: 1, cost: () => 4, desc: () => 'Your party hires itself: companions and upgrades are bought for you (toggle in the shop).' },
 ];
 export const HEART_BY_ID = new Map(HEART.map((h) => [h.id, h]));
 
