@@ -275,6 +275,9 @@ body.compact .rate .short { display: inline; }
 .dock { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; align-items: flex-end; }
 .dock-b { position: relative; flex-direction: column; min-width: 76px; height: 64px; gap: 4px; padding: 4px 6px; font-size: 14px; }
 .dock-b .glyph { width: 20px; height: 20px; color: var(--gold); }
+/* Shows a number rather than opening anything. */
+.dock-b.dock-stat { cursor: default; }
+.dock-b.dock-stat span { color: var(--gold-hi); }
 .badge {
   position: absolute; top: -14px; right: -8px; display: inline-flex; align-items: center; gap: 3px;
   font: 400 19px/1 'Jersey 10'; font-style: normal; padding: 2px 6px 3px;
@@ -526,6 +529,8 @@ body.compact .buff small { font-size: 14px; }
 body.compact .dock { left: calc(8px + var(--safe-l)); bottom: calc(8px + var(--safe-b)); gap: 4px; }
 body.compact .dock-b { min-width: 0; width: 42px; height: 42px; padding: 0; }
 body.compact .dock-b span { display: none; }
+body.compact .dock-b.dock-stat { width: auto; min-width: 42px; flex-direction: column; gap: 1px; padding: 2px 4px; }
+body.compact .dock-b.dock-stat span { display: block; font-size: 10px; line-height: 1; }
 body.compact .dock-b .glyph { width: 18px; height: 18px; }
 body.compact .dock .mute { display: none; }
 body.compact .badge { top: -10px; right: -12px; font-size: 15px; padding: 1px 4px; }

@@ -134,6 +134,7 @@ export class Ui {
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics">${G.relic()}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.abyss()}<span>Descend</span><em class="badge" hidden></em></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats()}<span>Stats</span></button>
+        <div class="btn dock-b dock-stat blade-rate" data-tip="dock:blade">${spriteFit('weapon_knife', 20, 'glyph')}<span>1/s</span></div>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu()}<span>Options</span></button>
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute"></button>
       </nav>
@@ -166,7 +167,7 @@ export class Ui {
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
       upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
-      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'),
+      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'),
     };
 
     COMPS.forEach((c, i) => {
@@ -923,6 +924,9 @@ export class Ui {
     const rb = this.el.relicBadge;
     rb.hidden = this.newRelics < 1;
     rb.textContent = `+${this.newRelics}`;
+    const rate = `${fmt(g.autoRate())}/s`;
+    const rateEl = this.el.bladeRate.lastElementChild!;
+    if (rateEl.textContent !== rate) rateEl.textContent = rate;
 
     this.hints();
     if (this.modal && ['trophies', 'abyss', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
@@ -1190,6 +1194,7 @@ export class Ui {
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
+        blade: `Phantom Blade: ${g.heroIndex() >= 0 ? `your hero, the ${esc(COMPS[g.heroIndex()].name)},` : 'your hero'} attacks ${fmt(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades, Abyss powers and the Phantom Hilt make it faster.`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }
