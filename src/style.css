@@ -204,6 +204,10 @@ body.compact .rate .short { display: inline; }
 .hint b { display: block; transform: translateX(-50%); white-space: nowrap; animation: hintbob 0.9s ease-in-out infinite; padding: 8px 12px; background: rgba(12, 6, 10, 0.75); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--gold); }
 .hint b small { display: block; margin-top: 4px; font: 400 14px/1 'Pixelify Sans'; color: var(--dim); text-align: center; }
 .hint b::before { content: ''; position: absolute; left: 50%; top: -10px; margin-left: -8px; border: 8px solid transparent; border-top: 0; border-bottom: 10px solid var(--gold); }
+/* Bobs over your hero's head while the hero tip is up. */
+.hero-mark { position: fixed; left: 0; top: 0; z-index: 26; margin: -26px 0 0 -7px; pointer-events: none; font: 400 26px/1 'Jersey 10'; color: var(--gold-hi); text-shadow: var(--outline), 0 0 10px rgba(255, 210, 100, 0.9); animation: markbob 0.7s ease-in-out infinite; }
+@keyframes markbob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+.hint.still b::before { display: none; }
 /* Pointing right, at something in the party panel (the hero star). */
 .hint { z-index: 26; }
 .hint.point-right b { transform: translate(-100%, -50%); animation-name: hintnudge; }
@@ -671,7 +675,7 @@ body.compact .cursors { grid-template-columns: repeat(auto-fill, minmax(48px, 1f
 body.compact .cur { width: auto; height: auto; aspect-ratio: 1; }
 
 @media (prefers-reduced-motion: reduce) {
-  .bank-ico, .hint b, .raid-mark .px, .raid-mark b, .badge.hot { animation: none; }
+  .bank-ico, .hint b, .hero-mark, .raid-mark .px, .raid-mark b, .badge.hot { animation: none; }
 }
 
 /* ---------- relics, boss modifiers and the Heart ---------- */

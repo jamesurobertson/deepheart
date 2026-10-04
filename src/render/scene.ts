@@ -1632,10 +1632,12 @@ export class Scene {
     return foot.x > rect.left + 48 && foot.x < rect.right - right - 48 && foot.y > rect.top + top + 70 && foot.y < rect.bottom - bottom - 16;
   }
 
-  /** Where your hero stands on screen (feet), for the introduction's callout. */
+  /** Where your hero's head is on screen, for the introduction's marker. */
   heroScreen(game: Game): { x: number; y: number } | null {
     const c = this.party.find((p) => p.comp === game.heroIndex());
-    return c && c.body.visible ? this.toScreen(c.body.position) : null;
+    if (!c || !c.body.visible) return null;
+    const h = (c.sprite.rect.h / 16) * c.base;
+    return this.toScreen(c.body.position.clone().setY(h + 0.15));
   }
 
   /** A gold ring under whoever is your hero. */

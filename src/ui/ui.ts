@@ -76,8 +76,9 @@ export class Ui {
   private modal: string | null = null;
   private resetArmed = false;
   private hintState = '';
-  /** When the current hint appeared (the hero tips time out). */
+  /** When the current hint appeared (the hero tips time out), and where the marker over your hero has eased to. */
   private tourAt = 0;
+  private markAt: { x: number; y: number } | null = null;
   /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
   private pointer: { x: number; y: number } | null = null;
   /** Where your hero is headed: the last spot the mouse pointed at on the battlefield (null: let them roam). */
@@ -133,6 +134,7 @@ export class Ui {
       </div>
       <div class="bars"></div>
       <div class="hint" hidden></div>
+      <div class="hero-mark" hidden>▼</div>
       <div class="raid-mark" hidden><b>!</b></div>
       <div class="banner" hidden><b></b><span></span></div>
       <div class="loot" hidden></div>
@@ -171,7 +173,7 @@ export class Ui {
       bank: q('.bank-v'), bankIco: q('.bank-ico'), dps: q('.dps-v'), click: q('.click-v'), rate: q('.rate'),
       floorN: q('.floor-n'), floorSub: q('.floor-sub'), floorBar: q('.floor-bar i'), floorBarT: q('.floor-bar span'), floorBox: q('.floor'),
       down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
-      fever: q('.fever'), feverBar: q('.fever i'), feverLabel: q('.fever span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), raid: q('.raid-mark'),
+      fever: q('.fever'), feverBar: q('.fever i'), feverLabel: q('.fever span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), heroMark: q('.hero-mark'), raid: q('.raid-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
       upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
@@ -1088,10 +1090,20 @@ export class Ui {
     else if (g.s.heroTips === 1 && g.s.owned.filter((n) => n > 0).length >= 2) state = 'star';
     if (state !== this.hintState) this.tourAt = performance.now();
     const shown = performance.now() - this.tourAt;
+    // The words stay put at the top of the battlefield (a hero on the move is hard to read beside); a small marker
+    // bobs over the hero's head, easing after them.
+    const mark = this.el.heroMark;
+    mark.hidden = state !== 'hero';
     if (state === 'hero') {
       const at = this.scene.heroScreen(g);
-      if (at) this.el.hint.style.transform = `translate(${at.x}px, ${at.y + 14}px)`;
-      this.el.hint.style.visibility = at ? 'visible' : 'hidden';
+      if (at) {
+        const was = this.markAt ?? at;
+        this.markAt = { x: was.x + (at.x - was.x) * 0.45, y: was.y + (at.y - was.y) * 0.45 };
+        mark.style.transform = `translate(${this.markAt.x}px, ${this.markAt.y}px)`;
+      }
+      mark.style.visibility = at ? 'visible' : 'hidden';
+      this.el.hint.style.transform = `translate(${this.field.w / 2}px, ${this.hudTop + (this.hudTop ? 16 : 222)}px)`;
+      this.el.hint.style.visibility = 'visible';
       if (shown > 10_000) g.s.heroTips = 1;
     } else if (state === 'star') {
       const star = this.rows[this.starPick()]?.querySelector('.gen-hero')?.getBoundingClientRect();
@@ -1111,9 +1123,10 @@ export class Ui {
     this.hintState = state;
     this.el.hint.hidden = !['click', 'hero', 'star'].includes(state);
     this.el.hint.classList.toggle('point-right', state === 'star');
+    this.el.hint.classList.toggle('still', state === 'hero');
     this.el.shop.classList.toggle('show-stars', state === 'star');
     this.el.hint.innerHTML = state === 'hero'
-      ? `<b>This is your hero!<small>${this.touch ? 'They roam the battlefield and fight for you' : 'They follow your mouse around the battlefield'}</small></b>`
+      ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'they roam the battlefield and fight for you' : 'they follow your mouse'}</small></b>`
       : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click their ★ to switch</small></b>`
         : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows[0].classList.toggle('nudge', state === 'hire');
