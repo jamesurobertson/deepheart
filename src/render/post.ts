@@ -32,19 +32,20 @@ export function tiltShift() {
   };
 }
 
-/** Final grade: multiplicative vignette (never pushes below black) plus warm shadows. */
+/** Final grade: multiplicative vignette (never pushes below black), warm shadows, and saturation (for slow-motion moments). */
 export const GradeShader = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
     vignette: { value: 0.55 },
     warmth: { value: 0.06 },
+    saturation: { value: 1 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
     void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
-    uniform float vignette, warmth;
+    uniform float vignette, warmth, saturation;
     varying vec2 vUv;
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
@@ -52,6 +53,7 @@ export const GradeShader = {
       float v = 1.0 - vignette * smoothstep(0.25, 0.85, length(p));
       float lum = dot(c.rgb, vec3(0.299, 0.587, 0.114));
       c.rgb += warmth * (1.0 - smoothstep(0.0, 0.35, lum)) * vec3(0.35, 0.12, -0.1);
+      c.rgb = mix(vec3(lum), c.rgb, saturation);
       gl_FragColor = vec4(max(c.rgb * v, 0.0), c.a);
     }`,
 };

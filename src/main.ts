@@ -129,6 +129,8 @@ async function boot() {
 
   // The sim runs on a fixed-step timer; rendering on rAF.
   let freeze = 0;
+  /** The scene's slow motion (a clutch kill), applied to the fight as well as the drawing. */
+  let timeScale = 1;
   let lastTick = Date.now();
   let acc = 0;
   setInterval(() => {
@@ -141,7 +143,7 @@ async function boot() {
     if (gap > OFFLINE_AFTER) return catchUp(gap);
     // The zone interlude pauses the fight (nothing is lost; it just waits).
     if (scene.busy) return;
-    acc += gap * SPEED * (freeze > 0 ? 0.1 : 1);
+    acc += gap * SPEED * (freeze > 0 ? 0.1 : 1) * timeScale;
     while (acc >= STEP) {
       game.update(STEP);
       acc -= STEP;
@@ -191,7 +193,8 @@ async function boot() {
     if (stop > 0 && game.s.settings.shake) freeze = Math.max(freeze, stop);
     const slowmo = freeze > 0 ? 0.1 : 1;
     freeze = Math.max(0, freeze - dt);
-    scene.update(dt * slowmo, game);
+    timeScale = scene.timeScale(dt);
+    scene.update(dt * slowmo * timeScale, game);
     ui.frame(dt);
     slow -= dt;
     if (slow <= 0) {
@@ -232,7 +235,11 @@ function playSound(sfx: Sfx, ev: GameEvent) {
     case 'sweep': sfx.play('kill', { vol: 0.6, rate: 1.3, jitter: 0.1 }); break;
     case 'bossWin':
       sfx.play('drop3', { vol: 0.8 });
-      if (ev.clutch) sfx.play('mega', { vol: 0.8, rate: 0.8 });
+      // A clutch kill: a deep, slowed boom as time drops, then the hit landing as it lets go.
+      if (ev.clutch) {
+        sfx.play('mega', { vol: 0.9, rate: 0.55 });
+        setTimeout(() => sfx.play('bosskill', { vol: 0.9, rate: 0.85 }), 900);
+      }
       break;
     case 'rampage': sfx.play('mega', { vol: 0.6, rate: 1 + ev.tier * 0.2 }); break;
     case 'vault': sfx.play(ev.on ? 'drop4' : 'coins', { vol: 0.8 }); break;
