@@ -1126,10 +1126,9 @@ export class Ui {
     if (kind === 'rel') {
       const d = RELIC_BY_ID.get(id)!;
       const lv = g.relicLv(id);
-      const mod = MODS.find((m) => m.counter === id);
       const head = `<div class="tt-h">${spriteFit(d.icon, 32)}<b style="color:${RARITY_COLORS[d.rarity]}">${lv ? esc(d.name) : '???'}</b><span class="tt-own">${RARITY[d.rarity]}${lv ? ` · level ${lv}` : ''}</span></div>`;
       if (!lv) return `${head}<p class="tt-f">Not found yet. ${d.rarity === 3 ? 'Legendary relics mostly turn up deep down.' : 'Keep killing bosses.'}</p>`;
-      return `${head}<p class="tt-d">${esc(relicText(d, lv))}</p><p class="tt-gain">Next level: ${esc(relicText(d, lv + 1))}</p>${mod ? `<p class="tt-f">Answers ${modChips([mod.id])} bosses.</p>` : ''}<p class="tt-f">“${esc(d.flavor)}”</p>`;
+      return `${head}<p class="tt-d">${esc(relicText(d, lv))}</p><p class="tt-gain">Next level: ${esc(relicText(d, lv + 1))}</p><p class="tt-f">“${esc(d.flavor)}”</p>`;
     }
     if (kind === 'heart') {
       const h = HEART_BY_ID.get(id)!;
