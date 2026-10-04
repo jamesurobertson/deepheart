@@ -705,16 +705,16 @@ body.compact .cur { width: auto; height: auto; aspect-ratio: 1; }
 .slot.empty small { font: 400 10px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; }
 .slot .lv { position: absolute; right: -6px; bottom: -6px; }
 .rel-help { text-align: center; margin: 4px auto 12px; max-width: 520px; font-size: 14px; }
-.rel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.rel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
 .rel {
   display: grid; grid-template-columns: 40px 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 8px; padding: 6px 8px; text-align: left; min-height: 60px;
   border: 6px solid transparent; border-image: var(--f-btn) 2 fill / 6px stretch;
   box-shadow: inset 3px 0 0 var(--rc);
 }
 .rel > .px { grid-row: span 2; justify-self: center; }
-.rel b { font: 700 15px/1.05 'Pixelify Sans'; color: var(--rc); text-shadow: var(--shadow); }
-.rel small { font: 400 17px/1 'Jersey 10'; color: var(--dim); }
-.rel.on { border-image-source: var(--f-gold); box-shadow: inset 3px 0 0 var(--rc), 0 0 0 2px color-mix(in srgb, var(--rc) 60%, transparent); }
+.rel b { min-width: 0; overflow-wrap: anywhere; font: 700 15px/1.05 'Pixelify Sans'; color: var(--rc); text-shadow: var(--shadow); }
+.rel small { min-width: 0; font: 400 17px/1 'Jersey 10'; color: var(--dim); }
+.rel.on { border-image-source: var(--f-gold); box-shadow: inset 3px 0 0 var(--rc), inset 0 0 12px color-mix(in srgb, var(--rc) 35%, transparent); }
 .rel.on small { color: var(--gold-hi); }
 .rel.unknown { opacity: 0.55; cursor: default; }
 .rel.unknown > .px { filter: brightness(0) opacity(0.6); }
@@ -744,8 +744,10 @@ body.compact .loot { top: calc(var(--free-h, 100%) * 0.3 + 60px); }
 body.compact .loot-ico { width: 56px; height: 56px; }
 body.compact .loot-t b { font-size: 24px; }
 body.compact .loot-t em { font-size: 12px; }
-body.compact .rel-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+body.compact .rel-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+body.compact .rel { grid-template-columns: 28px 1fr; column-gap: 6px; padding: 4px 6px; }
 body.compact .rel b { font-size: 13px; }
+body.compact .rel small { font-size: 15px; }
 body.compact .slot { width: 58px; height: 58px; }
 body.compact .tab { min-height: 36px; font-size: 14px; }
 body.compact .rel-help, body.compact .mods-list { font-size: 13px; }

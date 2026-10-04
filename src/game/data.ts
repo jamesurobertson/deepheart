@@ -476,7 +476,7 @@ export const RELICS: RelicDef[] = [
   r('glass', 'Sandglass', 'flask_yellow', 1, 'time', 'The sand falls up if you ask nicely.'),
   r('razor', 'Razor Edge', 'weapon_saw_sword', 1, 'critMult', 'Cuts on the way in. Cuts worse on the way out.'),
   r('hawk', 'Hawk\'s Eye', 'weapon_bow', 1, 'critChance', 'Sees the soft spot. Every monster has one.'),
-  r('pick', 'Armorbreaker', 'weapon_big_hammer', 1, 'pierce', 'Plate is just a tin you open.'),
+  r('pick', 'Armor\u00ADbreaker', 'weapon_big_hammer', 1, 'pierce', 'Plate is just a tin you open.'),
   r('rot', 'Festering Blade', 'weapon_machete', 1, 'rot', 'Wounds it makes do not close. Ever.'),
   r('drum', 'Blood Drum', 'flask_big_red', 2, 'rampage', 'Beat it once and the whole party sees red.'),
   r('bait', 'Golden Bait', 'chest_full_open', 2, 'goblin', 'Goblins cannot resist. Goblins have never resisted anything.'),
