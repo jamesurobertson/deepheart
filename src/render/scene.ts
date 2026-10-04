@@ -256,7 +256,7 @@ export class Scene {
   private mons = new Map<number, MonView>();
   private party: CompView[] = [];
   /** Steering for your hero, set by the UI each frame: the pointer over the battlefield, and WASD / arrow keys. */
-  heroInput: { aim: { x: number; y: number } | null; keys: { x: number; z: number } } = { aim: null, keys: { x: 0, z: 0 } };
+  heroInput: { aim: { x: number; y: number } | null; keys: { x: number; z: number }; stay: boolean } = { aim: null, keys: { x: 0, z: 0 }, stay: false };
   private heroRing: THREE.Mesh | null = null;
   private heroComp = -1;
   private raycaster = new THREE.Raycaster();
@@ -1513,11 +1513,13 @@ export class Scene {
     const live = game.monsters.filter((m) => m.arrive <= 0).map((m) => this.mons.get(m.id)).filter((v): v is MonView => !!v && v.dead < 0 && v.born >= 1);
     const nearest = (from: THREE.Vector3) => live.reduce<MonView | null>((best, v) => (!best || v.body.position.distanceToSquared(from) < best.body.position.distanceToSquared(from) ? v : best), null);
 
-    // Where to go: the keys, then the mouse, then (left alone) the nearest monster, or back home when the room is clear.
-    const { aim, keys } = this.heroInput;
+    // Where to go: the keys (then a moment standing where they left it), the mouse, or, left alone, the nearest
+    // monster (home when the room is clear).
+    const { aim, keys, stay } = this.heroInput;
     let goal: THREE.Vector3 | null = null;
     const steer = new THREE.Vector3(keys.x, 0, keys.z);
     if (steer.lengthSq() > 0) goal = p.clone().add(steer.normalize().multiplyScalar(2));
+    else if (stay) goal = null;
     else if (aim) goal = this.floorAt(aim.x, aim.y);
     else {
       const prey = nearest(p);

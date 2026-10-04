@@ -78,6 +78,9 @@ export class Ui {
   private pointer: { x: number; y: number } | null = null;
   /** Arrow keys / WASD held down, for steering your hero. */
   private keys = new Set<'up' | 'down' | 'left' | 'right'>();
+  /** After steering with the keys the hero ignores the mouse until it moves again (and stays put a moment first). */
+  private mouseStale = false;
+  private keyedAt = 0;
   private spaceHeld = false;
   private descending = false;
   private modalKey = '';
@@ -312,6 +315,7 @@ export class Ui {
       this.el.blade.hidden = !field;
       document.body.classList.toggle('blade-on', field);
       this.pointer = field ? { x: e.clientX, y: e.clientY } : null;
+      this.mouseStale = false;
       if (this.game.hold) {
         this.game.hold.x = e.clientX;
         this.game.hold.y = e.clientY;
@@ -348,6 +352,7 @@ export class Ui {
       const dir = dirOf(e);
       if (!dir || this.modal || (e.target as HTMLElement).closest('input, textarea')) return;
       this.keys.add(dir);
+      this.mouseStale = true;
       if (e.key.startsWith('Arrow')) e.preventDefault();
     });
     addEventListener('keyup', (e) => {
@@ -830,8 +835,11 @@ export class Ui {
 
   frame(dt: number) {
     const g = this.game;
-    this.scene.heroInput.aim = g.s.settings.heroFollow && !this.modal ? this.pointer : null;
-    this.scene.heroInput.keys = { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), z: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
+    if (this.keys.size) this.keyedAt = performance.now();
+    const input = this.scene.heroInput;
+    input.aim = g.s.settings.heroFollow && !this.modal && !this.mouseStale ? this.pointer : null;
+    input.keys = { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), z: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
+    input.stay = this.mouseStale && !this.keys.size && performance.now() - this.keyedAt < 4000;
     const bank = g.s.gold;
     this.shown = bank.lt(this.shown) || bank.minus(this.shown).lt(1) ? bank : this.shown.plus(bank.minus(this.shown).times(Math.min(1, dt * 10)));
     this.el.bank.textContent = fmt(this.shown);
