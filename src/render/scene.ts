@@ -258,6 +258,8 @@ export class Scene {
 
   private mons = new Map<number, MonView>();
   private party: CompView[] = [];
+  /** Screen areas your hero keeps out of (the dock), set by the UI. */
+  heroBlocked: DOMRect[] = [];
   /** Steering for your hero, set by the UI each frame: the pointer over the battlefield, and WASD / arrow keys. */
   heroInput: { aim: { x: number; y: number } | null; keys: { x: number; z: number }; stay: boolean } = { aim: null, keys: { x: 0, z: 0 }, stay: false };
   private heroRing: THREE.Mesh | null = null;
@@ -1629,7 +1631,9 @@ export class Scene {
     const foot = this.toScreen(at);
     const rect = this.renderer.domElement.getBoundingClientRect();
     const { right, bottom, top } = this.view;
-    return foot.x > rect.left + 48 && foot.x < rect.right - right - 48 && foot.y > rect.top + top + 70 && foot.y < rect.bottom - bottom - 16;
+    const clear = foot.x > rect.left + 48 && foot.x < rect.right - right - 48 && foot.y > rect.top + top + 70 && foot.y < rect.bottom - bottom - 16;
+    // Not behind the dock either (feet within reach of its buttons would put the hero's body behind them).
+    return clear && !this.heroBlocked.some((b) => foot.x > b.left - 36 && foot.x < b.right + 36 && foot.y > b.top - 14);
   }
 
   /** Where your hero's head is on screen, for the introduction's marker. */

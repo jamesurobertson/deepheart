@@ -322,7 +322,10 @@ export class Ui {
       const over = !t.closest('#ui button, #ui .shop, #ui .pnl') && (this.scene.overMonster(e.clientX, e.clientY) || (!!this.game.raid && this.scene.hitRaider(e.clientX, e.clientY)));
       document.body.classList.toggle('grab', over);
       // Over the battlefield, a mouse gets a sword instead of an arrow.
-      const field = e.pointerType === 'mouse' && !t.closest('#ui button, #ui .shop, #ui .pnl, #ui .dock, #ui .modal-wrap') && !this.modal;
+      // The whole dock strip counts as the dock, gaps between its buttons included: a normal cursor there, and no steering.
+      const dock = this.el.dock.getBoundingClientRect();
+      const overDock = e.clientX > dock.left - 10 && e.clientX < dock.right + 10 && e.clientY > dock.top - 10 && e.clientY < dock.bottom + 10;
+      const field = e.pointerType === 'mouse' && !overDock && !t.closest('#ui button, #ui .shop, #ui .pnl, #ui .dock, #ui .modal-wrap') && !this.modal;
       this.el.blade.hidden = !field;
       document.body.classList.toggle('blade-on', field);
       this.pointer = field ? { x: e.clientX, y: e.clientY } : null;
@@ -331,9 +334,6 @@ export class Ui {
       // leaves them heading where you last pointed; over the party panel (or off the window) they fight on their own.
       if (e.pointerType === 'mouse') {
         const inField = e.clientX < this.field.w && e.clientY < this.field.h;
-        // The whole dock strip counts as the dock, gaps between its buttons included.
-        const dock = this.el.dock.getBoundingClientRect();
-        const overDock = e.clientX > dock.left - 10 && e.clientX < dock.right + 10 && e.clientY > dock.top - 10 && e.clientY < dock.bottom + 10;
         if (!inField) this.heroAim = null;
         else if (!overDock && !t.closest('#ui button, #ui .shop, #ui .modal-wrap')) {
           this.heroAim = { x: e.clientX, y: e.clientY };
@@ -857,6 +857,7 @@ export class Ui {
   frame(dt: number) {
     const g = this.game;
     if (this.keys.size) this.keyedAt = performance.now();
+    this.scene.heroBlocked = [this.el.dock.getBoundingClientRect()];
     const input = this.scene.heroInput;
     input.aim = !this.modal && !this.mouseStale ? this.heroAim : null;
     input.keys = { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), z: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
