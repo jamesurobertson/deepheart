@@ -663,14 +663,14 @@ export class Ui {
         break;
       case 'bossWin':
         if (ev.clutch) {
-          // Letterbox bars for the slow motion; the banner lands with the release, not the kill.
+          // CLUTCH! slams in as the slow motion starts, with letterbox bars for the length of it.
           const { left, gold } = ev.clutch;
           if (g.s.settings.cinematics) {
             this.cinemaUntil = performance.now() + 1900;
             document.body.classList.add('cinema');
             setTimeout(() => document.body.classList.remove('cinema'), 1650);
-            setTimeout(() => this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold`, 'clutch'), 880);
-          } else this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold`, 'clutch');
+          }
+          this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold`, 'clutch');
         }
         else this.banner('Victory!', `Floor ${ev.floor} conquered`, 'win');
         break;
