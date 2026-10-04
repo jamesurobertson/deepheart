@@ -1067,7 +1067,7 @@ export class Ui {
     }
     if (kind === 'tro') {
       const t = TROPHIES.find((x) => x.id === id)!;
-      return `<div class="tt-h">${icon(t.icon, 32)}<b>${esc(t.name)}</b><span class="tt-own">${g.hasTrophy(id) ? 'unlocked' : 'locked'}</span></div><p class="tt-d">${esc(t.desc)}</p><p class="tt-f">Each trophy gives +1% damage.</p>`;
+      return `<div class="tt-h">${icon(t.icon, 32)}<b>${esc(t.name)}</b><span class="tt-own">${g.hasTrophy(id) ? 'unlocked' : 'locked'}</span></div><p class="tt-d">${esc(t.desc)}</p>`;
     }
     if (kind === 'aby') {
       const a = ABYSS.find((x) => x.id === id)!;
