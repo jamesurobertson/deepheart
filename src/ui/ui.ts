@@ -76,6 +76,8 @@ export class Ui {
   private modal: string | null = null;
   private resetArmed = false;
   private hintState = '';
+  /** When a clutch kill's slow motion ends (relic cards wait for it). */
+  private cinemaUntil = 0;
   /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
   private pointer: { x: number; y: number } | null = null;
   private spaceHeld = false;
@@ -616,6 +618,7 @@ export class Ui {
           // Letterbox bars for the slow motion; the banner lands with the release, not the kill.
           const { left, gold } = ev.clutch;
           if (g.s.settings.cinematics) {
+            this.cinemaUntil = performance.now() + 1900;
             document.body.classList.add('cinema');
             setTimeout(() => document.body.classList.remove('cinema'), 1650);
             setTimeout(() => this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold`, 'clutch'), 880);
@@ -665,7 +668,13 @@ export class Ui {
         else this.toast(`The vault closes. Haul: <b>+${fmt(ev.gold)} gold</b>`, 'chest_full_open', 'trophy');
         break;
       case 'abyss': this.toast(`Abyss power: <b>${esc(ABYSS.find((a) => a.id === ev.id)!.name)}</b>`, 'flask_big_red'); break;
-      case 'relic': this.showLoot(ev.id, ev.lv, ev.equipped, ev.star); break;
+      case 'relic': {
+        // A relic from a clutch kill waits for the slow motion to finish.
+        const wait = this.cinemaUntil - performance.now();
+        if (wait > 0) setTimeout(() => this.showLoot(ev.id, ev.lv, ev.equipped, ev.star), wait + 150);
+        else this.showLoot(ev.id, ev.lv, ev.equipped, ev.star);
+        break;
+      }
       case 'heal': {
         if (!g.s.settings.numbers) break;
         const s = this.scene.screenOf(ev.id);
@@ -1457,7 +1466,7 @@ export class Ui {
     }).join('');
     const counters = MODS.map((m) => `<li>${modChips([m.id])} ${esc(m.desc)}</li>`).join('');
     return `<div class="slots">${slots}</div>
-      <p class="muted rel-help">Bosses drop relics: a quarter of zone bosses, some mid-bosses, and always the first time you beat a zone boss this deep. Finding one again levels it up. Tap a relic to slot it in or out.</p>
+      <p class="muted rel-help">Bosses drop relics the first time you beat them each run: a quarter of zone bosses, some mid-bosses, and always a zone boss deeper than you've been before. Finding one again levels it up. Tap a relic to slot it in or out.</p>
       <div class="rel-grid">${cards}</div>
       <h3>Boss modifiers</h3>
       <ul class="mods-list">${counters}</ul>`;
