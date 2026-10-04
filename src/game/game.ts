@@ -26,10 +26,16 @@ const CLICK_DPS = 0.05;
 const RAID_MIN = 180;
 const RAID_MAX = 420;
 const RAID_STAY = 10;
+/** Attacks by hand (a click, a tap, holding either down, or holding Space) land at most this often; extra clicks
+ *  are ignored, so clicking frantically (or with an auto-clicker) gains nothing over holding the button. */
+export const MANUAL_RATE = 5;
+/** The Phantom Blade attacks on its own this many times a second before upgrades (the Auto toggle in the dock). */
+const AUTO_BASE = 1;
 const FEVER_TIME = 10;
+/** Attacks by hand that fill the Rampage meter (about 12 seconds of holding). */
 const FEVER_CLICKS = 60;
-/** Clicks during a Rampage that push it to the next tier, and what each tier does. */
-const RAMPAGE_STEPS = [25, 60];
+/** Attacks by hand during a Rampage that push it to the next tier, and what each tier does. */
+const RAMPAGE_STEPS = [20, 45];
 const RAMPAGE_TIERS = [{ click: 1, dps: 2 }, { click: 2, dps: 3 }, { click: 5, dps: 4 }];
 const RAMPAGE_EXTEND = 3;
 /** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
@@ -95,6 +101,8 @@ export interface Settings {
   cinematics: boolean;
   /** Cursor skin id (see CURSORS). */
   cursor: string;
+  /** The Phantom Blade attacks for you. */
+  autoAttack: boolean;
 }
 
 export interface SaveState {
@@ -172,7 +180,7 @@ export function newSave(): SaveState {
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
     relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rampage: 0, cycleBest: 0,
-    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto' },
+    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoAttack: true },
   };
 }
 
@@ -334,6 +342,10 @@ export class Game {
   private cache: Computed | null = null;
   private trophyTimer = 0;
   private autoClick = 0;
+  /** Seconds until the next attack by hand can land. */
+  private manualCd = 0;
+  /** Held down on the battlefield (mouse, finger or Space): attack by hand at MANUAL_RATE until let go. */
+  hold: { id: number | null; x: number; y: number } | null = null;
   private sinceClick = 99;
   /** DPS damage waiting to be shown as numbers, per monster. */
   private dpsShown = new Map<number, Decimal>();
@@ -868,6 +880,10 @@ export class Game {
   click(id: number | null, x: number, y: number, auto = false) {
     const target = (id !== null ? this.monster(id) : undefined) ?? this.focus();
     if (!target) return new Decimal(0);
+    if (!auto) {
+      if (this.manualCd > 0) return new Decimal(0);
+      this.manualCd = 1 / MANUAL_RATE;
+    }
     const crit = !auto && Math.random() < this.critChance();
     const fever = this.s.buffs.some((b) => b.id === 'fever');
     let amount = this.clickDamage().times(crit ? this.critMult() : 1);
@@ -892,7 +908,15 @@ export class Game {
     return amount;
   }
 
-  /** Keep clicking through a Rampage and it climbs: ×5, ×10, ×25 clicks, more party damage, a little more time. */
+  /** Phantom Blade attacks a second: a slow start, faster with shop upgrades, Abyss powers and the Phantom Hilt. */
+  autoRate() {
+    if (!this.s.settings.autoAttack) return 0;
+    let rate = AUTO_BASE + (this.hasAbyss('hands') ? 2 : 0) + (this.hasAbyss('hands2') ? 5 : 0) + 2 * this.relic('phantom');
+    for (const e of this.effects()) if (e.t === 'auto') rate += e.add;
+    return rate;
+  }
+
+  /** Keep attacking through a Rampage and it climbs: ×5, ×10, ×25 clicks, more party damage, a little more time. */
   private pushRampage() {
     if (this.rampageTier >= RAMPAGE_STEPS.length) return;
     if (++this.rampageClicks < RAMPAGE_STEPS[this.rampageTier]) return;
@@ -1392,7 +1416,10 @@ export class Game {
     }
 
     // Phantom Blade.
-    const rate = (this.hasAbyss('hands2') ? 10 : this.hasAbyss('hands') ? 3 : 0) + 2 * this.relic('phantom');
+    // Attacking by hand while held down, then the Phantom Blade on its own.
+    this.manualCd = Math.max(0, this.manualCd - dt);
+    if (this.hold && this.manualCd <= 0) this.click(this.hold.id, this.hold.x, this.hold.y);
+    const rate = this.autoRate();
     if (rate) {
       this.autoClick += dt * rate;
       while (this.autoClick >= 1) {

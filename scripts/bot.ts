@@ -3,11 +3,11 @@
  * slots the best relics, and prestiges once it stops making progress.
  */
 import Decimal from 'break_infinity.js';
-import { Game, newSave, type GameEvent } from '../src/game/game.ts';
+import { Game, MANUAL_RATE, newSave, type GameEvent } from '../src/game/game.ts';
 import { COMPS, HEART } from '../src/game/data.ts';
 
 export interface Profile {
-  /** Clicks per second while the player is active. */
+  /** Attacks by hand per second while the player is active (the game caps it at MANUAL_RATE, i.e. holding the button). */
   cps: number;
   /** Minutes of active play at the start (and 5 more after every prestige). */
   activeMin: number;
@@ -161,9 +161,14 @@ export class Sim {
     }, 0);
   }
 
+  /** Attacks a second this player makes by hand right now. */
+  private hand() {
+    return this.active ? Math.min(this.profile.cps, MANUAL_RATE) : 0;
+  }
+
   private power() {
     const { game } = this;
-    return game.baseDps().plus(game.clickDamage().times(this.active ? this.profile.cps : 0));
+    return game.baseDps().plus(game.clickDamage().times(this.hand() + game.autoRate()));
   }
 
   private shop() {
@@ -196,7 +201,8 @@ export class Sim {
         const e = u.effect;
         let gain = p.times(0.05);
         if (e.t === 'comp') gain = game.compDps(e.comp);
-        else if (e.t === 'click') gain = this.active ? game.clickDamage().times(this.profile.cps) : new Decimal(0.001);
+        else if (e.t === 'click') gain = game.clickDamage().times(Math.max(0.001, this.hand() + game.autoRate()));
+        else if (e.t === 'auto') gain = game.clickDamage().times(e.add);
         else if (e.t === 'global') gain = p.times(e.pct);
         const score = cost.div(Decimal.max(gain, 1e-9)).log10();
         if (!best || score < best.score) best = { buy: () => game.buyUpg(u.id), cost, score };

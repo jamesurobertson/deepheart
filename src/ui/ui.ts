@@ -74,6 +74,9 @@ export class Ui {
   private modal: string | null = null;
   private resetArmed = false;
   private hintState = '';
+  /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
+  private pointer: { x: number; y: number } | null = null;
+  private spaceHeld = false;
   private descending = false;
   private modalKey = '';
   private bannerTimer = 0;
@@ -126,6 +129,7 @@ export class Ui {
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics">${G.relic()}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.abyss()}<span>Descend</span><em class="badge" hidden></em></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats()}<span>Stats</span></button>
+        <button class="btn dock-b auto-atk" data-act="autoAttack" data-tip="dock:autoAttack">${spriteFit('weapon_knife', 20, 'glyph')}<span>Auto</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu()}<span>Options</span></button>
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute"></button>
       </nav>
@@ -158,7 +162,7 @@ export class Ui {
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
       upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
-      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'),
+      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'), autoAtk: q('.auto-atk'),
     };
 
     COMPS.forEach((c, i) => {
@@ -280,10 +284,22 @@ export class Ui {
         this.game.catchRaid();
         return;
       }
-      this.swing(e.clientX, e.clientY);
+      // Hold to keep attacking (at most MANUAL_RATE a second, so there's nothing to gain from clicking faster).
       const id = this.scene.pick(e.clientX, e.clientY);
-      if (id !== null) this.game.click(id, e.clientX, e.clientY);
+      this.game.hold = { id, x: e.clientX, y: e.clientY };
+      this.game.click(id, e.clientX, e.clientY);
     });
+    const letGo = () => {
+      this.game.hold = null;
+      this.spaceHeld = false;
+    };
+    // A clicked button lets go of keyboard focus, so Space goes back to attacking instead of pressing it again.
+    addEventListener('pointerup', (e) => {
+      if (!this.spaceHeld) this.game.hold = null;
+      if (e.pointerType === 'mouse') (document.activeElement as HTMLElement | null)?.closest?.('button')?.blur();
+    });
+    addEventListener('pointercancel', letGo);
+    addEventListener('blur', letGo);
     addEventListener('pointermove', (e) => {
       const t = e.target as HTMLElement;
       const over = !t.closest('#ui button, #ui .shop, #ui .pnl') && (this.scene.overMonster(e.clientX, e.clientY) || (!!this.game.raid && this.scene.hitRaider(e.clientX, e.clientY)));
@@ -292,6 +308,11 @@ export class Ui {
       const field = e.pointerType === 'mouse' && !t.closest('#ui button, #ui .shop, #ui .pnl, #ui .dock, #ui .modal-wrap') && !this.modal;
       this.el.blade.hidden = !field;
       document.body.classList.toggle('blade-on', field);
+      this.pointer = field ? { x: e.clientX, y: e.clientY } : null;
+      if (this.game.hold) {
+        this.game.hold.x = e.clientX;
+        this.game.hold.y = e.clientY;
+      }
       if (field) this.el.blade.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
     });
     document.addEventListener('pointerleave', () => {
@@ -301,12 +322,23 @@ export class Ui {
     addEventListener('keydown', (e) => {
       if ((e.target as HTMLElement).closest('input, textarea')) return;
       if (e.key === 'Escape' && this.modal) this.closeModal();
+      // Holding Space attacks just like holding the mouse down.
       if ((e.key === ' ' || e.key === 'Enter') && !e.repeat && !this.modal && !(e.target as HTMLElement).closest('button')) {
         e.preventDefault();
+        if (this.scene.busy) return;
+        // The sword swings where the cursor is, or at the front monster if the cursor's off the field.
         const f = this.game.focus();
         const s = f && this.scene.screenOf(f.id);
-        if (f && s) this.game.click(f.id, s.x, s.y + s.h * 0.4);
+        const at = this.pointer ?? (s ? { x: s.x, y: s.y + s.h * 0.4 } : { x: -1, y: -1 });
+        if (e.key === ' ') {
+          this.spaceHeld = true;
+          this.game.hold = { id: null, ...at };
+        }
+        this.game.click(null, at.x, at.y);
       }
+    });
+    addEventListener('keyup', (e) => {
+      if (e.key === ' ' && this.spaceHeld) letGo();
     });
 
     r.addEventListener('click', (e) => {
@@ -460,6 +492,11 @@ export class Ui {
         g.setAuto(!g.s.auto);
         this.hooks.sound('toggle', { vol: 0.5 });
         break;
+      case 'autoAttack':
+        s.autoAttack = !s.autoAttack;
+        this.hooks.sound('toggle', { vol: 0.5 });
+        this.hooks.settings();
+        break;
       case 'mute':
         s.muted = !s.muted;
         this.syncMute();
@@ -530,7 +567,7 @@ export class Ui {
     const g = this.game;
     switch (ev.t) {
       case 'click':
-        if (ev.crit && ev.x >= 0) this.swing(ev.x, ev.y, true);
+        if (ev.x >= 0) this.swing(ev.x, ev.y, ev.crit);
         break;
       case 'hit': {
         if (!g.s.settings.numbers && ev.kind !== 'crit') break;
@@ -855,6 +892,10 @@ export class Ui {
     const rb = this.el.relicBadge;
     rb.hidden = this.newRelics < 1;
     rb.textContent = `+${this.newRelics}`;
+    const auto = this.el.autoAtk;
+    const autoLabel = g.s.settings.autoAttack ? `Auto ${fmt(g.autoRate())}/s` : 'Auto off';
+    if (auto.lastElementChild!.textContent !== autoLabel) auto.lastElementChild!.textContent = autoLabel;
+    auto.classList.toggle('on', g.s.settings.autoAttack);
 
     this.hints();
     if (this.modal && ['trophies', 'abyss', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
@@ -995,7 +1036,7 @@ export class Ui {
     if (state === this.hintState) return;
     this.hintState = state;
     this.el.hint.hidden = state !== 'click';
-    this.el.hint.innerHTML = `<b>${this.touch ? 'Tap' : 'Click'} the monsters!</b>`;
+    this.el.hint.innerHTML = `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows[0].classList.toggle('nudge', state === 'hire');
     this.el.raid.classList.toggle('first', state === 'raid' || state === 'rainbow');
     this.el.raid.classList.toggle('rb-first', state === 'rainbow');
@@ -1106,7 +1147,7 @@ export class Ui {
       const how = tro ? `${this.cursorOpen(c.id) ? 'Unlocked by' : 'Unlock with'} the trophy <b>${esc(tro.name)}</b>: ${esc(tro.desc)}` : 'Always available.';
       return `<div class="tt-h"><b>${esc(c.name)}</b><span class="tt-own">${this.cursorOpen(c.id) ? (this.game.s.settings.cursor === c.id ? 'equipped' : 'cursor') : 'locked'}</span></div><p class="tt-d">${how}</p>${this.game.s.settings.cursor === c.id ? '<p class="tt-f">Tap again to go back to your best bought blade.</p>' : ''}`;
     }
-    if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Click fast to fill this. When it's full, your clicks deal ×${g.feverMult()} damage and your party hits twice as hard for a few seconds. Keep clicking through it to push the Rampage to ×10 and then ×25.</p>`;
+    if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Attack by hand to fill this: click, or just hold the mouse or Space down. When it's full, your attacks deal ×${fmt(g.feverMult())} damage and your party hits twice as hard for a few seconds. Keep attacking through it to push the Rampage to ×10 and then ×25.</p>`;
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
     if (kind === 'dock') {
       const text: Record<string, string> = {
@@ -1116,6 +1157,7 @@ export class Ui {
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
+        autoAttack: g.s.settings.autoAttack ? `Phantom Blade: attacking for you ${fmt(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades make it faster. Click to turn off.` : 'Phantom Blade: off. Click to let it attack for you.',
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }

@@ -202,6 +202,7 @@ body.compact .rate .short { display: inline; }
   font: 700 20px/1 'Pixelify Sans'; color: #fff; text-shadow: var(--outline);
 }
 .hint b { display: block; transform: translateX(-50%); white-space: nowrap; animation: hintbob 0.9s ease-in-out infinite; padding: 8px 12px; background: rgba(12, 6, 10, 0.75); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--gold); }
+.hint b small { display: block; margin-top: 4px; font: 400 14px/1 'Pixelify Sans'; color: var(--dim); text-align: center; }
 .hint b::before { content: ''; position: absolute; left: 50%; top: -10px; margin-left: -8px; border: 8px solid transparent; border-top: 0; border-bottom: 10px solid var(--gold); }
 
 .raid-mark { position: fixed; left: 0; top: 0; pointer-events: none; }
@@ -274,6 +275,8 @@ body.compact .rate .short { display: inline; }
 .dock { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; align-items: flex-end; }
 .dock-b { position: relative; flex-direction: column; min-width: 76px; height: 64px; gap: 4px; padding: 4px 6px; font-size: 14px; }
 .dock-b .glyph { width: 20px; height: 20px; color: var(--gold); }
+.dock-b.auto-atk:not(.on) { filter: saturate(0.3) brightness(0.75); }
+.dock-b.auto-atk.on span { color: var(--green); }
 .badge {
   position: absolute; top: -14px; right: -8px; display: inline-flex; align-items: center; gap: 3px;
   font: 400 19px/1 'Jersey 10'; font-style: normal; padding: 2px 6px 3px;

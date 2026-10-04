@@ -13,10 +13,11 @@ import { duration } from '../src/game/format.ts';
 import { Sim, seedRandom, type Profile } from './bot.ts';
 
 const PROFILES: Record<string, Profile & { earlyGap?: number }> = {
+  // Holding the attack down for the first half hour (then 5 minutes after every prestige); the Phantom Blade after that.
   active: { cps: 5, activeMin: 30, descendRatio: 0, descendGain: 0.5, awakenRatio: 1, stall: 120, catchRate: 0.05 },
-  casual: { cps: 2, activeMin: 10, descendRatio: 0, descendGain: 0.5, awakenRatio: 1, stall: 180, catchRate: 0.03 },
+  casual: { cps: 5, activeMin: 10, descendRatio: 0, descendGain: 0.5, awakenRatio: 1, stall: 180, catchRate: 0.03 },
   // Barely watching, so a quiet stretch early on matters less.
-  idle: { cps: 1, activeMin: 3, descendRatio: 0, descendGain: 0.5, awakenRatio: 1, stall: 300, catchRate: 0.01, earlyGap: 10 * 60 },
+  idle: { cps: 0, activeMin: 0, descendRatio: 0, descendGain: 0.5, awakenRatio: 1, stall: 300, catchRate: 0.01, earlyGap: 10 * 60 },
 };
 
 /** The targets. A gap is time with nothing you've never had before: floor, companion, relic or relic star, upgrade, abyss or Heart power. */
@@ -189,7 +190,7 @@ function judge(r: Report): Check[] {
 
 function print(r: Report, checks: Check[]) {
   const p = PROFILES[r.name];
-  console.log(`\n== ${r.name}: ${p.cps} clicks/s for ${p.activeMin} min, ${r.hours}h, ${r.descents} descents, ${r.awakens} awakenings`);
+  console.log(`\n== ${r.name}: ${p.activeMin ? `holds the attack for ${p.activeMin} min` : 'never attacks by hand'}, ${r.hours}h, ${r.descents} descents, ${r.awakens} awakenings`);
   for (const c of checks) console.log(`  ${c.ok ? 'PASS' : 'FAIL'}  ${c.line}`);
   const content = [
     r.allRelicsAt === null ? 'relics not all found' : `all relics by ${duration(r.allRelicsAt)}`,
@@ -197,6 +198,8 @@ function print(r: Report, checks: Check[]) {
   ];
   console.log(`  info  ${content.join(', ')}`);
   console.log(`  info  after each awakening, back past the old deepest floor in: ${r.recover.map((x) => (x === null ? 'never' : duration(x))).join(', ') || 'no awakenings'}`);
+  const first = r.runs[0].reached;
+  console.log(`  info  first run reaches floor ${[10, 20, 30, 50].map((f) => `${f} at ${first[f] === undefined ? 'never' : duration(first[f])}`).join(', ')}`);
   console.log(`  info  deepest floor every hour: ${r.curve.filter(([t]) => Math.round(t) % 3600 === 0).map(([t, f]) => `${Math.round(t / 3600)}h:${f}`).join(' ')}`);
 }
 
