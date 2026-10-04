@@ -39,6 +39,8 @@ const meetText = (def: { depth: number; heart?: number }, descents: number) =>
   descents < def.depth ? `Descend ${def.depth}× to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
 
 /** A relic's stars, as little gold glyphs after its name. */
+/** A small rate with up to two decimals (1.15, not 1.1); big ones as usual. */
+const perSec = (n: number) => (n < 100 ? String(Math.round(n * 100) / 100) : fmt(n));
 const starsOf = (lv: number) => (relicStars(lv) ? ` <span class="stars">${'★'.repeat(relicStars(lv))}</span>` : '');
 
 function buffText(b: Buff) {
@@ -893,7 +895,7 @@ export class Ui {
     rb.hidden = this.newRelics < 1;
     rb.textContent = `+${this.newRelics}`;
     const auto = this.el.autoAtk;
-    const autoLabel = g.s.settings.autoAttack ? `Auto ${fmt(g.autoRate())}/s` : 'Auto off';
+    const autoLabel = g.s.settings.autoAttack ? `Auto ${perSec(g.autoRate())}/s` : 'Auto off';
     if (auto.lastElementChild!.textContent !== autoLabel) auto.lastElementChild!.textContent = autoLabel;
     auto.classList.toggle('on', g.s.settings.autoAttack);
 
@@ -1156,7 +1158,7 @@ export class Ui {
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        autoAttack: g.s.settings.autoAttack ? `Phantom Blade: attacking for you ${fmt(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades make it faster. Click to turn off.` : 'Phantom Blade: off. Click to let it attack for you.',
+        autoAttack: g.s.settings.autoAttack ? `Phantom Blade: attacking for you ${perSec(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades make it faster. Click to turn off.` : 'Phantom Blade: off. Click to let it attack for you.',
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }

@@ -911,7 +911,7 @@ export class Game {
   /** Phantom Blade attacks a second: a slow start, faster with shop upgrades, Abyss powers and the Phantom Hilt. */
   autoRate() {
     if (!this.s.settings.autoAttack) return 0;
-    let rate = AUTO_BASE + (this.hasAbyss('hands') ? 2 : 0) + (this.hasAbyss('hands2') ? 5 : 0) + 2 * this.relic('phantom');
+    let rate = AUTO_BASE + (this.hasAbyss('hands') ? 1 : 0) + (this.hasAbyss('hands2') ? 3 : 0) + 0.5 * this.relic('phantom');
     for (const e of this.effects()) if (e.t === 'auto') rate += e.add;
     return rate;
   }
