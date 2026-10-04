@@ -4,14 +4,20 @@
 <meta charset="UTF-8" />
 <title>Phone preview</title>
 <style>
-  body { margin: 0; background: #222; display: flex; gap: 24px; padding: 16px; align-items: flex-start; font: 13px system-ui; color: #aaa; }
+  body { margin: 0; background: #222; display: flex; flex-wrap: wrap; gap: 24px; padding: 16px; align-items: flex-start; font: 13px system-ui; color: #aaa; }
   figure { margin: 0; }
   iframe { border: 0; border-radius: 18px; background: #000; display: block; }
 </style>
 </head>
 <body>
-  <!-- Dev only: the game at common phone sizes. ?slot keeps these saves apart from your real one. -->
-  <figure><iframe id="p" src="/?slot=phone" width="390" height="844"></iframe><figcaption>390×844 portrait</figcaption></figure>
-  <figure><iframe id="l" src="/?slot=phone-land" width="844" height="390"></iframe><figcaption>844×390 landscape</figcaption></figure>
+  <!-- Dev only: the game at common phone and tablet sizes. Each frame keeps its own save; ?slot=name points them all at one. -->
+  <figure><iframe data-slot="phone" width="390" height="844"></iframe><figcaption>390×844 portrait</figcaption></figure>
+  <figure><iframe data-slot="phone-small" width="360" height="640"></iframe><figcaption>360×640 small phone</figcaption></figure>
+  <figure><iframe data-slot="phone-land" width="844" height="390"></iframe><figcaption>844×390 landscape</figcaption></figure>
+  <figure><iframe data-slot="tablet" width="768" height="1024"></iframe><figcaption>768×1024 tablet</figcaption></figure>
+  <script>
+    const shared = new URLSearchParams(location.search).get('slot');
+    for (const f of document.querySelectorAll('iframe')) f.src = `/?slot=${shared ?? f.dataset.slot}`;
+  </script>
 </body>
 </html>

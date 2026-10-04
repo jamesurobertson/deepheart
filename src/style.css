@@ -208,10 +208,15 @@ body.compact .rate .short { display: inline; }
 .hero-mark { position: fixed; left: 0; top: 0; z-index: 26; margin: -26px 0 0 -7px; pointer-events: none; font: 400 26px/1 'Jersey 10'; color: var(--gold-hi); text-shadow: var(--outline), 0 0 10px rgba(255, 210, 100, 0.9); animation: markbob 0.7s ease-in-out infinite; }
 @keyframes markbob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
 .hint.still b::before { display: none; }
+/* The still banner wraps rather than running off a narrow screen. */
+.hint.still b { white-space: normal; width: max-content; max-width: min(420px, calc(100vw - 24px)); text-align: center; }
 /* Pointing right, at something in the party panel (the hero star). */
 .hint { z-index: 26; }
 .hint.point-right b { transform: translate(-100%, -50%); animation-name: hintnudge; }
 .hint.point-right b::before { left: auto; right: -10px; top: 50%; margin: -8px 0 0; border: 8px solid transparent; border-right: 0; border-left: 10px solid var(--gold); }
+/* Above its target, arrow down near the left (the hero star on the phone sheet). */
+.hint.point-down b { transform: translate(-18px, calc(-100% - 12px)); white-space: normal; width: max-content; max-width: min(320px, calc(100vw - 24px)); }
+.hint.point-down b::before { left: 10px; top: auto; bottom: -10px; margin: 0; border: 8px solid transparent; border-bottom: 0; border-top: 10px solid var(--gold); }
 @keyframes hintnudge { 0%, 100% { translate: 0 0; } 50% { translate: -6px 0; } }
 
 .raid-mark { position: fixed; left: 0; top: 0; pointer-events: none; }

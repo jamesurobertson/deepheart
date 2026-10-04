@@ -82,8 +82,10 @@ export class Ui {
   private cinemaUntil = 0;
   /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
   private pointer: { x: number; y: number } | null = null;
-  /** Where your hero is headed: the last spot the mouse pointed at on the battlefield (null: let them roam). */
+  /** Where your hero is headed: the last spot the mouse pointed at on the battlefield, or where a finger is held
+   *  down (null: let them roam). */
   private heroAim: { x: number; y: number } | null = null;
+  private fingerDown = false;
   /** The battlefield's share of the window (left of the party panel / above the phone sheet). */
   private field = { w: innerWidth, h: innerHeight };
   /** Arrow keys / WASD held down, for steering your hero. */
@@ -303,6 +305,11 @@ export class Ui {
         this.game.catchRaid();
         return;
       }
+      // On a touch screen, a finger held on the battlefield leads your hero (lift it and they fight on their own).
+      if (e.pointerType !== 'mouse') {
+        this.fingerDown = true;
+        this.heroAim = { x: e.clientX, y: e.clientY };
+      }
       // Hold to keep attacking (at most MANUAL_RATE a second, so there's nothing to gain from clicking faster).
       const id = this.scene.pick(e.clientX, e.clientY);
       this.game.hold = { id, x: e.clientX, y: e.clientY };
@@ -311,10 +318,18 @@ export class Ui {
     const letGo = () => {
       this.game.hold = null;
       this.spaceHeld = false;
+      if (this.fingerDown) {
+        this.fingerDown = false;
+        this.heroAim = null;
+      }
     };
     // A clicked button lets go of keyboard focus, so Space goes back to attacking instead of pressing it again.
     addEventListener('pointerup', (e) => {
       if (!this.spaceHeld) this.game.hold = null;
+      if (e.pointerType !== 'mouse' && this.fingerDown) {
+        this.fingerDown = false;
+        this.heroAim = null;
+      }
       if (e.pointerType === 'mouse') (document.activeElement as HTMLElement | null)?.closest?.('button')?.blur();
     });
     addEventListener('pointercancel', letGo);
@@ -340,7 +355,7 @@ export class Ui {
         else if (!overDock && !t.closest('#ui button, #ui .shop, #ui .modal-wrap')) {
           this.heroAim = { x: e.clientX, y: e.clientY };
         }
-      }
+      } else if (this.fingerDown) this.heroAim = { x: e.clientX, y: e.clientY };
       // Holding the attack down follows the cursor onto whichever monster it's over now.
       if (this.game.hold) {
         this.game.hold.x = e.clientX;
@@ -1139,7 +1154,11 @@ export class Ui {
     } else if (state === 'star') {
       const star = this.rows[this.starPick()]?.querySelector('.gen-hero')?.getBoundingClientRect();
       const visible = !!star && star.width > 0 && star.top > 0 && star.bottom < innerHeight;
-      if (star) this.el.hint.style.transform = `translate(${star.left - 12}px, ${star.top + star.height / 2}px)`;
+      // Beside the star when there's room to its left (the party panel on the right); above it otherwise (the phone sheet).
+      const above = !!star && star.left < 340;
+      this.el.hint.classList.toggle('point-right', !above);
+      this.el.hint.classList.toggle('point-down', above);
+      if (star) this.el.hint.style.transform = above ? `translate(${star.left + star.width / 2}px, ${star.top - 6}px)` : `translate(${star.left - 12}px, ${star.top + star.height / 2}px)`;
       this.el.hint.style.visibility = visible ? 'visible' : 'hidden';
       if (shown > 15_000) g.s.heroTips = 2;
     }
@@ -1153,11 +1172,11 @@ export class Ui {
     if (state === this.hintState) return;
     this.hintState = state;
     this.el.hint.hidden = !['click', 'hero', 'star'].includes(state);
-    this.el.hint.classList.toggle('point-right', state === 'star');
+    if (state !== 'star') this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero');
     this.el.shop.classList.toggle('show-stars', state === 'star');
     this.el.hint.innerHTML = state === 'hero'
-      ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'they roam the battlefield and fight for you' : 'they follow your mouse'}</small></b>`
+      ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : 'they follow your mouse'}</small></b>`
       : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click their ★ to switch</small></b>`
         : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows[0].classList.toggle('nudge', state === 'hire');
