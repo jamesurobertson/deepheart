@@ -76,6 +76,8 @@ export class Ui {
   private hintState = '';
   /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
   private pointer: { x: number; y: number } | null = null;
+  /** Arrow keys / WASD held down, for steering your hero. */
+  private keys = new Set<'up' | 'down' | 'left' | 'right'>();
   private spaceHeld = false;
   private descending = false;
   private modalKey = '';
@@ -129,7 +131,7 @@ export class Ui {
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics">${G.relic()}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.abyss()}<span>Descend</span><em class="badge" hidden></em></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats()}<span>Stats</span></button>
-        <button class="btn dock-b auto-atk" data-act="autoAttack" data-tip="dock:autoAttack">${spriteFit('weapon_knife', 20, 'glyph')}<span>Auto</span></button>
+        <button class="btn dock-b auto-atk" data-act="heroFollow" data-tip="dock:heroFollow">${spriteFit('weapon_knife', 20, 'glyph')}<span>Follow</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu()}<span>Options</span></button>
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute"></button>
       </nav>
@@ -173,7 +175,8 @@ export class Ui {
       row.innerHTML = `
         <span class="gen-ico">${charFit(c.sprite, 40)}</span>
         <span class="gen-mid"><b class="gen-name"></b><span class="gen-cost"></span></span>
-        <span class="gen-right"><b class="gen-lv"></b><small class="gen-dps"></small></span>`;
+        <span class="gen-right"><b class="gen-lv"></b><small class="gen-dps"></small></span>
+        <span class="gen-hero" data-hero="${i}" data-tip="hero:${i}">★</span>`;
       this.el.gens.appendChild(row);
       this.rows.push(row);
       this.rowCache.push('');
@@ -340,6 +343,18 @@ export class Ui {
     addEventListener('keyup', (e) => {
       if (e.key === ' ' && this.spaceHeld) letGo();
     });
+    const dirOf = (e: KeyboardEvent) => ({ w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down', a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right' } as const)[e.key.toLowerCase() as 'w'];
+    addEventListener('keydown', (e) => {
+      const dir = dirOf(e);
+      if (!dir || this.modal || (e.target as HTMLElement).closest('input, textarea')) return;
+      this.keys.add(dir);
+      if (e.key.startsWith('Arrow')) e.preventDefault();
+    });
+    addEventListener('keyup', (e) => {
+      const dir = dirOf(e);
+      if (dir) this.keys.delete(dir);
+    });
+    addEventListener('blur', () => this.keys.clear());
 
     r.addEventListener('click', (e) => {
       if (this.pressed) {
@@ -348,6 +363,14 @@ export class Ui {
         return;
       }
       const t = e.target as HTMLElement;
+      const hero = t.closest<HTMLElement>('[data-hero]');
+      if (hero) {
+        if (this.game.setHero(Number(hero.dataset.hero))) {
+          this.hooks.sound('toggle', { vol: 0.6 });
+          this.refreshTip();
+        }
+        return;
+      }
       const comp = t.closest<HTMLElement>('[data-comp]');
       if (comp) {
         if (this.game.buyComp(Number(comp.dataset.comp))) this.refreshTip();
@@ -492,8 +515,8 @@ export class Ui {
         g.setAuto(!g.s.auto);
         this.hooks.sound('toggle', { vol: 0.5 });
         break;
-      case 'autoAttack':
-        s.autoAttack = !s.autoAttack;
+      case 'heroFollow':
+        s.heroFollow = !s.heroFollow;
         this.hooks.sound('toggle', { vol: 0.5 });
         this.hooks.settings();
         break;
@@ -623,7 +646,11 @@ export class Ui {
         break;
       }
       case 'retreat': this.toast(`Floor ${ev.floor} is too tough for now. Falling back.`, 'skull'); break;
-      case 'buyComp': this.rowCache[ev.comp] = ''; this.bump(this.rows[ev.comp]); break;
+      case 'buyComp':
+        this.rowCache[ev.comp] = '';
+        this.bump(this.rows[ev.comp]);
+        if (g.s.owned.filter((n) => n > 0).length === 1 && g.s.owned[ev.comp] === 1) this.toast(`Your ${COMPS[ev.comp].name} is your hero<small>They follow your mouse and fight for you. Pick another hero with the ★ on their row.</small>`, COMPS[ev.comp].sprite, 'trophy');
+        break;
       case 'reveal': this.toast(`New companion for hire: <b>${COMPS[ev.comp].name}</b>`, COMPS[ev.comp].sprite); break;
       case 'buyUpg': this.upgKey = ''; break;
       case 'trophy': {
@@ -803,6 +830,8 @@ export class Ui {
 
   frame(dt: number) {
     const g = this.game;
+    this.scene.heroInput.aim = g.s.settings.heroFollow && !this.modal ? this.pointer : null;
+    this.scene.heroInput.keys = { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), z: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
     const bank = g.s.gold;
     this.shown = bank.lt(this.shown) || bank.minus(this.shown).lt(1) ? bank : this.shown.plus(bank.minus(this.shown).times(Math.min(1, dt * 10)));
     this.el.bank.textContent = fmt(this.shown);
@@ -893,9 +922,9 @@ export class Ui {
     rb.hidden = this.newRelics < 1;
     rb.textContent = `+${this.newRelics}`;
     const auto = this.el.autoAtk;
-    const autoLabel = g.s.settings.autoAttack ? `Auto ${fmt(g.autoRate())}/s` : 'Auto off';
+    const autoLabel = g.s.settings.heroFollow ? 'Follow' : 'Roam';
     if (auto.lastElementChild!.textContent !== autoLabel) auto.lastElementChild!.textContent = autoLabel;
-    auto.classList.toggle('on', g.s.settings.autoAttack);
+    auto.classList.toggle('on', g.s.settings.heroFollow);
 
     this.hints();
     if (this.modal && ['trophies', 'abyss', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
@@ -978,6 +1007,8 @@ export class Ui {
       const q = g.compQuote(i);
       const can = !locked && !mystery && g.s.gold.gte(q.cost);
       row.classList.toggle('can', can);
+      row.classList.toggle('is-hero', g.heroIndex() === i);
+      row.classList.toggle('owned', g.s.owned[i] > 0);
       row.classList.toggle('mystery', mystery || locked);
       row.style.setProperty('--prog', `${Math.min(1, g.s.gold.div(q.cost).toNumber()) * 100}%`);
       const lv = g.s.owned[i];
@@ -1146,6 +1177,11 @@ export class Ui {
       const how = tro ? `${this.cursorOpen(c.id) ? 'Unlocked by' : 'Unlock with'} the trophy <b>${esc(tro.name)}</b>: ${esc(tro.desc)}` : 'Always available.';
       return `<div class="tt-h"><b>${esc(c.name)}</b><span class="tt-own">${this.cursorOpen(c.id) ? (this.game.s.settings.cursor === c.id ? 'equipped' : 'cursor') : 'locked'}</span></div><p class="tt-d">${how}</p>${this.game.s.settings.cursor === c.id ? '<p class="tt-f">Tap again to go back to your best bought blade.</p>' : ''}`;
     }
+    if (kind === 'hero') {
+      const i = Number(id);
+      const now = g.heroIndex() === i;
+      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse and does your auto-attacks.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line, follow your mouse and do your auto-attacks.`}</p>`;
+    }
     if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Attack by hand to fill this: click, or just hold the mouse or Space down. When it's full, your attacks deal ×${fmt(g.feverMult())} damage and your party hits twice as hard for a few seconds. Keep attacking through it to push the Rampage to ×10 and then ×25.</p>`;
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
     if (kind === 'dock') {
@@ -1156,7 +1192,7 @@ export class Ui {
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        autoAttack: g.s.settings.autoAttack ? `Phantom Blade: attacking for you ${fmt(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades make it faster. Click to turn off.` : 'Phantom Blade: off. Click to let it attack for you.',
+        heroFollow: `${g.heroIndex() >= 0 ? `Your hero, the ${COMPS[g.heroIndex()].name},` : 'Your hero'} attacks ${fmt(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second (shop upgrades make it faster). ${g.s.settings.heroFollow ? 'Following your mouse over the battlefield; click to let them roam and fight on their own.' : 'Roaming and fighting on their own; click to have them follow your mouse.'}`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }

@@ -343,6 +343,12 @@ body.compact .rate .short { display: inline; }
 .gen-name { font: 700 18px/1 'Pixelify Sans'; color: var(--text); text-shadow: var(--shadow); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gen-name small { font: 400 14px/1 'Silkscreen'; color: var(--gold); }
 .gen-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+/* The star picks your hero: shown on your hero's row, and on the others when you hover them. */
+.gen { position: relative; }
+.gen-hero { position: absolute; left: 2px; top: 1px; display: none; padding: 1px 4px; font: 400 14px/1 'Pixelify Sans'; color: var(--faint); text-shadow: var(--outline); cursor: pointer; }
+.gen.owned:hover .gen-hero, body.touch .gen.owned .gen-hero { display: block; }
+.gen.is-hero .gen-hero { display: block; color: var(--gold-hi); text-shadow: var(--outline), 0 0 6px rgba(255, 210, 100, 0.8); }
+.gen-hero:hover { color: var(--gold-hi); }
 .gen-lv { font: 400 28px/1 'Jersey 10'; color: rgba(241, 228, 204, 0.55); text-shadow: var(--shadow); font-weight: 400; }
 .gen-dps { font: 400 16px/1 'Jersey 10'; color: var(--faint); }
 .gen.can .gen-lv { color: var(--text); }

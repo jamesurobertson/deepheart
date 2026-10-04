@@ -255,6 +255,11 @@ export class Scene {
 
   private mons = new Map<number, MonView>();
   private party: CompView[] = [];
+  /** Steering for your hero, set by the UI each frame: the pointer over the battlefield, and WASD / arrow keys. */
+  heroInput: { aim: { x: number; y: number } | null; keys: { x: number; z: number } } = { aim: null, keys: { x: 0, z: 0 } };
+  private heroRing: THREE.Mesh | null = null;
+  private heroComp = -1;
+  private raycaster = new THREE.Raycaster();
   private shots: Shot[] = [];
   private raider: RaiderView | null = null;
   private leaving: RaiderView[] = [];
@@ -601,9 +606,11 @@ export class Scene {
     const targets = game.monsters.filter((m) => m.arrive <= 0);
     const focus = targets[0];
     const haste = 1 + this.fever;
+    const hero = game.heroIndex();
     for (const c of this.party) {
       c.home.x = c.homeX * this.squeeze;
       c.home.z = c.homeZ * this.deep;
+      if (c.comp === hero) continue;
       const def = COMPS[c.comp];
       const p = c.body.position;
       const a = c.act;
@@ -1479,6 +1486,98 @@ export class Scene {
     this.fade.material.opacity = Math.min(1, fade);
   }
 
+  // ---------- your hero ----------
+
+  /** Where a point on screen lands on the floor. */
+  private floorAt(x: number, y: number): THREE.Vector3 | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const ray = this.raycaster.ray;
+    if (ray.direction.y >= -1e-4) return null;
+    return ray.origin.clone().addScaledVector(ray.direction, -ray.origin.y / ray.direction.y);
+  }
+
+  /** Your hero leaves the formation: it walks after the mouse (or the keys), or roams to the nearest monster, and
+   *  swings at whatever it reaches. The swings are your auto-attacks, so the game waits for the scene to land them. */
+  private updateHero(dt: number, game: Game) {
+    game.heroDriven = true;
+    const idx = game.heroIndex();
+    const c = this.party.find((p) => p.comp === idx);
+    if (!c) return;
+    this.markHero(c);
+    const def = COMPS[c.comp];
+    const p = c.body.position;
+    const melee = def.attack === 'slash';
+    const reach = melee ? 1.4 : 4.5;
+    const live = game.monsters.filter((m) => m.arrive <= 0).map((m) => this.mons.get(m.id)).filter((v): v is MonView => !!v && v.dead < 0 && v.born >= 1);
+    const nearest = (from: THREE.Vector3) => live.reduce<MonView | null>((best, v) => (!best || v.body.position.distanceToSquared(from) < best.body.position.distanceToSquared(from) ? v : best), null);
+
+    // Where to go: the keys, then the mouse, then (left alone) the nearest monster, or back home when the room is clear.
+    const { aim, keys } = this.heroInput;
+    let goal: THREE.Vector3 | null = null;
+    const steer = new THREE.Vector3(keys.x, 0, keys.z);
+    if (steer.lengthSq() > 0) goal = p.clone().add(steer.normalize().multiplyScalar(2));
+    else if (aim) goal = this.floorAt(aim.x, aim.y);
+    else {
+      const prey = nearest(p);
+      if (prey) {
+        const to = p.clone().sub(prey.body.position).setY(0);
+        goal = prey.body.position.clone().add(to.setLength(Math.min(to.length(), reach * 0.7)));
+      } else goal = c.home;
+    }
+    let moving = false;
+    if (goal) {
+      goal.x = Math.max(-9, Math.min(9, goal.x));
+      goal.z = Math.max(-4.6, Math.min(6.5, goal.z));
+      const d = goal.clone().sub(p).setY(0);
+      const len = d.length();
+      if (len > 0.15) {
+        p.addScaledVector(d, Math.min(1, (6.5 * (1 + this.fever * 0.3) * dt) / len));
+        moving = true;
+        if (Math.abs(d.x) > 0.05) c.sprite.flip = d.x < 0;
+      }
+    }
+
+    // Swing at whatever's in reach.
+    const target = nearest(p);
+    if (target && target.body.position.distanceTo(p) <= reach && game.heroAttack(target.id)) {
+      const at = target.body.position.clone().setY(target.height * 0.5);
+      const color = SHOT_COLOR[def.attack];
+      c.sprite.flip = at.x < p.x;
+      c.stretch = 1;
+      if (melee) {
+        c.inner.position.x = (at.x < p.x ? -1 : 1) * 0.25;
+        this.fx.swipe(at, color, 0.9, Math.PI * (0.6 + Math.random() * 0.5));
+      } else {
+        this.fx.trail(p.clone().setY(0.9), at, color);
+        this.fx.star(at, color, 0.6, 0.14);
+      }
+    }
+    c.inner.position.x *= Math.max(0, 1 - dt * 12);
+    c.stretch *= Math.max(0, 1 - dt * 10);
+    c.inner.scale.set(c.base * (1 - c.stretch * 0.1), c.base * (1 + c.stretch * 0.15), c.base);
+
+    // Treasure goblins don't get past you.
+    const r = this.raider;
+    if (r && r.state === 'run' && game.raid && r.group.position.distanceTo(p) < 1.3) game.catchRaid();
+
+    c.sprite.play(moving ? c.run : c.idle);
+    c.sprite.update(dt);
+  }
+
+  /** A gold ring under whoever is your hero. */
+  private markHero(c: CompView) {
+    if (this.heroComp === c.comp && this.heroRing) return;
+    if (!this.heroRing) {
+      this.heroRing = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.7, 32), new THREE.MeshBasicMaterial({ color: 0xffd070, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
+      this.heroRing.rotation.x = -Math.PI / 2;
+      this.heroRing.position.y = 0.03;
+    }
+    c.body.add(this.heroRing);
+    this.heroComp = c.comp;
+  }
+
   // ---------- goblin vault ----------
 
   /** A rainbow portal opens; the party runs into it and the flash carries them to the other room. */
@@ -1572,7 +1671,10 @@ export class Scene {
     if (this.inVaultRoom) this.updateVaultRoom(dt);
     const holding = (this.cine && this.cine.phase !== 'arrive') || this.trip?.phase === 'go';
     this.updateMonsters(dt, game);
-    if (!holding) this.updateParty(dt, game);
+    if (!holding) {
+      this.updateParty(dt, game);
+      this.updateHero(dt, game);
+    }
     this.updateShots(dt);
     this.updateRaiders(dt, game);
     this.fx.update(dt);
