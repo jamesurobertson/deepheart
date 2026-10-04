@@ -558,6 +558,7 @@ export type TrophyReq =
   | { t: 'clutches'; n: number }
   | { t: 'champions'; n: number }
   | { t: 'vaults'; n: number }
+  | { t: 'rainbows'; n: number }
   | { t: 'rampage'; n: number }
   | { t: 'stars'; n: number };
 
@@ -615,7 +616,8 @@ function buildTrophies(): TrophyDef[] {
   [1, 4, 8, 12, 16].forEach((n, k) => out.push({ id: `rel${k}`, name: ['Finder', 'Collector', 'Curator', 'Reliquary', 'Every Last One'][k], desc: n === 1 ? 'Find a relic.' : n === 16 ? 'Find every relic.' : `Find ${n} different relics.`, icon: { sprite: 'chest_full_open', tier: k }, req: { t: 'relics', n } }));
   [1, 10, 50].forEach((n, k) => out.push({ id: `clutch${k}`, name: ['By a Hair', 'Nerves of Steel', 'Living on the Edge'][k], desc: `Beat ${n === 1 ? 'a boss' : `${n} bosses`} with ${CLUTCH_SECONDS} seconds or less on the clock.`, icon: { sprite: 'flask_yellow', tier: k }, req: { t: 'clutches', n } }));
   [1, 25, 100].forEach((n, k) => out.push({ id: `champ${k}`, name: ['Champion Slayer', 'Crown Breaker', 'Champion of Champions'][k], desc: `Slay ${n === 1 ? 'a champion' : `${n} champions`}.`, icon: { sprite: 'weapon_red_gem_sword', tier: k }, req: { t: 'champions', n } }));
-  [1, 5, 20].forEach((n, k) => out.push({ id: `vault${k}`, name: ['Over the Rainbow', 'Vault Raider', 'Goblin Banker'][k], desc: `Open the Goblin Vault ${n === 1 ? 'once' : `${n} times`} (catch a rainbow goblin).`, icon: { sprite: 'chest_full_open', tier: k }, req: { t: 'vaults', n } }));
+  [1, 3, 10].forEach((n, k) => out.push({ id: `vault${k}`, name: ['Over the Rainbow', 'Vault Raider', 'Goblin Banker'][k], desc: `Open the Goblin Vault ${n === 1 ? 'once' : `${n} times`} (a rainbow goblin's jackpot).`, icon: { sprite: 'chest_full_open', tier: k }, req: { t: 'vaults', n } }));
+  [1, 5, 15, 40].forEach((n, k) => out.push({ id: `rainbow${k}`, name: ['Double Rainbow', 'Rainbow Wrangler', 'Chasing Rainbows', 'End of the Rainbow'][k], desc: `Catch ${n === 1 ? 'a rainbow goblin' : `${n} rainbow goblins`}.`, icon: { sprite: 'goblin', tier: k + 2 }, req: { t: 'rainbows', n } }));
   [1, 2, 3, 4].forEach((n, k) => out.push({ id: `star${k}`, name: ['Polished', 'Gleaming', 'Radiant', 'Mythic'][k], desc: `Raise a relic to ${'★'.repeat(n)} (level ${RELIC_STARS[k]}).`, icon: { sprite: 'chest_full_open', tier: k + 1 }, req: { t: 'stars', n } }));
   [1, 2, 3, 4].forEach((n, k) => out.push({ id: `lap${k}`, name: ['Corruption', 'The Abyss Looks Back', 'Hollowed Out', 'Eternity'][k], desc: `Reach floor ${n * 80 + 1}, where the zones return ${CORRUPTION[n].name.toLowerCase()}.`, icon: { sprite: 'skull', tier: k + 1 }, req: { t: 'floor', n: n * 80 } }));
   [1, 2].forEach((n, k) => out.push({ id: `rampage${k}`, name: ['Bloodrush', 'Unstoppable'][k], desc: `Keep clicking until a Rampage reaches ×${[10, 25][k]}.`, icon: { sprite: 'flask_big_red', tier: k + 1 }, req: { t: 'rampage', n } }));

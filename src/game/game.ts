@@ -156,6 +156,8 @@ export interface SaveState {
   clutches: number;
   champions: number;
   vaults: number;
+  /** Rainbow goblins caught (a vault or a Rainbow Haul each). */
+  rainbows: number;
   rampage: number;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
   cycleBest: number;
@@ -169,7 +171,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rampage: 0, cycleBest: 0,
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rampage: 0, cycleBest: 0,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto' },
   };
 }
@@ -354,6 +356,8 @@ export class Game {
       s.stones = (s.stones ?? 0) + 4;
       delete s.heart.quarter;
     }
+    // Before Rainbow Hauls, every rainbow goblin caught opened the vault.
+    if (s.rainbows === undefined) s.rainbows = s.vaults ?? 0;
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
@@ -977,6 +981,7 @@ export class Game {
     if (!r) return false;
     this.raid = null;
     this.s.raids++;
+    if (r.rainbow) this.s.rainbows++;
     if (r.rainbow && (this.s.vaults === 0 || Math.random() < VAULT_CHANCE)) {
       this.events.push({ t: 'raidCatch', id: r.id, reward: 'vault' });
       this.openVault();
@@ -1036,7 +1041,8 @@ export class Game {
 
   private spawnRaid() {
     const from = Math.random() < 0.5 ? -1 : 1;
-    const rainbow = Math.random() < RAINBOW_CHANCE;
+    // Your first goblin is always an ordinary one; rainbows only turn up once you know what to do with a goblin.
+    const rainbow = this.s.raids > 0 && Math.random() < RAINBOW_CHANCE;
     // The first rainbow goblin lingers, so it's caught (and the vault seen) rather than missed.
     const stay = rainbow && this.s.vaults === 0 ? RAID_STAY * 1.8 : RAID_STAY;
     this.raid = { id: this.seq++, from, t: 0, stay, rainbow };
@@ -1274,6 +1280,7 @@ export class Game {
       case 'clutches': return s.clutches >= r.n;
       case 'champions': return s.champions >= r.n;
       case 'vaults': return s.vaults >= r.n;
+      case 'rainbows': return s.rainbows >= r.n;
       case 'rampage': return s.rampage >= r.n;
       case 'stars': return Object.values(s.relics).some((lv) => relicStars(lv) >= r.n);
     }
