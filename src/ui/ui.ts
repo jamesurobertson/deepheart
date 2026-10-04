@@ -138,7 +138,7 @@ export class Ui {
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics">${G.relic()}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.abyss()}<span>Descend</span><em class="badge" hidden></em></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats()}<span>Stats</span></button>
-        <div class="btn dock-b dock-stat blade-rate" data-tip="dock:blade">${spriteFit('weapon_knife', 20, 'glyph')}<span>1/s</span></div>
+        <button class="btn dock-b dock-stat blade-rate" data-tip="dock:blade" tabindex="-1">${spriteFit('weapon_knife', 20, 'glyph')}<span>1/s</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu()}<span>Options</span></button>
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute"></button>
       </nav>
@@ -171,7 +171,7 @@ export class Ui {
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
       upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
-      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'),
+      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'),
     };
 
     COMPS.forEach((c, i) => {
@@ -325,8 +325,11 @@ export class Ui {
       // leaves them heading where you last pointed; over the party panel (or off the window) they fight on their own.
       if (e.pointerType === 'mouse') {
         const inField = e.clientX < this.field.w && e.clientY < this.field.h;
+        // The whole dock strip counts as the dock, gaps between its buttons included.
+        const dock = this.el.dock.getBoundingClientRect();
+        const overDock = e.clientX > dock.left - 10 && e.clientX < dock.right + 10 && e.clientY > dock.top - 10 && e.clientY < dock.bottom + 10;
         if (!inField) this.heroAim = null;
-        else if (!t.closest('#ui button, #ui .dock, #ui .shop, #ui .modal-wrap')) this.heroAim = { x: e.clientX, y: e.clientY };
+        else if (!overDock && !t.closest('#ui button, #ui .shop, #ui .modal-wrap')) this.heroAim = { x: e.clientX, y: e.clientY };
       }
       if (this.game.hold) {
         this.game.hold.x = e.clientX;
