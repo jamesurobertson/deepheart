@@ -282,6 +282,8 @@ export class Scene {
   private hitstop = 0;
   /** A clutch kill's slow-motion moment: real seconds since the kill, and where the boss fell. */
   private clutch: { t: number; at: THREE.Vector3; released: boolean } | null = null;
+  /** A change of room that came in during the slow motion, made once it's over. */
+  private pendingBand: number | null = null;
   /** Screen space covered by UI: the camera frames the fight in what's left. */
   private view = { right: 0, bottom: 0, top: 0 };
   /** Portrait screens pull the battle line together so both sides fit. */
@@ -950,7 +952,8 @@ export class Scene {
 
   private updateMonsters(dt: number, game: Game) {
     const alive = new Set(game.monsters.map((m) => m.id));
-    for (const m of game.monsters) if (!this.mons.has(m.id)) this.addMonster(m);
+    // (Nothing new climbs into view during a clutch kill's slow motion; it arrives once that's over.)
+    if (!this.clutch) for (const m of game.monsters) if (!this.mons.has(m.id)) this.addMonster(m);
     for (const v of [...this.mons.values()]) {
       if (v.dead >= 0) {
         // Already shattered into pixels; keep the (hidden) view a moment so the UI can place gold on it.
@@ -1251,6 +1254,7 @@ export class Scene {
         // Let the boss's light, gold and sparks settle (longer if a relic dropped) before the party heads for the stairs.
         // Only for new depths: sweeping back through zones you've seen just changes the room.
         else if (deeper && this.settings.cinematics && game.s.bestFloor <= ev.floor) this.hold = { zone: z, t: this.relicDropped ? 2.8 : 1.6 };
+        else if (this.clutch) this.pendingBand = z;
         else this.setBand(z);
         this.relicDropped = false;
         break;
@@ -1362,6 +1366,8 @@ export class Scene {
     }
     if (c.t >= CLUTCH_END) {
       this.clutch = null;
+      if (this.pendingBand !== null) this.setBand(this.pendingBand);
+      this.pendingBand = null;
       this.grade.uniforms.saturation.value = 1;
       return 1;
     }
@@ -1393,7 +1399,8 @@ export class Scene {
 
   /** True while the interlude holds the screen (the game pauses meanwhile). */
   get busy() {
-    return !!this.hold || (!!this.cine && this.cine.phase !== 'arrive') || this.trip?.phase === 'go';
+    // (A clutch kill's slow motion holds everything else too: the next boss, the staircase, a change of room.)
+    return !!this.hold || (!!this.cine && this.cine.phase !== 'arrive') || this.trip?.phase === 'go' || !!this.clutch;
   }
 
   private startCinematic(zone: number) {
@@ -1781,7 +1788,7 @@ export class Scene {
     });
 
     for (const pr of this.props) pr.update(dt);
-    if (this.hold && (this.hold.t -= dt) <= 0) {
+    if (this.hold && !this.clutch && (this.hold.t -= dt) <= 0) {
       this.startCinematic(this.hold.zone);
       this.hold = null;
     }
