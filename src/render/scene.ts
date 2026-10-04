@@ -1433,8 +1433,9 @@ export class Scene {
     this.scene.add(well.group);
     if (this.room) this.room.visible = false;
     for (const p of this.party) p.body.visible = false;
-    // The walkers: the whole party, two abreast (or a lone squire).
-    const who = this.party.length ? [...this.party].sort((x, y) => x.comp - y.comp).map((p) => COMPS[p.comp]) : [COMPS[0]];
+    // The walkers: the whole party, two abreast (or a lone squire), your hero leading the way.
+    const leads = (p: CompView) => (p.comp === this.heroComp ? 0 : 1);
+    const who = this.party.length ? [...this.party].sort((x, y) => leads(x) - leads(y) || x.comp - y.comp).map((p) => COMPS[p.comp]) : [COMPS[0]];
     for (const def of who) {
       const { run } = a.creature(def.sprite);
       const w = new PixelSprite(a.texture, a.size, run, { fps: 10 });
@@ -1471,11 +1472,11 @@ export class Scene {
     this.band = -1;
     this.setBand(c.zone);
     if (this.room) this.room.visible = true;
-    // Everyone walks in from the left.
+    // Everyone walks in from the left, your hero first.
     for (const p of this.party) {
       p.body.visible = true;
       p.act = null;
-      p.body.position.set(-16 - Math.random() * 2, 0, p.home.z);
+      p.body.position.set(p.comp === this.heroComp ? -14.5 : -16.5 - Math.random() * 2, 0, p.home.z);
     }
     this.resize();
     this.onArrive?.();
