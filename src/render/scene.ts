@@ -45,6 +45,10 @@ function corrupt(p: Palette, lap: number): Palette {
   return { ...p, torch: toward(p.torch, 0.85), hemi: toward(p.hemi, 0.75), fog: new THREE.Color(p.fog).lerp(c, 0.12).getHex(), wall: wash(p.wall), floor: wash(p.floor) };
 }
 
+/** A clutch kill's slow motion: real seconds until the release burst, and until time is back to full speed. */
+const CLUTCH_RELEASE = 0.9;
+const CLUTCH_END = 1.9;
+
 /** Ordinary companions are drawn this many art pixels tall, whatever size their sprite is (big ones stay big). */
 const COMP_HEIGHT = 20;
 
@@ -263,6 +267,8 @@ export class Scene {
   private time = 0;
   private fever = 0;
   private hitstop = 0;
+  /** A clutch kill's slow-motion moment: real seconds since the kill, and where the boss fell. */
+  private clutch: { t: number; at: THREE.Vector3; released: boolean } | null = null;
   /** Screen space covered by UI: the camera frames the fight in what's left. */
   private view = { right: 0, bottom: 0, top: 0 };
   /** Portrait screens pull the battle line together so both sides fit. */
@@ -1245,11 +1251,14 @@ export class Scene {
         this.spawnRaider(ev.id, ev.from, ev.rainbow);
         break;
       case 'bossWin':
-        // A clutch kill: the world holds its breath for a moment.
+        // A clutch kill: the world drops into slow motion around the boss (or just holds its breath, cinematics off).
         if (ev.clutch) {
-          this.hitstop = Math.max(this.hitstop, 0.5);
-          this.addShake(0.6);
-          this.fx.light(new THREE.Vector3(3 * this.squeeze, 2, 0), 0xfff0b0, 60, 1, 18);
+          const boss = [...this.mons.values()].find((v) => v.boss);
+          const at = boss ? boss.body.position.clone().setY(0) : new THREE.Vector3(3 * this.squeeze, 0, 0);
+          if (this.settings.cinematics) this.clutch = { t: 0, at, released: false };
+          else this.hitstop = Math.max(this.hitstop, 0.5);
+          this.addShake(0.35);
+          this.fx.light(at.clone().setY(2), 0xfff0b0, 40, 0.6, 14);
         }
         break;
       case 'rampage':
@@ -1324,6 +1333,38 @@ export class Scene {
 
   private addShake(v: number) {
     if (this.settings.shake) this.shake = Math.max(this.shake, v);
+  }
+
+  /** How fast the world runs this frame: a clutch kill's slow motion, timed in real seconds so it always takes as
+   *  long. Starts slow, lets go with a burst, and eases back to full speed. */
+  timeScale(realDt: number) {
+    const c = this.clutch;
+    if (!c) return 1;
+    c.t += realDt;
+    if (!c.released && c.t >= CLUTCH_RELEASE) {
+      c.released = true;
+      this.clutchRelease(c.at);
+    }
+    if (c.t >= CLUTCH_END) {
+      this.clutch = null;
+      this.grade.uniforms.saturation.value = 1;
+      return 1;
+    }
+    if (c.t < CLUTCH_RELEASE) return 0.16;
+    const k = (c.t - CLUTCH_RELEASE) / (CLUTCH_END - CLUTCH_RELEASE);
+    return 0.16 + 0.84 * k * k * (3 - 2 * k);
+  }
+
+  /** The held breath lets go: a shockwave, gold everywhere, the colour flooding back. */
+  private clutchRelease(at: THREE.Vector3) {
+    this.fx.shockwave(at.clone().setY(0.1), 9);
+    this.fx.ring(at.clone().setY(0.1), 0xffd070, 3.5, 0.6);
+    this.fx.light(at.clone().setY(2.5), 0xffe6a0, 90, 1.1, 22);
+    if (this.settings.particles) {
+      this.fx.burst(at.clone().setY(1.2), '#ffd070', 70, 9, 0.11, 10, true);
+      this.fx.burst(at.clone().setY(1.2), '#ffffff', 30, 6, 0.08, 6, true);
+    }
+    this.addShake(0.9);
   }
 
   /** Hit-stop requested by big impacts (the main loop slows time briefly). */
@@ -1586,7 +1627,20 @@ export class Scene {
     const sh = this.shake * this.shake * 2.2;
     if (this.cine?.phase !== 'stairs') {
       this.camera.position.set(this.camBase.x + (Math.random() - 0.5) * sh, this.camBase.y + (Math.random() - 0.5) * sh, this.camBase.z);
-      this.camera.lookAt(this.look);
+      const look = this.look.clone();
+      // A clutch kill: push in on the fallen boss and drain the colour, then let both go with the release.
+      const c = this.clutch;
+      if (c) {
+        const inT = Math.min(1, c.t / 0.35);
+        const outT = c.t < CLUTCH_RELEASE + 0.15 ? 0 : Math.min(1, (c.t - CLUTCH_RELEASE - 0.15) / (CLUTCH_END - CLUTCH_RELEASE - 0.15));
+        const punch = inT * inT * (3 - 2 * inT) * (1 - outT * outT * (3 - 2 * outT));
+        const focus = c.at.clone().setY(1.2);
+        this.camera.position.lerp(focus.clone().add(new THREE.Vector3(0, 3.2, 6.5)), punch * 0.45);
+        look.lerp(focus, punch * 0.6);
+        this.grade.uniforms.saturation.value = c.released ? 1 + 0.35 * (1 - outT) : 1 - 0.75 * inT;
+        this.grade.uniforms.vignette.value += punch * 0.35;
+      }
+      this.camera.lookAt(look);
     }
     this.composer.render(dt);
   }

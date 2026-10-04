@@ -123,6 +123,7 @@ export class Ui {
       <div class="bars"></div>
       <div class="hint" hidden></div>
       <div class="raid-mark" hidden><b>!</b></div>
+      <div class="letterbox" aria-hidden="true"></div>
       <div class="banner" hidden><b></b><span></span></div>
       <div class="loot" hidden></div>
       <div class="ticker"><span></span></div>
@@ -611,7 +612,15 @@ export class Ui {
         }
         break;
       case 'bossWin':
-        if (ev.clutch) this.banner('CLUTCH!', `${ev.clutch.left.toFixed(1)}s to spare · +${fmt(ev.clutch.gold)} bonus gold`, 'clutch');
+        if (ev.clutch) {
+          // Letterbox bars for the slow motion; the banner lands with the release, not the kill.
+          const { left, gold } = ev.clutch;
+          if (g.s.settings.cinematics) {
+            document.body.classList.add('cinema');
+            setTimeout(() => document.body.classList.remove('cinema'), 1650);
+            setTimeout(() => this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold`, 'clutch'), 880);
+          } else this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold`, 'clutch');
+        }
         else this.banner('Victory!', `Floor ${ev.floor} conquered`, 'win');
         break;
       case 'bossFail':
