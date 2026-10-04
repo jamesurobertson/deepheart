@@ -1505,9 +1505,8 @@ export class Scene {
   }
 
   /** Your hero leaves the formation: it walks after the mouse (or the keys), or roams to the nearest monster, and
-   *  attacks whatever it reaches. The attacks are your auto-attacks, so the game waits for the scene to land them. */
+   *  attacks whatever it reaches at the same pace as the rest of the party (its damage counts with theirs). */
   private updateHero(dt: number, game: Game) {
-    game.heroDriven = true;
     const idx = game.heroIndex();
     const c = this.party.find((p) => p.comp === idx);
     if (!c) return;
@@ -1592,7 +1591,9 @@ export class Scene {
     // The monster you're pointing at first, if it's in reach; otherwise the nearest one that is.
     const pointed = aim ? pointedAt(aim.x, aim.y) : undefined;
     const target = pointed && inReach(pointed) ? pointed : live.filter(inReach).sort((a, b) => a.body.position.distanceTo(p) - b.body.position.distanceTo(p))[0];
-    if (target && game.heroAttack(target.id)) {
+    c.cd -= dt * (1 + this.fever);
+    if (target && c.cd <= 0 && game.dps().gt(0)) {
+      c.cd = 0.8 + Math.random() * 0.9;
       const left = target.body.position.x < p.x;
       c.sprite.flip = left;
       this.heroFace = 0.35;

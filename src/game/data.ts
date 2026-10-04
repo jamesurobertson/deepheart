@@ -265,7 +265,7 @@ const CLICK_UPGS: [string, string, number, number][] = [
   ['Hand of the Deep', 'weapon_anime_sword', 80, 1e20],
 ];
 
-/** Shop upgrades that speed up your hero (it attacks once a second to begin with): name, floor, cost. */
+/** Shop upgrades that speed up the Phantom Blade (it attacks once a second to begin with): name, floor, cost. */
 const PHANTOM_UPGS: [string, number, number][] = [
   ['Restless Blade', 4, 150],
   ['Eager Blade', 12, 2e4],
@@ -326,7 +326,7 @@ function buildUpgrades(): UpgDef[] {
     out.push({ id: `cd${k}`, name, desc: 'Each click also deals +5% of your companions\' damage per second.', cost, icon: { sprite }, effect: { t: 'clickDps', pct: 0.05 }, req: { t: 'floor', n: floor } });
   });
   PHANTOM_UPGS.forEach(([name, floor, cost], k) => {
-    out.push({ id: `auto${k}`, name, desc: 'Your hero attacks once more a second.', cost, icon: { sprite: 'weapon_knife', tier: k + 1 }, effect: { t: 'auto', add: 1 }, req: { t: 'floor', n: floor } });
+    out.push({ id: `auto${k}`, name, desc: 'Your Phantom Blade attacks once more a second.', cost, icon: { sprite: 'weapon_knife', tier: k + 1 }, effect: { t: 'auto', add: 1 }, req: { t: 'floor', n: floor } });
   });
   CRITS.forEach(([name, floor, cost, effect], k) => out.push({
     id: `crit${k}`, name, desc: effect.t === 'crit' && effect.chance ? `+${Math.round(effect.chance * 100)}% chance to land a critical hit.` : 'Critical hits deal twice as much damage.',
@@ -395,7 +395,7 @@ export const ABYSS: AbyssDef[] = [
   { id: 'pulse', name: 'Restless Dead', desc: 'Offline progress 25% → 50%.', cost: 5, icon: 'skull' },
   { id: 'twin', name: 'Twin Blades', desc: 'Clicks deal twice as much damage.', cost: 10, icon: 'weapon_duel_sword' },
   { id: 'heirloom', name: 'Old Friends', desc: 'Start each descent with Squire and Ranger at level 10.', cost: 15, icon: 'knight_m', needs: ['pulse'] },
-  { id: 'hands', name: 'Phantom Fury', desc: 'Your hero attacks 2 more times a second.', cost: 25, icon: 'weapon_knife', needs: ['twin'] },
+  { id: 'hands', name: 'Phantom Fury', desc: 'Your Phantom Blade attacks 2 more times a second.', cost: 25, icon: 'weapon_knife', needs: ['twin'] },
   { id: 'lure', name: 'Scent of Gold', desc: 'Treasure goblins show up 25% more often.', cost: 40, icon: 'coin', needs: ['twin'] },
   { id: 'bargain', name: 'Dark Bargain', desc: 'Upgrades cost 10% less.', cost: 60, icon: 'flask_big_red', needs: ['heirloom'] },
   { id: 'tithe', name: 'Mercenary Guild', desc: 'Companions cost 10% less.', cost: 100, icon: 'coin', needs: ['heirloom'] },
@@ -405,7 +405,7 @@ export const ABYSS: AbyssDef[] = [
   { id: 'mimic', name: 'Mimic Chests', desc: 'Treasure can hold a Soul Storm: damage ×666 for 6 seconds.', cost: 400, icon: 'chest_mimic_open', needs: ['lure'] },
   { id: 'patience', name: 'Patient Hunter', desc: 'Bosses give you 45 seconds instead of 30.', cost: 500, icon: 'ogre', needs: ['skip'] },
   { id: 'roots', name: 'Deep Roots', desc: 'Each soul gives +3% damage instead of +2%.', cost: 700, icon: 'flask_big_green', needs: ['tithe', 'night'] },
-  { id: 'hands2', name: 'Blade Storm', desc: 'Your hero attacks 5 more times a second.', cost: 1500, icon: 'weapon_golden_sword', needs: ['dreams', 'roots'] },
+  { id: 'hands2', name: 'Blade Storm', desc: 'Your Phantom Blade attacks 5 more times a second.', cost: 1500, icon: 'weapon_golden_sword', needs: ['dreams', 'roots'] },
   { id: 'crown', name: 'Crown of the Deep', desc: 'Each soul gives +4% damage instead of +3%.', cost: 5000, icon: 'weapon_red_gem_sword', needs: ['hands2', 'mimic', 'patience'] },
 ];
 export const ABYSS_BY_ID = new Map(ABYSS.map((a) => [a.id, a]));
@@ -510,7 +510,7 @@ export function relicText(def: RelicDef, lv: number): string {
     case 'rampage': return `Rampage is ×${fmtN(1 + 0.5 * L)} stronger.`;
     case 'goblin': return `Treasure goblins show up ${30 * L}% more often.`;
     case 'souls': return `Descending earns ${15 * L}% more souls.`;
-    case 'phantom': return `Your hero attacks ${2 * L} more times a second.`;
+    case 'phantom': return `Your Phantom Blade attacks ${2 * L} more times a second.`;
     case 'cleave': return `Clicks also hit every other monster for ${20 * L}% damage.`;
     case 'all': return `All damage ×${1 + L}.`;
     case 'oath': return `Each click also deals ${10 * L}% of your party's damage per second.`;

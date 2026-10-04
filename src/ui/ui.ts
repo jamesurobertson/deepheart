@@ -1195,7 +1195,7 @@ export class Ui {
     if (kind === 'hero') {
       const i = Number(id);
       const now = g.heroIndex() === i;
-      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse and does your auto-attacks.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line, follow your mouse and do your auto-attacks.`}</p>`;
+      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p>`;
     }
     if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Attack by hand to fill this: click, or just hold the mouse or Space down. When it's full, your attacks deal ×${fmt(g.feverMult())} damage and your party hits twice as hard for a few seconds. Keep attacking through it to push the Rampage to ×10 and then ×25.</p>`;
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
@@ -1207,7 +1207,7 @@ export class Ui {
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        blade: `Phantom Blade: ${g.heroIndex() >= 0 ? `your hero, the ${esc(COMPS[g.heroIndex()].name)},` : 'your hero'} attacks ${fmt(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades, Abyss powers and the Phantom Hilt make it faster.`,
+        blade: `Phantom Blade: attacks the front monster for you ${fmt(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades, Abyss powers and the Phantom Hilt make it faster.`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }

@@ -29,7 +29,7 @@ const RAID_STAY = 10;
 /** Attacks by hand (a click, a tap, holding either down, or holding Space) land at most this often; extra clicks
  *  are ignored, so clicking frantically (or with an auto-clicker) gains nothing over holding the button. */
 export const MANUAL_RATE = 5;
-/** Your hero (a companion you pick) attacks on its own this many times a second before upgrades. */
+/** The Phantom Blade attacks on its own this many times a second before upgrades. */
 const AUTO_BASE = 1;
 const FEVER_TIME = 10;
 /** Attacks by hand that fill the Rampage meter (about 12 seconds of holding). */
@@ -164,7 +164,7 @@ export interface SaveState {
   vaults: number;
   /** Rainbow goblins caught (a vault or a Rainbow Haul each). */
   rainbows: number;
-  /** The companion you picked as your hero: it leaves the formation, follows the mouse and does your auto-attacks. */
+  /** The companion you picked as your hero: it leaves the formation and follows the mouse (just for the fun of it). */
   hero: number;
   rampage: number;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
@@ -346,10 +346,6 @@ export class Game {
   private manualCd = 0;
   /** Held down on the battlefield (mouse, finger or Space): attack by hand at MANUAL_RATE until let go. */
   hold: { id: number | null; x: number; y: number } | null = null;
-  /** The scene walks the hero into range and calls heroAttack; without one (the headless pacing bot) the hero
-   *  attacks the front monster on its own at the same rate. */
-  heroDriven = false;
-  private heroCd = 0;
   private sinceClick = 99;
   /** DPS damage waiting to be shown as numbers, per monster. */
   private dpsShown = new Map<number, Decimal>();
@@ -924,17 +920,7 @@ export class Game {
     return true;
   }
 
-  /** The hero swings at a monster it's reached, as often as autoRate allows. True if the swing landed. */
-  heroAttack(id: number) {
-    if (this.heroCd > 0 || this.heroIndex() < 0) return false;
-    const rate = this.autoRate();
-    if (!rate || !this.monster(id)) return false;
-    this.heroCd = 1 / rate;
-    this.click(id, -1, -1, true);
-    return true;
-  }
-
-  /** Hero attacks a second: a slow start, faster with shop upgrades, Abyss powers and the Phantom Hilt. */
+  /** Phantom Blade attacks a second: a slow start, faster with shop upgrades, Abyss powers and the Phantom Hilt. */
   autoRate() {
     let rate = AUTO_BASE + (this.hasAbyss('hands') ? 2 : 0) + (this.hasAbyss('hands2') ? 5 : 0) + 2 * this.relic('phantom');
     for (const e of this.effects()) if (e.t === 'auto') rate += e.add;
@@ -1444,9 +1430,7 @@ export class Game {
     // Attacking by hand while held down, then the Phantom Blade on its own.
     this.manualCd = Math.max(0, this.manualCd - dt);
     if (this.hold && this.manualCd <= 0) this.click(this.hold.id, this.hold.x, this.hold.y);
-    this.heroCd = Math.max(0, this.heroCd - dt);
-    // Until you've hired a hero (or with no scene to walk one about) the attacks land on the front monster by themselves.
-    const rate = this.heroDriven && this.heroIndex() >= 0 ? 0 : this.autoRate();
+    const rate = this.autoRate();
     if (rate) {
       this.autoClick += dt * rate;
       while (this.autoClick >= 1) {
