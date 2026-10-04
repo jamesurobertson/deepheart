@@ -569,18 +569,28 @@ export interface TrophyDef {
   req: TrophyReq;
 }
 
-const FLOOR_NAMES = ['Into the Dark', 'Down the Stairs', 'Deeper', 'Where Torches Fail', 'Bone Deep', 'The Long Descent', 'Lightless', 'The Underneath', 'Below Below', 'Heartland', 'No Way Back', 'The Bottom?', 'There Is No Bottom'];
-const FLOOR_AT = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 300, 400, 500];
+const FLOOR_NAMES = ['Into the Dark', 'Down the Stairs', 'Deeper', 'Where Torches Fail', 'Bone Deep', 'The Long Descent', 'Lightless', 'The Underneath', 'Below Below', 'Heartland', 'No Way Back', 'The Bottom?', 'There Is No Bottom', 'Older Than Stone', 'A Thousand Down', 'The Abyss Stares Back', 'Two Thousand Fathoms', 'Root of the World', 'Where the Heart Beats'];
+const FLOOR_AT = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 5000];
 const GOLD_NAMES = ['Pocket Change', 'Coin Purse', 'Strongbox', 'Treasury', 'Dragon Hoard', 'Kingdom\'s Ransom', 'Empire\'s Gold', 'Gold Mountain', 'Sea of Gold', 'World of Gold', 'Starfall Gold', 'Beyond Counting'];
-const OWN_AT = [1, 25, 100, 200, 300, 500];
-const OWN_TITLES = ['Hired:', 'Loyal', 'Veteran', 'Legendary', 'Mythic', 'Eternal'];
+const OWN_AT = [1, 25, 100, 200, 300, 500, 750, 1000, 1500, 2000, 3000];
+const OWN_TITLES = ['Hired:', 'Loyal', 'Veteran', 'Legendary', 'Mythic', 'Eternal', 'Ascended', 'Godlike', 'Immortal', 'Transcendent', 'Beyond'];
+
+/** A round power of ten in words for trophy text ("1 sextillion"), falling back to 1e80 past the named ones. */
+const POWER_WORDS: Record<number, string> = { 6: 'million', 9: 'billion', 12: 'trillion', 15: 'quadrillion', 18: 'quintillion', 21: 'sextillion', 24: 'septillion', 27: 'octillion', 30: 'nonillion', 33: 'decillion', 36: 'undecillion', 39: 'duodecillion', 42: 'tredecillion', 45: 'quattuordecillion', 60: 'novemdecillion' };
+function bigWords(n: number): string {
+  const e = Math.round(Math.log10(n));
+  if (e < 6) return n.toLocaleString('en-US');
+  if (e === 100) return 'a googol';
+  const w = POWER_WORDS[e - (e % 3)];
+  return w ? `${10 ** (e % 3)} ${w}` : `1e${e}`;
+}
 
 function buildTrophies(): TrophyDef[] {
   const out: TrophyDef[] = [];
   FLOOR_AT.forEach((n, k) => out.push({ id: `fl${k}`, name: FLOOR_NAMES[k], desc: `Clear floor ${n}.`, icon: { sprite: 'floor_stairs', tier: Math.min(k, 10) }, req: { t: 'floor', n } }));
   GOLD_NAMES.forEach((name, k) => {
     const n = 10 ** (2 + k * 4);
-    out.push({ id: `gold${k}`, name, desc: `Collect ${n.toLocaleString('en-US')} gold in total.`, icon: { sprite: 'coin', tier: Math.min(k, 10) }, req: { t: 'gold', n } });
+    out.push({ id: `gold${k}`, name, desc: `Collect ${bigWords(n)} gold in total.`, icon: { sprite: 'coin', tier: Math.min(k, 10) }, req: { t: 'gold', n } });
   });
   [100, 1000, 10_000, 100_000, 1e6, 1e7].forEach((n, k) => out.push({ id: `kill${k}`, name: ['Monster Hunter', 'Slayer', 'Butcher', 'Massacre', 'Extinction Event', 'The Reaper'][k], desc: `Kill ${n.toLocaleString('en-US')} monsters.`, icon: { sprite: 'skull', tier: k }, req: { t: 'kills', n } }));
   [1, 10, 50, 200, 1000].forEach((n, k) => out.push({ id: `boss${k}`, name: ['Giant Slayer', 'Kingsbane', 'Tyrant Killer', 'Boss Rush', 'Nothing Stands'][k], desc: `Defeat ${n} boss${n > 1 ? 'es' : ''}.`, icon: { sprite: 'ogre', tier: k }, req: { t: 'bosses', n } }));
@@ -610,7 +620,8 @@ function buildTrophies(): TrophyDef[] {
   [1, 2, 3, 4].forEach((n, k) => out.push({ id: `lap${k}`, name: ['Corruption', 'The Abyss Looks Back', 'Hollowed Out', 'Eternity'][k], desc: `Reach floor ${n * 80 + 1}, where the zones return ${CORRUPTION[n].name.toLowerCase()}.`, icon: { sprite: 'skull', tier: k + 1 }, req: { t: 'floor', n: n * 80 } }));
   [1, 2].forEach((n, k) => out.push({ id: `rampage${k}`, name: ['Bloodrush', 'Unstoppable'][k], desc: `Keep clicking until a Rampage reaches ×${[10, 25][k]}.`, icon: { sprite: 'flask_big_red', tier: k + 1 }, req: { t: 'rampage', n } }));
   [1, 3, 10, 25].forEach((n, k) => out.push({ id: `awk${k}`, name: ['It Wakes', 'Heartbeat', 'Drumming Deep', 'The Heart Remembers'][k], desc: `Awaken the Heart ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'ui_heart_full', tier: k }, req: { t: 'awakens', n } }));
-  [10, 1e3, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21].forEach((n, k) => out.push({ id: `dps${k}`, name: ['Scrapper', 'Fighter', 'Warrior', 'Warlord', 'Army', 'Legion', 'Cataclysm', 'Apocalypse'][k], desc: `Reach ${n.toLocaleString('en-US')} damage per second.`, icon: { sprite: 'weapon_waraxe', tier: k }, req: { t: 'dps', n } }));
+  const dpsNames = ['Scrapper', 'Fighter', 'Warrior', 'Warlord', 'Army', 'Legion', 'Cataclysm', 'Apocalypse', 'Extinction', 'World Breaker', 'Star Eater', 'Galaxy Killer', 'Heat Death', 'Big Bang', 'Googol'];
+  [10, 1e3, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21, 1e24, 1e30, 1e36, 1e45, 1e60, 1e80, 1e100].forEach((n, k) => out.push({ id: `dps${k}`, name: dpsNames[k], desc: `Reach ${bigWords(n)} damage per second.`, icon: { sprite: 'weapon_waraxe', tier: Math.min(k, 10) }, req: { t: 'dps', n } }));
   return out;
 }
 
