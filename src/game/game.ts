@@ -215,7 +215,7 @@ export type GameEvent =
   | { t: 'click'; crit: boolean; x: number; y: number }
   | { t: 'spawn'; id: number }
   | { t: 'kill'; id: number; gold: Decimal; boss: boolean; by: HitKind; champ?: boolean }
-  | { t: 'floor'; floor: number; boss: boolean }
+  | { t: 'floor'; floor: number; boss: boolean; cleared?: boolean }
   | { t: 'sweep'; floor: number; gold: Decimal }
   | { t: 'bossFail'; floor: number }
   | { t: 'bossWin'; floor: number; clutch?: { left: number; gold: Decimal } }
@@ -624,7 +624,8 @@ export class Game {
 
   // ---------- floors and monsters ----------
 
-  private enterFloor(f: number, quiet = false) {
+  /** Move to a floor. `cleared`: because the last one was just cleared (the UI and scene make a moment of it). */
+  private enterFloor(f: number, quiet = false, cleared = false) {
     this.s.floor = f;
     this.s.floorKills = 0;
     this.stuckT = 0;
@@ -634,7 +635,7 @@ export class Game {
     this.stash = [];
     // During the Goblin Vault the boss waits until the vault closes.
     if (isBossFloor(f) && !this.inVault()) this.spawnBoss();
-    if (!quiet) this.events.push({ t: 'floor', floor: f, boss: isBossFloor(f) });
+    if (!quiet) this.events.push({ t: 'floor', floor: f, boss: isBossFloor(f), cleared });
   }
 
   /** Go to a floor you've unlocked. */
@@ -839,7 +840,7 @@ export class Game {
       this.s.floorKills++;
       if (this.s.floorKills >= FLOOR_KILLS) {
         this.unlockNext();
-        if (this.s.auto && this.s.floor + 1 <= this.s.maxFloor) this.enterFloor(this.s.floor + 1);
+        if (this.s.auto && this.s.floor + 1 <= this.s.maxFloor) this.enterFloor(this.s.floor + 1, false, true);
       }
     }
   }
@@ -869,6 +870,7 @@ export class Game {
     s.floorKills = FLOOR_KILLS;
     this.events.push({ t: 'sweep', floor, gold });
     this.unlockNext();
+    // (A sweep announces itself, so it doesn't count as a 'cleared' floor change.)
     if (s.auto && floor + 1 <= s.maxFloor) this.enterFloor(floor + 1);
   }
 

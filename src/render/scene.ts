@@ -93,6 +93,8 @@ interface MonView {
   glow: 'champ' | 'hoard' | null;
   /** A champion's gold ring at its feet. */
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial> | null;
+  /** Seconds spent running for the stairs after the floor changed under it (-1: not fleeing). */
+  flee: number;
 }
 
 interface CompView {
@@ -934,7 +936,7 @@ export class Scene {
       ring.position.y = 0.03;
       body.add(ring);
     }
-    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0, glow: m.champ ? 'champ' : m.vault ? 'hoard' : null, ring });
+    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0, glow: m.champ ? 'champ' : m.vault ? 'hoard' : null, ring, flee: -1 });
     if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(0.4), '#6a5a78', 6, 2, 0.08, 6);
     if (m.boss && !m.half) {
       this.fx.light(STAIRS.clone().setY(2), 0xff4040, 30, 1, 12);
@@ -962,7 +964,21 @@ export class Scene {
         continue;
       }
       if (!alive.has(v.id)) {
-        // Gone without dying (floor change): vanish in a puff.
+        // Left behind by a floor change: run for the stairs and shrink away into them. Anything else (the vault,
+        // a descent) vanishes in a puff.
+        if (v.flee >= 0) {
+          v.flee += dt;
+          const stairs = STAIRS.clone();
+          const d = stairs.sub(v.body.position).setY(0);
+          if (d.length() > 0.2) v.body.position.addScaledVector(d.normalize(), Math.min(d.length(), 9 * dt));
+          v.sprite.flip = d.x < 0;
+          v.sprite.play(v.run);
+          v.sprite.update(dt * 1.6);
+          const fade = Math.max(0, 1 - Math.max(0, v.flee - 0.55) / 0.45);
+          v.body.scale.setScalar(fade);
+          if (fade <= 0) this.removeView(v);
+          continue;
+        }
         if (this.settings.particles) this.fx.burst(v.body.position.clone().setY(0.5), '#6a5a78', 8, 2, 0.08, 6);
         this.removeView(v);
         continue;
@@ -1245,6 +1261,8 @@ export class Scene {
         this.relicDropped = true;
         break;
       case 'floor': {
+        // Whatever's still standing has lost the floor: it turns and runs for the stairs.
+        for (const v of this.mons.values()) if (v.dead < 0 && v.flee < 0) v.flee = 0;
         const z = zoneOf(ev.floor);
         // Going down into a zone you've never reached: the staircase.
         const deeper = z > zoneOf(this.lastFloor);

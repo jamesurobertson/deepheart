@@ -647,6 +647,14 @@ export class Ui {
         break;
       }
       case 'floor':
+        // A cleared floor: say so in the middle of the field, and give the floor bar a gold flash as it ticks over.
+        if (ev.cleared) {
+          const mid = this.scene.fieldScreen();
+          this.pop(mid.x, mid.y, `Floor ${ev.floor - 1} cleared!`, 'p-floor');
+          this.el.floorBox.classList.remove('advance');
+          void this.el.floorBox.offsetWidth;
+          this.el.floorBox.classList.add('advance');
+        }
         // Entering a new zone gets a title card.
         if (ev.floor % 10 === 1 && ev.floor > 1) {
           // During the staircase interlude, the title card waits for the party to arrive.
