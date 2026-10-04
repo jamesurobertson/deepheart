@@ -364,17 +364,17 @@ export class Scene {
     this.camera.aspect = fullW / fullH;
     this.camera.setViewOffset(fullW, fullH, fullW / 2 - cx, fullH / 2 - cy, w, h);
     this.camera.updateProjectionMatrix();
-    // Wide screens show the whole battle line; tall ones squeeze it and zoom in.
-    const portrait = freeW < freeH * 1.1;
-    this.squeeze = portrait ? 0.72 : 1;
-    this.deep = portrait ? 1.7 : 1;
-    this.look.set(portrait ? -0.9 : 0, LOOK.y, LOOK.z);
-    const across = portrait ? 10 : 17;
-    const tall = portrait ? 11 : 8;
+    // One camera everywhere: looking down steeply, the battle spread in depth rather than in a long line.
+    // Wider screens pull back a little further to show more of the room around the fight.
+    this.squeeze = 0.72;
+    this.deep = 1.7;
+    this.look.set(-0.9, LOOK.y, LOOK.z);
     const t = Math.tan(THREE.MathUtils.degToRad(15));
-    const dist = Math.max((across * fullH) / (2 * t * freeW), (tall * fullH) / (2 * t * freeH));
-    // Tall screens look down more steeply, so depth turns into usable vertical space.
-    const tilt = portrait ? 0.62 : 0.26;
+    // Short screens (landscape phones) frame the fight tighter so it doesn't shrink to specks.
+    const roomy = freeW >= freeH && freeH >= 600 ? 1.15 : 1;
+    const tall = freeH < 500 ? 8 : 11;
+    const dist = Math.max((10 * fullH) / (2 * t * freeW), (tall * fullH) / (2 * t * freeH)) * roomy;
+    const tilt = 0.62;
     this.camBase.set(this.look.x, this.look.y + dist * tilt, this.look.z + dist);
     const fog = this.scene.fog as THREE.Fog;
     fog.near = dist + 8;

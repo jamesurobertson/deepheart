@@ -204,9 +204,10 @@ async function boot() {
   requestAnimationFrame(frame);
 }
 
-/** Each zone has its own track; bosses get the boss themes (the zone boss the bigger one). */
+/** Each zone has its own track; bosses get the boss themes (the zone boss the bigger one); the Goblin Vault its own calm one. */
 const ZONE_TRACKS: Track[] = ['halls', 'crypts', 'warrens', 'tomb', 'rotting', 'grove', 'demon', 'frozen'];
 function trackFor(game: Game): Track {
+  if (game.s.buffs.some((b) => b.id === 'vault')) return 'vault';
   if (game.bossFloor()) return game.s.floor % 10 === 0 ? 'boss2' : 'boss';
   return ZONE_TRACKS[zoneOf(game.s.floor) % ZONE_TRACKS.length];
 }
