@@ -93,8 +93,6 @@ interface MonView {
   glow: 'champ' | 'hoard' | null;
   /** A champion's gold ring at its feet. */
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial> | null;
-  /** Seconds spent running for the stairs after the floor changed under it (-1: not fleeing). */
-  flee: number;
 }
 
 interface CompView {
@@ -615,6 +613,23 @@ export class Scene {
     if (!instant) this.fx.light(home.clone().setY(1.5), 0xffd070, 12, 0.5, 6);
   }
 
+  /** A monster bursts into its own pixels (dying, or caught on a floor that's just been cleared). Returns where. */
+  private burstApart(v: MonView) {
+    v.dead = 0;
+    v.body.visible = false;
+    const r = v.sprite.rect;
+    const origin = v.body.position.clone().add(new THREE.Vector3(v.knock, v.hopY, 0.05));
+    this.fx.shatter(origin, this.atlas.pixels(r, 1), r, v.scale / 16, v.sprite.flip, 1, v.boss ? 1.4 : 1);
+    const at = origin.clone().setY(v.height * 0.45);
+    this.fx.star(at, 0xffffff, v.boss ? 2.5 : 1.1, 0.18);
+    if (this.settings.particles) this.fx.burst(at, '#ffd070', v.boss ? 30 : 5, v.boss ? 6 : 3, 0.06, 12, true);
+    if (this.settings.blood) {
+      this.fx.spray(at, v.blood, v.boss ? 30 : 10, 1, v.boss ? 1.5 : 1.1);
+      if (v.blood !== BONE) this.fx.bloodSplat(v.body.position.clone().setX(v.body.position.x + 0.25), v.blood, v.boss ? 2.2 : 1);
+    }
+    return at;
+  }
+
   private monsterPos(id: number): THREE.Vector3 | null {
     const v = this.mons.get(id);
     return v && v.dead < 0 ? v.body.position : null;
@@ -936,7 +951,7 @@ export class Scene {
       ring.position.y = 0.03;
       body.add(ring);
     }
-    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0, glow: m.champ ? 'champ' : m.vault ? 'hoard' : null, ring, flee: -1 });
+    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0, glow: m.champ ? 'champ' : m.vault ? 'hoard' : null, ring });
     if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(0.4), '#6a5a78', 6, 2, 0.08, 6);
     if (m.boss && !m.half) {
       this.fx.light(STAIRS.clone().setY(2), 0xff4040, 30, 1, 12);
@@ -964,21 +979,7 @@ export class Scene {
         continue;
       }
       if (!alive.has(v.id)) {
-        // Left behind by a floor change: run for the stairs and shrink away into them. Anything else (the vault,
-        // a descent) vanishes in a puff.
-        if (v.flee >= 0) {
-          v.flee += dt;
-          const stairs = STAIRS.clone();
-          const d = stairs.sub(v.body.position).setY(0);
-          if (d.length() > 0.2) v.body.position.addScaledVector(d.normalize(), Math.min(d.length(), 9 * dt));
-          v.sprite.flip = d.x < 0;
-          v.sprite.play(v.run);
-          v.sprite.update(dt * 1.6);
-          const fade = Math.max(0, 1 - Math.max(0, v.flee - 0.55) / 0.45);
-          v.body.scale.setScalar(fade);
-          if (fade <= 0) this.removeView(v);
-          continue;
-        }
+        // Gone without dying (the floor changed, the vault, a descent): vanish in a puff.
         if (this.settings.particles) this.fx.burst(v.body.position.clone().setY(0.5), '#6a5a78', 8, 2, 0.08, 6);
         this.removeView(v);
         continue;
@@ -1225,23 +1226,7 @@ export class Scene {
       case 'kill': {
         const v = this.mons.get(ev.id);
         if (!v || v.dead >= 0) break;
-        v.dead = 0;
-        v.body.visible = false;
-        const scale = v.scale;
-        const unit = scale / 16;
-        const r = v.sprite.rect;
-        const origin = v.body.position.clone().add(new THREE.Vector3(v.knock, v.hopY, 0.05));
-        // The monster bursts into its own pixels.
-        this.fx.shatter(origin, this.atlas.pixels(r, v.boss ? 1 : 1), r, unit, v.sprite.flip, 1, v.boss ? 1.4 : 1);
-        const at = origin.clone().setY(v.height * 0.45);
-        this.fx.star(at, 0xffffff, v.boss ? 2.5 : 1.1, 0.18);
-        if (this.settings.particles) {
-          this.fx.burst(at, '#ffd070', v.boss ? 30 : 5, v.boss ? 6 : 3, 0.06, 12, true);
-        }
-        if (this.settings.blood) {
-          this.fx.spray(at, v.blood, v.boss ? 30 : 10, 1, v.boss ? 1.5 : 1.1);
-          if (v.blood !== BONE) this.fx.bloodSplat(v.body.position.clone().setX(v.body.position.x + 0.25), v.blood, v.boss ? 2.2 : 1);
-        }
+        const at = this.burstApart(v);
         if (ev.champ) {
           this.fx.light(at, 0xffd070, 30, 0.6, 10);
           if (this.settings.particles) this.fx.burst(at, '#ffd070', 26, 5, 0.08, 10, true);
@@ -1261,8 +1246,15 @@ export class Scene {
         this.relicDropped = true;
         break;
       case 'floor': {
-        // Whatever's still standing has lost the floor: it turns and runs for the stairs.
-        for (const v of this.mons.values()) if (v.dead < 0 && v.flee < 0) v.flee = 0;
+        // A cleared floor: whatever's still standing bursts apart with it.
+        if (ev.cleared) {
+          let any = false;
+          for (const v of this.mons.values()) if (v.dead < 0 && v.born >= 0.5) {
+            this.burstApart(v);
+            any = true;
+          }
+          if (any) this.addShake(0.15);
+        }
         const z = zoneOf(ev.floor);
         // Going down into a zone you've never reached: the staircase.
         const deeper = z > zoneOf(this.lastFloor);
