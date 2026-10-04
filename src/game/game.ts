@@ -1081,8 +1081,8 @@ export class Game {
   private rewardBuff(reward: RaidReward, effect: number): Buff {
     const b = (id: Buff['id'], name: string, t: number, dps: number, click: number, gold: number): Buff => ({ id, name, t: t * effect, dur: t * effect, dps, click, gold });
     switch (reward) {
-      case 'bloodlust': return b('bloodlust', 'Bloodlust', 60, 7, 1, 1);
-      case 'heartstorm': return b('heartstorm', 'Frenzy', 15, 1, 77, 1);
+      case 'bloodlust': return b('bloodlust', 'Bloodlust', 30, 7, 1, 1);
+      case 'heartstorm': return b('heartstorm', 'Frenzy', 10, 1, 77, 1);
       case 'soulstorm': return b('soulstorm', 'Soul Storm', 6, 666, 666, 1);
       default: return b('horde', 'Gold Rush', 30, 1, 1, 7);
     }
