@@ -1114,7 +1114,7 @@ export class Ui {
     this.el.shop.classList.toggle('show-stars', state === 'star');
     this.el.hint.innerHTML = state === 'hero'
       ? `<b>This is your hero!<small>${this.touch ? 'They roam the battlefield and fight for you' : 'They follow your mouse around the battlefield'}</small></b>`
-      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click ★ · just for looks, damage stays the same</small></b>`
+      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click their ★ to switch</small></b>`
         : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows[0].classList.toggle('nudge', state === 'hire');
     this.el.raid.classList.toggle('first', state === 'raid' || state === 'rainbow');
@@ -1234,7 +1234,7 @@ export class Ui {
     if (kind === 'hero') {
       const i = Number(id);
       const now = g.heroIndex() === i;
-      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p><p class="tt-f">Just for looks: your hero deals the same damage as anyone else.</p>`;
+      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p>`;
     }
     if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Attack by hand to fill this: click, or just hold the mouse or Space down. When it's full, your attacks deal ×${fmt(g.feverMult())} damage and your party hits twice as hard for a few seconds. Keep attacking through it to push the Rampage to ×10 and then ×25.</p>`;
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
