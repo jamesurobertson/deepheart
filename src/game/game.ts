@@ -34,9 +34,10 @@ const AUTO_BASE = 1;
 const FEVER_TIME = 10;
 /** Attacks by hand that fill the Rampage meter (about 12 seconds of holding). */
 const FEVER_CLICKS = 60;
-/** Attacks by hand during a Rampage that push it to the next tier, and what each tier does. */
-const RAMPAGE_STEPS = [20, 45];
-const RAMPAGE_TIERS = [{ click: 1, dps: 2 }, { click: 2, dps: 3 }, { click: 5, dps: 4 }];
+/** Attacks by hand during a Rampage that push it to its top tier, and what each tier does: clicks ×5 then ×10
+ *  (nothing raises that further), party damage ×2 then ×3 (the Unstoppable upgrade and Blood Drum add to it). */
+const RAMPAGE_STEPS = [20];
+const RAMPAGE_TIERS = [{ click: 1, dps: 2 }, { click: 2, dps: 3 }];
 const RAMPAGE_EXTEND = 3;
 /** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
 const CLUTCH_GOLD = 1.5;
@@ -372,6 +373,8 @@ export class Game {
     }
     // Before Rainbow Hauls, every rainbow goblin caught opened the vault.
     if (s.rainbows === undefined) s.rainbows = s.vaults ?? 0;
+    // Trophies that no longer exist (retired ones) shouldn't keep counting toward the trophy bonus.
+    if (s.trophies) s.trophies = s.trophies.filter((id) => TROPHIES.some((t) => t.id === id));
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
@@ -566,16 +569,20 @@ export class Game {
   }
 
   feverMult() {
-    let p = 5;
+    return 5 * RAMPAGE_TIERS[this.rampageTier].click;
+  }
+
+  /** How much harder the party hits during a Rampage on top of its tier: the Unstoppable upgrade and the Blood Drum. */
+  rampageParty() {
+    let p = 1 + 0.25 * this.relic('rampage');
     for (const e of this.effects()) if (e.t === 'fever' && e.power) p *= e.power;
-    return p * (1 + 0.5 * this.relic('rampage')) * RAMPAGE_TIERS[this.rampageTier].click;
+    return p;
   }
 
   /** Clicks still needed for the next Rampage tier and the click multiplier it brings (null at the top tier). */
   rampageNext(): { left: number; mult: number } | null {
     if (this.rampageTier >= RAMPAGE_STEPS.length) return null;
-    const base = this.feverMult() / RAMPAGE_TIERS[this.rampageTier].click;
-    return { left: RAMPAGE_STEPS[this.rampageTier] - this.rampageClicks, mult: base * RAMPAGE_TIERS[this.rampageTier + 1].click };
+    return { left: RAMPAGE_STEPS[this.rampageTier] - this.rampageClicks, mult: 5 * RAMPAGE_TIERS[this.rampageTier + 1].click };
   }
 
   inVault() {
@@ -929,14 +936,14 @@ export class Game {
     return rate;
   }
 
-  /** Keep attacking through a Rampage and it climbs: ×5, ×10, ×25 clicks, more party damage, a little more time. */
+  /** Keep attacking through a Rampage and it climbs from ×5 clicks to ×10, with more party damage and a little more time. */
   private pushRampage() {
     if (this.rampageTier >= RAMPAGE_STEPS.length) return;
     if (++this.rampageClicks < RAMPAGE_STEPS[this.rampageTier]) return;
     this.rampageTier++;
     const b = this.s.buffs.find((x) => x.id === 'fever');
     if (b) {
-      b.dps = RAMPAGE_TIERS[this.rampageTier].dps;
+      b.dps = RAMPAGE_TIERS[this.rampageTier].dps * this.rampageParty();
       b.t += RAMPAGE_EXTEND;
       b.dur += RAMPAGE_EXTEND;
     }
@@ -952,7 +959,7 @@ export class Game {
     for (const e of this.effects()) if (e.t === 'fever' && e.dur) dur *= e.dur;
     if (this.hasAbyss('dreams')) dur *= 1.5;
     this.s.fevers++;
-    this.addBuff({ id: 'fever', name: 'Rampage', t: dur, dur, dps: 2, click: 1, gold: 1 });
+    this.addBuff({ id: 'fever', name: 'Rampage', t: dur, dur, dps: RAMPAGE_TIERS[0].dps * this.rampageParty(), click: 1, gold: 1 });
     this.events.push({ t: 'fever', on: true });
   }
 
