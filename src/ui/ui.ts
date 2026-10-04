@@ -16,7 +16,7 @@ export interface UiHooks {
 }
 
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
-const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', soulstorm: 'Soul Storm!', vault: 'Goblin Vault!' };
+const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', soulstorm: 'Soul Storm!', vault: 'Goblin Vault!', rainbow: 'Rainbow Haul!' };
 const MAX_POPS = 90;
 const RARITY_COLORS = ['#c9b8a0', '#5fa8ff', '#c77dff', '#ffb13d'];
 
@@ -599,8 +599,8 @@ export class Ui {
       case 'raidCatch': {
         if (ev.reward === 'vault') break;
         const title = REWARD_TEXT[ev.reward];
-        const line = ev.reward === 'plunder' ? `+${fmt(ev.amount ?? 0)} gold` : ev.buff ? `${buffText(ev.buff)} for ${Math.round(ev.buff.dur)}s` : '';
-        this.banner(title, line, 'loot');
+        const line = ev.reward === 'plunder' || ev.reward === 'rainbow' ? `+${fmt(ev.amount ?? 0)} gold` : ev.buff ? `${buffText(ev.buff)} for ${Math.round(ev.buff.dur)}s` : '';
+        this.banner(title, line, ev.reward === 'rainbow' ? 'loot rainbow' : 'loot');
         break;
       }
       case 'raidSpawn':

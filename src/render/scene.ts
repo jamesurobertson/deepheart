@@ -899,7 +899,8 @@ export class Scene {
     if (m.mods.includes('enraged')) tint.multiply(new THREE.Color(0xff9a88));
     if (m.mods.includes('regen')) tint.multiply(new THREE.Color(0xb8ffb0));
     // Later laps: everything that climbs the stairs wears the corruption's colour.
-    const lap = Math.floor(this.band / ZONES.length);
+    // (From the floor, not the room: the vault's treasure room has no lap.)
+    const lap = Math.floor(zoneOf(this.lastFloor) / ZONES.length);
     if (lap && !m.vault) tint.lerp(tint.clone().multiply(new THREE.Color(corruptionOf(lap).tint)), 0.7);
     sprite.mesh.material.color.copy(tint);
     if (m.half && this.settings.particles) this.fx.burst(body.position.clone().setY(1), '#d58aff', 14, 4, 0.08, 8);

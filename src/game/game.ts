@@ -37,14 +37,18 @@ const CLUTCH_GOLD = 1.5;
 /** A champion turns up about as often as a treasure goblin: tougher, glowing, and worth a little more than a goblin's plunder. */
 const CHAMP_HP = 6;
 const CHAMP_GOLD = 50;
-/** Share of treasure goblins that are rainbow goblins; catching one opens the Goblin Vault. */
+/** Share of treasure goblins that are rainbow goblins. Catching one opens the Goblin Vault a quarter of the time
+ *  (always the first time); otherwise it drops a Rainbow Haul of RAINBOW_HAUL times a goblin's plunder. */
 const RAINBOW_CHANCE = 1 / 8;
+const VAULT_CHANCE = 0.25;
+const RAINBOW_HAUL = 3;
 const VAULT_TIME = 20;
 const VAULT_ON = 16;
 const VAULT_GAP = 0.1;
-/** Hoarders take this many seconds of party damage each, so the room fills up and clicking them pays. */
-const VAULT_HP = 0.4;
-const VAULT_GOLD = 3;
+/** Hoarders fall in this many seconds of party damage each and drop this many times a monster's gold, so a vault is
+ *  worth roughly a quarter of an hour of ordinary fighting even without clicking. */
+const VAULT_HP = 0.15;
+const VAULT_GOLD = 15;
 const BASE_CRIT = 0.04;
 const BASE_CRIT_MULT = 8;
 const OFFLINE_CAP = 72 * 3600;
@@ -656,7 +660,8 @@ export class Game {
   }
 
   private spawnHoarder() {
-    const hp = Decimal.max(floorHp(this.s.floor).times(TRASH * 0.25), this.dps().times(VAULT_HP));
+    // Health from your own strength only, so a vault pays out in full even on a floor you're stuck on.
+    const hp = Decimal.max(this.dps().times(VAULT_HP), this.clickDamage());
     const def = HOARDERS[Math.floor(Math.random() * HOARDERS.length)];
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.4, mods: [], vault: true, ...this.spot(false) };
     this.monsters.push(m);
@@ -972,9 +977,16 @@ export class Game {
     if (!r) return false;
     this.raid = null;
     this.s.raids++;
-    if (r.rainbow) {
+    if (r.rainbow && (this.s.vaults === 0 || Math.random() < VAULT_CHANCE)) {
       this.events.push({ t: 'raidCatch', id: r.id, reward: 'vault' });
       this.openVault();
+      this.scheduleRaid();
+      return true;
+    }
+    if (r.rainbow) {
+      const amount = floorGold(this.s.floor).times(this.goldMult() * RAINBOW_HAUL * (10 + Math.random() * 10));
+      this.earn(amount);
+      this.events.push({ t: 'raidCatch', id: r.id, reward: 'rainbow', amount });
       this.scheduleRaid();
       return true;
     }
