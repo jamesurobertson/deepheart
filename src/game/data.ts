@@ -374,7 +374,7 @@ function buildUpgrades(): UpgDef[] {
   const fever: [string, string, number, number, Effect][] = [
     ['Battle Fury', 'Rampage fills 25% faster.', 1, 2_000, { t: 'fever', fill: 1.25 }],
     ['Blood Frenzy', 'Rampage lasts 50% longer.', 5, 5e7, { t: 'fever', dur: 1.5 }],
-    ['Unstoppable', 'Rampage makes clicks ×10 instead of ×5.', 15, 5e12, { t: 'fever', power: 2 }],
+    ['Unstoppable', 'Rampage makes your party half as strong again.', 15, 5e12, { t: 'fever', power: 1.5 }],
   ];
   fever.forEach(([name, desc, n, cost, effect], k) => out.push({ id: `fev${k}`, name, desc, cost, icon: { sprite: 'flask_big_red', tier: k }, effect, req: { t: 'fevers', n } }));
   return out;
@@ -510,7 +510,7 @@ export function relicText(def: RelicDef, lv: number): string {
     case 'critChance': return `+${Math.min(30, 2 * L)}% critical hit chance.`;
     case 'pierce': return `Armored bosses block ${Math.round(75 * 0.7 ** L)}% of companion damage instead of 75%.`;
     case 'rot': return `Regenerating bosses heal ${fmtN(3 * 0.7 ** L)}% a second instead of 3%.`;
-    case 'rampage': return `Rampage is ×${fmtN(1 + 0.5 * L)} stronger.`;
+    case 'rampage': return `Rampage makes your party ×${fmtN(1 + 0.25 * L)} stronger.`;
     case 'goblin': return `Treasure goblins show up ${30 * L}% more often.`;
     case 'souls': return `Descending earns ${15 * L}% more souls.`;
     case 'phantom': return `Your Phantom Blade attacks ${fmtN(0.5 * L)} more time${0.5 * L === 1 ? '' : 's'} a second.`;
@@ -636,7 +636,7 @@ function buildTrophies(): TrophyDef[] {
   [1, 5, 15, 40].forEach((n, k) => out.push({ id: `rainbow${k}`, name: ['Double Rainbow', 'Rainbow Wrangler', 'Chasing Rainbows', 'End of the Rainbow'][k], desc: `Catch ${n === 1 ? 'a rainbow goblin' : `${n} rainbow goblins`}.`, icon: { sprite: 'goblin', tier: k + 2 }, req: { t: 'rainbows', n } }));
   [1, 2, 3, 4].forEach((n, k) => out.push({ id: `star${k}`, name: ['Polished', 'Gleaming', 'Radiant', 'Mythic'][k], desc: `Raise a relic to ${'★'.repeat(n)} (level ${RELIC_STARS[k]}).`, icon: { sprite: 'chest_full_open', tier: k + 1 }, req: { t: 'stars', n } }));
   [1, 2, 3, 4].forEach((n, k) => out.push({ id: `lap${k}`, name: ['Corruption', 'The Abyss Looks Back', 'Hollowed Out', 'Eternity'][k], desc: `Reach floor ${n * 80 + 1}, where the zones return ${CORRUPTION[n].name.toLowerCase()}.`, icon: { sprite: 'skull', tier: k + 1 }, req: { t: 'floor', n: n * 80 } }));
-  [1, 2].forEach((n, k) => out.push({ id: `rampage${k}`, name: ['Bloodrush', 'Unstoppable'][k], desc: `Keep clicking until a Rampage reaches ×${[10, 25][k]}.`, icon: { sprite: 'flask_big_red', tier: k + 1 }, req: { t: 'rampage', n } }));
+  out.push({ id: 'rampage0', name: 'Bloodrush', desc: 'Keep attacking until a Rampage reaches ×10.', icon: { sprite: 'flask_big_red', tier: 1 }, req: { t: 'rampage', n: 1 } });
   [1, 3, 10, 25].forEach((n, k) => out.push({ id: `awk${k}`, name: ['It Wakes', 'Heartbeat', 'Drumming Deep', 'The Heart Remembers'][k], desc: `Awaken the Heart ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'ui_heart_full', tier: k }, req: { t: 'awakens', n } }));
   const dpsNames = ['Scrapper', 'Fighter', 'Warrior', 'Warlord', 'Army', 'Legion', 'Cataclysm', 'Apocalypse', 'Extinction', 'World Breaker', 'Star Eater', 'Galaxy Killer', 'Heat Death', 'Big Bang', 'Googol'];
   [10, 1e3, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21, 1e24, 1e30, 1e36, 1e45, 1e60, 1e80, 1e100].forEach((n, k) => out.push({ id: `dps${k}`, name: dpsNames[k], desc: `Reach ${bigWords(n)} damage per second.`, icon: { sprite: 'weapon_waraxe', tier: Math.min(k, 10) }, req: { t: 'dps', n } }));

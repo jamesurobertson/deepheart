@@ -649,8 +649,8 @@ export class Ui {
         }
         break;
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
-      case 'fever': if (ev.on) this.banner('RAMPAGE!', `Clicks ×${fmt(g.feverMult())} · party damage ×2 · ${g.rampageNext()?.left ?? 0} clicks to ×${fmt(g.rampageNext()?.mult ?? 0)}`, 'rampage'); break;
-      case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, ev.tier >= 2 ? 'Unstoppable · party damage ×4' : 'Keep going · party damage ×3', `rampage tier${ev.tier}`); break;
+      case 'fever': if (ev.on) this.banner('RAMPAGE!', `Clicks ×${fmt(g.feverMult())} · party damage ×${fmt(2 * g.rampageParty())} · ${g.rampageNext()?.left ?? 0} attacks to ×${fmt(g.rampageNext()?.mult ?? 0)}`, 'rampage'); break;
+      case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, `Unstoppable · party damage ×${fmt(3 * g.rampageParty())}`, `rampage tier${ev.tier}`); break;
       case 'vault':
         if (ev.on) this.banner('GOBLIN VAULT!', 'The room fills with hoarders. Get them all!', 'loot rainbow');
         else this.toast(`The vault closes. Haul: <b>+${fmt(ev.gold)} gold</b>`, 'chest_full_open', 'trophy');
@@ -1148,7 +1148,7 @@ export class Ui {
       const how = tro ? `${this.cursorOpen(c.id) ? 'Unlocked by' : 'Unlock with'} the trophy <b>${esc(tro.name)}</b>: ${esc(tro.desc)}` : 'Always available.';
       return `<div class="tt-h"><b>${esc(c.name)}</b><span class="tt-own">${this.cursorOpen(c.id) ? (this.game.s.settings.cursor === c.id ? 'equipped' : 'cursor') : 'locked'}</span></div><p class="tt-d">${how}</p>${this.game.s.settings.cursor === c.id ? '<p class="tt-f">Tap again to go back to your best bought blade.</p>' : ''}`;
     }
-    if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Attack by hand to fill this: click, or just hold the mouse or Space down. When it's full, your attacks deal ×${fmt(g.feverMult())} damage and your party hits twice as hard for a few seconds. Keep attacking through it to push the Rampage to ×10 and then ×25.</p>`;
+    if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Attack by hand to fill this: click, or just hold the mouse or Space down. When it's full, your attacks deal ×${fmt(g.feverMult())} damage and your party hits ×${fmt(2 * g.rampageParty())} as hard for a few seconds. Keep attacking through it to push the Rampage to ×10; the meter counts down the attacks.</p>`;
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
     if (kind === 'dock') {
       const text: Record<string, string> = {
