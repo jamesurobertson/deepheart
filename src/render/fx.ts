@@ -640,8 +640,9 @@ export class Fx {
     if (!pixels.length) return;
     while (this.shards.length >= MAX_SHATTERS) this.dropShard(0);
     const n = pixels.length;
-    // Lit like the sprites, so white pixels (bones) don't blow out in the bloom.
-    const mesh = new THREE.InstancedMesh(CUBE, new THREE.MeshLambertMaterial({ transparent: true }), n);
+    // Unlit, so the pieces keep the monster's own colours whatever the room's light (a corrupted lap's purple, say),
+    // a shade dimmed so white pixels (bones) don't blow out in the bloom.
+    const mesh = new THREE.InstancedMesh(CUBE, new THREE.MeshBasicMaterial({ transparent: true }), n);
     const pos = new Float32Array(n * 3);
     const vel = new Float32Array(n * 3);
     const spin = new Float32Array(n);
@@ -659,7 +660,7 @@ export class Fx {
       vel[i * 3 + 1] = (2.5 + oy * 3 + Math.random() * 3.5) * power;
       vel[i * 3 + 2] = (Math.random() - 0.3) * 3 * power;
       spin[i] = (Math.random() - 0.5) * 20;
-      mesh.setColorAt(i, c.setHex(p.color));
+      mesh.setColorAt(i, c.setHex(p.color).multiplyScalar(0.78));
     });
     mesh.instanceColor!.needsUpdate = true;
     mesh.frustumCulled = false;

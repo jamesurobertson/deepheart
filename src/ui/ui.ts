@@ -1278,7 +1278,7 @@ export class Ui {
     if (kind === 'hero') {
       const i = Number(id);
       const now = g.heroIndex() === i;
-      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p>`;
+      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach. Click the ★ again to have no hero.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p>`;
     }
     if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Attack by hand to fill this: click, or just hold the mouse or Space down. When it's full, your attacks deal ×${fmt(g.feverMult())} damage and your party hits ×${fmt(2 * g.rampageParty())} as hard for a few seconds. Keep attacking through it to push the Rampage to ×10; the meter counts down the attacks.</p>`;
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;

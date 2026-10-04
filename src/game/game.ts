@@ -165,7 +165,7 @@ export interface SaveState {
   vaults: number;
   /** Rainbow goblins caught (a vault or a Rainbow Haul each). */
   rainbows: number;
-  /** The companion you picked as your hero: it leaves the formation and follows the mouse (just for the fun of it). */
+  /** The companion you picked as your hero (-1: none): it leaves the formation and follows the mouse, for the fun of it. */
   hero: number;
   /** How far through the hero introduction you are: 0 none, 1 met your hero, 2 shown the star that picks one. */
   heroTips: number;
@@ -921,13 +921,20 @@ export class Game {
     return amount;
   }
 
-  /** Your hero: the companion you picked, or the first one you hired if that one's gone (-1 before any). */
+  /** Your hero: the companion you picked, or the first one you hired if that one's gone. -1 for none (before your
+   *  first hire, or when you've chosen to go without). */
   heroIndex() {
+    if (this.s.hero < 0) return -1;
     if (this.s.owned[this.s.hero] > 0) return this.s.hero;
     return this.s.owned.findIndex((n) => n > 0);
   }
 
+  /** Pick a companion as your hero; picking the one you already have means no hero at all. */
   setHero(i: number) {
+    if (this.heroIndex() === i) {
+      this.s.hero = -1;
+      return true;
+    }
     if (this.s.owned[i] === 0) return false;
     this.s.hero = i;
     return true;

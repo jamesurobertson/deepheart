@@ -980,7 +980,7 @@ export class Scene {
       }
       if (!alive.has(v.id)) {
         // Gone without dying (the floor changed, the vault, a descent): vanish in a puff.
-        if (this.settings.particles) this.fx.burst(v.body.position.clone().setY(0.5), '#6a5a78', 8, 2, 0.08, 6);
+        if (this.settings.particles) this.fx.burst(v.body.position.clone().setY(0.5), v.blood, 8, 2, 0.08, 6);
         this.removeView(v);
         continue;
       }
@@ -1570,7 +1570,12 @@ export class Scene {
   private updateHero(dt: number, game: Game) {
     const idx = game.heroIndex();
     const c = this.party.find((p) => p.comp === idx);
-    if (!c) return;
+    if (!c) {
+      // No hero (none yet, or you've gone without): the ring comes off, and whoever had it walks back into line.
+      this.heroRing?.removeFromParent();
+      this.heroComp = -1;
+      return;
+    }
     if (this.heroComp !== c.comp) this.heroVel.set(0, 0, 0);
     this.markHero(c);
     const def = COMPS[c.comp];
