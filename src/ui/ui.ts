@@ -76,6 +76,10 @@ export class Ui {
   private hintState = '';
   /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
   private pointer: { x: number; y: number } | null = null;
+  /** Where your hero is headed: the last spot the mouse pointed at on the battlefield (null: let them roam). */
+  private heroAim: { x: number; y: number } | null = null;
+  /** The battlefield's share of the window (left of the party panel / above the phone sheet). */
+  private field = { w: innerWidth, h: innerHeight };
   /** Arrow keys / WASD held down, for steering your hero. */
   private keys = new Set<'up' | 'down' | 'left' | 'right'>();
   /** After steering with the keys the hero ignores the mouse until it moves again (and stays put a moment first). */
@@ -213,6 +217,7 @@ export class Ui {
     const shop = this.el.shop.getBoundingClientRect();
     const freeW = sheet ? w : shop.left;
     const freeH = sheet ? shop.top : h;
+    this.field = { w: freeW, h: freeH };
     this.root.style.setProperty('--free-w', `${freeW}px`);
     this.root.style.setProperty('--free-h', `${freeH}px`);
     // The news ticker starts where the dock ends (the dock grows as features are added).
@@ -316,6 +321,13 @@ export class Ui {
       document.body.classList.toggle('blade-on', field);
       this.pointer = field ? { x: e.clientX, y: e.clientY } : null;
       this.mouseStale = false;
+      // Your hero follows the mouse anywhere over the battlefield, HUD overlays included. Reaching for a button
+      // leaves them heading where you last pointed; over the party panel (or off the window) they fight on their own.
+      if (e.pointerType === 'mouse') {
+        const inField = e.clientX < this.field.w && e.clientY < this.field.h;
+        if (!inField) this.heroAim = null;
+        else if (!t.closest('#ui button, #ui .dock, #ui .shop, #ui .modal-wrap')) this.heroAim = { x: e.clientX, y: e.clientY };
+      }
       if (this.game.hold) {
         this.game.hold.x = e.clientX;
         this.game.hold.y = e.clientY;
@@ -323,6 +335,7 @@ export class Ui {
       if (field) this.el.blade.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
     });
     document.addEventListener('pointerleave', () => {
+      this.heroAim = null;
       this.el.blade.hidden = true;
       document.body.classList.remove('blade-on');
     });
@@ -832,7 +845,7 @@ export class Ui {
     const g = this.game;
     if (this.keys.size) this.keyedAt = performance.now();
     const input = this.scene.heroInput;
-    input.aim = !this.modal && !this.mouseStale ? this.pointer : null;
+    input.aim = !this.modal && !this.mouseStale ? this.heroAim : null;
     input.keys = { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), z: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
     input.stay = this.mouseStale && !this.keys.size && performance.now() - this.keyedAt < 4000;
     const bank = g.s.gold;

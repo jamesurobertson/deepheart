@@ -1519,7 +1519,8 @@ export class Scene {
     // Everything is measured from a monster's edge, so a giant is fought from as far off as a rat is close up.
     const radius = (v: MonView) => Math.min(1.6, Math.max(0.35, v.height * 0.28));
     const standOff = (v: MonView) => radius(v) + (melee ? (def.big ? 1.1 : 0.7) : 2.6);
-    const inReach = (v: MonView) => v.body.position.distanceTo(p) <= radius(v) + (melee ? (def.big ? 1.6 : 1.15) : 4.5);
+    // Ranged heroes hit anything in the room; melee ones have to get close.
+    const inReach = (v: MonView) => !melee || v.body.position.distanceTo(p) <= radius(v) + (def.big ? 1.6 : 1.15);
     const live = game.monsters.filter((m) => m.arrive <= 0).map((m) => this.mons.get(m.id)).filter((v): v is MonView => !!v && v.dead < 0 && v.born >= 1);
     const nearest = (from: THREE.Vector3) => live.reduce<MonView | null>((best, v) => (!best || v.body.position.distanceToSquared(from) < best.body.position.distanceToSquared(from) ? v : best), null);
     /** Beside a monster rather than on top of it, on the side the hero is coming from. */
@@ -1588,7 +1589,9 @@ export class Scene {
     // Attack whatever's in reach, on the move or standing, each in their own style: blades up close; arrows,
     // fireballs, dark orbs, lightning, chain lightning or runes from range.
     this.heroFace = Math.max(0, this.heroFace - dt);
-    const target = live.filter(inReach).sort((a, b) => a.body.position.distanceTo(p) - b.body.position.distanceTo(p))[0];
+    // The monster you're pointing at first, if it's in reach; otherwise the nearest one that is.
+    const pointed = aim ? pointedAt(aim.x, aim.y) : undefined;
+    const target = pointed && inReach(pointed) ? pointed : live.filter(inReach).sort((a, b) => a.body.position.distanceTo(p) - b.body.position.distanceTo(p))[0];
     if (target && game.heroAttack(target.id)) {
       const left = target.body.position.x < p.x;
       c.sprite.flip = left;
