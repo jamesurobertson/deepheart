@@ -603,6 +603,12 @@ export class Ui {
         this.banner(title, line, 'loot');
         break;
       }
+      case 'raidSpawn':
+        if (ev.rainbow && g.s.vaults === 0) {
+          this.banner('A RAINBOW GOBLIN!', 'Catch it to open the Goblin Vault!', 'loot rainbow');
+          this.hooks.sound('drop4', { vol: 0.7 });
+        }
+        break;
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
       case 'fever': if (ev.on) this.banner('RAMPAGE!', `Clicks ×${fmt(g.feverMult())} · party damage ×2 · ${g.rampageNext()?.left ?? 0} clicks to ×${fmt(g.rampageNext()?.mult ?? 0)}`, 'rampage'); break;
       case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, ev.tier >= 2 ? 'Unstoppable · party damage ×4' : 'Keep going · party damage ×3', `rampage tier${ev.tier}`); break;
@@ -978,6 +984,7 @@ export class Ui {
     if (g.s.clicks < 6) state = 'click';
     else if (g.s.owned.every((n) => n === 0) && g.s.gold >= g.compCost(0)) state = 'hire';
     else if (g.raid && g.s.raids === 0) state = 'raid';
+    else if (g.raid?.rainbow && g.s.vaults === 0) state = 'rainbow';
     if (state === 'click') {
       const f = g.focus();
       const s = f && this.scene.screenOf(f.id);
@@ -990,7 +997,8 @@ export class Ui {
     this.el.hint.hidden = state !== 'click';
     this.el.hint.innerHTML = `<b>${this.touch ? 'Tap' : 'Click'} the monsters!</b>`;
     this.rows[0].classList.toggle('nudge', state === 'hire');
-    this.el.raid.classList.toggle('first', state === 'raid');
+    this.el.raid.classList.toggle('first', state === 'raid' || state === 'rainbow');
+    this.el.raid.classList.toggle('rb-first', state === 'rainbow');
   }
 
   // ---------- tooltips ----------

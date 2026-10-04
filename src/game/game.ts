@@ -1025,7 +1025,9 @@ export class Game {
   private spawnRaid() {
     const from = Math.random() < 0.5 ? -1 : 1;
     const rainbow = Math.random() < RAINBOW_CHANCE;
-    this.raid = { id: this.seq++, from, t: 0, stay: RAID_STAY, rainbow };
+    // The first rainbow goblin lingers, so it's caught (and the vault seen) rather than missed.
+    const stay = rainbow && this.s.vaults === 0 ? RAID_STAY * 1.8 : RAID_STAY;
+    this.raid = { id: this.seq++, from, t: 0, stay, rainbow };
     this.events.push({ t: 'raidSpawn', id: this.raid.id, from, rainbow });
   }
 

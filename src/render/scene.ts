@@ -30,6 +30,12 @@ const PALETTES: Palette[] = [
   { torch: 0x9cc0ff, fog: 0x05070c, hemi: 0x5a6a8a, wall: [0.56, 0.72, 1], floor: [0.9, 1.1, 1.45], banner: 'blue', goo: 0 }, // Frozen Vault
 ];
 
+/** The Goblin Vault: gilded stone, with torches that cycle through the rainbow (see update). */
+const VAULT_PALETTE: Palette = { torch: 0xffd070, fog: 0x0d0616, hemi: 0x9a78b0, wall: [1.3, 1.08, 0.6], floor: [1.4, 1.2, 0.75], banner: 'yellow', goo: 0 };
+/** Seconds the party runs toward the portal before the flash, and the fade back in after it. */
+const TRIP_GO = 0.95;
+const TRIP_ARRIVE = 0.55;
+
 /** A zone's palette on a later lap: torches, light and stone pulled toward the lap's colour, the dark a shade deeper. */
 function corrupt(p: Palette, lap: number): Palette {
   if (!lap) return p;
@@ -270,6 +276,10 @@ export class Scene {
   /** A pause (the loot card is up) before the staircase starts. */
   private hold: { zone: number; t: number } | null = null;
   private relicDropped = false;
+  /** In the Goblin Vault's treasure room, and the portal trip in or out of it (the game pauses during the run-up). */
+  private inVaultRoom = false;
+  private trip: { into: boolean; phase: 'go' | 'arrive'; t: number; portal: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial> } | null = null;
+  private sparkleT = 0;
   private cine: { phase: 'exit' | 'stairs' | 'arrive'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[] } | null = null;
   /** Black card in front of the camera for fades. */
   private fade: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
@@ -380,14 +390,42 @@ export class Scene {
     if (band === this.band) return;
     this.band = band;
     this.palette = corrupt(PALETTES[band % PALETTES.length], Math.floor(band / ZONES.length));
+    this.clearRoom();
+    this.room = this.buildRoom(band);
+    this.scene.add(this.room);
+    this.applyPalette();
+  }
+
+  private clearRoom() {
     if (this.room) {
       this.scene.remove(this.room);
-      this.room.traverse((o) => o instanceof THREE.Mesh && o.geometry.dispose());
+      this.room.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return;
+        o.geometry.dispose();
+        if (o.userData.ownMaterial) o.material.dispose();
+      });
     }
     for (const pr of this.props) pr.dispose();
     this.props = [];
-    this.room = this.buildRoom(band);
+  }
+
+  /** Swap between the zone's room and the Goblin Vault's treasure room. */
+  private setVaultRoom(on: boolean) {
+    this.inVaultRoom = on;
+    if (!on) {
+      this.band = -1;
+      this.setBand(zoneOf(this.lastFloor));
+      return;
+    }
+    this.band = -2;
+    this.palette = VAULT_PALETTE;
+    this.clearRoom();
+    this.room = this.buildRoom(0, true);
     this.scene.add(this.room);
+    this.applyPalette();
+  }
+
+  private applyPalette() {
     const p = this.palette;
     this.floorMat.color.setRGB(...p.floor);
     (this.scene.background as THREE.Color).setHex(p.fog);
@@ -399,7 +437,7 @@ export class Scene {
     this.flameMat.color.setHex(p.torch).lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(1.4);
   }
 
-  private buildRoom(seed: number): THREE.Group {
+  private buildRoom(seed: number, loot = false): THREE.Group {
     const a = this.atlas;
     const r = seeded(seed * 977 + 5);
     const p = this.palette;
@@ -474,9 +512,33 @@ export class Scene {
       if ([-13, -5.5, 2, 9.5, fountainX + 0.5].some((c) => Math.abs(c - x) < 1)) continue;
       floor.face(x, 0, WALL_Z + 0.5 + r() * 0.6, skull, 0.7, 0.7);
     }
+    // The vault is heaped with treasure: open chests along the wall, coins everywhere the fight isn't.
+    if (loot) {
+      const chest = a.anim('chest_full_open')[2];
+      const coin = a.anim('coin')[0];
+      const flask = a.rect('flask_big_yellow');
+      [-15, -10.5, -8, 4, 6.5, 12].forEach((x) => floor.face(x, 0, WALL_Z + 0.6 + r() * 0.4, chest, 1.1, 1.1));
+      for (let i = 0; i < 140; i++) {
+        const x = -20 + r() * 40;
+        const z = WALL_Z + 0.4 + r() * 18;
+        if (x > -9 && x < 8 && z > -3.5 && z < 6.5) continue;
+        floor.face(x, 0, z, r() < 0.08 ? flask : coin, 0.42, 0.42);
+      }
+    }
 
     const group = new THREE.Group();
     group.add(new THREE.Mesh(wall.build(), this.wallMat), new THREE.Mesh(floor.build(), this.floorMat), ...fountain);
+    // A great rainbow arched across the vault's back wall.
+    if (loot) {
+      const bands = [0xff4a4a, 0xff9a3a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0x6a6aff, 0xc46aff];
+      bands.forEach((color, i) => {
+        const outer = 9.4 - i * 0.55;
+        const band = new THREE.Mesh(new THREE.RingGeometry(outer - 0.55, outer, 64, 1, 0, Math.PI), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+        band.position.set(-1, 0.6, WALL_Z + 0.05);
+        band.userData.ownMaterial = true;
+        group.add(band);
+      });
+    }
     this.flames = [];
     [-12, -2, 6, 14].forEach((x, i) => {
       const f = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.8), this.flameMat);
@@ -1199,6 +1261,9 @@ export class Scene {
           if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(1), '#ffd070', 60, 7, 0.1, 14, true);
           this.addShake(0.4);
         }
+        // Mid-staircase there's no room to run from; just change the room.
+        if (this.cine || this.hold || !this.settings.cinematics) this.setVaultRoom(ev.on);
+        else this.startTrip(ev.on);
         break;
       case 'raidCatch': {
         const r = this.raider;
@@ -1251,8 +1316,9 @@ export class Scene {
     }
     this.party = [];
     this.syncParty(game, true);
-    this.setBand(zoneOf(game.s.floor));
     this.lastFloor = game.s.floor;
+    this.band = -1;
+    this.setVaultRoom(game.s.buffs.some((b) => b.id === 'vault'));
   }
 
   private addShake(v: number) {
@@ -1270,7 +1336,7 @@ export class Scene {
 
   /** True while the interlude holds the screen (the game pauses meanwhile). */
   get busy() {
-    return !!this.hold || (!!this.cine && this.cine.phase !== 'arrive');
+    return !!this.hold || (!!this.cine && this.cine.phase !== 'arrive') || this.trip?.phase === 'go';
   }
 
   private startCinematic(zone: number) {
@@ -1354,6 +1420,7 @@ export class Scene {
   private updateCinematic(dt: number) {
     const c = this.cine!;
     c.t += dt;
+    this.fade.material.color.setHex(0x000000);
     let fade = 0;
     if (c.phase === 'exit') {
       // March out to the right, toward the stairs.
@@ -1411,6 +1478,76 @@ export class Scene {
     this.fade.material.opacity = Math.min(1, fade);
   }
 
+  // ---------- goblin vault ----------
+
+  /** A rainbow portal opens; the party runs into it and the flash carries them to the other room. */
+  private startTrip(into: boolean) {
+    if (this.trip) {
+      this.scene.remove(this.trip.portal);
+      this.trip.portal.geometry.dispose();
+    }
+    const portal = new THREE.Mesh(new THREE.CircleGeometry(1.6, 40), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+    portal.position.set(9 * this.squeeze, 1.6, 0.5 * this.deep);
+    portal.scale.setScalar(0.01);
+    this.scene.add(portal);
+    this.trip = { into, phase: 'go', t: 0, portal };
+  }
+
+  private updateTrip(dt: number) {
+    const trip = this.trip!;
+    trip.t += dt;
+    const hue = (this.time * 0.6) % 1;
+    let fade = 0;
+    if (trip.phase === 'go') {
+      const portal = trip.portal;
+      portal.scale.setScalar(Math.min(1, trip.t / 0.3) * (1 + Math.sin(this.time * 9) * 0.06));
+      portal.rotation.z += dt * 3;
+      portal.material.color.setHSL(hue, 0.9, 0.6);
+      if (this.settings.particles && Math.random() < 0.6) {
+        this.fx.burst(portal.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, 0)), new THREE.Color().setHSL(Math.random(), 0.9, 0.65), 3, 2.5, 0.08, 2, true);
+      }
+      for (const p of this.party) {
+        p.act = null;
+        if (trip.t > 0.2) p.body.position.x += dt * 11;
+        p.sprite.flip = false;
+        p.sprite.play(p.run);
+        p.sprite.update(dt);
+      }
+      fade = Math.max(0, (trip.t - 0.55) / (TRIP_GO - 0.55));
+      if (trip.t >= TRIP_GO) {
+        this.setVaultRoom(trip.into);
+        this.scene.remove(portal);
+        portal.geometry.dispose();
+        portal.material.dispose();
+        // Everyone tumbles in from the left of the new room.
+        for (const p of this.party) p.body.position.set(-15 - Math.random() * 3, 0, p.home.z);
+        trip.phase = 'arrive';
+        trip.t = 0;
+        this.addShake(0.3);
+      }
+    } else {
+      fade = Math.max(0, 1 - trip.t / TRIP_ARRIVE);
+      if (trip.t >= TRIP_ARRIVE) this.trip = null;
+    }
+    this.fade.material.color.setHSL(hue, 0.7, 0.85);
+    this.fade.visible = fade > 0;
+    this.fade.material.opacity = Math.min(1, fade);
+  }
+
+  /** The treasure room shimmers: torches cycle the rainbow and coins glint across the floor. */
+  private updateVaultRoom(dt: number) {
+    const hue = this.time * 0.15;
+    this.torchLights.forEach((l, i) => l.color.setHSL((hue + i / 4) % 1, 0.85, 0.6));
+    this.hemi.color.setHSL((hue + 0.5) % 1, 0.45, 0.55);
+    this.flameMat.color.setHSL(hue % 1, 0.9, 0.7).multiplyScalar(1.4);
+    if (!this.settings.particles) return;
+    this.sparkleT -= dt;
+    if (this.sparkleT > 0) return;
+    this.sparkleT = 0.12;
+    const at = new THREE.Vector3(-14 + Math.random() * 28, 0.2 + Math.random() * 0.6, WALL_Z + 0.6 + Math.random() * 12);
+    this.fx.burst(at, new THREE.Color().setHSL(Math.random(), 0.9, 0.7), 4, 1.6, 0.06, 3, true);
+  }
+
   // ---------- frame ----------
 
   update(dt: number, game: Game) {
@@ -1430,7 +1567,9 @@ export class Scene {
       this.hold = null;
     }
     if (this.cine) this.updateCinematic(dt);
-    const holding = this.cine && this.cine.phase !== 'arrive';
+    if (this.trip) this.updateTrip(dt);
+    if (this.inVaultRoom) this.updateVaultRoom(dt);
+    const holding = (this.cine && this.cine.phase !== 'arrive') || this.trip?.phase === 'go';
     this.updateMonsters(dt, game);
     if (!holding) this.updateParty(dt, game);
     this.updateShots(dt);
