@@ -39,6 +39,8 @@ const meetText = (def: { depth: number; heart?: number }, descents: number) =>
   descents < def.depth ? `Descend ${def.depth}× to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
 
 /** A relic's stars, as little gold glyphs after its name. */
+/** A small rate with up to two decimals (1.15, not 1.1); big ones as usual. */
+const perSec = (n: number) => (n < 100 ? String(Math.round(n * 100) / 100) : fmt(n));
 const starsOf = (lv: number) => (relicStars(lv) ? ` <span class="stars">${'★'.repeat(relicStars(lv))}</span>` : '');
 
 function buffText(b: Buff) {
@@ -946,7 +948,7 @@ export class Ui {
     const rb = this.el.relicBadge;
     rb.hidden = this.newRelics < 1;
     rb.textContent = `+${this.newRelics}`;
-    const rate = `${fmt(g.autoRate())}/s`;
+    const rate = `${perSec(g.autoRate())}/s`;
     const rateEl = this.el.bladeRate.lastElementChild!;
     if (rateEl.textContent !== rate) rateEl.textContent = rate;
 
@@ -1244,7 +1246,7 @@ export class Ui {
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        blade: `Phantom Blade: attacks the front monster for you ${fmt(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades, Abyss powers and the Phantom Hilt make it faster.`,
+        blade: `Phantom Blade: attacks the front monster for you ${perSec(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades, Abyss powers and the Phantom Hilt make it faster.`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }
