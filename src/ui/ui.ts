@@ -76,9 +76,8 @@ export class Ui {
   private modal: string | null = null;
   private resetArmed = false;
   private hintState = '';
-  /** When the current hint appeared (the hero tips time out), and where the marker over your hero has eased to. */
+  /** When the current hint appeared (the hero tips time out). */
   private tourAt = 0;
-  private markAt: { x: number; y: number } | null = null;
   /** When a clutch kill's slow motion ends (relic cards wait for it). */
   private cinemaUntil = 0;
   /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
@@ -880,6 +879,13 @@ export class Ui {
 
   frame(dt: number) {
     const g = this.game;
+    // The marker over your hero (hero tip) moves every frame, right with them.
+    const mark = this.el.heroMark;
+    if (!mark.hidden) {
+      const at = this.scene.heroScreen(g);
+      if (at) mark.style.transform = `translate(${at.x}px, ${at.y}px)`;
+      mark.style.visibility = at ? 'visible' : 'hidden';
+    }
     if (this.keys.size) this.keyedAt = performance.now();
     this.scene.heroBlocked = [this.el.dock.getBoundingClientRect()];
     const input = this.scene.heroInput;
@@ -1116,17 +1122,9 @@ export class Ui {
     if (state !== this.hintState) this.tourAt = performance.now();
     const shown = performance.now() - this.tourAt;
     // The words stay put at the top of the battlefield (a hero on the move is hard to read beside); a small marker
-    // bobs over the hero's head, easing after them.
-    const mark = this.el.heroMark;
-    mark.hidden = state !== 'hero';
+    // bobs over the hero's head (moved every frame, in frame()).
+    this.el.heroMark.hidden = state !== 'hero';
     if (state === 'hero') {
-      const at = this.scene.heroScreen(g);
-      if (at) {
-        const was = this.markAt ?? at;
-        this.markAt = { x: was.x + (at.x - was.x) * 0.45, y: was.y + (at.y - was.y) * 0.45 };
-        mark.style.transform = `translate(${this.markAt.x}px, ${this.markAt.y}px)`;
-      }
-      mark.style.visibility = at ? 'visible' : 'hidden';
       this.el.hint.style.transform = `translate(${this.field.w / 2}px, ${this.hudTop + (this.hudTop ? 16 : 222)}px)`;
       this.el.hint.style.visibility = 'visible';
       if (shown > 10_000) g.s.heroTips = 1;
