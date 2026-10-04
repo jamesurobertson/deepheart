@@ -74,9 +74,8 @@ export class Ui {
   private modal: string | null = null;
   private resetArmed = false;
   private hintState = '';
-  /** When the current hint appeared, and how much the mouse has wandered the battlefield since (the hero tip). */
+  /** When the current hint appeared (the hero tips time out). */
   private tourAt = 0;
-  private heroMoves = 0;
   /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
   private pointer: { x: number; y: number } | null = null;
   /** Where your hero is headed: the last spot the mouse pointed at on the battlefield (null: let them roam). */
@@ -334,12 +333,13 @@ export class Ui {
         if (!inField) this.heroAim = null;
         else if (!overDock && !t.closest('#ui button, #ui .shop, #ui .modal-wrap')) {
           this.heroAim = { x: e.clientX, y: e.clientY };
-          this.heroMoves++;
         }
       }
+      // Holding the attack down follows the cursor onto whichever monster it's over now.
       if (this.game.hold) {
         this.game.hold.x = e.clientX;
         this.game.hold.y = e.clientY;
+        this.game.hold.id = this.scene.pick(e.clientX, e.clientY);
       }
       if (field) this.el.blade.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
     });
@@ -1090,9 +1090,9 @@ export class Ui {
       const at = this.scene.heroScreen(g);
       if (at) this.el.hint.style.transform = `translate(${at.x}px, ${at.y + 14}px)`;
       this.el.hint.style.visibility = at ? 'visible' : 'hidden';
-      if (this.heroMoves > 40 || shown > 10_000) g.s.heroTips = 1;
+      if (shown > 10_000) g.s.heroTips = 1;
     } else if (state === 'star') {
-      const star = this.rows[g.heroIndex()]?.querySelector('.gen-hero')?.getBoundingClientRect();
+      const star = this.rows[this.starPick()]?.querySelector('.gen-hero')?.getBoundingClientRect();
       const visible = !!star && star.width > 0 && star.top > 0 && star.bottom < innerHeight;
       if (star) this.el.hint.style.transform = `translate(${star.left - 12}px, ${star.top + star.height / 2}px)`;
       this.el.hint.style.visibility = visible ? 'visible' : 'hidden';
@@ -1107,17 +1107,22 @@ export class Ui {
     }
     if (state === this.hintState) return;
     this.hintState = state;
-    this.heroMoves = 0;
     this.el.hint.hidden = !['click', 'hero', 'star'].includes(state);
     this.el.hint.classList.toggle('point-right', state === 'star');
     this.el.shop.classList.toggle('show-stars', state === 'star');
     this.el.hint.innerHTML = state === 'hero'
       ? `<b>This is your hero!<small>${this.touch ? 'They roam the battlefield and fight for you' : 'They follow your mouse around the battlefield'}</small></b>`
-      : state === 'star' ? `<b>★ marks your hero<small>Click another companion's ★ to switch</small></b>`
+      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click ★ · just for looks, damage stays the same</small></b>`
         : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows[0].classList.toggle('nudge', state === 'hire');
     this.el.raid.classList.toggle('first', state === 'raid' || state === 'rainbow');
     this.el.raid.classList.toggle('rb-first', state === 'rainbow');
+  }
+
+  /** Who the star tip suggests trying as your hero: the first companion you have who isn't your hero already. */
+  private starPick() {
+    const hero = this.game.heroIndex();
+    return this.game.s.owned.findIndex((n, i) => n > 0 && i !== hero);
   }
 
   // ---------- tooltips ----------
@@ -1227,7 +1232,7 @@ export class Ui {
     if (kind === 'hero') {
       const i = Number(id);
       const now = g.heroIndex() === i;
-      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p>`;
+      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p><p class="tt-f">Just for looks: your hero deals the same damage as anyone else.</p>`;
     }
     if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Attack by hand to fill this: click, or just hold the mouse or Space down. When it's full, your attacks deal ×${fmt(g.feverMult())} damage and your party hits twice as hard for a few seconds. Keep attacking through it to push the Rampage to ×10 and then ×25.</p>`;
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
