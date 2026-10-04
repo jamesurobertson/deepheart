@@ -166,6 +166,8 @@ export interface SaveState {
   rainbows: number;
   /** The companion you picked as your hero: it leaves the formation and follows the mouse (just for the fun of it). */
   hero: number;
+  /** How far through the hero introduction you are: 0 none, 1 met your hero, 2 shown the star that picks one. */
+  heroTips: number;
   rampage: number;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
   cycleBest: number;
@@ -179,7 +181,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, hero: 0, rampage: 0, cycleBest: 0,
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto' },
   };
 }

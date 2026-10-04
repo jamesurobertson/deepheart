@@ -74,6 +74,9 @@ export class Ui {
   private modal: string | null = null;
   private resetArmed = false;
   private hintState = '';
+  /** When the current hint appeared, and how much the mouse has wandered the battlefield since (the hero tip). */
+  private tourAt = 0;
+  private heroMoves = 0;
   /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
   private pointer: { x: number; y: number } | null = null;
   /** Where your hero is headed: the last spot the mouse pointed at on the battlefield (null: let them roam). */
@@ -329,7 +332,10 @@ export class Ui {
         const dock = this.el.dock.getBoundingClientRect();
         const overDock = e.clientX > dock.left - 10 && e.clientX < dock.right + 10 && e.clientY > dock.top - 10 && e.clientY < dock.bottom + 10;
         if (!inField) this.heroAim = null;
-        else if (!overDock && !t.closest('#ui button, #ui .shop, #ui .modal-wrap')) this.heroAim = { x: e.clientX, y: e.clientY };
+        else if (!overDock && !t.closest('#ui button, #ui .shop, #ui .modal-wrap')) {
+          this.heroAim = { x: e.clientX, y: e.clientY };
+          this.heroMoves++;
+        }
       }
       if (this.game.hold) {
         this.game.hold.x = e.clientX;
@@ -387,6 +393,7 @@ export class Ui {
       const hero = t.closest<HTMLElement>('[data-hero]');
       if (hero) {
         if (this.game.setHero(Number(hero.dataset.hero))) {
+          if (this.game.s.heroTips === 1) this.game.s.heroTips = 2;
           this.hooks.sound('toggle', { vol: 0.6 });
           this.refreshTip();
         }
@@ -665,7 +672,6 @@ export class Ui {
       case 'buyComp':
         this.rowCache[ev.comp] = '';
         this.bump(this.rows[ev.comp]);
-        if (g.s.owned.filter((n) => n > 0).length === 1 && g.s.owned[ev.comp] === 1) this.toast(`Your ${COMPS[ev.comp].name} is your hero<small>They follow your mouse and fight for you. Pick another hero with the ★ on their row.</small>`, COMPS[ev.comp].sprite, 'trophy');
         break;
       case 'reveal': this.toast(`New companion for hire: <b>${COMPS[ev.comp].name}</b>`, COMPS[ev.comp].sprite); break;
       case 'buyUpg': this.upgKey = ''; break;
@@ -1075,6 +1081,23 @@ export class Ui {
     else if (g.s.owned.every((n) => n === 0) && g.s.gold >= g.compCost(0)) state = 'hire';
     else if (g.raid && g.s.raids === 0) state = 'raid';
     else if (g.raid?.rainbow && g.s.vaults === 0) state = 'rainbow';
+    // Meeting your hero: first on the field, then (once there's someone to switch to) the star that picks one.
+    else if (g.s.heroTips === 0 && g.heroIndex() >= 0) state = 'hero';
+    else if (g.s.heroTips === 1 && g.s.owned.filter((n) => n > 0).length >= 2) state = 'star';
+    if (state !== this.hintState) this.tourAt = performance.now();
+    const shown = performance.now() - this.tourAt;
+    if (state === 'hero') {
+      const at = this.scene.heroScreen(g);
+      if (at) this.el.hint.style.transform = `translate(${at.x}px, ${at.y + 14}px)`;
+      this.el.hint.style.visibility = at ? 'visible' : 'hidden';
+      if (this.heroMoves > 40 || shown > 10_000) g.s.heroTips = 1;
+    } else if (state === 'star') {
+      const star = this.rows[g.heroIndex()]?.querySelector('.gen-hero')?.getBoundingClientRect();
+      const visible = !!star && star.width > 0 && star.top > 0 && star.bottom < innerHeight;
+      if (star) this.el.hint.style.transform = `translate(${star.left - 12}px, ${star.top + star.height / 2}px)`;
+      this.el.hint.style.visibility = visible ? 'visible' : 'hidden';
+      if (shown > 15_000) g.s.heroTips = 2;
+    }
     if (state === 'click') {
       const f = g.focus();
       const s = f && this.scene.screenOf(f.id);
@@ -1084,8 +1107,14 @@ export class Ui {
     }
     if (state === this.hintState) return;
     this.hintState = state;
-    this.el.hint.hidden = state !== 'click';
-    this.el.hint.innerHTML = `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
+    this.heroMoves = 0;
+    this.el.hint.hidden = !['click', 'hero', 'star'].includes(state);
+    this.el.hint.classList.toggle('point-right', state === 'star');
+    this.el.shop.classList.toggle('show-stars', state === 'star');
+    this.el.hint.innerHTML = state === 'hero'
+      ? `<b>This is your hero!<small>${this.touch ? 'They roam the battlefield and fight for you' : 'They follow your mouse around the battlefield'}</small></b>`
+      : state === 'star' ? `<b>★ marks your hero<small>Click another companion's ★ to switch</small></b>`
+        : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows[0].classList.toggle('nudge', state === 'hire');
     this.el.raid.classList.toggle('first', state === 'raid' || state === 'rainbow');
     this.el.raid.classList.toggle('rb-first', state === 'rainbow');

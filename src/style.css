@@ -204,6 +204,11 @@ body.compact .rate .short { display: inline; }
 .hint b { display: block; transform: translateX(-50%); white-space: nowrap; animation: hintbob 0.9s ease-in-out infinite; padding: 8px 12px; background: rgba(12, 6, 10, 0.75); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--gold); }
 .hint b small { display: block; margin-top: 4px; font: 400 14px/1 'Pixelify Sans'; color: var(--dim); text-align: center; }
 .hint b::before { content: ''; position: absolute; left: 50%; top: -10px; margin-left: -8px; border: 8px solid transparent; border-top: 0; border-bottom: 10px solid var(--gold); }
+/* Pointing right, at something in the party panel (the hero star). */
+.hint { z-index: 26; }
+.hint.point-right b { transform: translate(-100%, -50%); animation-name: hintnudge; }
+.hint.point-right b::before { left: auto; right: -10px; top: 50%; margin: -8px 0 0; border: 8px solid transparent; border-right: 0; border-left: 10px solid var(--gold); }
+@keyframes hintnudge { 0%, 100% { translate: 0 0; } 50% { translate: -6px 0; } }
 
 .raid-mark { position: fixed; left: 0; top: 0; pointer-events: none; }
 .raid-mark b { position: absolute; left: -8px; top: -40px; font: 400 44px/1 'Jersey 10'; color: var(--gold-hi); text-shadow: var(--outline), 0 0 12px rgba(255, 210, 100, 0.9); animation: hintbob 0.5s ease-in-out infinite; }
@@ -347,7 +352,7 @@ body.compact .rate .short { display: inline; }
 /* The star picks your hero: shown on your hero's row, and on the others when you hover them. */
 .gen { position: relative; }
 .gen-hero { position: absolute; left: 2px; top: 1px; display: none; padding: 1px 4px; font: 400 14px/1 'Pixelify Sans'; color: var(--faint); text-shadow: var(--outline); cursor: pointer; }
-.gen.owned:hover .gen-hero, body.touch .gen.owned .gen-hero { display: block; }
+.gen.owned:hover .gen-hero, body.touch .gen.owned .gen-hero, .shop.show-stars .gen.owned .gen-hero { display: block; }
 .gen.is-hero .gen-hero { display: block; color: var(--gold-hi); text-shadow: var(--outline), 0 0 6px rgba(255, 210, 100, 0.8); }
 .gen-hero:hover { color: var(--gold-hi); }
 .gen-lv { font: 400 28px/1 'Jersey 10'; color: rgba(241, 228, 204, 0.55); text-shadow: var(--shadow); font-weight: 400; }
