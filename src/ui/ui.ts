@@ -781,6 +781,12 @@ export class Ui {
   }
 
   private banner(title: string, sub: string, cls = '') {
+    // Nothing else takes the banner during a clutch kill's slow motion; it waits its turn after the CLUTCH! one.
+    const cinema = this.cinemaUntil - performance.now();
+    if (cinema > 0 && !/\bclutch\b/.test(cls)) {
+      setTimeout(() => this.banner(title, sub, cls), cinema + 1200);
+      return;
+    }
     // A victory gets its moment before the next boss's introduction takes over the banner.
     const held = Date.now() - this.bannerAt < 1500 && /\b(win|clutch)\b/.test(this.el.banner.className);
     if (held && cls === 'boss') {
