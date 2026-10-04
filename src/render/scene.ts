@@ -45,6 +45,9 @@ function corrupt(p: Palette, lap: number): Palette {
   return { ...p, torch: toward(p.torch, 0.85), hemi: toward(p.hemi, 0.75), fog: new THREE.Color(p.fog).lerp(c, 0.12).getHex(), wall: wash(p.wall), floor: wash(p.floor) };
 }
 
+/** Your hero's top walking speed (world units a second). */
+const HERO_SPEED = 6.5;
+
 /** Ordinary companions are drawn this many art pixels tall, whatever size their sprite is (big ones stay big). */
 const COMP_HEIGHT = 20;
 
@@ -258,6 +261,9 @@ export class Scene {
   /** Steering for your hero, set by the UI each frame: the pointer over the battlefield, and WASD / arrow keys. */
   heroInput: { aim: { x: number; y: number } | null; keys: { x: number; z: number }; stay: boolean } = { aim: null, keys: { x: 0, z: 0 }, stay: false };
   private heroRing: THREE.Mesh | null = null;
+  private heroVel = new THREE.Vector3();
+  /** Seconds the hero keeps facing what it just attacked before turning back to where it's walking. */
+  private heroFace = 0;
   private heroComp = -1;
   private raycaster = new THREE.Raycaster();
   private shots: Shot[] = [];
@@ -718,7 +724,7 @@ export class Scene {
     const view = this.mons.get(id);
     if (!view || view.dead >= 0) return;
     const def = COMPS[c.comp];
-    const from = c.body.position.clone().add(new THREE.Vector3(0.35, def.big ? 1.6 : 0.95, 0.1));
+    const from = c.body.position.clone().add(new THREE.Vector3(c.sprite.flip ? -0.35 : 0.35, def.big ? 1.6 : 0.95, 0.1));
     const to = view.body.position.clone().setY(view.height * 0.45);
     this.fx.star(from, SHOT_COLOR[kind], 0.5, 0.12);
     if (kind === 'bolt') {
@@ -1499,73 +1505,127 @@ export class Scene {
   }
 
   /** Your hero leaves the formation: it walks after the mouse (or the keys), or roams to the nearest monster, and
-   *  swings at whatever it reaches. The swings are your auto-attacks, so the game waits for the scene to land them. */
+   *  attacks whatever it reaches. The attacks are your auto-attacks, so the game waits for the scene to land them. */
   private updateHero(dt: number, game: Game) {
     game.heroDriven = true;
     const idx = game.heroIndex();
     const c = this.party.find((p) => p.comp === idx);
     if (!c) return;
+    if (this.heroComp !== c.comp) this.heroVel.set(0, 0, 0);
     this.markHero(c);
     const def = COMPS[c.comp];
     const p = c.body.position;
     const melee = def.attack === 'slash';
-    const reach = melee ? 1.4 : 4.5;
+    // Everything is measured from a monster's edge, so a giant is fought from as far off as a rat is close up.
+    const radius = (v: MonView) => Math.min(1.6, Math.max(0.35, v.height * 0.28));
+    const standOff = (v: MonView) => radius(v) + (melee ? (def.big ? 1.1 : 0.7) : 2.6);
+    const inReach = (v: MonView) => v.body.position.distanceTo(p) <= radius(v) + (melee ? (def.big ? 1.6 : 1.15) : 4.5);
     const live = game.monsters.filter((m) => m.arrive <= 0).map((m) => this.mons.get(m.id)).filter((v): v is MonView => !!v && v.dead < 0 && v.born >= 1);
     const nearest = (from: THREE.Vector3) => live.reduce<MonView | null>((best, v) => (!best || v.body.position.distanceToSquared(from) < best.body.position.distanceToSquared(from) ? v : best), null);
+    /** Beside a monster rather than on top of it, on the side the hero is coming from. */
+    const besideOf = (v: MonView) => {
+      const away = p.clone().sub(v.body.position).setY(0);
+      if (away.lengthSq() < 1e-4) away.set(-1, 0, 0);
+      return v.body.position.clone().add(away.setLength(standOff(v))).setY(0);
+    };
+    /** The monster the cursor is on, judged by what's drawn on screen (a tall monster's head is far from its feet). */
+    const pointedAt = (x: number, y: number) => live.find((v) => {
+      const s = this.screenOf(v.id);
+      return !!s && Math.abs(x - s.x) < Math.max(18, s.h * 0.5) && y > s.y - 8 && y < s.y + s.h + 10;
+    });
 
     // Where to go: the keys (then a moment standing where they left it), the mouse, or, left alone, the nearest
-    // monster (home when the room is clear).
+    // monster (home when the room is clear). Pointing at or near a monster means "go and fight that one".
     const { aim, keys, stay } = this.heroInput;
     let goal: THREE.Vector3 | null = null;
     const steer = new THREE.Vector3(keys.x, 0, keys.z);
-    if (steer.lengthSq() > 0) goal = p.clone().add(steer.normalize().multiplyScalar(2));
+    if (steer.lengthSq() > 0) goal = p.clone().add(steer.normalize().multiplyScalar(3));
     else if (stay) goal = null;
-    else if (aim) goal = this.floorAt(aim.x, aim.y);
-    else {
+    else if (aim) {
+      const spot = this.floorAt(aim.x, aim.y);
+      const near = spot && nearest(spot);
+      const on = pointedAt(aim.x, aim.y) ?? (near && near.body.position.distanceTo(spot) < radius(near) + 0.8 ? near : null);
+      goal = on ? besideOf(on) : spot;
+    } else {
       const prey = nearest(p);
-      if (prey) {
-        const to = p.clone().sub(prey.body.position).setY(0);
-        goal = prey.body.position.clone().add(to.setLength(Math.min(to.length(), reach * 0.7)));
-      } else goal = c.home;
-    }
-    let moving = false;
-    if (goal) {
-      goal.x = Math.max(-9, Math.min(9, goal.x));
-      goal.z = Math.max(-4.6, Math.min(6.5, goal.z));
-      const d = goal.clone().sub(p).setY(0);
-      const len = d.length();
-      if (len > 0.15) {
-        p.addScaledVector(d, Math.min(1, (6.5 * (1 + this.fever * 0.3) * dt) / len));
-        moving = true;
-        if (Math.abs(d.x) > 0.05) c.sprite.flip = d.x < 0;
-      }
+      goal = prey ? besideOf(prey) : c.home.clone();
     }
 
-    // Swing at whatever's in reach.
-    const target = nearest(p);
-    if (target && target.body.position.distanceTo(p) <= reach && game.heroAttack(target.id)) {
-      const at = target.body.position.clone().setY(target.height * 0.5);
-      const color = SHOT_COLOR[def.attack];
-      c.sprite.flip = at.x < p.x;
-      c.stretch = 1;
+    // Walk there smoothly: ease in and out, ignore tiny nudges until already walking, settle on arrival.
+    const want = new THREE.Vector3();
+    if (goal) {
+      goal.z = Math.max(WALL_Z + 0.9, goal.z);
+      const d = goal.sub(p).setY(0);
+      const dist = d.length();
+      const walking = this.heroVel.length() > 0.4;
+      if (dist > (walking ? 0.08 : 0.45)) want.copy(d).setLength(HERO_SPEED * (1 + this.fever * 0.3) * Math.min(1, dist / 0.9));
+    }
+    this.heroVel.lerp(want, Math.min(1, dt * 12));
+    if (want.lengthSq() === 0 && this.heroVel.length() < 0.15) this.heroVel.set(0, 0, 0);
+    // Anywhere on the floor you can see: a step that would take them off screen (or into the back wall) isn't taken.
+    // (A hero still walking in from off screen, newly hired or arriving in a new zone, is let through.)
+    const was = p.clone();
+    const inView = this.onScreen(was);
+    const allowed = (at: THREE.Vector3) => (!inView || this.onScreen(at)) && at.z >= WALL_Z + 0.9;
+    const step = this.heroVel.clone().multiplyScalar(dt);
+    // Blocked going diagonally into an edge: slide along it instead.
+    const tries = [step, new THREE.Vector3(step.x, 0, 0), new THREE.Vector3(0, 0, step.z)];
+    const ok = tries.find((t) => allowed(was.clone().add(t)));
+    if (ok) {
+      p.copy(was).add(ok);
+      if (ok !== step) this.heroVel.set(ok.x / dt || 0, 0, ok.z / dt || 0);
+    } else this.heroVel.set(0, 0, 0);
+    // Never stand inside a monster.
+    for (const v of live) {
+      const away = p.clone().sub(v.body.position).setY(0);
+      const min = radius(v) + (def.big ? 0.8 : 0.3);
+      const len = away.length();
+      if (len < min) p.add(len > 1e-4 ? away.setLength(min - len) : new THREE.Vector3(-(min - len), 0, 0));
+    }
+    const speed = this.heroVel.length();
+    const moving = speed > 0.35;
+
+    // Attack whatever's in reach, on the move or standing, each in their own style: blades up close; arrows,
+    // fireballs, dark orbs, lightning, chain lightning or runes from range.
+    this.heroFace = Math.max(0, this.heroFace - dt);
+    const target = live.filter(inReach).sort((a, b) => a.body.position.distanceTo(p) - b.body.position.distanceTo(p))[0];
+    if (target && game.heroAttack(target.id)) {
+      const left = target.body.position.x < p.x;
+      c.sprite.flip = left;
+      this.heroFace = 0.35;
       if (melee) {
-        c.inner.position.x = (at.x < p.x ? -1 : 1) * 0.25;
-        this.fx.swipe(at, color, 0.9, Math.PI * (0.6 + Math.random() * 0.5));
+        c.inner.position.x = (left ? -1 : 1) * 0.25;
+        this.strike(c, target.id);
       } else {
-        this.fx.trail(p.clone().setY(0.9), at, color);
-        this.fx.star(at, color, 0.6, 0.14);
+        c.stretch = 0.6;
+        this.fire(c, def.attack, target.id);
       }
     }
+    // Face the way they're walking, except just after an attack, when they keep facing what they hit.
+    if (this.heroFace <= 0 && Math.abs(this.heroVel.x) > 0.5) c.sprite.flip = this.heroVel.x < 0;
+
+    // A little bob and some dust while running; ease the lunge and the squash back to rest.
     c.inner.position.x *= Math.max(0, 1 - dt * 12);
+    c.inner.position.y = moving ? Math.abs(Math.sin(this.time * 14)) * 0.08 * Math.min(1, speed / HERO_SPEED) : c.inner.position.y * Math.max(0, 1 - dt * 14);
+    if (moving && this.settings.particles && Math.random() < dt * 12) this.fx.burst(p.clone().setY(0.1), '#6a5a50', 1, 0.8, 0.06, 4);
     c.stretch *= Math.max(0, 1 - dt * 10);
     c.inner.scale.set(c.base * (1 - c.stretch * 0.1), c.base * (1 + c.stretch * 0.15), c.base);
+    c.inner.rotation.z = 0;
 
     // Treasure goblins don't get past you.
     const r = this.raider;
     if (r && r.state === 'run' && game.raid && r.group.position.distanceTo(p) < 1.3) game.catchRaid();
 
     c.sprite.play(moving ? c.run : c.idle);
-    c.sprite.update(dt);
+    c.sprite.update(dt * (moving ? 0.6 + 0.6 * Math.min(1, speed / HERO_SPEED) : 1));
+  }
+
+  /** Is a spot on the floor inside the visible battlefield (clear of the screen edges, the HUD and the panels)? */
+  private onScreen(at: THREE.Vector3) {
+    const foot = this.toScreen(at);
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const { right, bottom, top } = this.view;
+    return foot.x > rect.left + 48 && foot.x < rect.right - right - 48 && foot.y > rect.top + top + 70 && foot.y < rect.bottom - bottom - 16;
   }
 
   /** A gold ring under whoever is your hero. */

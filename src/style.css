@@ -275,8 +275,6 @@ body.compact .rate .short { display: inline; }
 .dock { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; align-items: flex-end; }
 .dock-b { position: relative; flex-direction: column; min-width: 76px; height: 64px; gap: 4px; padding: 4px 6px; font-size: 14px; }
 .dock-b .glyph { width: 20px; height: 20px; color: var(--gold); }
-.dock-b.auto-atk:not(.on) { filter: saturate(0.3) brightness(0.75); }
-.dock-b.auto-atk.on span { color: var(--green); }
 .badge {
   position: absolute; top: -14px; right: -8px; display: inline-flex; align-items: center; gap: 3px;
   font: 400 19px/1 'Jersey 10'; font-style: normal; padding: 2px 6px 3px;

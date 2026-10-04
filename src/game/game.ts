@@ -101,8 +101,6 @@ export interface Settings {
   cinematics: boolean;
   /** Cursor skin id (see CURSORS). */
   cursor: string;
-  /** Your hero walks after the mouse while it's over the battlefield (otherwise it roams and fights by itself). */
-  heroFollow: boolean;
 }
 
 export interface SaveState {
@@ -182,7 +180,7 @@ export function newSave(): SaveState {
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
     relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, hero: 0, rampage: 0, cycleBest: 0,
-    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', heroFollow: true },
+    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto' },
   };
 }
 

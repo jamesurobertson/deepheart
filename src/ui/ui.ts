@@ -134,7 +134,6 @@ export class Ui {
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics">${G.relic()}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.abyss()}<span>Descend</span><em class="badge" hidden></em></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats()}<span>Stats</span></button>
-        <button class="btn dock-b auto-atk" data-act="heroFollow" data-tip="dock:heroFollow">${spriteFit('weapon_knife', 20, 'glyph')}<span>Follow</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu()}<span>Options</span></button>
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute"></button>
       </nav>
@@ -167,7 +166,7 @@ export class Ui {
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
       upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
-      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'), autoAtk: q('.auto-atk'),
+      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'),
     };
 
     COMPS.forEach((c, i) => {
@@ -520,11 +519,6 @@ export class Ui {
         g.setAuto(!g.s.auto);
         this.hooks.sound('toggle', { vol: 0.5 });
         break;
-      case 'heroFollow':
-        s.heroFollow = !s.heroFollow;
-        this.hooks.sound('toggle', { vol: 0.5 });
-        this.hooks.settings();
-        break;
       case 'mute':
         s.muted = !s.muted;
         this.syncMute();
@@ -837,7 +831,7 @@ export class Ui {
     const g = this.game;
     if (this.keys.size) this.keyedAt = performance.now();
     const input = this.scene.heroInput;
-    input.aim = g.s.settings.heroFollow && !this.modal && !this.mouseStale ? this.pointer : null;
+    input.aim = !this.modal && !this.mouseStale ? this.pointer : null;
     input.keys = { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), z: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
     input.stay = this.mouseStale && !this.keys.size && performance.now() - this.keyedAt < 4000;
     const bank = g.s.gold;
@@ -929,10 +923,6 @@ export class Ui {
     const rb = this.el.relicBadge;
     rb.hidden = this.newRelics < 1;
     rb.textContent = `+${this.newRelics}`;
-    const auto = this.el.autoAtk;
-    const autoLabel = g.s.settings.heroFollow ? 'Follow' : 'Roam';
-    if (auto.lastElementChild!.textContent !== autoLabel) auto.lastElementChild!.textContent = autoLabel;
-    auto.classList.toggle('on', g.s.settings.heroFollow);
 
     this.hints();
     if (this.modal && ['trophies', 'abyss', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
@@ -1200,7 +1190,6 @@ export class Ui {
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        heroFollow: `${g.heroIndex() >= 0 ? `Your hero, the ${COMPS[g.heroIndex()].name},` : 'Your hero'} attacks ${fmt(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second (shop upgrades make it faster). ${g.s.settings.heroFollow ? 'Following your mouse over the battlefield; click to let them roam and fight on their own.' : 'Roaming and fighting on their own; click to have them follow your mouse.'}`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }
