@@ -566,9 +566,10 @@ export interface CardDef {
   kind: CardKind;
   /** Zone it's listed under (-1: the goblins). */
   zone: number;
-  /** Where it turns up, one line per place, with the first floor of that place (a place is only listed once reached). */
+  /** Where it turns up, one line per place, with the first floor of that place's zone (a place is only listed once
+   *  you've reached its zone). */
   where: { text: string; floor: number }[];
-  /** First floor it can turn up on: the card shows in the collection once you've been that deep. */
+  /** First floor of the first zone it turns up in: the card shows in the collection once you've reached that zone. */
   floor: number;
   /** Champions of this kind can drop a gold copy (every card but the goblins'). */
   gold: boolean;
@@ -598,8 +599,8 @@ function buildCards(): CardDef[] {
     const name = z.name.replace(/^The /, '');
     z.band.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 1}–${a + 9}`, a + 1));
     z.lap.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 81}–${a + 89}`, a + 81));
-    add(z.mid, 'mid', i, `Floor ${a + 5} boss`, a + 5);
-    add(z.boss, 'boss', i, `Floor ${a + 10} boss`, a + 10);
+    add(z.mid, 'mid', i, `Floor ${a + 5} boss`, a + 1);
+    add(z.boss, 'boss', i, `Floor ${a + 10} boss`, a + 1);
   });
   out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: [{ text: 'Sometimes carried by a treasure goblin you catch', floor: 1 }], floor: 1, gold: false });
   out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: [{ text: 'Sometimes carried by a rainbow goblin you catch', floor: 1 }], floor: 1, gold: false });
