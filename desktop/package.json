@@ -1,0 +1,56 @@
+{
+  "name": "deepheart-desktop",
+  "productName": "Deepheart",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deepheart as a desktop app (Electron), for Steam and for playing offline.",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "npm --prefix .. run build && electron .",
+    "dist:mac": "npm --prefix .. run build && electron-builder --mac",
+    "dist:win": "npm --prefix .. run build && electron-builder --win",
+    "dist:linux": "npm --prefix .. run build && electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.jamesurobertson.deepheart",
+    "productName": "Deepheart",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist",
+        "to": "game"
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.games",
+      "identity": null
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png",
+      "category": "Game"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  }
+}
