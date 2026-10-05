@@ -229,14 +229,14 @@ function playSound(sfx: Sfx, ev: GameEvent) {
       } else sfx.vary('hit', { vol: 0.4 });
       break;
     case 'kill':
-      // Phantom Blade kills stay quiet: at several a second the thud turns into a drone.
-      if (ev.by === 'auto' && !ev.boss && !ev.champ) break;
-      sfx.play(ev.boss ? 'bosskill' : 'kill', { vol: ev.boss ? 0.9 : 0.3, jitter: 0.15 });
-      if (ev.champ) sfx.play('drop3', { vol: 0.7, rate: 1.2 });
-      else if (!ev.boss) sfx.play('coins', { vol: 0.12, rate: 1.3, jitter: 0.2 });
+      // Ordinary monsters die quietly: mowing through an easy floor, a sound per kill is just noise.
+      if (ev.boss) sfx.play('bosskill', { vol: 0.9, jitter: 0.15 });
+      else if (ev.champ) {
+        sfx.play('kill', { vol: 0.3, jitter: 0.15 });
+        sfx.play('drop3', { vol: 0.7, rate: 1.2 });
+      }
       break;
     case 'floor': if (ev.boss) sfx.play('boss', { vol: 0.8 }); break;
-    case 'sweep': sfx.play('kill', { vol: 0.6, rate: 1.3, jitter: 0.1 }); break;
     case 'bossWin':
       sfx.play('drop3', { vol: 0.8 });
       // A clutch kill: a deep, slowed boom as time drops, then the hit landing as it lets go.
@@ -252,7 +252,8 @@ function playSound(sfx: Sfx, ev: GameEvent) {
     case 'reveal': sfx.play('levelup', { vol: 0.5 }); break;
     case 'buyUpg': sfx.play('equip', { vol: 0.55, jitter: 0.05 }); break;
     case 'trophy': sfx.play('drop2', { vol: 0.55 }); break;
-    case 'raidSpawn': sfx.play(ev.rainbow ? 'awaken' : 'drop1', { vol: 0.7, rate: ev.rainbow ? 1.5 : 1.2 }); break;
+    // A rainbow goblin sounds like any other: it's a surprise.
+    case 'raidSpawn': sfx.play('drop1', { vol: 0.7, rate: 1.2 }); break;
     case 'raidCatch':
       sfx.play('kill', { vol: 0.6 });
       sfx.play('chest', { vol: 0.7 });
