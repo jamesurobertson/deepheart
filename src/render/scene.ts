@@ -349,6 +349,8 @@ export class Scene {
   private fade: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   /** The floor we were last on: stepping down into a new zone plays the staircase. */
   private lastFloor = 1;
+  /** When a floor was last swept (scene time): blitzing back through old floors skips the staircase. */
+  private sweptAt = -99;
   /** Called when the party arrives in the new zone (the UI shows the title card then). */
   onArrive: (() => void) | null = null;
 
@@ -1474,6 +1476,9 @@ export class Scene {
         else this.dropLoot(ev, at);
         break;
       }
+      case 'sweep':
+        this.sweptAt = this.time;
+        break;
       case 'floor': {
         // Leaving a floor: any relic still lying there flies to the party (but not one the boss just dropped: the
         // next floor starts the moment a boss dies, and its relic waits on the floor to be picked up there).
@@ -1488,14 +1493,14 @@ export class Scene {
           if (any) this.addShake(0.15);
         }
         const z = zoneOf(ev.floor);
-        // Going down into a zone you've never reached: the staircase.
-        const deeper = z > zoneOf(this.lastFloor);
+        // Going down into a zone you haven't reached this descent: the staircase. Not while blitzing back through old
+        // floors after a descent (sweeping them in seconds), where a staircase every ten floors would just stall you.
+        const deeper = z > zoneOf(this.lastFloor) && ev.floor >= game.s.maxFloor && this.time - this.sweptAt > 4;
         this.lastFloor = ev.floor;
         if (this.cine) this.cine.zone = z;
         else if (this.hold) this.hold.zone = z;
         // Let the boss's light, gold and sparks settle (longer if a relic dropped) before the party heads for the stairs.
-        // Only for new depths: sweeping back through zones you've seen just changes the room.
-        else if (deeper && this.settings.cinematics && game.s.bestFloor <= ev.floor) this.hold = { zone: z, t: this.relicDropped ? 2.8 : 1.6 };
+        else if (deeper && this.settings.cinematics) this.hold = { zone: z, t: this.relicDropped ? 2.8 : 1.6 };
         else if (this.clutch) this.pendingBand = z;
         else this.setBand(z);
         this.relicDropped = false;
