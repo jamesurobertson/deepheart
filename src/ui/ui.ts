@@ -1398,8 +1398,8 @@ export class Ui {
     if (name === 'cards') this.newCards = 0;
     this.el.modalWrap.hidden = false;
     this.renderModal();
-    // Cards opens at the row for the zone you're in.
-    if (name === 'cards') this.el.modalWrap.querySelector('.here-zone')?.scrollIntoView({ block: 'start' });
+    // Every menu (and tab) opens at the top, not wherever the last one was scrolled to.
+    this.el.modal.scrollTop = 0;
   }
 
   closeModal() {
