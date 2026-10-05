@@ -842,7 +842,10 @@ export class Scene {
   }
 
   private updateParty(dt: number, game: Game) {
-    const targets = game.monsters.filter((m) => m.arrive <= 0);
+    // On a floor you badly outclass, monsters die the moment they arrive, so the party also goes for the ones still
+    // walking in: it's seen fighting them down the room instead of standing idle. (Only the look: damage is the sim's.)
+    const arrived = game.monsters.filter((m) => m.arrive <= 0);
+    const targets = arrived.length ? arrived : game.monsters;
     const focus = targets[0];
     const haste = 1 + this.fever;
     const hero = game.heroIndex();
@@ -937,14 +940,17 @@ export class Scene {
   /** A melee companion's blow landing. */
   private strike(c: CompView, id: number) {
     const v = this.mons.get(id);
-    if (!v || v.dead >= 0) return;
+    if (!v) return;
     const big = COMPS[c.comp].big;
     const at = v.body.position.clone().setY(v.height * 0.45);
     c.stretch = 1;
     this.fx.swipe(at, 0xfff0d8, big ? 1.5 : 0.95, Math.PI * (0.6 + Math.random() * 0.5));
     this.fx.star(at.clone().setX(at.x - 0.2), 0xffffff, big ? 1.1 : 0.7);
-    this.react(v, big ? 0.6 : 0.3);
-    this.bleed(v, at, big ? 8 : 4, !!big);
+    // (The blow still lands on one that died a moment ago, so a swing is never wasted on thin air.)
+    if (v.dead < 0) {
+      this.react(v, big ? 0.6 : 0.3);
+      this.bleed(v, at, big ? 8 : 4, !!big);
+    }
     if (big) {
       this.fx.ring(v.body.position, 0xffd070, 2.2);
       this.addShake(0.1);
@@ -954,8 +960,13 @@ export class Scene {
 
   /** A ranged companion lets loose. */
   private fire(c: CompView, kind: Attack, id: number) {
-    const view = this.mons.get(id);
-    if (!view || view.dead >= 0) return;
+    let view = this.mons.get(id);
+    // Its target died during the wind-up (all the time on floors you badly outclass): shoot at another instead.
+    if (!view || view.dead >= 0) {
+      view = [...this.mons.values()].find((m) => m.dead < 0);
+      if (!view) return;
+      id = view.id;
+    }
     const def = COMPS[c.comp];
     const from = c.body.position.clone().add(new THREE.Vector3(c.sprite.flip ? -0.35 : 0.35, def.big ? 1.6 : 0.95, 0.1));
     const to = view.body.position.clone().setY(view.height * 0.45);
@@ -1811,7 +1822,10 @@ export class Scene {
     const standOff = (v: MonView) => radius(v) + (melee ? (def.big ? 1.1 : 0.7) : 2.6);
     // Ranged heroes hit anything in the room; melee ones have to get close.
     const inReach = (v: MonView) => !melee || v.body.position.distanceTo(p) <= radius(v) + (def.big ? 1.6 : 1.15);
-    const live = game.monsters.filter((m) => m.arrive <= 0).map((m) => this.mons.get(m.id)).filter((v): v is MonView => !!v && v.dead < 0 && v.born >= 1);
+    const views = (list: Monster[]) => list.map((m) => this.mons.get(m.id)).filter((v): v is MonView => !!v && v.dead < 0 && v.born >= 1);
+    // As with the party: when everything dies on arrival, the hero goes for what's still walking in.
+    const arrivedLive = views(game.monsters.filter((m) => m.arrive <= 0));
+    const live = arrivedLive.length ? arrivedLive : views(game.monsters);
     const nearest = (from: THREE.Vector3) => live.reduce<MonView | null>((best, v) => (!best || v.body.position.distanceToSquared(from) < best.body.position.distanceToSquared(from) ? v : best), null);
     /** Beside a monster rather than on top of it, on the side the hero is coming from. */
     const besideOf = (v: MonView) => {
