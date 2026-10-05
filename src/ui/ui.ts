@@ -33,11 +33,11 @@ function icon(i: Icon, box = 36): string {
   return `<span class="ico">${spriteFit(i.sprite, box)}${sub}${tier}</span>`;
 }
 
-/** A monster card as it sits in the collection: unknown (never slain) shows a "?", met shows a silhouette. */
-function cardFace(card: (typeof CARDS)[number], state: 'unknown' | 'met' | 'got', gilded = false, box = 44): string {
+/** A monster card as it sits in the collection: one you don't have yet is a blurred silhouette under a "?". */
+function cardFace(card: (typeof CARDS)[number], state: 'locked' | 'got', gilded = false, box = 44): string {
   const frame = gilded ? CARD_FRAME.gold : CARD_FRAME[card.kind];
-  const art = state === 'unknown' ? '<i class="mc-q">?</i>' : cardArt(card, box, card.id === 'rainbow-goblin' && state === 'got' ? 'rainbow' : '');
-  return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'unknown' ? '???' : esc(card.name)}</span></span>`;
+  const art = state === 'locked' ? `${cardArt(card, box)}<i class="mc-q">?</i>` : cardArt(card, box, card.id === 'rainbow-goblin' ? 'rainbow' : '');
+  return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'locked' ? '???' : esc(card.name)}</span></span>`;
 }
 
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
@@ -1489,14 +1489,14 @@ export class Ui {
     return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${this.newCards ? ` <em class="tab-new">+${this.newCards}</em>` : ''}`)}</nav>`;
   }
 
-  /** Every monster's card, zone by zone: a "?" for monsters never slain, a silhouette until the card turns up. A zone's row
+  /** Every monster's card, zone by zone: a blurred "?" until the card turns up. A zone's row
    *  (and the monsters that only come on later laps) appear once you've been that deep, the goblins once you've met one. */
   private cardsHtml(): string {
     const g = this.game;
     const seen = (c: (typeof CARDS)[number]) => g.cardCount(c.id) > 0 || (c.kind === 'goblin' ? g.cardMet(c.id) : c.floor <= g.s.bestFloor);
     const face = (c: (typeof CARDS)[number]) => {
       const n = g.cardCount(c.id);
-      const state = n ? 'got' : g.cardMet(c.id) ? 'met' : 'unknown';
+      const state = n ? 'got' : 'locked';
       return `<span class="mc-cell" data-tip="card:${c.id}">${cardFace(c, state, g.hasGoldCard(c.id))}</span>`;
     };
     const section = (title: string, all: typeof CARDS) => {
