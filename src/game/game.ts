@@ -1044,12 +1044,6 @@ export class Game {
     return true;
   }
 
-  buyAllUpgs() {
-    let n = 0;
-    for (const u of this.shopUpgrades()) if (this.buyUpg(u.id)) n++;
-    return n;
-  }
-
   private reqMet(r: Req): boolean {
     const s = this.s;
     switch (r.t) {

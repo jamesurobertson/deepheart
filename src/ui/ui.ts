@@ -166,7 +166,7 @@ export class Ui {
       <aside class="shop">
         <header class="shop-head"><h2>Your Party</h2><span class="shop-sub"></span><span class="sheet-grip" aria-hidden="true"></span></header>
         <section class="upgs">
-          <div class="upgs-head"><h3>Upgrades</h3><button class="btn small buy-all" data-act="buyAll" hidden>Buy all</button></div>
+          <div class="upgs-head"><h3>Upgrades</h3></div>
           <div class="upg-grid"></div>
           <p class="upgs-empty">Upgrades appear as you go deeper.</p>
         </section>
@@ -190,7 +190,7 @@ export class Ui {
       down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
       fever: q('.fever'), feverBar: q('.fever i'), feverLabel: q('.fever span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), heroMark: q('.hero-mark'), raid: q('.raid-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
-      upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
+      upgEmpty: q('.upgs-empty'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
       relicBadge: q('[data-open=relics] .badge'), cardBadge: q('[data-open=trophies] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'),
     };
@@ -569,7 +569,6 @@ export class Ui {
         this.hooks.settings();
         this.renderModal();
         break;
-      case 'buyAll': if (g.buyAllUpgs()) this.hideTip(); break;
       case 'floorDown':
         if (g.goFloor(g.s.floor - 1)) g.s.auto = false;
         break;
@@ -1141,7 +1140,6 @@ export class Ui {
       if (can) affordable++;
       b.classList.toggle('can', can);
     });
-    this.el.buyAll.hidden = affordable < 2;
     // Folded phone sheet: a strip of just the upgrades you can buy right now (or nothing at all).
     const strip = affordable > 0;
     if (strip !== this.strip) {
