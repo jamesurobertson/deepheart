@@ -1,6 +1,7 @@
 import Decimal from 'break_infinity.js';
 import {
   ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, HOARDERS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
+  CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
@@ -46,6 +47,15 @@ const CLUTCH_GOLD = 1.5;
 /** A champion turns up about as often as a treasure goblin: tougher, glowing, and worth a little more than a goblin's plunder. */
 const CHAMP_HP = 6;
 const CHAMP_GOLD = 50;
+/** A boss on a floor you've beaten before is now and then a champion (so farming a boss floor has a jackpot):
+ *  tougher, more gold, and the only source of gold boss cards. */
+const CHAMP_BOSS_CHANCE = 1 / 150;
+const CHAMP_BOSS_HP = 3;
+const CHAMP_BOSS_GOLD = 10;
+/** Card drops: 1 in this many kills (Ragnarok's 0.01% for ordinary monsters), and so on. 1% is the best odds anything gets. */
+const CARD_ODDS = { monster: 10_000, boss: 2_500, champ: 100, champBoss: 100, goblin: 100, rainbow: 100 };
+/** Seconds before the boss of a floor you're farming climbs back up. */
+const BOSS_RESPAWN = 2.5;
 /** Share of treasure goblins that are rainbow goblins. Catching one opens the Goblin Vault a quarter of the time
  *  (always the first time); otherwise it drops a Rainbow Haul of RAINBOW_HAUL times a goblin's plunder. */
 const RAINBOW_CHANCE = 1 / 8;
@@ -172,6 +182,11 @@ export interface SaveState {
   /** How far through the hero introduction you are: 0 none, 1 met your hero, 2 shown the star that picks one. */
   heroTips: number;
   rampage: number;
+  /** Cards by id: copies per edition (normal, then each corruption; only normal is shown so far), plain and gold, and
+   *  the kill (for goblins, the catch) that first dropped each. */
+  cards: Record<string, { n: number[]; gold: number[]; at?: number; goldAt?: number }>;
+  /** Monsters slain per card id (a swept floor counts the monsters it wipes out). */
+  slain: Record<string, number>;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
   cycleBest: number;
   settings: Settings;
@@ -184,7 +199,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0,
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, cards: {}, slain: {},
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto' },
   };
 }
@@ -220,7 +235,7 @@ export type GameEvent =
   | { t: 'floor'; floor: number; boss: boolean; cleared?: boolean }
   | { t: 'sweep'; floor: number; gold: Decimal }
   | { t: 'bossFail'; floor: number }
-  | { t: 'bossWin'; floor: number; clutch?: { left: number; gold: Decimal } }
+  | { t: 'bossWin'; floor: number; first: boolean; clutch?: { left: number; gold: Decimal } }
   | { t: 'souls'; id: number; floor: number; souls: number }
   | { t: 'retreat'; floor: number }
   | { t: 'buyComp'; comp: number; n: number }
@@ -239,7 +254,9 @@ export type GameEvent =
   | { t: 'split'; id: number; into: [number, number] }
   | { t: 'heal'; id: number; amount: Decimal }
   | { t: 'awaken'; stones: number }
-  | { t: 'heart'; id: string; lv: number };
+  | { t: 'heart'; id: string; lv: number }
+  /** `src`: dropped by a monster just killed, on a swept floor (no body to drop from), or by a goblin caught. */
+  | { t: 'card'; id: string; gold: boolean; count: number; first: boolean; src: 'kill' | 'sweep' | 'raid'; kill: number };
 
 /** Every multiplier behind the damage, crit and gold numbers, kept apart for the stats page. */
 export interface Parts {
@@ -353,6 +370,8 @@ export class Game {
   hold: { id: number | null; x: number; y: number } | null = null;
   /** Testing only (?relics=always): every boss drops a relic, every time. */
   debugRelics = false;
+  /** Testing only (?cards=often): cards drop hundreds of times as often, and champion bosses are common. */
+  debugCards = false;
   private sinceClick = 99;
   /** DPS damage waiting to be shown as numbers, per monster. */
   private dpsShown = new Map<number, Decimal>();
@@ -594,7 +613,7 @@ export class Game {
   }
 
   monsterGold(m: Monster) {
-    const k = m.boss ? 8 : TRASH * (m.champ ? CHAMP_GOLD : m.vault ? VAULT_GOLD : 1);
+    const k = m.boss ? 8 * (m.champ ? CHAMP_BOSS_GOLD : 1) : TRASH * (m.champ ? CHAMP_GOLD : m.vault ? VAULT_GOLD : 1);
     return Decimal.max(1, floorGold(this.s.floor).times(k)).times(this.goldMult()).ceil();
   }
 
@@ -629,7 +648,7 @@ export class Game {
   // ---------- floors and monsters ----------
 
   /** Move to a floor. `cleared`: because the last one was just cleared (the UI and scene make a moment of it). */
-  private enterFloor(f: number, quiet = false, cleared = false) {
+  private enterFloor(f: number, quiet = false, cleared = false, bossDelay = 0) {
     this.s.floor = f;
     this.s.floorKills = 0;
     this.stuckT = 0;
@@ -638,7 +657,8 @@ export class Game {
     this.bossTime = 0;
     this.stash = [];
     // During the Goblin Vault the boss waits until the vault closes.
-    if (isBossFloor(f) && !this.inVault()) this.spawnBoss();
+    if (bossDelay) this.spawnT = bossDelay;
+    else if (isBossFloor(f) && !this.inVault()) this.spawnBoss();
     if (!quiet) this.events.push({ t: 'floor', floor: f, boss: isBossFloor(f), cleared });
   }
 
@@ -739,12 +759,14 @@ export class Game {
     // Zone bosses from floor 30 on are the walls; the first two just teach you what a boss is.
     const zone = this.s.floor % 10 === 0 && this.s.floor >= DESCEND_FLOOR ? TUNE.zoneBoss : 1;
     const first = this.s.floor <= 10 ? 0.5 : 1;
-    const hp = floorHp(this.s.floor).times(8 * zone * first * (giant ? 1 + 2 * bite : 1));
-    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, ...this.spot(true) };
+    // Only on a boss floor you've beaten before, so a champion never stands in the way of new ground.
+    const champ = this.s.floor < this.s.bestFloor && Math.random() < (this.debugCards ? 0.34 : CHAMP_BOSS_CHANCE);
+    const hp = floorHp(this.s.floor).times(8 * zone * first * (giant ? 1 + 2 * bite : 1) * (champ ? CHAMP_BOSS_HP : 1));
+    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, champ, ...this.spot(true) };
     this.monsters.push(m);
     let time = (this.hasAbyss('patience') ? 45 : BOSS_TIME) + Math.min(30, 3 * this.relic('time'));
     if (mods.includes('enraged')) time *= 1 - 0.5 * bite;
-    if (giant) time *= 1.5;
+    if (giant || champ) time *= 1.5;
     this.bossTimeMax = time;
     this.bossTime = time;
     this.events.push({ t: 'spawn', id: m.id });
@@ -798,18 +820,19 @@ export class Game {
     this.s.kills++;
     this.killAcc++;
     this.stuckT = 0;
-    if (m.champ) this.s.champions++;
+    if (m.champ && !m.half) this.s.champions++;
     this.events.push({ t: 'kill', id: m.id, gold, boss: m.boss, by, champ: m.champ });
     if (m.vault) {
       this.vaultGold = this.vaultGold.plus(gold);
       return;
     }
+    if (!m.boss) this.rollCard(this.slay(m.def), !!m.champ, 'kill');
     if (m.boss && m.mods.includes('split') && !m.half) {
       // Two halves climb out of the body; the clock keeps running.
       const frac = 0.5 * this.modBite() + 0.25 * (1 - this.modBite());
       const mods = m.mods.filter((x) => x !== 'split');
       const halves = [-1, 1].map((side): Monster => ({
-        id: this.seq++, def: m.def, hp: m.max.times(frac), max: m.max.times(frac), boss: true, half: true, arrive: 0.4, mods,
+        id: this.seq++, def: m.def, hp: m.max.times(frac), max: m.max.times(frac), boss: true, half: true, arrive: 0.4, mods, champ: m.champ,
         x: m.x + side * 1.1, z: m.z - side * 1,
       }));
       this.monsters.push(...halves);
@@ -819,27 +842,31 @@ export class Game {
     }
     if (m.boss && this.monsters.some((x) => x.boss)) return;
     if (m.boss) {
-      this.s.bosses++;
-      // Only a boss beaten for the first time this run can drop a relic, so going back to farm one doesn't pay.
+      // Only a boss beaten for the first time this run drops a relic, pays souls or counts toward trophies, so going
+      // back to farm one doesn't.
       const firstWin = this.s.floor >= this.s.maxFloor;
+      if (firstWin) this.s.bosses++;
+      const firstClear = this.s.floor > this.s.bestCleared;
       let clutch: { left: number; gold: Decimal } | undefined;
       if (this.bossTime > 0 && this.bossTime <= CLUTCH_SECONDS) {
         const bonus = gold.times(CLUTCH_GOLD - 1);
         this.earn(bonus);
-        this.s.clutches++;
+        if (firstWin) this.s.clutches++;
         clutch = { left: this.bossTime, gold: bonus };
       }
       this.bossTime = 0;
       this.unlockNext();
-      this.events.push({ t: 'bossWin', floor: this.s.floor, clutch });
-      const souls = this.bossSouls(this.s.floor);
+      this.events.push({ t: 'bossWin', floor: this.s.floor, first: firstClear, clutch });
+      this.rollCard(this.slay(m.def), !!m.champ, 'kill', true);
+      // Each boss pays its souls once a descent: farming its floor afterwards doesn't.
+      const souls = firstWin ? this.bossSouls(this.s.floor) : 0;
       if (souls > 0) {
         this.s.runSouls += souls;
         this.events.push({ t: 'souls', id: m.id, floor: this.s.floor, souls });
       }
       if (firstWin || this.debugRelics) this.rollRelic(this.s.floor);
       if (this.s.auto) this.enterFloor(this.s.floor + 1);
-      else this.enterFloor(this.s.floor);
+      else this.enterFloor(this.s.floor, false, false, BOSS_RESPAWN);
     } else if (!this.bossFloor()) {
       this.s.floorKills++;
       if (this.s.floorKills >= FLOOR_KILLS) {
@@ -867,6 +894,8 @@ export class Game {
     }
     if (s.floor !== floor || s.floorKills >= FLOOR_KILLS) return;
     const left = FLOOR_KILLS - s.floorKills;
+    const band = bandFor(floor);
+    for (let k = 0; k < left; k++) this.rollCard(this.slay(band[Math.floor(Math.random() * band.length)]), false, 'sweep');
     const gold = Decimal.max(1, floorGold(floor).times(TRASH)).times(this.goldMult()).ceil().times(left);
     this.earn(gold);
     s.kills += left;
@@ -1041,6 +1070,7 @@ export class Game {
     this.raid = null;
     this.s.raids++;
     if (r.rainbow) this.s.rainbows++;
+    if (this.cardRoll(r.rainbow ? CARD_ODDS.rainbow : CARD_ODDS.goblin)) this.giveCard(r.rainbow ? RAINBOW_CARD : GOBLIN_CARD, false, 'raid');
     if (r.rainbow && (this.s.vaults === 0 || Math.random() < VAULT_CHANCE)) {
       this.events.push({ t: 'raidCatch', id: r.id, reward: 'vault' });
       this.openVault();
@@ -1317,6 +1347,58 @@ export class Game {
     return true;
   }
 
+  // ---------- cards ----------
+
+  /** Count a kill toward its card's tally; returns the card id. */
+  private slay(def: MonsterDef) {
+    const id = cardId(def.name);
+    this.s.slain[id] = (this.s.slain[id] ?? 0) + 1;
+    return id;
+  }
+
+  private cardRoll(odds: number) {
+    return Math.random() * (this.debugCards ? Math.max(1, odds / 500) : odds) < 1;
+  }
+
+  /** A killed monster's chance at its card: champions roll for a gold one first. */
+  private rollCard(id: string, champ: boolean, src: 'kill' | 'sweep', boss = false) {
+    if (champ && this.cardRoll(boss ? CARD_ODDS.champBoss : CARD_ODDS.champ)) this.giveCard(id, true, src);
+    else if (this.cardRoll(boss ? CARD_ODDS.boss : CARD_ODDS.monster)) this.giveCard(id, false, src);
+  }
+
+  giveCard(id: string, gold = false, src: 'kill' | 'sweep' | 'raid' = 'kill') {
+    const c = (this.s.cards[id] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
+    const first = gold ? !this.hasGoldCard(id) : !this.cardCount(id);
+    const kill = this.cardKill(id);
+    if (first && gold) c.goldAt = kill;
+    else if (first) c.at = kill;
+    (gold ? c.gold : c.n)[Math.min(lapOf(this.s.floor), CORRUPTION.length - 1)]++;
+    this.events.push({ t: 'card', id, gold, count: this.cardCount(id), first, src, kill });
+  }
+
+  /** Which kill of this monster it is (for the goblins, which catch). */
+  cardKill(id: string) {
+    return id === GOBLIN_CARD ? this.s.raids - this.s.rainbows : id === RAINBOW_CARD ? this.s.rainbows : this.s.slain[id] ?? 0;
+  }
+
+  /** Copies of a card owned, plain and gold together. */
+  cardCount(id: string) {
+    const c = this.s.cards[id];
+    return c ? c.n.reduce((a, b) => a + b, 0) + c.gold.reduce((a, b) => a + b, 0) : 0;
+  }
+
+  hasGoldCard(id: string) {
+    return !!this.s.cards[id]?.gold.some((n) => n > 0);
+  }
+
+  cardsFound() {
+    return CARDS.filter((c) => this.cardCount(c.id) > 0).length;
+  }
+
+  goldCardsFound() {
+    return CARDS.filter((c) => this.hasGoldCard(c.id)).length;
+  }
+
   // ---------- trophies ----------
 
   private trophyMet(r: TrophyReq): boolean {
@@ -1343,6 +1425,8 @@ export class Game {
       case 'rainbows': return s.rainbows >= r.n;
       case 'rampage': return s.rampage >= r.n;
       case 'stars': return Object.values(s.relics).some((lv) => relicStars(lv) >= r.n);
+      case 'cards': return this.cardsFound() >= r.n;
+      case 'goldCards': return this.goldCardsFound() >= r.n;
     }
   }
 
@@ -1388,7 +1472,7 @@ export class Game {
         this.spawn();
         this.spawnT = SPAWN_GAP;
       }
-    } else if (this.monsters.length === 0) this.spawnBoss();
+    } else if (this.monsters.length === 0 && (this.spawnT -= dt) <= 0) this.spawnBoss();
 
     this.sweepT -= dt;
     if (!vault && this.sweepT <= 0 && this.canSweep()) this.sweep();

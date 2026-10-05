@@ -1,4 +1,6 @@
 import type { Atlas, Rect } from '../render/atlas.ts';
+import { portrait, portraitUrl } from '../render/cards.ts';
+import type { CardDef } from '../game/data.ts';
 
 let atlas: Atlas | null = null;
 export function setAtlas(a: Atlas) {
@@ -38,6 +40,14 @@ export function charFit(name: string, height: number, maxW = height * 1.2, cls =
   if (!full) return '';
   const r = atlas!.trimmed(full);
   return cell(r, Math.min(height / r.h, maxW / r.w), cls);
+}
+
+/** A card's monster, tinted as it looks in the dungeon, at the largest integer scale that fits `box` (never below 1). */
+export function cardArt(card: CardDef, box: number, cls = ''): string {
+  if (!atlas) return '';
+  const p = portrait(atlas, card);
+  const k = Math.max(1, Math.floor(box / Math.max(p.width, p.height)));
+  return `<img class="px ${cls}" src="${portraitUrl(atlas, card)}" width="${p.width * k}" height="${p.height * k}" alt="">`;
 }
 
 /** Small hand-made pixel glyphs (drawn as SVG rects so they stay crisp). */

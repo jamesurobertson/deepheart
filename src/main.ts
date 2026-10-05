@@ -15,8 +15,8 @@ const SAVE_KEY = 'deepheart-save' + (params.get('slot') ? `:${params.get('slot')
 const STEP = 1 / 30;
 /** Away (tab hidden or closed) longer than this counts as offline: paid at the offline rate, with a summary. Shorter is played out at full speed. */
 const OFFLINE_AFTER = 60;
-// ?speed=10 runs the sim faster for playtesting.
-const SPEED = Math.max(1, Number(params.get('speed')) || 1);
+// ?speed=10 runs the sim faster for playtesting (dev build only).
+const SPEED = import.meta.env.DEV ? Math.max(1, Number(params.get('speed')) || 1) : 1;
 
 function load(): SaveState | null {
   try {
@@ -92,6 +92,8 @@ async function boot() {
   if (import.meta.env.DEV) {
     // ?relics=always makes every boss drop a relic.
     if (params.get('relics') === 'always') game.debugRelics = true;
+    // ?cards=often makes cards drop hundreds of times as often, and champion bosses common.
+    if (params.get('cards') === 'often') game.debugCards = true;
     // step(n, click) advances n frames by hand: handy when the tab is in the background.
     const step = (n: number, click = false) => {
       for (let i = 0; i < n; i++) {

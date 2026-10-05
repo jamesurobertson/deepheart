@@ -1,0 +1,86 @@
+/**
+ * Synthesizes the card drop sounds: a quick retro "you got something" arpeggio (C6 E6 G6 C7 in square waves), and for
+ * gold cards the same arpeggio answered a fifth higher a beat later, with high glints on top.
+ *   node scripts/card-sound.ts  ->  public/assets/sfx/card.mp3, public/assets/sfx/cardgold.mp3
+ */
+import { execFileSync } from 'node:child_process';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const RATE = 44100;
+const TAU = Math.PI * 2;
+const ARPEGGIO = [1047, 1319, 1568, 2093];
+
+function square(out: Float32Array, t0: number, f: number, len: number, vol: number) {
+  const i0 = Math.round(t0 * RATE);
+  for (let k = 0; k < len * RATE && i0 + k < out.length; k++) {
+    const t = k / RATE;
+    const env = Math.min(1, t / 0.003) * Math.exp(-t * 7);
+    out[i0 + k] += (Math.sin(TAU * f * t) > 0 ? 1 : -1) * env * vol * 0.25;
+  }
+}
+
+/** The four notes, the last one left to ring. `p` shifts the pitch. */
+function itemGet(out: Float32Array, t0: number, p: number, vol: number) {
+  ARPEGGIO.forEach((f, k) => square(out, t0 + k * 0.055, f * p, k === ARPEGGIO.length - 1 ? 0.5 : 0.08, vol));
+}
+
+function ping(out: Float32Array, t0: number, f: number, vol: number) {
+  const i0 = Math.round(t0 * RATE);
+  for (let k = 0; i0 + k < out.length; k++) {
+    const t = k / RATE;
+    const env = Math.min(1, t / 0.001) * Math.exp(-t * 9);
+    if (env < 1e-4) break;
+    out[i0 + k] += Math.sin(TAU * f * t) * env * vol;
+  }
+}
+
+/** A small, bright room: four combs into the dry signal. */
+function room(buf: Float32Array, mix: number) {
+  const combs = [1557, 1617, 1491, 1422].map((n) => ({ line: new Float32Array(n), at: 0 }));
+  for (let i = 0; i < buf.length; i++) {
+    let y = 0;
+    for (const c of combs) {
+      const v = c.line[c.at];
+      c.line[c.at] = buf[i] + v * 0.72;
+      c.at = (c.at + 1) % c.line.length;
+      y += v;
+    }
+    buf[i] += y * 0.25 * mix;
+  }
+}
+
+function render(name: string, seconds: number, build: (out: Float32Array) => void) {
+  const out = new Float32Array(Math.round(seconds * RATE));
+  build(out);
+  room(out, 0.12);
+  let peak = 0;
+  for (const v of out) peak = Math.max(peak, Math.abs(v));
+  const pcm = Buffer.alloc(44 + out.length * 2);
+  pcm.write('RIFF', 0);
+  pcm.writeUInt32LE(36 + out.length * 2, 4);
+  pcm.write('WAVEfmt ', 8);
+  pcm.writeUInt32LE(16, 16);
+  pcm.writeUInt16LE(1, 20);
+  pcm.writeUInt16LE(1, 22);
+  pcm.writeUInt32LE(RATE, 24);
+  pcm.writeUInt32LE(RATE * 2, 28);
+  pcm.writeUInt16LE(2, 32);
+  pcm.writeUInt16LE(16, 34);
+  pcm.write('data', 36);
+  pcm.writeUInt32LE(out.length * 2, 40);
+  for (let i = 0; i < out.length; i++) pcm.writeInt16LE(Math.round((out[i] / peak) * 0.9 * 32767), 44 + i * 2);
+  const wav = join(tmpdir(), `deepheart-${name}.wav`);
+  writeFileSync(wav, pcm);
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', wav, '-af', 'loudnorm=I=-17:TP=-1.5,aresample=44100', '-ac', '1', '-b:a', '96k', `public/assets/sfx/${name}.mp3`]);
+  unlinkSync(wav);
+  console.log(`${name}.mp3`);
+}
+
+render('card', 1.2, (out) => itemGet(out, 0, 1, 1));
+render('cardgold', 1.6, (out) => {
+  itemGet(out, 0, 1, 1);
+  itemGet(out, 0.14, 1.498, 0.8);
+  [2, 2.52, 3, 3.78].forEach((r, k) => ping(out, 0.32 + k * 0.06, 1760 * r, 0.18));
+});
