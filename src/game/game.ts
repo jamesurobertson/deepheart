@@ -842,15 +842,16 @@ export class Game {
     }
     if (m.boss && this.monsters.some((x) => x.boss)) return;
     if (m.boss) {
-      this.s.bosses++;
-      // Only a boss beaten for the first time this run can drop a relic, so going back to farm one doesn't pay.
+      // Only a boss beaten for the first time this run drops a relic, pays souls or counts toward trophies, so going
+      // back to farm one doesn't.
       const firstWin = this.s.floor >= this.s.maxFloor;
+      if (firstWin) this.s.bosses++;
       const firstClear = this.s.floor > this.s.bestCleared;
       let clutch: { left: number; gold: Decimal } | undefined;
       if (this.bossTime > 0 && this.bossTime <= CLUTCH_SECONDS) {
         const bonus = gold.times(CLUTCH_GOLD - 1);
         this.earn(bonus);
-        this.s.clutches++;
+        if (firstWin) this.s.clutches++;
         clutch = { left: this.bossTime, gold: bonus };
       }
       this.bossTime = 0;

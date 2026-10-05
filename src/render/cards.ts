@@ -75,3 +75,37 @@ export function cardTexture(atlas: Atlas, card: CardDef, gold: boolean): THREE.C
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
+
+let back: THREE.CanvasTexture | null = null;
+
+/** The back every card shares: dark, diamond-patterned, with a gold gem in the middle. */
+export function cardBackTexture(): THREE.CanvasTexture {
+  if (back) return back;
+  const S = 4;
+  const c = document.createElement('canvas');
+  c.width = CARD_W * S;
+  c.height = CARD_H * S;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#140e18';
+  g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = '#8a6a3a';
+  g.fillRect(S, S, c.width - 2 * S, c.height - 2 * S);
+  g.fillStyle = '#2a1c3a';
+  g.fillRect(2 * S, 2 * S, c.width - 4 * S, c.height - 4 * S);
+  g.fillStyle = '#3a2850';
+  for (let y = 3; y < CARD_H - 3; y++) for (let x = 3; x < CARD_W - 3; x++) if ((x + y) % 4 === 0 || (x - y + 64) % 4 === 0) g.fillRect(x * S, y * S, S, S);
+  // The gem: the relic glyph's shape, centred.
+  const gem = ['..###..', '.#####.', '#######', '.#####.', '..###..', '...#...'];
+  const gx = Math.floor((CARD_W - 7) / 2);
+  const gy = Math.floor((CARD_H - 6) / 2);
+  gem.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (ch !== '#') return;
+    g.fillStyle = y < 2 ? '#ffe9a0' : '#f2c14e';
+    g.fillRect((gx + x) * S, (gy + y) * S, S, S);
+  }));
+  back = new THREE.CanvasTexture(c);
+  back.magFilter = THREE.NearestFilter;
+  back.minFilter = THREE.NearestFilter;
+  back.colorSpace = THREE.SRGBColorSpace;
+  return back;
+}

@@ -9,7 +9,7 @@ import { PixelSprite, blobShadow } from './sprite.ts';
 import { Fx, flameTexture, spellTextures } from './fx.ts';
 import { GradeShader, tiltShift } from './post.ts';
 import { buildStairwell, stairPoint } from './stairwell.ts';
-import { CARD_FRAME, CARD_H, CARD_W, cardTexture } from './cards.ts';
+import { CARD_FRAME, CARD_H, CARD_W, cardBackTexture, cardTexture } from './cards.ts';
 import { CARD_BY_ID, COMPS, RELIC_BY_ID, ZONES, corruptionOf, tilesFor, zoneOf, type Attack, type CompDef, type Tiles } from '../game/data.ts';
 import type { Game, GameEvent, Monster } from '../game/game.ts';
 
@@ -76,6 +76,9 @@ interface LootView {
   /** Height on the floor, in world units, and the angle it lies at. */
   size: number;
   tilt: number;
+  /** Seconds in the air before it lands (it can't be walked over until then), and whether it has. */
+  air: number;
+  landed: boolean;
   color: THREE.Color;
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   /** Seconds on the floor, and seconds into the flight to the party (-1: still on the floor). */
@@ -688,6 +691,7 @@ export class Scene {
     let tier: number;
     let size: number;
     let tilt = LOOT_TILT;
+    let air = LOOT_LAND;
     if (ev.t === 'relic') {
       const def = RELIC_BY_ID.get(ev.id);
       if (!def) return;
@@ -703,10 +707,18 @@ export class Scene {
       color = new THREE.Color(ev.gold ? CARD_FRAME.gold : CARD_FRAME[def.kind]);
       const map = cardTexture(this.atlas, def, ev.gold);
       // Lit by its own picture as well as the room, so the frame keeps its colour in the dungeon's warm gloom.
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W / CARD_H, 1), new THREE.MeshLambertMaterial({ map, emissiveMap: map, emissive: 0xffffff, emissiveIntensity: 0.6, color: 0x999999, side: THREE.DoubleSide }));
-      icon = { mesh, dispose: () => { mesh.geometry.dispose(); mesh.material.dispose(); map.dispose(); } };
+      const face = (tex: THREE.Texture) => new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.6, color: 0x999999 });
+      const geo = new THREE.PlaneGeometry(CARD_W / CARD_H, 1);
+      const mesh = new THREE.Mesh(geo, face(map));
+      // Two-sided: it spins face-down through the air and lands face-up.
+      const backSide = new THREE.Mesh(geo, face(cardBackTexture()));
+      backSide.rotation.y = Math.PI;
+      mesh.add(backSide);
+      icon = { mesh, dispose: () => { geo.dispose(); mesh.material.dispose(); backSide.material.dispose(); map.dispose(); } };
       size = 1.55;
       tilt = 0.3;
+      air = 1.15;
+      if (ev.gold || def.kind !== 'monster') this.fx.pillar(at.clone(), color, 7, 0.7);
     }
     const group = new THREE.Group();
     // Two drops at once land side by side.
@@ -718,7 +730,7 @@ export class Scene {
     ring.position.y = 0.03;
     group.add(ring, icon.mesh);
     this.scene.add(group);
-    this.loot.push({ ev, group, icon, size, tilt, color, ring, t: 0, fly: -1, from: new THREE.Vector3() });
+    this.loot.push({ ev, group, icon, size, tilt, air, landed: false, color, ring, t: 0, fly: -1, from: new THREE.Vector3() });
     this.fx.light(group.position.clone().setY(1.2), color, 25 + tier * 10, 0.6, 9);
     if (this.settings.particles) this.fx.burst(group.position.clone().setY(0.5), '#' + color.getHexString(), 12 + tier * 6, 3, 0.07, 8, true);
   }
@@ -738,14 +750,26 @@ export class Scene {
       if (l.fly < 0) {
         // Pops up out of the boss and lands, then bobs, pulses and turns while it waits.
         // It tumbles through the air upright, then settles flat on the floor at an angle, in a pool of its own light.
-        const land = Math.min(1, l.t / LOOT_LAND);
+        const land = Math.min(1, l.t / l.air);
         const settle = Math.max(0, (land - 0.7) / 0.3);
-        l.icon.mesh.position.y = land < 1 ? 0.6 * (1 - settle) + 0.05 * settle + Math.sin(land * Math.PI) * 2.2 : 0.05;
-        l.icon.mesh.rotation.set(-Math.PI / 2 * settle, 0, land < 1 ? -land * (Math.PI * 2 + l.tilt) : -l.tilt, 'YXZ');
+        const card = l.ev.t === 'card';
+        l.icon.mesh.position.y = land < 1 ? 0.6 * (1 - settle) + 0.05 * settle + Math.sin(land * Math.PI) * (card ? 2.8 : 2.2) : 0.05;
+        // A relic tumbles end over end; a card spins face-down and slows to a stop face-up (5π: from its back to its face).
+        if (card) l.icon.mesh.rotation.set(-Math.PI / 2 * settle, (1 - (1 - (1 - land) ** 3)) * 5 * Math.PI, -l.tilt, 'YXZ');
+        else l.icon.mesh.rotation.set(-Math.PI / 2 * settle, 0, land < 1 ? -land * (Math.PI * 2 + l.tilt) : -l.tilt, 'YXZ');
+        if (land >= 1 && !l.landed) {
+          l.landed = true;
+          if (card) {
+            const at = l.group.position.clone().setY(0.3);
+            this.fx.light(at, l.color, 30, 0.5, 8);
+            if (this.settings.particles) this.fx.burst(at, '#' + l.color.getHexString(), 18, 3.5, 0.07, 9, true);
+            this.addShake(0.08);
+          }
+        }
         l.icon.mesh.scale.setScalar(l.size * (0.4 + 0.6 * Math.min(1, land * 2)));
         l.ring.rotation.z += dt * 1.5;
         if (l.ev.t === 'card' && l.ev.gold && this.settings.particles && Math.random() < dt * 6) this.fx.burst(l.group.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0.15, (Math.random() - 0.5) * 0.8)), '#ffe9a0', 2, 1.2, 0.05, 4, true);
-        l.ring.material.opacity = (0.3 + Math.sin(l.t * 3) * 0.1) * Math.min(1, l.t / LOOT_LAND);
+        l.ring.material.opacity = (0.3 + Math.sin(l.t * 3) * 0.1) * Math.min(1, l.t / l.air);
         // Picked up by walking over it, or it flies to you by itself before long (sooner if the staircase is waiting).
         if (land >= 1 && hero && hero.body.position.distanceTo(l.group.position.clone().setY(0)) < 0.9) this.collectLoot(i);
         else if (l.t > (this.hold ? LOOT_WAIT_STAIRS : LOOT_WAIT)) this.startLootFlight(l);
@@ -797,7 +821,7 @@ export class Scene {
 
   /** A click or tap on a relic lying on the floor picks it up. */
   pickLoot(x: number, y: number) {
-    const i = this.loot.findIndex((l) => l.fly < 0 && l.t >= LOOT_LAND && this.lootNear(l, x, y));
+    const i = this.loot.findIndex((l) => l.fly < 0 && l.landed && this.lootNear(l, x, y));
     if (i < 0) return false;
     this.collectLoot(i);
     return true;
@@ -1324,6 +1348,11 @@ export class Scene {
   /** Middle of the monster field on screen, for news about the whole floor. */
   fieldScreen() {
     return this.toScreen(new THREE.Vector3(3 * this.squeeze, 1.6, 0));
+  }
+
+  /** The middle of the room, between the party and the monsters. */
+  centerScreen() {
+    return this.toScreen(new THREE.Vector3(0, 2, 0));
   }
 
   screenOf(id: number): { x: number; y: number; h: number } | null {

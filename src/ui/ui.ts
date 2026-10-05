@@ -751,6 +751,8 @@ export class Ui {
         }
         break;
       }
+      // The tink: something rare just dropped.
+      case 'card': this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 }); break;
       case 'raidSpawn':
         if (ev.rainbow && g.s.vaults === 0) {
           this.banner('A RAINBOW GOBLIN!', 'Catch it to open the Goblin Vault!', 'loot rainbow');
@@ -1605,7 +1607,7 @@ export class Ui {
     const s = g.s;
     const rows: [string, string][] = [
       ['Floor', `${s.floor} (deepest this descent ${s.maxFloor})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
-      ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses killed', fmt(s.bosses)],
+      ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses beaten', fmt(s.bosses)],
       ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Goblin Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
       ['Descents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ['Relics', `${g.relicsFound()} / ${RELICS.length}`], ['Cards', `${g.cardsFound()} / ${CARDS.length}`],
       ['This descent', duration(s.runTime)], ['Time played', duration(s.playTime)],
@@ -1690,25 +1692,52 @@ export class Ui {
   }
 
   /** A card picked up: it slides up like a relic, and a gold one gets a banner. */
+  /** Cards picked up and waiting their turn to be shown (they're shown one at a time). */
+  private cardQueue: Extract<Drop, { t: 'card' }>[] = [];
+
   private showCard(ev: Extract<Drop, { t: 'card' }>) {
-    const d = CARD_BY_ID.get(ev.id)!;
     if (this.modal !== 'cards' && ev.first) this.newCards++;
-    const el = this.el.loot;
-    el.hidden = false;
+    this.cardQueue.push(ev);
+    if (this.cardQueue.length === 1) this.revealCard();
+  }
+
+  /** The card turns up big over the room face-down, flips over in a burst of light, then flies into the Collection button. */
+  private revealCard() {
+    const ev = this.cardQueue[0];
+    if (!ev) return;
+    const d = CARD_BY_ID.get(ev.id)!;
+    const el = document.createElement('div');
+    el.className = `card-reveal${ev.gold ? ' gold' : ''}${ev.first || ev.gold ? '' : ' dupe'}`;
     el.style.setProperty('--rc', ev.gold ? CARD_FRAME.gold : CARD_FRAME[d.kind]);
-    el.className = `loot card-loot${ev.gold ? ' starred' : ''}`;
-    const head = ev.gold ? (ev.first ? 'New gold card!' : 'Gold card') : ev.first ? `New card · ${this.game.cardsFound()} / ${CARDS.length}` : 'Card';
-    const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)} · see Collection → Cards</em>` : '';
-    el.innerHTML = `<span class="loot-ico">${cardFace(d, 'got', ev.gold, 40)}</span><span class="loot-t"><small>${head}</small><b>${esc(d.name)} Card</b>${line}</span>`;
-    void el.offsetWidth;
-    el.classList.add('in');
-    if (ev.gold) this.banner('GOLD CARD!', `${d.name} Card`, 'loot');
-    this.hooks.sound(ev.gold || d.kind !== 'monster' ? 'drop4' : 'drop3', { vol: 0.7 });
-    clearTimeout(this.lootTimer);
-    this.lootTimer = window.setTimeout(() => {
-      el.classList.remove('in');
-      this.lootTimer = window.setTimeout(() => (el.hidden = true), 400);
-    }, 3600);
+    const mid = this.scene.centerScreen();
+    el.style.left = `${mid.x}px`;
+    el.style.top = `${mid.y}px`;
+    const dock = this.el.cardBadge.parentElement!;
+    const to = dock.getBoundingClientRect();
+    el.style.setProperty('--tx', `${to.left + to.width / 2 - mid.x}px`);
+    el.style.setProperty('--ty', `${to.top + to.height / 2 - mid.y}px`);
+    const head = ev.gold ? (ev.first ? 'New gold card!' : 'Gold card!') : ev.first ? `New card · ${this.game.cardsFound()} / ${CARDS.length}` : 'Card';
+    const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
+    el.innerHTML = `<i class="cr-rays"></i>
+      <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.relic(6)}</div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96)}</div></div></div>
+      <div class="cr-text"><small>${head}</small><b>${esc(d.name)} Card</b>${line}</div>`;
+    this.el.loot.parentElement!.appendChild(el);
+    // The sound lands with the flip.
+    setTimeout(() => this.hooks.sound(ev.gold || d.kind !== 'monster' ? 'drop4' : 'drop3', { vol: 0.8 }), 380);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      el.remove();
+      this.bump(dock);
+      this.cardQueue.shift();
+      this.revealCard();
+    };
+    el.querySelector('.cr-card')!.addEventListener('animationend', (e) => {
+      if ((e as AnimationEvent).animationName === 'cr-fly') finish();
+    });
+    // In case the animation never runs (reduced motion, a hidden tab).
+    setTimeout(finish, 4500);
   }
 
   private renderAwakenConfirm() {

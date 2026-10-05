@@ -39,6 +39,8 @@ sfx drop4     "$J/8-Bit jingles/jingles_NES00.ogg" 17
 sfx awaken    "$J/Steel jingles/jingles_STEEL07.ogg" 17
 sfx boss      "$J/Hit jingles/jingles_HIT15.ogg" 17
 sfx bosskill  "$J/Hit jingles/jingles_HIT11.ogg" 17
+# The card drop "tink" is synthesized, not from a pack.
+node scripts/card-sound.ts
 # Background music (Juhani Junkala, "Chiptune Adventures", CC0). Seamless loops; kept quieter than SFX.
 mkdir -p "$OUT/music"
 M="$SRC/chiptune-adventures"
