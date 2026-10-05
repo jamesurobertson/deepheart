@@ -1290,11 +1290,11 @@ export class Ui {
       const n = g.cardCount(id);
       const slain = g.s.slain[id] ?? 0;
       const gilded = g.hasGoldCard(id);
-      // Nothing about it until you've killed one: not its name, nor where it lives.
-      if (!n && !g.cardMet(id)) return '<div class="tt-h"><b>???</b></div><p class="tt-d">Not met yet.</p>';
+      const lines = c.where.filter((w) => w.floor <= g.s.bestFloor).map((w) => `<li>${esc(w.text)}</li>`).join('');
+      // Until you've killed one, only where to find it: not its name.
+      if (!n && !g.cardMet(id)) return `<div class="tt-h"><b>???</b></div><p class="tt-d">Not met yet.</p><ul class="tt-l">${lines}</ul>`;
       const what = { monster: 'monster card', mid: 'mid-boss card', boss: 'boss card', goblin: 'goblin card' }[c.kind];
       const head = `<div class="tt-h"><b style="color:${gilded ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${esc(c.name)} Card</b><span class="tt-own">${n ? `×${n}${gilded ? ' · gold' : ''}` : what}</span></div>`;
-      const lines = c.where.filter((w) => w.floor <= g.s.bestFloor).map((w) => `<li>${esc(w.text)}</li>`).join('');
       const own = g.s.cards[id];
       const unit = c.kind === 'goblin' ? 'catch' : 'kill';
       const found = [own?.at ? `Got your first at ${unit} #${fmt(own.at)}` : '', own?.goldAt ? `gold at ${unit} #${fmt(own.goldAt)}` : ''].filter(Boolean).join(' · ');
