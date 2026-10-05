@@ -672,7 +672,7 @@ export class Scene {
     // Two relics at once land side by side.
     group.position.copy(this.lastBossAt).add(new THREE.Vector3(-0.9 * this.loot.length, 0, 0.4 * this.loot.length));
     // (Some relic icons are animations, the purse's coin and the bait's chest: they lie there as their first frame.)
-    const frame = this.atlas.has(def.icon) ? this.atlas.rect(def.icon) : this.atlas.anim(def.icon)[0];
+    const frame = this.atlas.anim(def.icon)[0];
     const icon = new PixelSprite(this.atlas.texture, this.atlas.size, [frame], { anchor: 'center' });
     icon.mesh.scale.setScalar(1.15);
     icon.mesh.material.emissive.setScalar(0.12);
