@@ -12,8 +12,6 @@ Fight monsters, hire companions with their gold, and descend the dungeon for sou
 **Play it at https://jamesurobertson.github.io/deepheart/**, or
 **[download the desktop app](https://github.com/jamesurobertson/deepheart/releases/latest)** for Mac, Windows or Linux.
 
-![Deepheart on desktop](docs/screenshots/carnage.jpg)
-
 ## Every monster has a card
 
 ![A champion falls and drops a gold Bog Lurker card, which flips over and flies into the collection](docs/screenshots/card-drop.webp)
