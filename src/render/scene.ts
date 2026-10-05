@@ -58,8 +58,10 @@ const LOOT_COLORS = [0xc9b8a0, 0x5fa8ff, 0xc77dff, 0xffb13d];
 const LOOT_WAIT = 6;
 const LOOT_WAIT_STAIRS = 3.5;
 const LOOT_FLY = 0.5;
-/** Seconds a relic spends popping out of the boss and landing, before it can be walked over. */
+/** Seconds a relic spends tumbling out of the boss and landing (it can't be walked over until then), and the angle
+ *  it lies at, flat on the floor. */
 const LOOT_LAND = 0.8;
+const LOOT_TILT = Math.PI / 4;
 
 type RelicDrop = Extract<GameEvent, { t: 'relic' }>;
 
@@ -69,6 +71,7 @@ interface LootView {
   icon: PixelSprite;
   shaft: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial>;
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  halo: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   /** Seconds on the floor, and seconds into the flight to the party (-1: still on the floor). */
   t: number;
   fly: number;
@@ -670,19 +673,24 @@ export class Scene {
     const group = new THREE.Group();
     // Two relics at once land side by side.
     group.position.copy(this.lastBossAt).add(new THREE.Vector3(-0.9 * this.loot.length, 0, 0.4 * this.loot.length));
-    const icon = new PixelSprite(this.atlas.texture, this.atlas.size, [this.atlas.rect(def.icon)], { anchor: 'center' });
-    icon.mesh.scale.setScalar(1.4);
-    icon.mesh.material.emissive.setScalar(0.35);
-    icon.mesh.position.y = 0.8;
-    const h = 2.6 + def.rarity * 1.1;
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04 + def.rarity * 0.015, 0.2 + def.rarity * 0.04, h, 14, 1, true), new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(0.9), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    // (Some relic icons are animations, the purse's coin and the bait's chest: they lie there as their first frame.)
+    const frame = this.atlas.has(def.icon) ? this.atlas.rect(def.icon) : this.atlas.anim(def.icon)[0];
+    const icon = new PixelSprite(this.atlas.texture, this.atlas.size, [frame], { anchor: 'center' });
+    icon.mesh.scale.setScalar(1.15);
+    icon.mesh.material.emissive.setScalar(0.12);
+    const h = 2.2 + def.rarity * 1.1;
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.18 + def.rarity * 0.03, 0.34 + def.rarity * 0.05, h, 16, 1, true), new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(0.55), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     shaft.position.y = h / 2;
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55 + def.rarity * 0.06, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.03;
-    group.add(shaft, ring, icon.mesh);
+    // A soft pool of the rarity's light on the floor under it.
+    const halo = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: this.glow, color: color.clone().multiplyScalar(0.7), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.y = 0.02;
+    group.add(halo, shaft, ring, icon.mesh);
     this.scene.add(group);
-    this.loot.push({ ev, group, icon, shaft, ring, t: 0, fly: -1, from: new THREE.Vector3() });
+    this.loot.push({ ev, group, icon, shaft, ring, halo, t: 0, fly: -1, from: new THREE.Vector3() });
     this.fx.light(group.position.clone().setY(1.2), color, 25 + def.rarity * 10, 0.6, 9);
     if (this.settings.particles) this.fx.burst(group.position.clone().setY(0.5), '#' + color.getHexString(), 12 + def.rarity * 6, 3, 0.07, 8, true);
   }
@@ -701,9 +709,13 @@ export class Scene {
       l.t += dt;
       if (l.fly < 0) {
         // Pops up out of the boss and lands, then bobs, pulses and turns while it waits.
+        // It tumbles through the air upright, then settles flat on the floor at an angle, in a pool of its own light.
         const land = Math.min(1, l.t / LOOT_LAND);
-        l.icon.mesh.position.y = land < 1 ? 0.8 + Math.sin(land * Math.PI) * 2.2 : 0.8 + Math.sin(l.t * 3) * 0.12;
-        l.icon.mesh.scale.setScalar(1.4 * (0.4 + 0.6 * Math.min(1, land * 2)));
+        const settle = Math.max(0, (land - 0.7) / 0.3);
+        l.icon.mesh.position.y = land < 1 ? 0.6 * (1 - settle) + 0.05 * settle + Math.sin(land * Math.PI) * 2.2 : 0.05;
+        l.icon.mesh.rotation.set(-Math.PI / 2 * settle, 0, land < 1 ? -land * (Math.PI * 2 + LOOT_TILT) : -LOOT_TILT, 'YXZ');
+        l.icon.mesh.scale.setScalar(1.15 * (0.4 + 0.6 * Math.min(1, land * 2)));
+        l.halo.material.opacity = (0.45 + Math.sin(l.t * 3) * 0.12) * land;
         l.shaft.scale.y = land;
         l.shaft.position.y = (l.shaft.geometry.parameters.height / 2) * land;
         l.ring.rotation.z += dt * 1.5;
@@ -718,7 +730,8 @@ export class Scene {
       const k = Math.min(1, l.fly / LOOT_FLY);
       const to = this.lootHome(game);
       l.group.position.lerpVectors(l.from, to.clone().setY(0), k);
-      l.icon.mesh.position.y = 0.8 + Math.sin(k * Math.PI) * 1.4;
+      l.icon.mesh.position.y = 0.3 + Math.sin(k * Math.PI) * 1.4;
+      l.icon.mesh.rotation.set(0, 0, 0);
       l.group.scale.setScalar(1 - k * 0.4);
       if (k >= 1) this.collectLoot(i);
     }
@@ -730,6 +743,7 @@ export class Scene {
     l.from.copy(l.group.position);
     l.shaft.visible = false;
     l.ring.visible = false;
+    l.halo.visible = false;
   }
 
   /** Picked up: a burst in its colour, and the UI shows its card. */
@@ -746,6 +760,8 @@ export class Scene {
     l.shaft.material.dispose();
     l.ring.geometry.dispose();
     l.ring.material.dispose();
+    l.halo.geometry.dispose();
+    l.halo.material.dispose();
     // Picking it up while the staircase waits lets the party head down soon after the card.
     if (this.hold && !this.loot.length) this.hold.t = Math.min(this.hold.t, 1.4);
     this.onLoot?.(l.ev);
