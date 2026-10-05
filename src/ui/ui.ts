@@ -33,10 +33,10 @@ function icon(i: Icon, box = 36): string {
   return `<span class="ico">${spriteFit(i.sprite, box)}${sub}${tier}</span>`;
 }
 
-/** A monster card as it sits in the collection: one you don't have yet is a blurred silhouette under a "?". */
+/** A monster card as it sits in the collection: one you don't have yet is a blurred silhouette. */
 function cardFace(card: (typeof CARDS)[number], state: 'locked' | 'got', gilded = false, box = 44): string {
   const frame = gilded ? CARD_FRAME.gold : CARD_FRAME[card.kind];
-  const art = state === 'locked' ? `${cardArt(card, box)}<i class="mc-q">?</i>` : cardArt(card, box, card.id === 'rainbow-goblin' ? 'rainbow' : '');
+  const art = cardArt(card, box, state === 'got' && card.id === 'rainbow-goblin' ? 'rainbow' : '');
   return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'locked' ? '???' : esc(card.name)}</span></span>`;
 }
 
@@ -753,12 +753,6 @@ export class Ui {
       }
       // The tink: something rare just dropped.
       case 'card': this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 }); break;
-      case 'raidSpawn':
-        if (ev.rainbow && g.s.vaults === 0) {
-          this.banner('A RAINBOW GOBLIN!', 'Catch it to open the Goblin Vault!', 'loot rainbow');
-          this.hooks.sound('drop4', { vol: 0.7 });
-        }
-        break;
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
       case 'fever': if (ev.on) this.banner('RAMPAGE!', `Clicks ×${fmt(g.feverMult())} · party damage ×${fmt(2 * g.rampageParty())} · ${g.rampageNext()?.left ?? 0} attacks to ×${fmt(g.rampageNext()?.mult ?? 0)}`, 'rampage'); break;
       case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, `Unstoppable · party damage ×${fmt(3 * g.rampageParty())}`, `rampage tier${ev.tier}`); break;
@@ -1165,7 +1159,6 @@ export class Ui {
     if (g.s.clicks < 6) state = 'click';
     else if (g.s.owned.every((n) => n === 0) && g.s.gold >= g.compCost(0)) state = 'hire';
     else if (g.raid && g.s.raids === 0) state = 'raid';
-    else if (g.raid?.rainbow && g.s.vaults === 0) state = 'rainbow';
     // Meeting your hero: first on the field, then (once there's someone to switch to) the star that picks one.
     else if (g.s.heroTips === 0 && g.heroIndex() >= 0) state = 'hero';
     else if (g.s.heroTips === 1 && g.s.owned.filter((n) => n > 0).length >= 2) state = 'star';
@@ -1207,8 +1200,7 @@ export class Ui {
       : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click their ★ to switch</small></b>`
         : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows[0].classList.toggle('nudge', state === 'hire');
-    this.el.raid.classList.toggle('first', state === 'raid' || state === 'rainbow');
-    this.el.raid.classList.toggle('rb-first', state === 'rainbow');
+    this.el.raid.classList.toggle('first', state === 'raid');
   }
 
   /** Who the star tip suggests trying as your hero: the first companion you have who isn't your hero already. */
@@ -1489,7 +1481,7 @@ export class Ui {
     return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${this.newCards ? ` <em class="tab-new">+${this.newCards}</em>` : ''}`)}</nav>`;
   }
 
-  /** Every monster's card, zone by zone: a blurred "?" until the card turns up. A zone's row
+  /** Every monster's card, zone by zone: a blurred silhouette until the card turns up. A zone's row
    *  (and the monsters that only come on later laps) appear once you've been that deep, the goblins once you've met one. */
   private cardsHtml(): string {
     const g = this.game;
