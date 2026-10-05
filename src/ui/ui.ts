@@ -1698,8 +1698,8 @@ export class Ui {
     el.style.setProperty('--rc', ev.gold ? CARD_FRAME.gold : CARD_FRAME[d.kind]);
     el.className = `loot card-loot${ev.gold ? ' starred' : ''}`;
     const head = ev.gold ? (ev.first ? 'New gold card!' : 'Gold card') : ev.first ? `New card · ${this.game.cardsFound()} / ${CARDS.length}` : 'Card';
-    const line = ev.first ? `Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)} · see Collection → Cards` : `You have ${ev.count}`;
-    el.innerHTML = `<span class="loot-ico">${cardFace(d, 'got', ev.gold, 40)}</span><span class="loot-t"><small>${head}</small><b>${esc(d.name)} Card</b><em>${line}</em></span>`;
+    const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)} · see Collection → Cards</em>` : '';
+    el.innerHTML = `<span class="loot-ico">${cardFace(d, 'got', ev.gold, 40)}</span><span class="loot-t"><small>${head}</small><b>${esc(d.name)} Card</b>${line}</span>`;
     void el.offsetWidth;
     el.classList.add('in');
     if (ev.gold) this.banner('GOLD CARD!', `${d.name} Card`, 'loot');
