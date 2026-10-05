@@ -175,8 +175,9 @@ export interface SaveState {
   clutches: number;
   champions: number;
   vaults: number;
-  /** Rainbow goblins caught (a vault or a Rainbow Haul each). */
+  /** Rainbow goblins caught (a vault or a Rainbow Haul each), and whether one has ever turned up at all. */
   rainbows: number;
+  rainbowSeen: boolean;
   /** The companion you picked as your hero (-1: none): it leaves the formation and follows the mouse, for the fun of it. */
   hero: number;
   /** How far through the hero introduction you are: 0 none, 1 met your hero, 2 shown the star that picks one. */
@@ -199,7 +200,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, cards: {}, slain: {},
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, cards: {}, slain: {},
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto' },
   };
 }
@@ -396,6 +397,7 @@ export class Game {
     }
     // Before Rainbow Hauls, every rainbow goblin caught opened the vault.
     if (s.rainbows === undefined) s.rainbows = s.vaults ?? 0;
+    if (s.rainbowSeen === undefined) s.rainbowSeen = (s.rainbows ?? 0) > 0;
     // Trophies that no longer exist (retired ones) shouldn't keep counting toward the trophy bonus.
     if (s.trophies) s.trophies = s.trophies.filter((id) => TROPHIES.some((t) => t.id === id));
     const fresh = newSave();
@@ -1137,6 +1139,7 @@ export class Game {
     // The first rainbow goblin lingers, so it's caught (and the vault seen) rather than missed.
     const stay = rainbow && this.s.vaults === 0 ? RAID_STAY * 1.8 : RAID_STAY;
     this.raid = { id: this.seq++, from, t: 0, stay, rainbow };
+    if (rainbow) this.s.rainbowSeen = true;
     this.events.push({ t: 'raidSpawn', id: this.raid.id, from, rainbow });
   }
 
@@ -1381,6 +1384,13 @@ export class Game {
   /** Which kill of this monster it is (for the goblins, which catch). */
   cardKill(id: string) {
     return id === GOBLIN_CARD ? this.s.raids - this.s.rainbows : id === RAINBOW_CARD ? this.s.rainbows : this.s.slain[id] ?? 0;
+  }
+
+  /** Have you come across this card's monster: slain one, or for the goblins, seen one run by? */
+  cardMet(id: string) {
+    if (id === GOBLIN_CARD) return this.s.raids + this.s.missed > 0;
+    if (id === RAINBOW_CARD) return this.s.rainbowSeen;
+    return (this.s.slain[id] ?? 0) > 0;
   }
 
   /** Copies of a card owned, plain and gold together. */

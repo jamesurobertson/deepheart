@@ -1298,7 +1298,7 @@ export class Ui {
       const n = g.cardCount(id);
       const slain = g.s.slain[id] ?? 0;
       const gilded = g.hasGoldCard(id);
-      const known = n || slain || (c.kind === 'goblin' && g.s.raids);
+      const known = n || g.cardMet(id);
       const what = { monster: 'monster card', mid: 'mid-boss card', boss: 'boss card', goblin: 'goblin card' }[c.kind];
       const head = `<div class="tt-h"><b style="color:${gilded ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${known ? `${esc(c.name)} Card` : '???'}</b><span class="tt-own">${n ? `×${n}${gilded ? ' · gold' : ''}` : what}</span></div>`;
       const lines = c.where.filter((w) => w.floor <= g.s.bestFloor).map((w) => `<li>${esc(w.text)}</li>`).join('');
@@ -1493,10 +1493,10 @@ export class Ui {
    *  (and the monsters that only come on later laps) appear once you've been that deep, the goblins once you've met one. */
   private cardsHtml(): string {
     const g = this.game;
-    const seen = (c: (typeof CARDS)[number]) => g.cardCount(c.id) > 0 || (c.kind === 'goblin' ? g.s.raids + g.s.missed > 0 : c.floor <= g.s.bestFloor);
+    const seen = (c: (typeof CARDS)[number]) => g.cardCount(c.id) > 0 || (c.kind === 'goblin' ? g.cardMet(c.id) : c.floor <= g.s.bestFloor);
     const face = (c: (typeof CARDS)[number]) => {
       const n = g.cardCount(c.id);
-      const state = n ? 'got' : g.s.slain[c.id] || (c.kind === 'goblin' && g.s.raids) ? 'met' : 'unknown';
+      const state = n ? 'got' : g.cardMet(c.id) ? 'met' : 'unknown';
       return `<span class="mc-cell" data-tip="card:${c.id}">${cardFace(c, state, g.hasGoldCard(c.id))}</span>`;
     };
     const section = (title: string, all: typeof CARDS) => {
