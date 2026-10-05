@@ -56,6 +56,8 @@ const CHAMP_BOSS_HP = 3;
 const CHAMP_BOSS_GOLD = 10;
 /** Card drops: 1 in this many kills (Ragnarok's 0.01% for ordinary monsters), and so on. 1% is the best odds anything gets. */
 const CARD_ODDS = { monster: 10_000, boss: 2_500, champ: 100, champBoss: 100, goblin: 100, rainbow: 100 };
+/** Party damage is shown as numbers in batches this many seconds apart. */
+const DPS_SHOWN_EVERY = 0.35;
 /** Seconds before the boss of a floor you're farming climbs back up. */
 const BOSS_RESPAWN = 2.5;
 /** Share of treasure goblins that are rainbow goblins. Catching one opens the Goblin Vault a quarter of the time
@@ -797,9 +799,9 @@ export class Game {
         amount = amount.times(1 - this.armor());
       }
     }
-    const dealt = Decimal.min(m.hp, amount);
     m.hp = m.hp.minus(amount);
-    if (kind === 'dps') this.dpsShown.set(m.id, (this.dpsShown.get(m.id) ?? new Decimal(0)).plus(dealt));
+    // The number shown is the whole hit, overkill included: one-shotting a weak monster should look like it.
+    if (kind === 'dps') this.dpsShown.set(m.id, (this.dpsShown.get(m.id) ?? new Decimal(0)).plus(amount));
     else this.events.push({ t: 'hit', id: m.id, amount, kind, x, y });
     if (m.hp.lte(0)) {
       this.kill(m, kind);
@@ -814,7 +816,8 @@ export class Game {
     this.monsters.splice(i, 1);
     const shown = this.dpsShown.get(m.id);
     if (shown) {
-      this.events.push({ t: 'hit', id: m.id, amount: shown, kind: 'dps' });
+      // A monster the party kills in one tick shows a whole volley's worth, like the numbers on monsters that last.
+      this.events.push({ t: 'hit', id: m.id, amount: Decimal.max(shown, this.dps().times(DPS_SHOWN_EVERY)), kind: 'dps' });
       this.dpsShown.delete(m.id);
     }
     const gold = this.monsterGold(m);
@@ -1580,7 +1583,7 @@ export class Game {
     // Show companion damage as numbers a few times a second, not every tick.
     this.dpsFlush -= dt;
     if (this.dpsFlush <= 0) {
-      this.dpsFlush = 0.35;
+      this.dpsFlush = DPS_SHOWN_EVERY;
       for (const [id, amount] of this.dpsShown) if (this.monster(id)) this.events.push({ t: 'hit', id, amount, kind: 'dps' });
       this.dpsShown.clear();
       for (const [id, amount] of this.healShown) if (this.monster(id)) this.events.push({ t: 'heal', id, amount });
