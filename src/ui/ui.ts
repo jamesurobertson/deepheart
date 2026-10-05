@@ -1,7 +1,7 @@
-import { ABYSS, AWAKEN_FLOOR, CARDS, CARD_BY_ID, COMPS, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABYSS, AWAKEN_FLOOR, CARDS, CARD_BY_ID, COMPS, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, bandFor, bossFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { DESCEND_FLOOR, FLOOR_KILLS, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { DESCEND_FLOOR, FLOOR_KILLS, isBossFloor, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
@@ -1387,6 +1387,8 @@ export class Ui {
     if (name === 'cards') this.newCards = 0;
     this.el.modalWrap.hidden = false;
     this.renderModal();
+    // Cards opens at the row for the zone you're in.
+    if (name === 'cards') this.el.modalWrap.querySelector('.here-zone')?.scrollIntoView({ block: 'start' });
   }
 
   closeModal() {
@@ -1486,19 +1488,25 @@ export class Ui {
     const g = this.game;
     const goblinSeen = (id: string) => (id === 'rainbow-goblin' ? g.s.rainbowSeen : g.s.raids + g.s.missed > 0);
     const seen = (c: (typeof CARDS)[number]) => g.cardCount(c.id) > 0 || (c.kind === 'goblin' ? goblinSeen(c.id) : c.floor <= g.s.bestFloor);
+    // Where you are: a marker on your zone's row, and a dot on the cards that can drop on this floor.
+    const floor = g.s.floor;
+    const lap = lapOf(floor);
+    const hereZone = zoneOf(floor) % ZONES.length;
+    const hereCards = new Set((isBossFloor(floor) ? [bossFor(floor)] : bandFor(floor)).map((d) => cardId(d.name)));
     const face = (c: (typeof CARDS)[number]) => {
       const n = g.cardCount(c.id);
       const state = n ? 'got' : 'locked';
-      return `<span class="mc-cell" data-tip="card:${c.id}">${cardFace(c, state, g.hasGoldCard(c.id))}</span>`;
+      return `<span class="mc-cell${hereCards.has(c.id) ? ' here' : ''}" data-tip="card:${c.id}">${cardFace(c, state, g.hasGoldCard(c.id))}</span>`;
     };
-    const section = (title: string, all: typeof CARDS) => {
+    const section = (title: string, all: typeof CARDS, here = false) => {
       const cards = all.filter(seen);
       if (!cards.length) return '';
       const got = cards.filter((c) => g.cardCount(c.id)).length;
-      return `<h3>${esc(title)} <span class="muted">${got} / ${cards.length}</span></h3><div class="card-grid">${cards.map(face).join('')}</div>`;
+      const marker = here ? ` <em class="here-mark">▸ Floor ${floor}${lap ? ` · ${corruptionOf(lap).name}` : ''}</em>` : '';
+      return `<h3${here ? ' class="here-zone"' : ''}><span>${esc(title)}${marker}</span> <span class="muted">${got} / ${cards.length}</span></h3><div class="card-grid">${cards.map(face).join('')}</div>`;
     };
     const more = CARDS.some((c) => !seen(c)) ? '<p class="cards-more">More cards wait deeper down.</p>' : '';
-    return ZONES.map((z, i) => section(z.name, CARDS.filter((c) => c.zone === i))).join('')
+    return ZONES.map((z, i) => section(z.name, CARDS.filter((c) => c.zone === i), i === hereZone)).join('')
       + section('Treasure goblins', CARDS.filter((c) => c.zone < 0)) + more;
   }
 

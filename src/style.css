@@ -887,3 +887,5 @@ body.compact .cr-text b { font-size: 32px; }
 .cr-back .g-heart { filter: drop-shadow(0 0 6px rgba(255, 90, 126, 0.7)); }
 .cards-more { margin: 20px 0 4px; font: 400 20px/1 'Jersey 10'; color: var(--faint); text-align: center; }
 .tt-got { margin: 6px 0 0; font-size: 14px; color: var(--gold-hi); }
+.here-mark { margin-left: 8px; font: 400 11px/1 'Silkscreen'; font-style: normal; letter-spacing: 0.5px; color: var(--gold); opacity: 0.85; }
+.mc-cell.here .mcard::after { content: ''; position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; background: var(--gold-hi); box-shadow: 0 0 0 2px var(--ink), 0 0 8px rgba(255, 210, 100, 0.8); }
