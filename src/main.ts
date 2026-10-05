@@ -15,8 +15,8 @@ const SAVE_KEY = 'deepheart-save' + (params.get('slot') ? `:${params.get('slot')
 const STEP = 1 / 30;
 /** Away (tab hidden or closed) longer than this counts as offline: paid at the offline rate, with a summary. Shorter is played out at full speed. */
 const OFFLINE_AFTER = 60;
-// ?speed=10 runs the sim faster for playtesting.
-const SPEED = Math.max(1, Number(params.get('speed')) || 1);
+// ?speed=10 runs the sim faster for playtesting (dev build only).
+const SPEED = import.meta.env.DEV ? Math.max(1, Number(params.get('speed')) || 1) : 1;
 
 function load(): SaveState | null {
   try {
