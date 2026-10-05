@@ -34,10 +34,10 @@ function icon(i: Icon, box = 36): string {
 }
 
 /** A monster card as it sits in the collection: unknown (never slain) shows a "?", met shows a silhouette. */
-function cardFace(card: (typeof CARDS)[number], state: 'unknown' | 'met' | 'got', gilded = false, count = 0, box = 44): string {
+function cardFace(card: (typeof CARDS)[number], state: 'unknown' | 'met' | 'got', gilded = false, box = 44): string {
   const frame = gilded ? CARD_FRAME.gold : CARD_FRAME[card.kind];
   const art = state === 'unknown' ? '<i class="mc-q">?</i>' : cardArt(card, box, card.id === 'rainbow-goblin' ? 'rainbow' : '');
-  return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'unknown' ? '???' : esc(card.name)}</span>${count > 1 ? `<b class="mc-n">×${count}</b>` : ''}</span>`;
+  return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'unknown' ? '???' : esc(card.name)}</span></span>`;
 }
 
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
@@ -155,7 +155,7 @@ export class Ui {
       <div class="loot" hidden></div>
       <div class="ticker"><span></span></div>
       <nav class="dock">
-        <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy()}<span>Trophies</span><em class="badge new" hidden></em></button>
+        <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy()}<span>Collection</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics">${G.relic()}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.abyss()}<span>Descend</span><em class="badge" hidden></em></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats()}<span>Stats</span></button>
@@ -1343,7 +1343,7 @@ export class Ui {
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
     if (kind === 'dock') {
       const text: Record<string, string> = {
-        trophies: `Trophies: ${g.s.trophies.length}/${TROPHIES.length}. Each gives +1% damage. Cards: ${g.cardsFound()}/${CARDS.length}.`,
+        trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length} (each gives +1% damage) and monster cards ${g.cardsFound()}/${CARDS.length}.`,
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
         abyss: (g.canDescend() ? `Descend now for ${fmt(g.pendingSouls())} souls.` : g.descendOpen() ? 'Beat a zone boss to bank souls.' : `The way down opens at the floor ${DESCEND_FLOOR} boss.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
         stats: 'Your numbers, and where every bonus comes from.',
@@ -1492,7 +1492,7 @@ export class Ui {
     const face = (c: (typeof CARDS)[number]) => {
       const n = g.cardCount(c.id);
       const state = n ? 'got' : g.s.slain[c.id] || (c.kind === 'goblin' && g.s.raids) ? 'met' : 'unknown';
-      return `<span class="mc-cell" data-tip="card:${c.id}">${cardFace(c, state, g.hasGoldCard(c.id), n)}</span>`;
+      return `<span class="mc-cell" data-tip="card:${c.id}">${cardFace(c, state, g.hasGoldCard(c.id))}</span>`;
     };
     const section = (title: string, cards: typeof CARDS) => {
       const got = cards.filter((c) => g.cardCount(c.id)).length;
@@ -1607,7 +1607,7 @@ export class Ui {
       ['Floor', `${s.floor} (deepest this descent ${s.maxFloor})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
       ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses killed', fmt(s.bosses)],
       ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Goblin Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
-      ['Descents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ['Relics', `${g.relicsFound()} / ${RELICS.length}`],
+      ['Descents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ['Relics', `${g.relicsFound()} / ${RELICS.length}`], ['Cards', `${g.cardsFound()} / ${CARDS.length}`],
       ['This descent', duration(s.runTime)], ['Time played', duration(s.playTime)],
     ];
     return `<dl class="stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
@@ -1698,8 +1698,8 @@ export class Ui {
     el.style.setProperty('--rc', ev.gold ? CARD_FRAME.gold : CARD_FRAME[d.kind]);
     el.className = `loot card-loot${ev.gold ? ' starred' : ''}`;
     const head = ev.gold ? (ev.first ? 'New gold card!' : 'Gold card') : ev.first ? `New card · ${this.game.cardsFound()} / ${CARDS.length}` : 'Card';
-    const line = ev.first ? `Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)} · see Trophies → Cards` : `You have ${ev.count}`;
-    el.innerHTML = `<span class="loot-ico">${cardFace(d, 'got', ev.gold, 0, 40)}</span><span class="loot-t"><small>${head}</small><b>${esc(d.name)} Card</b><em>${line}</em></span>`;
+    const line = ev.first ? `Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)} · see Collection → Cards` : `You have ${ev.count}`;
+    el.innerHTML = `<span class="loot-ico">${cardFace(d, 'got', ev.gold, 40)}</span><span class="loot-t"><small>${head}</small><b>${esc(d.name)} Card</b><em>${line}</em></span>`;
     void el.offsetWidth;
     el.classList.add('in');
     if (ev.gold) this.banner('GOLD CARD!', `${d.name} Card`, 'loot');
