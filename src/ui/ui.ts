@@ -33,7 +33,7 @@ function icon(i: Icon, box = 36): string {
   return `<span class="ico">${spriteFit(i.sprite, box)}${sub}${tier}</span>`;
 }
 
-/** A monster card as it sits in the collection: one you don't have yet is a blurred silhouette. */
+/** A monster card as it sits in the collection: one you don't have yet is a dark silhouette. */
 function cardFace(card: (typeof CARDS)[number], state: 'locked' | 'got', gilded = false, box = 44): string {
   const frame = gilded ? CARD_FRAME.gold : CARD_FRAME[card.kind];
   const art = cardArt(card, box, state === 'got' && card.id === 'rainbow-goblin' ? 'rainbow' : '');
@@ -1290,16 +1290,17 @@ export class Ui {
       const n = g.cardCount(id);
       const slain = g.s.slain[id] ?? 0;
       const gilded = g.hasGoldCard(id);
-      const known = n || g.cardMet(id);
+      // Nothing about it until you've killed one: not its name, nor where it lives.
+      if (!n && !g.cardMet(id)) return '<div class="tt-h"><b>???</b></div><p class="tt-d">Not met yet.</p>';
       const what = { monster: 'monster card', mid: 'mid-boss card', boss: 'boss card', goblin: 'goblin card' }[c.kind];
-      const head = `<div class="tt-h"><b style="color:${gilded ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${known ? `${esc(c.name)} Card` : '???'}</b><span class="tt-own">${n ? `×${n}${gilded ? ' · gold' : ''}` : what}</span></div>`;
+      const head = `<div class="tt-h"><b style="color:${gilded ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${esc(c.name)} Card</b><span class="tt-own">${n ? `×${n}${gilded ? ' · gold' : ''}` : what}</span></div>`;
       const lines = c.where.filter((w) => w.floor <= g.s.bestFloor).map((w) => `<li>${esc(w.text)}</li>`).join('');
       const own = g.s.cards[id];
       const unit = c.kind === 'goblin' ? 'catch' : 'kill';
       const found = [own?.at ? `Got your first at ${unit} #${fmt(own.at)}` : '', own?.goldAt ? `gold at ${unit} #${fmt(own.goldAt)}` : ''].filter(Boolean).join(' · ');
       const caught = id === 'rainbow-goblin' ? g.s.rainbows : g.s.raids - g.s.rainbows;
       const tally = `${found ? `<p class="tt-got">${found}</p>` : ''}<p class="tt-f">${c.kind === 'goblin' ? `Caught: ${fmt(caught)}` : `Slain: ${fmt(slain)}`}</p>`;
-      return `${head}${known ? '' : '<p class="tt-d">Not met yet.</p>'}<ul class="tt-l">${lines}</ul>${tally}`;
+      return `${head}<ul class="tt-l">${lines}</ul>${tally}`;
     }
     if (kind === 'aby') {
       const a = ABYSS.find((x) => x.id === id)!;
@@ -1481,11 +1482,12 @@ export class Ui {
     return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${this.newCards ? ` <em class="tab-new">+${this.newCards}</em>` : ''}`)}</nav>`;
   }
 
-  /** Every monster's card, zone by zone: a blurred silhouette until the card turns up. A zone's row
+  /** Every monster's card, zone by zone: a dark silhouette until the card turns up. A zone's row
    *  (and the monsters that only come on later laps) appear once you've been that deep, the goblins once you've met one. */
   private cardsHtml(): string {
     const g = this.game;
-    const seen = (c: (typeof CARDS)[number]) => g.cardCount(c.id) > 0 || (c.kind === 'goblin' ? g.cardMet(c.id) : c.floor <= g.s.bestFloor);
+    const goblinSeen = (id: string) => (id === 'rainbow-goblin' ? g.s.rainbowSeen : g.s.raids + g.s.missed > 0);
+    const seen = (c: (typeof CARDS)[number]) => g.cardCount(c.id) > 0 || (c.kind === 'goblin' ? goblinSeen(c.id) : c.floor <= g.s.bestFloor);
     const face = (c: (typeof CARDS)[number]) => {
       const n = g.cardCount(c.id);
       const state = n ? 'got' : 'locked';

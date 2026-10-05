@@ -1386,10 +1386,10 @@ export class Game {
     return id === GOBLIN_CARD ? this.s.raids - this.s.rainbows : id === RAINBOW_CARD ? this.s.rainbows : this.s.slain[id] ?? 0;
   }
 
-  /** Have you come across this card's monster: slain one, or for the goblins, seen one run by? */
+  /** Have you killed one of this card's monster (for the goblins, caught one)? Until then its card is a mystery. */
   cardMet(id: string) {
-    if (id === GOBLIN_CARD) return this.s.raids + this.s.missed > 0;
-    if (id === RAINBOW_CARD) return this.s.rainbowSeen;
+    if (id === GOBLIN_CARD) return this.s.raids - this.s.rainbows > 0;
+    if (id === RAINBOW_CARD) return this.s.rainbows > 0;
     return (this.s.slain[id] ?? 0) > 0;
   }
 
