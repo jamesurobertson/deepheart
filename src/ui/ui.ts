@@ -1839,6 +1839,26 @@ export class Ui {
     setTimeout(() => (c.hidden = true), 3600);
   }
 
+  /** Desktop app only: a newer release is out. One click downloads it; it can be dismissed until next launch. */
+  showUpdate(version: string, download: () => void) {
+    let el = this.el.loot.parentElement!.querySelector<HTMLElement>('.update-pill');
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'update-pill pnl';
+      this.el.loot.parentElement!.appendChild(el);
+    }
+    el.innerHTML = `<span><b>Update available</b> v${esc(version)}</span><button class="btn small primary" data-update="now">Update now</button><button class="btn icon small" data-update="later" aria-label="Dismiss">${G.close()}</button>`;
+    const pill = el;
+    pill.onclick = (e) => {
+      const act = (e.target as HTMLElement).closest<HTMLElement>('[data-update]')?.dataset.update;
+      if (act === 'later') pill.remove();
+      if (act === 'now') {
+        download();
+        pill.innerHTML = `<span><b>Downloading v${esc(version)}</b> Open it and replace Deepheart; your save stays.</span><button class="btn icon small" data-update="later" aria-label="Dismiss">${G.close()}</button>`;
+      }
+    };
+  }
+
   showOffline(o: OfflineSummary) {
     this.modal = 'offline';
     this.el.modalWrap.hidden = false;

@@ -15,6 +15,13 @@ import { setAtlas } from './ui/px.ts';
 import { Sfx, type Track } from './audio/sfx.ts';
 import { zoneOf } from './game/data.ts';
 
+declare global {
+  interface Window {
+    /** Only in the desktop app (see desktop/preload.cjs). */
+    deepheart?: { onUpdate(callback: (update: { version: string }) => void): void; downloadUpdate(): void };
+  }
+}
+
 const params = new URLSearchParams(location.search);
 // ?slot=name keeps a separate save (handy for testing without touching your run).
 /** Where the site is served from ('./' in builds), so asset URLs work in a subfolder. */
@@ -97,6 +104,8 @@ async function boot() {
   applySettings();
   scene.rebuild(game);
   scene.onArrive = () => ui.arrived();
+  // The desktop app says when a newer release is out.
+  window.deepheart?.onUpdate((update) => ui.showUpdate(update.version, () => window.deepheart?.downloadUpdate()));
   if (import.meta.env.DEV) {
     // ?relics=always makes every boss drop a relic.
     if (params.get('relics') === 'always') game.debugRelics = true;

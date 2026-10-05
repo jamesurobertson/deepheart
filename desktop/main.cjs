@@ -3,9 +3,13 @@
  * private app:// origin rather than file://, because the game fetches its sprites and sounds and Chromium won't fetch
  * file:// URLs. Saves live in the app's own storage, separate from the browser's.
  */
-const { app, BrowserWindow, Menu, net, protocol, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, net, protocol, shell } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+
+const RELEASES = 'https://api.github.com/repos/jamesurobertson/deepheart/releases/latest';
+/** How often a running game checks for a newer release (it also checks on launch). */
+const CHECK_EVERY = 6 * 60 * 60 * 1000;
 
 const ROOT = app.isPackaged ? path.join(process.resourcesPath, 'game') : path.join(__dirname, '..', 'dist');
 
@@ -24,7 +28,7 @@ function createWindow() {
     autoHideMenuBar: true,
     show: false,
     // An idle game keeps playing when minimised or covered (this also keeps the page "visible" to the game).
-    webPreferences: { backgroundThrottling: false, contextIsolation: true, sandbox: true },
+    webPreferences: { backgroundThrottling: false, contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preload.cjs') },
   });
   win.loadURL('app://game/index.html');
   // Out of sight, out of earshot: it keeps playing while minimised or hidden, just silently.
@@ -36,6 +40,10 @@ function createWindow() {
     shell.openExternal(url);
     return { action: 'deny' };
   });
+  win.webContents.once('did-finish-load', () => {
+    checkForUpdate(win);
+    setInterval(() => checkForUpdate(win), CHECK_EVERY);
+  });
   win.webContents.on('before-input-event', (e, input) => {
     if (input.type === 'keyDown' && input.key === 'F11') {
       win.setFullScreen(!win.isFullScreen());
@@ -43,6 +51,41 @@ function createWindow() {
     }
   });
 }
+
+/** "0.1.10" > "0.1.9". */
+function newer(a, b) {
+  const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0);
+  return false;
+}
+
+/** This computer's download in a release: the Mac build for its chip, the Windows installer, or the AppImage. */
+function assetFor(assets) {
+  const want = process.platform === 'darwin' ? `mac-${process.arch === 'arm64' ? 'arm64' : 'x64'}.dmg` : process.platform === 'win32' ? 'windows-setup.exe' : '.AppImage';
+  return assets.find((a) => a.name.endsWith(want));
+}
+
+let update = null;
+
+/** Ask GitHub for the latest release; if it's newer than this app, tell the game. Offline or rate-limited: try later. */
+async function checkForUpdate(win) {
+  try {
+    const res = await net.fetch(RELEASES, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!res.ok) return;
+    const release = await res.json();
+    const version = String(release.tag_name).replace(/^v/, '');
+    if (!newer(version, app.getVersion())) return;
+    const asset = assetFor(release.assets ?? []);
+    update = { version, url: asset ? asset.browser_download_url : release.html_url };
+    if (!win.isDestroyed()) win.webContents.send('update', update);
+  } catch {
+    // No connection: the next check will try again.
+  }
+}
+
+ipcMain.on('update:download', () => {
+  if (update) shell.openExternal(update.url);
+});
 
 app.whenReady().then(() => {
   protocol.handle('app', (req) => {
