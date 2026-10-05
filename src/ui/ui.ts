@@ -200,6 +200,8 @@ export class Ui {
     });
 
     this.bind();
+    // A relic's card shows when it's picked up off the floor (the scene sets it down and tells us).
+    this.scene.onLoot = (ev) => this.showLoot(ev.id, ev.lv, ev.equipped, ev.star);
     this.bindSheet();
     this.syncMode();
     this.syncMute();
@@ -301,6 +303,7 @@ export class Ui {
       if (this.scene.busy) return;
       const t = e.target as HTMLElement;
       if (t.closest('button, .shop, .pnl, .dock, input, textarea')) return;
+      if (this.scene.pickLoot(e.clientX, e.clientY)) return;
       if (this.game.raid && this.scene.hitRaider(e.clientX, e.clientY)) {
         this.game.catchRaid();
         return;
@@ -336,7 +339,7 @@ export class Ui {
     addEventListener('blur', letGo);
     addEventListener('pointermove', (e) => {
       const t = e.target as HTMLElement;
-      const over = !t.closest('#ui button, #ui .shop, #ui .pnl') && (this.scene.overMonster(e.clientX, e.clientY) || (!!this.game.raid && this.scene.hitRaider(e.clientX, e.clientY)));
+      const over = !t.closest('#ui button, #ui .shop, #ui .pnl') && (this.scene.overMonster(e.clientX, e.clientY) || this.scene.overLoot(e.clientX, e.clientY) || (!!this.game.raid && this.scene.hitRaider(e.clientX, e.clientY)));
       document.body.classList.toggle('grab', over);
       // Over the battlefield, a mouse gets a sword instead of an arrow.
       // The whole dock strip counts as the dock, gaps between its buttons included: a normal cursor there, and no steering.
@@ -741,13 +744,6 @@ export class Ui {
         else this.toast(`The vault closes. Haul: <b>+${fmt(ev.gold)} gold</b>`, 'chest_full_open', 'trophy');
         break;
       case 'abyss': this.toast(`Abyss power: <b>${esc(ABYSS.find((a) => a.id === ev.id)!.name)}</b>`, 'flask_big_red'); break;
-      case 'relic': {
-        // A relic from a clutch kill waits for the slow motion to finish.
-        const wait = this.cinemaUntil - performance.now();
-        if (wait > 0) setTimeout(() => this.showLoot(ev.id, ev.lv, ev.equipped, ev.star), wait + 150);
-        else this.showLoot(ev.id, ev.lv, ev.equipped, ev.star);
-        break;
-      }
       case 'heal': {
         if (!g.s.settings.numbers) break;
         const s = this.scene.screenOf(ev.id);

@@ -9,7 +9,7 @@ import { PixelSprite, blobShadow } from './sprite.ts';
 import { Fx, flameTexture, spellTextures } from './fx.ts';
 import { GradeShader, tiltShift } from './post.ts';
 import { buildStairwell, stairPoint } from './stairwell.ts';
-import { COMPS, ZONES, corruptionOf, tilesFor, zoneOf, type Attack, type CompDef, type Tiles } from '../game/data.ts';
+import { COMPS, RELIC_BY_ID, ZONES, corruptionOf, tilesFor, zoneOf, type Attack, type CompDef, type Tiles } from '../game/data.ts';
 import type { Game, GameEvent, Monster } from '../game/game.ts';
 
 const WALL_Z = -6;
@@ -51,6 +51,29 @@ const HERO_SPEED = 6.5;
 /** A clutch kill's slow motion: real seconds until the release burst, and until time is back to full speed. */
 const CLUTCH_RELEASE = 0.9;
 const CLUTCH_END = 1.9;
+
+/** A relic on the floor: its glow in the rarity's colour, how long it waits before flying to the party by itself
+ *  (shorter while the staircase is waiting on it), and how long that flight takes. */
+const LOOT_COLORS = [0xc9b8a0, 0x5fa8ff, 0xc77dff, 0xffb13d];
+const LOOT_WAIT = 6;
+const LOOT_WAIT_STAIRS = 3.5;
+const LOOT_FLY = 0.5;
+/** Seconds a relic spends popping out of the boss and landing, before it can be walked over. */
+const LOOT_LAND = 0.8;
+
+type RelicDrop = Extract<GameEvent, { t: 'relic' }>;
+
+interface LootView {
+  ev: RelicDrop;
+  group: THREE.Group;
+  icon: PixelSprite;
+  shaft: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial>;
+  ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  /** Seconds on the floor, and seconds into the flight to the party (-1: still on the floor). */
+  t: number;
+  fly: number;
+  from: THREE.Vector3;
+}
 
 /** Ordinary companions are drawn this many art pixels tall, whatever size their sprite is (big ones stay big). */
 const COMP_HEIGHT = 20;
@@ -276,6 +299,13 @@ export class Scene {
   private raider: RaiderView | null = null;
   private leaving: RaiderView[] = [];
   private chests: Chest[] = [];
+  /** Relics lying where they dropped, waiting to be picked up (walk over them, click them, or let them fly to you). */
+  private loot: LootView[] = [];
+  /** Relics that dropped during a clutch kill's slow motion, set down once it's over. */
+  private pendingLoot: RelicDrop[] = [];
+  private lastBossAt = new THREE.Vector3(3, 0, 0);
+  /** Called when a relic is picked up (the UI shows its card then). */
+  onLoot: ((ev: RelicDrop) => void) | null = null;
   private shake = 0;
   private time = 0;
   private fever = 0;
@@ -628,6 +658,124 @@ export class Scene {
       if (v.blood !== BONE) this.fx.bloodSplat(v.body.position.clone().setX(v.body.position.x + 0.25), v.blood, v.boss ? 2.2 : 1);
     }
     return at;
+  }
+
+  // ---------- relics on the floor ----------
+
+  /** A relic lands where the boss fell, glowing in its rarity's colour. */
+  private dropLoot(ev: RelicDrop) {
+    const def = RELIC_BY_ID.get(ev.id);
+    if (!def) return;
+    const color = new THREE.Color(LOOT_COLORS[def.rarity]);
+    const group = new THREE.Group();
+    // Two relics at once land side by side.
+    group.position.copy(this.lastBossAt).add(new THREE.Vector3(-0.9 * this.loot.length, 0, 0.4 * this.loot.length));
+    const icon = new PixelSprite(this.atlas.texture, this.atlas.size, [this.atlas.rect(def.icon)], { anchor: 'center' });
+    icon.mesh.scale.setScalar(1.4);
+    icon.mesh.material.emissive.setScalar(0.35);
+    icon.mesh.position.y = 0.8;
+    const h = 2.6 + def.rarity * 1.1;
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.04 + def.rarity * 0.015, 0.2 + def.rarity * 0.04, h, 14, 1, true), new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(0.9), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    shaft.position.y = h / 2;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55 + def.rarity * 0.06, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.03;
+    group.add(shaft, ring, icon.mesh);
+    this.scene.add(group);
+    this.loot.push({ ev, group, icon, shaft, ring, t: 0, fly: -1, from: new THREE.Vector3() });
+    this.fx.light(group.position.clone().setY(1.2), color, 25 + def.rarity * 10, 0.6, 9);
+    if (this.settings.particles) this.fx.burst(group.position.clone().setY(0.5), '#' + color.getHexString(), 12 + def.rarity * 6, 3, 0.07, 8, true);
+  }
+
+  /** Where loot flies to: your hero, or the front of the party without one. */
+  private lootHome(game: Game | null) {
+    const hero = game ? this.party.find((c) => c.comp === game.heroIndex()) : undefined;
+    const c = hero ?? this.party[0];
+    return c ? c.body.position.clone().setY(0.9) : new THREE.Vector3(-4, 0.9, 1);
+  }
+
+  private updateLoot(dt: number, game: Game) {
+    const hero = this.party.find((c) => c.comp === game.heroIndex());
+    for (let i = this.loot.length - 1; i >= 0; i--) {
+      const l = this.loot[i];
+      l.t += dt;
+      if (l.fly < 0) {
+        // Pops up out of the boss and lands, then bobs, pulses and turns while it waits.
+        const land = Math.min(1, l.t / LOOT_LAND);
+        l.icon.mesh.position.y = land < 1 ? 0.8 + Math.sin(land * Math.PI) * 2.2 : 0.8 + Math.sin(l.t * 3) * 0.12;
+        l.icon.mesh.scale.setScalar(1.4 * (0.4 + 0.6 * Math.min(1, land * 2)));
+        l.shaft.scale.y = land;
+        l.shaft.position.y = (l.shaft.geometry.parameters.height / 2) * land;
+        l.ring.rotation.z += dt * 1.5;
+        l.ring.material.opacity = 0.55 + Math.sin(l.t * 4) * 0.2;
+        l.shaft.material.opacity = 0.28 + Math.sin(l.t * 2.5) * 0.08;
+        // Picked up by walking over it, or it flies to you by itself before long (sooner if the staircase is waiting).
+        if (land >= 1 && hero && hero.body.position.distanceTo(l.group.position.clone().setY(0)) < 0.9) this.collectLoot(i);
+        else if (l.t > (this.hold ? LOOT_WAIT_STAIRS : LOOT_WAIT)) this.startLootFlight(l);
+        continue;
+      }
+      l.fly += dt;
+      const k = Math.min(1, l.fly / LOOT_FLY);
+      const to = this.lootHome(game);
+      l.group.position.lerpVectors(l.from, to.clone().setY(0), k);
+      l.icon.mesh.position.y = 0.8 + Math.sin(k * Math.PI) * 1.4;
+      l.group.scale.setScalar(1 - k * 0.4);
+      if (k >= 1) this.collectLoot(i);
+    }
+  }
+
+  private startLootFlight(l: LootView) {
+    if (l.fly >= 0) return;
+    l.fly = 0;
+    l.from.copy(l.group.position);
+    l.shaft.visible = false;
+    l.ring.visible = false;
+  }
+
+  /** Picked up: a burst in its colour, and the UI shows its card. */
+  private collectLoot(i: number) {
+    const [l] = this.loot.splice(i, 1);
+    const def = RELIC_BY_ID.get(l.ev.id);
+    const color = new THREE.Color(LOOT_COLORS[def?.rarity ?? 0]);
+    const at = l.group.position.clone().setY(0.9);
+    this.fx.light(at, color, 35, 0.5, 9);
+    if (this.settings.particles) this.fx.burst(at, '#' + color.getHexString(), 22, 4.5, 0.08, 8, true);
+    this.scene.remove(l.group);
+    l.icon.dispose();
+    l.shaft.geometry.dispose();
+    l.shaft.material.dispose();
+    l.ring.geometry.dispose();
+    l.ring.material.dispose();
+    // Picking it up while the staircase waits lets the party head down soon after the card.
+    if (this.hold && !this.loot.length) this.hold.t = Math.min(this.hold.t, 1.4);
+    this.onLoot?.(l.ev);
+  }
+
+  /** Everything on the floor flies to the party (leaving the floor); `now` skips the flight (a descent), and
+   *  `oldOnly` leaves anything that only just dropped. */
+  private collectAllLoot(now = false, oldOnly = false) {
+    if (now) {
+      while (this.loot.length) this.collectLoot(this.loot.length - 1);
+      return;
+    }
+    for (const l of this.loot) if (!oldOnly || l.t > 0.1) this.startLootFlight(l);
+  }
+
+  /** A click or tap on a relic lying on the floor picks it up. */
+  pickLoot(x: number, y: number) {
+    const i = this.loot.findIndex((l) => l.fly < 0 && l.t >= LOOT_LAND && this.lootNear(l, x, y));
+    if (i < 0) return false;
+    this.collectLoot(i);
+    return true;
+  }
+
+  overLoot(x: number, y: number) {
+    return this.loot.some((l) => l.fly < 0 && this.lootNear(l, x, y));
+  }
+
+  private lootNear(l: LootView, x: number, y: number) {
+    const s = this.toScreen(l.group.position.clone().setY(0.6));
+    return Math.abs(x - s.x) < 40 && y > s.y - 60 && y < s.y + 40;
   }
 
   private monsterPos(id: number): THREE.Vector3 | null {
@@ -1226,6 +1374,7 @@ export class Scene {
       case 'kill': {
         const v = this.mons.get(ev.id);
         if (!v || v.dead >= 0) break;
+        if (v.boss) this.lastBossAt.copy(v.body.position).setY(0);
         const at = this.burstApart(v);
         if (ev.champ) {
           this.fx.light(at, 0xffd070, 30, 0.6, 10);
@@ -1244,8 +1393,13 @@ export class Scene {
       }
       case 'relic':
         this.relicDropped = true;
+        if (this.clutch) this.pendingLoot.push(ev);
+        else this.dropLoot(ev);
         break;
       case 'floor': {
+        // Leaving a floor: any relic still lying there flies to the party (but not one the boss just dropped: the
+        // next floor starts the moment a boss dies, and its relic waits on the floor to be picked up there).
+        this.collectAllLoot(false, true);
         // A cleared floor: whatever's still standing bursts apart with it.
         if (ev.cleared) {
           let any = false;
@@ -1295,6 +1449,7 @@ export class Scene {
         this.fx.light(new THREE.Vector3(1.5 * this.squeeze, 2, 1), 0xff3050, 30 + ev.tier * 20, 0.8, 14);
         break;
       case 'vault':
+        this.collectAllLoot();
         if (ev.on) {
           this.fx.light(STAIRS.clone().setY(2), 0xffd070, 60, 1.5, 20);
           if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(1), '#ffd070', 60, 7, 0.1, 14, true);
@@ -1341,6 +1496,7 @@ export class Scene {
         }
         break;
       case 'descend':
+        this.collectAllLoot(true);
         for (const v of [...this.mons.values()]) this.removeView(v);
         break;
     }
@@ -1348,6 +1504,7 @@ export class Scene {
 
   /** Rebuild everything from the game state (after loading or descending). */
   rebuild(game: Game) {
+    this.collectAllLoot(true);
     this.hold = null;
     for (const c of this.party) {
       this.scene.remove(c.body);
@@ -1377,6 +1534,7 @@ export class Scene {
     if (c.t >= CLUTCH_END) {
       this.clutch = null;
       if (this.pendingBand !== null) this.setBand(this.pendingBand);
+      for (const drop of this.pendingLoot.splice(0)) this.dropLoot(drop);
       this.pendingBand = null;
       this.grade.uniforms.saturation.value = 1;
       return 1;
@@ -1613,8 +1771,10 @@ export class Scene {
       const on = pointedAt(aim.x, aim.y) ?? (near && near.body.position.distanceTo(spot) < radius(near) + 0.8 ? near : null);
       goal = on ? besideOf(on) : spot;
     } else {
+      // Left alone, the hero goes for loot on the floor first, then the nearest monster.
+      const drop = this.loot.find((l) => l.fly < 0);
       const prey = nearest(p);
-      goal = prey ? besideOf(prey) : c.home.clone();
+      goal = drop ? drop.group.position.clone().setY(0) : prey ? besideOf(prey) : c.home.clone();
     }
 
     // Walk there smoothly: ease in and out, ignore tiny nudges until already walking, settle on arrival.
@@ -1804,7 +1964,8 @@ export class Scene {
     });
 
     for (const pr of this.props) pr.update(dt);
-    if (this.hold && !this.clutch && (this.hold.t -= dt) <= 0) {
+    // (The staircase waits for any relic on the floor to be picked up.)
+    if (this.hold && !this.clutch && !this.loot.length && (this.hold.t -= dt) <= 0) {
       this.startCinematic(this.hold.zone);
       this.hold = null;
     }
@@ -1819,6 +1980,7 @@ export class Scene {
     }
     this.updateShots(dt);
     this.updateRaiders(dt, game);
+    this.updateLoot(dt, game);
     this.fx.update(dt);
 
     const buffed = game.s.buffs.some((b) => b.id !== 'fever');
