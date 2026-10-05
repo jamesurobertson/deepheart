@@ -860,7 +860,7 @@ body.compact .card-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap:
 .cr-card { position: relative; perspective: 700px; animation: cr-in 0.35s cubic-bezier(0.2, 1.5, 0.4, 1) both, cr-fly 0.5s cubic-bezier(0.5, 0, 0.9, 0.6) var(--hold) forwards; }
 .cr-flip { position: relative; width: 132px; height: 180px; transform-style: preserve-3d; animation: cr-flip 0.55s ease-out 0.3s both; }
 .cr-back, .cr-front { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-.cr-back { display: grid; place-items: center; transform: rotateY(180deg); color: var(--gold); border: 5px solid #8a6a3a; box-shadow: 0 0 0 3px var(--ink);
+.cr-back { display: grid; place-items: center; transform: rotateY(180deg); color: var(--ess); border: 5px solid #8a6a3a; box-shadow: 0 0 0 3px var(--ink);
   background: repeating-linear-gradient(45deg, #3a2850 0 3px, #2a1c3a 3px 12px), repeating-linear-gradient(-45deg, #3a2850 0 3px, transparent 3px 12px); background-blend-mode: lighten; }
 .cr-front .mcard { width: 100%; height: 100%; padding: 6px; box-shadow: 0 0 0 3px var(--ink), inset 0 0 0 2px rgba(255, 255, 255, 0.3), 0 0 40px color-mix(in srgb, var(--rc) 75%, transparent); }
 .cr-front .mc-name { height: 34px; margin-top: 6px; font-size: 15px; }
@@ -887,3 +887,4 @@ body.compact .cr-rays { top: 68px; width: 320px; height: 320px; margin: -160px 0
 body.compact .cr-front .mc-name { height: 26px; font-size: 12px; }
 body.compact .cr-text b { font-size: 32px; }
 @media (prefers-reduced-motion: reduce) { .cr-rays { animation: none; opacity: 0.6; } }
+.cr-back .g-heart { filter: drop-shadow(0 0 6px rgba(255, 90, 126, 0.7)); }

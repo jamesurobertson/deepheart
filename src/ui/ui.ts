@@ -1719,7 +1719,7 @@ export class Ui {
     const head = ev.gold ? (ev.first ? 'New gold card!' : 'Gold card!') : ev.first ? `New card · ${this.game.cardsFound()} / ${CARDS.length}` : 'Card';
     const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
-      <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.relic(6)}</div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96)}</div></div></div>
+      <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.heart(7)}</div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96)}</div></div></div>
       <div class="cr-text"><small>${head}</small><b>${esc(d.name)} Card</b>${line}</div>`;
     this.el.loot.parentElement!.appendChild(el);
     // The sound lands with the flip.

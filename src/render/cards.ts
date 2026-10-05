@@ -78,7 +78,7 @@ export function cardTexture(atlas: Atlas, card: CardDef, gold: boolean): THREE.C
 
 let back: THREE.CanvasTexture | null = null;
 
-/** The back every card shares: dark, diamond-patterned, with a gold gem in the middle. */
+/** The back every card shares: dark, diamond-patterned, with the Deepheart heart in the middle. */
 export function cardBackTexture(): THREE.CanvasTexture {
   if (back) return back;
   const S = 4;
@@ -94,14 +94,14 @@ export function cardBackTexture(): THREE.CanvasTexture {
   g.fillRect(2 * S, 2 * S, c.width - 4 * S, c.height - 4 * S);
   g.fillStyle = '#3a2850';
   for (let y = 3; y < CARD_H - 3; y++) for (let x = 3; x < CARD_W - 3; x++) if ((x + y) % 4 === 0 || (x - y + 64) % 4 === 0) g.fillRect(x * S, y * S, S, S);
-  // The gem: the relic glyph's shape, centred.
-  const gem = ['..###..', '.#####.', '#######', '.#####.', '..###..', '...#...'];
-  const gx = Math.floor((CARD_W - 7) / 2);
-  const gy = Math.floor((CARD_H - 6) / 2);
-  gem.forEach((row, y) => [...row].forEach((ch, x) => {
+  // The heart: the same shape as the UI's heart glyph, with a highlight in its top-left lobe.
+  const heart = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'];
+  const hx = Math.floor((CARD_W - 7) / 2);
+  const hy = Math.floor((CARD_H - 6) / 2);
+  heart.forEach((row, y) => [...row].forEach((ch, x) => {
     if (ch !== '#') return;
-    g.fillStyle = y < 2 ? '#ffe9a0' : '#f2c14e';
-    g.fillRect((gx + x) * S, (gy + y) * S, S, S);
+    g.fillStyle = (x === 1 && y === 1) || (x === 2 && y === 0) ? '#ffb3c4' : '#ff5a7e';
+    g.fillRect((hx + x) * S, (hy + y) * S, S, S);
   }));
   back = new THREE.CanvasTexture(c);
   back.magFilter = THREE.NearestFilter;
