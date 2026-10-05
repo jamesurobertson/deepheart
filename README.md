@@ -3,7 +3,8 @@
 ![Deepheart](public/og-image.png)
 
 Fight monsters, hire companions with their gold, and descend the dungeon for souls.
-**Play it at https://jamesurobertson.github.io/deepheart/**
+**Play it at https://jamesurobertson.github.io/deepheart/**, or
+**[download the desktop app](https://github.com/jamesurobertson/deepheart/releases/latest)** for Mac, Windows or Linux.
 
 ![Deepheart on desktop](docs/screenshots/carnage.jpg)
 
@@ -50,6 +51,13 @@ The project is built with:
 `npm run pace` simulates active, casual and idle players for 8 hours and fails if the game goes quiet for too long, the first descent pays too little, or replaying a run isn't clearly faster.
 `node scripts/build-atlas.ts` repacks the sprite atlas after adding art.
 `node scripts/card-sound.ts` regenerates the card drop sounds.
+
+## Desktop app
+
+`desktop/` wraps the built game in Electron. `cd desktop && npm install`, then `npm start` to run it or
+`npm run dist:mac` (or `dist:win`, `dist:linux`) to package it into `desktop/release/`.
+Pushing a version tag (`git tag v0.2.0 && git push origin v0.2.0`) builds all three on GitHub and publishes them as a
+release (`.github/workflows/desktop.yml`).
 
 ## Building for Production
 

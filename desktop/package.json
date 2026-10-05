@@ -28,25 +28,46 @@
     ],
     "mac": {
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.png",
       "category": "public.app-category.games",
-      "identity": null
+      "identity": "-",
+      "hardenedRuntime": false
     },
     "win": {
       "target": [
-        "nsis",
-        "zip"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.png"
     },
     "linux": {
       "target": [
-        "AppImage"
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.png",
       "category": "Game"
+    },
+    "artifactName": "Deepheart-${version}-${os}-${arch}.${ext}",
+    "nsis": {
+      "artifactName": "Deepheart-${version}-windows-setup.${ext}",
+      "oneClick": true
     }
   },
   "devDependencies": {
