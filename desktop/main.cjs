@@ -27,6 +27,9 @@ function createWindow() {
     webPreferences: { backgroundThrottling: false, contextIsolation: true, sandbox: true },
   });
   win.loadURL('app://game/index.html');
+  // Out of sight, out of earshot: it keeps playing while minimised or hidden, just silently.
+  for (const quiet of ['minimize', 'hide']) win.on(quiet, () => win.webContents.setAudioMuted(true));
+  for (const back of ['restore', 'show']) win.on(back, () => win.webContents.setAudioMuted(false));
   win.once('ready-to-show', () => win.show());
   // Links open in the real browser, never inside the game window.
   win.webContents.setWindowOpenHandler(({ url }) => {
