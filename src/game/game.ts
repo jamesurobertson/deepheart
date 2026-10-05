@@ -876,9 +876,11 @@ export class Game {
     }
   }
 
-  /** Strong enough to clear what's left of this floor at once (the toughest monster type counts for all of them). */
+  /** Strong enough to clear what's left of this floor at once (the toughest monster type counts for all of them).
+   *  Only while auto-advancing: with auto off you're staying to farm the floor (and a reload, which restarts its kill
+   *  count, shouldn't sweep it again for free). */
   private canSweep() {
-    if (this.bossFloor() || this.s.floorKills >= FLOOR_KILLS) return false;
+    if (!this.s.auto || this.bossFloor() || this.s.floorKills >= FLOOR_KILLS) return false;
     const toughest = Math.max(...bandFor(this.s.floor).map((d) => d.hp));
     return this.dps().times(SWEEP_SECONDS).gte(floorHp(this.s.floor).times(this.floorLeft() * toughest * TRASH));
   }
