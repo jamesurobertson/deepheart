@@ -1,5 +1,11 @@
 # Deepheart
 
+[![Play in your browser](https://img.shields.io/badge/play-in_your_browser-ff5a7e?style=for-the-badge)](https://jamesurobertson.github.io/deepheart/)
+[![Download the desktop app](https://img.shields.io/github/v/release/jamesurobertson/deepheart?label=download&style=for-the-badge&color=f2c14e)](https://github.com/jamesurobertson/deepheart/releases/latest)
+
+[![Website deploy](https://github.com/jamesurobertson/deepheart/actions/workflows/deploy.yml/badge.svg)](https://github.com/jamesurobertson/deepheart/actions/workflows/deploy.yml)
+[![Desktop build](https://github.com/jamesurobertson/deepheart/actions/workflows/desktop.yml/badge.svg)](https://github.com/jamesurobertson/deepheart/actions/workflows/desktop.yml)
+
 ![Deepheart](public/og-image.png)
 
 Fight monsters, hire companions with their gold, and descend the dungeon for souls.
