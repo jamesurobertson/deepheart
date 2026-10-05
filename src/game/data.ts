@@ -602,8 +602,8 @@ function buildCards(): CardDef[] {
     add(z.mid, 'mid', i, `Floor ${a + 5} boss`, a + 1);
     add(z.boss, 'boss', i, `Floor ${a + 10} boss`, a + 1);
   });
-  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: [{ text: 'Sometimes carried by a treasure goblin you catch', floor: 1 }], floor: 1, gold: false });
-  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: [{ text: 'Sometimes carried by a rainbow goblin you catch', floor: 1 }], floor: 1, gold: false });
+  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: [], floor: 1, gold: false });
+  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: [], floor: 1, gold: false });
   return [...out.values()];
 }
 
