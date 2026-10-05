@@ -566,8 +566,10 @@ export interface CardDef {
   kind: CardKind;
   /** Zone it's listed under (-1: the goblins). */
   zone: number;
-  /** Where it turns up, one line per place. */
-  where: string[];
+  /** Where it turns up, one line per place, with the first floor of that place (a place is only listed once reached). */
+  where: { text: string; floor: number }[];
+  /** First floor it can turn up on: the card shows in the collection once you've been that deep. */
+  floor: number;
   /** Champions of this kind can drop a gold copy (every card but the goblins'). */
   gold: boolean;
 }
@@ -585,28 +587,27 @@ export const RAINBOW_CARD = 'rainbow-goblin';
 
 function buildCards(): CardDef[] {
   const out = new Map<string, CardDef>();
-  const add = (d: MonsterDef, kind: CardKind, zone: number, where: string) => {
+  const add = (d: MonsterDef, kind: CardKind, zone: number, text: string, floor: number) => {
     const id = cardId(d.name);
     const known = out.get(id);
-    if (known) known.where.push(where);
-    else out.set(id, { id, name: d.name, sprite: d.sprite, tint: d.tint, kind, zone, where: [where], gold: true });
+    if (known) known.where.push({ text, floor });
+    else out.set(id, { id, name: d.name, sprite: d.sprite, tint: d.tint, kind, zone, where: [{ text, floor }], floor, gold: true });
   };
   ZONES.forEach((z, i) => {
     const a = i * 10;
     const name = z.name.replace(/^The /, '');
-    z.band.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 1}–${a + 9}`));
-    z.lap.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 81}–${a + 89}`));
-    add(z.mid, 'mid', i, `Floor ${a + 5} boss`);
-    add(z.boss, 'boss', i, `Floor ${a + 10} boss`);
+    z.band.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 1}–${a + 9}`, a + 1));
+    z.lap.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 81}–${a + 89}`, a + 81));
+    add(z.mid, 'mid', i, `Floor ${a + 5} boss`, a + 5);
+    add(z.boss, 'boss', i, `Floor ${a + 10} boss`, a + 10);
   });
-  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: ['Sometimes carried by a treasure goblin you catch'], gold: false });
-  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: ['Sometimes carried by a rainbow goblin you catch'], gold: false });
+  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: [{ text: 'Sometimes carried by a treasure goblin you catch', floor: 1 }], floor: 1, gold: false });
+  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: [{ text: 'Sometimes carried by a rainbow goblin you catch', floor: 1 }], floor: 1, gold: false });
   return [...out.values()];
 }
 
 export const CARDS = buildCards();
 export const CARD_BY_ID = new Map(CARDS.map((c) => [c.id, c]));
-export const GOLD_CARDS = CARDS.filter((c) => c.gold).length;
 
 // ---------- trophies ----------
 

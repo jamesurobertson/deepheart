@@ -1,4 +1,4 @@
-import { ABYSS, AWAKEN_FLOOR, CARDS, CARD_BY_ID, COMPS, GOLD_CARDS, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABYSS, AWAKEN_FLOOR, CARDS, CARD_BY_ID, COMPS, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { DESCEND_FLOOR, FLOOR_KILLS, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -1301,11 +1301,12 @@ export class Ui {
       const known = n || slain || (c.kind === 'goblin' && g.s.raids);
       const what = { monster: 'monster card', mid: 'mid-boss card', boss: 'boss card', goblin: 'goblin card' }[c.kind];
       const head = `<div class="tt-h"><b style="color:${gilded ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${known ? `${esc(c.name)} Card` : '???'}</b><span class="tt-own">${n ? `×${n}${gilded ? ' · gold' : ''}` : what}</span></div>`;
-      const lines = c.where.map((w) => `<li>${esc(w)}</li>`).join('');
+      const lines = c.where.filter((w) => w.floor <= g.s.bestFloor).map((w) => `<li>${esc(w.text)}</li>`).join('');
       const own = g.s.cards[id];
-      const found = [own?.at ? `First card on ${c.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(own.at)}` : '', own?.goldAt ? `gold on #${fmt(own.goldAt)}` : ''].filter(Boolean).join(' · ');
+      const unit = c.kind === 'goblin' ? 'catch' : 'kill';
+      const found = [own?.at ? `Got your first at ${unit} #${fmt(own.at)}` : '', own?.goldAt ? `gold at ${unit} #${fmt(own.goldAt)}` : ''].filter(Boolean).join(' · ');
       const caught = id === 'rainbow-goblin' ? g.s.rainbows : g.s.raids - g.s.rainbows;
-      const tally = `<p class="tt-f">${c.kind === 'goblin' ? `Caught: ${fmt(caught)}` : `Slain: ${fmt(slain)}`}</p>${found ? `<p class="tt-f">${found}</p>` : ''}`;
+      const tally = `${found ? `<p class="tt-got">${found}</p>` : ''}<p class="tt-f">${c.kind === 'goblin' ? `Caught: ${fmt(caught)}` : `Slain: ${fmt(slain)}`}</p>`;
       return `${head}${known ? '' : '<p class="tt-d">Not met yet.</p>'}<ul class="tt-l">${lines}</ul>${tally}`;
     }
     if (kind === 'aby') {
@@ -1414,7 +1415,7 @@ export class Ui {
       const n = g.s.trophies.length;
       html = head('Trophies', `${n} / ${TROPHIES.length} · +${n}% damage`) + this.troTabs('trophies') + `<div class="tro-grid">${TROPHIES.map((t) => `<span class="tro ${g.hasTrophy(t.id) ? 'got' : ''}" data-tip="tro:${t.id}">${icon(t.icon, 28)}</span>`).join('')}</div>`;
     } else if (name === 'cards') {
-      html = head('Cards', `${g.cardsFound()} / ${CARDS.length} · ${g.goldCardsFound()} / ${GOLD_CARDS} gold`) + this.troTabs('cards') + this.cardsHtml();
+      html = head('Cards') + this.troTabs('cards') + this.cardsHtml();
     } else if (name === 'abyss') {
       html = head('The Abyss', `${G.soul()} ${fmt(g.s.souls)} souls · +${fmt(Math.round(g.s.souls * g.soulPower() * 100))}% damage`) + this.tabs('abyss') + this.abyssHtml();
     } else if (name === 'heart') {
@@ -1488,20 +1489,25 @@ export class Ui {
     return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${this.newCards ? ` <em class="tab-new">+${this.newCards}</em>` : ''}`)}</nav>`;
   }
 
-  /** Every monster's card, zone by zone: a "?" for monsters never slain, a silhouette until the card turns up. */
+  /** Every monster's card, zone by zone: a "?" for monsters never slain, a silhouette until the card turns up. A zone's row
+   *  (and the monsters that only come on later laps) appear once you've been that deep, the goblins once you've met one. */
   private cardsHtml(): string {
     const g = this.game;
+    const seen = (c: (typeof CARDS)[number]) => g.cardCount(c.id) > 0 || (c.kind === 'goblin' ? g.s.raids + g.s.missed > 0 : c.floor <= g.s.bestFloor);
     const face = (c: (typeof CARDS)[number]) => {
       const n = g.cardCount(c.id);
       const state = n ? 'got' : g.s.slain[c.id] || (c.kind === 'goblin' && g.s.raids) ? 'met' : 'unknown';
       return `<span class="mc-cell" data-tip="card:${c.id}">${cardFace(c, state, g.hasGoldCard(c.id))}</span>`;
     };
-    const section = (title: string, cards: typeof CARDS) => {
+    const section = (title: string, all: typeof CARDS) => {
+      const cards = all.filter(seen);
+      if (!cards.length) return '';
       const got = cards.filter((c) => g.cardCount(c.id)).length;
       return `<h3>${esc(title)} <span class="muted">${got} / ${cards.length}</span></h3><div class="card-grid">${cards.map(face).join('')}</div>`;
     };
+    const more = CARDS.some((c) => !seen(c)) ? '<p class="cards-more">More cards wait deeper down.</p>' : '';
     return ZONES.map((z, i) => section(z.name, CARDS.filter((c) => c.zone === i))).join('')
-      + section('Treasure goblins', CARDS.filter((c) => c.zone < 0));
+      + section('Treasure goblins', CARDS.filter((c) => c.zone < 0)) + more;
   }
 
   private statTabs(on: string) {
