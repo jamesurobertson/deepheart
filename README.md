@@ -7,13 +7,35 @@ Fight monsters, hire companions with their gold, and descend the dungeon for sou
 
 ![Deepheart on desktop](docs/screenshots/carnage.jpg)
 
+## Every monster has a card
+
+![A champion falls and drops a gold Bog Lurker card, which flips over and flies into the collection](docs/screenshots/card-drop.webp)
+
+One card for every monster in the dungeon, and a ten-thousand-to-one chance of seeing it drop. Cards spin out of the
+monster face-down and land face-up; pick one up and it flips over in a burst of light, straight into your collection.
+Champions drop gold copies. Boss cards are rarer. The gold card of a champion boss, which only turns up on boss floors
+you've already beaten, is the rarest thing in the dungeon. They do nothing except prove you were there.
+
+## What's down there
+
+- **A party that fights for you.** Hire companions with the gold they earn, level them into the thousands, and pick a
+  hero to lead around the room with your mouse (or a finger).
+- **Relics** from bosses: sixteen of them, each answering a boss modifier or pushing a build.
+- **Descend** for souls, **awaken the Heart** for heartstones: two prestige layers, and every run back down is faster
+  than the last.
+- **Treasure goblins** that run for the exit with your loot. Every so often one is a rainbow. Catch it and find out.
+- **No bottom.** After floor 80 the zones come back corrupted, then abyssal, hollow, eternal, and the numbers keep
+  climbing past 1e308.
+
 ## Getting Started
 
 1. Clone the repository
 2. Install dependencies with `npm install`
 3. Run the development server with `npm run dev`
 
-Add `?slot=name` to the URL to keep a separate save, or `?speed=10` to run the game faster.
+Add `?slot=name` to the URL to keep a separate save. On the dev server only: `?speed=10` runs the game faster,
+`?cards=often` makes cards drop hundreds of times as often (and champion bosses common), and `?relics=always` makes
+every boss drop a relic.
 
 ## Development
 
@@ -27,6 +49,7 @@ The project is built with:
 `node scripts/balance.ts 8 5 30 0.3` runs a headless pacing sim (hours, clicks/sec, active minutes, descend ratio).
 `npm run pace` simulates active, casual and idle players for 8 hours and fails if the game goes quiet for too long, the first descent pays too little, or replaying a run isn't clearly faster.
 `node scripts/build-atlas.ts` repacks the sprite atlas after adding art.
+`node scripts/card-sound.ts` regenerates the card drop sounds.
 
 ## Building for Production
 
