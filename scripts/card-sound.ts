@@ -1,6 +1,6 @@
 /**
- * Synthesizes the card drop sounds: a bright, glassy "tink" (a struck metal bar's inharmonic ring with a shimmer),
- * and a double strike with a high sparkle for gold cards.
+ * Synthesizes the card drop sounds: a quick retro "you got something" arpeggio (C6 E6 G6 C7 in square waves), and for
+ * gold cards the same arpeggio answered a fifth higher a beat later, with high glints on top.
  *   node scripts/card-sound.ts  ->  public/assets/sfx/card.mp3, public/assets/sfx/cardgold.mp3
  */
 import { execFileSync } from 'node:child_process';
@@ -9,34 +9,30 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const RATE = 44100;
-let seed = 3;
-const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+const TAU = Math.PI * 2;
+const ARPEGGIO = [1047, 1319, 1568, 2093];
 
-/** A struck bar's partials (frequency ratio, loudness, how much faster it dies away than the fundamental). */
-const PARTIALS: [number, number, number][] = [[1, 1, 1], [2, 0.3, 1.6], [2.756, 0.45, 2.4], [5.404, 0.22, 4.5], [8.933, 0.08, 8]];
-
-function strike(out: Float32Array, start: number, freq: number, vol: number, decay: number) {
-  const i0 = Math.round(start * RATE);
-  for (const [ratio, amp, fast] of PARTIALS) {
-    const f = freq * ratio;
-    // Two copies a hair apart beat against each other: the shimmer in the ring.
-    for (const detune of [-1.2, 1.2]) {
-      for (let k = 0; i0 + k < out.length; k++) {
-        const t = k / RATE;
-        const env = Math.min(1, t / 0.0015) * Math.exp(-t * decay * fast);
-        if (env < 1e-4 && t > 0.01) break;
-        out[i0 + k] += Math.sin(2 * Math.PI * (f + detune * ratio) * t) * env * amp * vol * 0.5;
-      }
-    }
+function square(out: Float32Array, t0: number, f: number, len: number, vol: number) {
+  const i0 = Math.round(t0 * RATE);
+  for (let k = 0; k < len * RATE && i0 + k < out.length; k++) {
+    const t = k / RATE;
+    const env = Math.min(1, t / 0.003) * Math.exp(-t * 7);
+    out[i0 + k] += (Math.sin(TAU * f * t) > 0 ? 1 : -1) * env * vol * 0.25;
   }
-  // The tap itself: a few milliseconds of bright noise.
-  let hp = 0;
-  let prev = 0;
-  for (let k = 0; k < RATE * 0.004; k++) {
-    const x = rand() * 2 - 1;
-    hp = 0.6 * (hp + x - prev);
-    prev = x;
-    out[i0 + k] += hp * vol * 0.35 * (1 - k / (RATE * 0.004));
+}
+
+/** The four notes, the last one left to ring. `p` shifts the pitch. */
+function itemGet(out: Float32Array, t0: number, p: number, vol: number) {
+  ARPEGGIO.forEach((f, k) => square(out, t0 + k * 0.055, f * p, k === ARPEGGIO.length - 1 ? 0.5 : 0.08, vol));
+}
+
+function ping(out: Float32Array, t0: number, f: number, vol: number) {
+  const i0 = Math.round(t0 * RATE);
+  for (let k = 0; i0 + k < out.length; k++) {
+    const t = k / RATE;
+    const env = Math.min(1, t / 0.001) * Math.exp(-t * 9);
+    if (env < 1e-4) break;
+    out[i0 + k] += Math.sin(TAU * f * t) * env * vol;
   }
 }
 
@@ -58,7 +54,7 @@ function room(buf: Float32Array, mix: number) {
 function render(name: string, seconds: number, build: (out: Float32Array) => void) {
   const out = new Float32Array(Math.round(seconds * RATE));
   build(out);
-  room(out, 0.22);
+  room(out, 0.12);
   let peak = 0;
   for (const v of out) peak = Math.max(peak, Math.abs(v));
   const pcm = Buffer.alloc(44 + out.length * 2);
@@ -82,11 +78,9 @@ function render(name: string, seconds: number, build: (out: Float32Array) => voi
   console.log(`${name}.mp3`);
 }
 
-// A6: high and clear, like a coin of something precious hitting stone.
-render('card', 1.8, (out) => strike(out, 0, 1760, 1, 3.2));
-// Gold: the tink, a higher answer a beat later (E7), and a scatter of sparkle on top.
-render('cardgold', 2.4, (out) => {
-  strike(out, 0, 1760, 1, 3);
-  strike(out, 0.12, 2637, 0.85, 2.6);
-  [3136, 3520, 4186].forEach((f, k) => strike(out, 0.3 + k * 0.07, f, 0.25, 6));
+render('card', 1.2, (out) => itemGet(out, 0, 1, 1));
+render('cardgold', 1.6, (out) => {
+  itemGet(out, 0, 1, 1);
+  itemGet(out, 0.14, 1.498, 0.8);
+  [2, 2.52, 3, 3.78].forEach((r, k) => ping(out, 0.32 + k * 0.06, 1760 * r, 0.18));
 });
