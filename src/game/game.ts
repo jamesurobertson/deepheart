@@ -44,11 +44,11 @@ const RAMPAGE_TIERS = [{ click: 1, dps: 2 }, { click: 2, dps: 3 }];
 const RAMPAGE_EXTEND = 3;
 /** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
 const CLUTCH_GOLD = 1.5;
-/** Any monster that climbs the stairs has this chance of being a champion: tougher, glowing, and worth a little more
- *  than a goblin's plunder. */
+/** Any monster that climbs the stairs has this chance of being a champion: tougher, glowing, and worth as much gold
+ *  as ten ordinary monsters. */
 const CHAMP_CHANCE = 0.01;
 const CHAMP_HP = 6;
-const CHAMP_GOLD = 50;
+const CHAMP_GOLD = 10;
 /** A boss on a floor you've beaten before is now and then a champion (so farming a boss floor has a jackpot):
  *  tougher, more gold, and the only source of gold boss cards. */
 const CHAMP_BOSS_CHANCE = 1 / 150;
