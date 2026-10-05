@@ -52,8 +52,8 @@ const CHAMP_GOLD = 50;
 const CHAMP_BOSS_CHANCE = 1 / 150;
 const CHAMP_BOSS_HP = 3;
 const CHAMP_BOSS_GOLD = 10;
-/** Card drops: 1 in this many kills (Ragnarok's 0.01% for ordinary monsters), and so on. */
-const CARD_ODDS = { monster: 10_000, boss: 2_500, champ: 40, champBoss: 50, goblin: 50, rainbow: 10 };
+/** Card drops: 1 in this many kills (Ragnarok's 0.01% for ordinary monsters), and so on. 1% is the best odds anything gets. */
+const CARD_ODDS = { monster: 10_000, boss: 2_500, champ: 100, champBoss: 100, goblin: 100, rainbow: 100 };
 /** Seconds before the boss of a floor you're farming climbs back up. */
 const BOSS_RESPAWN = 2.5;
 /** Share of treasure goblins that are rainbow goblins. Catching one opens the Goblin Vault a quarter of the time
