@@ -31,6 +31,8 @@ const RAID_STAY = 10;
 export const MANUAL_RATE = 5;
 /** The Phantom Blade attacks on its own this many times a second before upgrades. */
 const AUTO_BASE = 1;
+/** A new companion is revealed once the gold earned this run reaches this share of their price. */
+const REVEAL_AT = 0.7;
 const FEVER_TIME = 10;
 /** Attacks by hand that fill the Rampage meter (about 12 seconds of holding). */
 const FEVER_CLICKS = 60;
@@ -1474,10 +1476,10 @@ export class Game {
       if (s.raidTimer <= 0) this.spawnRaid();
     }
 
-    // Reveal companions as you get close to affording them.
+    // Reveal companions as you get close to affording them (once this run's gold reaches REVEAL_AT of their price).
     for (let i = s.revealed; i < COMPS.length; i++) {
       if (!this.compUnlocked(i)) break;
-      if (s.owned[i] > 0 || s.runGold.gte(COMPS[i].cost * 0.3)) {
+      if (s.owned[i] > 0 || s.runGold.gte(COMPS[i].cost * REVEAL_AT)) {
         s.revealed = i + 1;
         if (i > 0) this.events.push({ t: 'reveal', comp: i });
       } else break;
