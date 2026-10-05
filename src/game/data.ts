@@ -41,7 +41,7 @@ export const COMPS: CompDef[] = [
   c('brawler', 'Dwarf Brawler', 'dwarf_m', 150, 44, 'slash', 'Came for the gold. Stayed for the punching.'),
   c('apprentice', 'Apprentice', 'wizzard_m', 750, 148, 'bolt', 'Knows exactly one spell. It is lightning. It is enough.'),
   c('hunter', 'Lizard Hunter', 'lizard_m', 7_000, 245, 'arrow', 'Can smell a monster through three floors of stone.'),
-  c('shieldmaiden', 'Shieldmaiden', 'knight_f', 35_000, 976, 'slash', 'Her shield has killed more monsters than her sword.'),
+  c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 35_000, 976, 'slash', 'Her shield has killed more monsters than her sword.'),
   c('thief', 'Shadow Thief', 'cr_green_thief', 180_000, 3_725, 'arrow', 'Throws knives. Takes them back. Takes your purse too, then gives it back.'),
   c('dancer', 'Blade Dancer', 'elf_m', 1e6, 10_859, 'slash', 'Fights like it is a performance. The monsters do not clap.'),
   c('corsair', 'Corsair Captain', 'cr_pirate_captain', 6e6, 47_143, 'arrow', 'Sailed the underground sea. There is an underground sea. Do not ask.'),
