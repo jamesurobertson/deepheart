@@ -351,6 +351,8 @@ export class Game {
   private manualCd = 0;
   /** Held down on the battlefield (mouse, finger or Space): attack by hand at MANUAL_RATE until let go. */
   hold: { id: number | null; x: number; y: number } | null = null;
+  /** Testing only (?relics=always): every boss drops a relic, every time. */
+  debugRelics = false;
   private sinceClick = 99;
   /** DPS damage waiting to be shown as numbers, per monster. */
   private dpsShown = new Map<number, Decimal>();
@@ -835,7 +837,7 @@ export class Game {
         this.s.runSouls += souls;
         this.events.push({ t: 'souls', id: m.id, floor: this.s.floor, souls });
       }
-      if (firstWin) this.rollRelic(this.s.floor);
+      if (firstWin || this.debugRelics) this.rollRelic(this.s.floor);
       if (this.s.auto) this.enterFloor(this.s.floor + 1);
       else this.enterFloor(this.s.floor);
     } else if (!this.bossFloor()) {
@@ -1213,6 +1215,7 @@ export class Game {
 
   /** Chance a boss on this floor drops a relic (a new deepest zone boss always does). */
   relicChance(floor: number) {
+    if (this.debugRelics) return 1;
     if (floor % 10 === 0 && floor > this.s.bossBest) return 1;
     return Math.min(1, (floor % 10 === 0 ? 0.25 : 0.08) * (1 + 0.5 * this.heartLv('hunter')));
   }

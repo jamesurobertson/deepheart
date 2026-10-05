@@ -90,6 +90,8 @@ async function boot() {
   scene.rebuild(game);
   scene.onArrive = () => ui.arrived();
   if (import.meta.env.DEV) {
+    // ?relics=always makes every boss drop a relic.
+    if (params.get('relics') === 'always') game.debugRelics = true;
     // step(n, click) advances n frames by hand: handy when the tab is in the background.
     const step = (n: number, click = false) => {
       for (let i = 0; i < n; i++) {
