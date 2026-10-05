@@ -69,9 +69,7 @@ interface LootView {
   ev: RelicDrop;
   group: THREE.Group;
   icon: PixelSprite;
-  shaft: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial>;
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
-  halo: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   /** Seconds on the floor, and seconds into the flight to the party (-1: still on the floor). */
   t: number;
   fly: number;
@@ -678,19 +676,12 @@ export class Scene {
     const icon = new PixelSprite(this.atlas.texture, this.atlas.size, [frame], { anchor: 'center' });
     icon.mesh.scale.setScalar(1.15);
     icon.mesh.material.emissive.setScalar(0.12);
-    const h = 2.2 + def.rarity * 1.1;
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.18 + def.rarity * 0.03, 0.34 + def.rarity * 0.05, h, 16, 1, true), new THREE.MeshBasicMaterial({ color: color.clone().multiplyScalar(0.55), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-    shaft.position.y = h / 2;
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55 + def.rarity * 0.06, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.03;
-    // A soft pool of the rarity's light on the floor under it.
-    const halo = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: this.glow, color: color.clone().multiplyScalar(0.7), transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
-    halo.rotation.x = -Math.PI / 2;
-    halo.position.y = 0.02;
-    group.add(halo, shaft, ring, icon.mesh);
+    group.add(ring, icon.mesh);
     this.scene.add(group);
-    this.loot.push({ ev, group, icon, shaft, ring, halo, t: 0, fly: -1, from: new THREE.Vector3() });
+    this.loot.push({ ev, group, icon, ring, t: 0, fly: -1, from: new THREE.Vector3() });
     this.fx.light(group.position.clone().setY(1.2), color, 25 + def.rarity * 10, 0.6, 9);
     if (this.settings.particles) this.fx.burst(group.position.clone().setY(0.5), '#' + color.getHexString(), 12 + def.rarity * 6, 3, 0.07, 8, true);
   }
@@ -715,12 +706,8 @@ export class Scene {
         l.icon.mesh.position.y = land < 1 ? 0.6 * (1 - settle) + 0.05 * settle + Math.sin(land * Math.PI) * 2.2 : 0.05;
         l.icon.mesh.rotation.set(-Math.PI / 2 * settle, 0, land < 1 ? -land * (Math.PI * 2 + LOOT_TILT) : -LOOT_TILT, 'YXZ');
         l.icon.mesh.scale.setScalar(1.15 * (0.4 + 0.6 * Math.min(1, land * 2)));
-        l.halo.material.opacity = (0.45 + Math.sin(l.t * 3) * 0.12) * land;
-        l.shaft.scale.y = land;
-        l.shaft.position.y = (l.shaft.geometry.parameters.height / 2) * land;
         l.ring.rotation.z += dt * 1.5;
-        l.ring.material.opacity = 0.55 + Math.sin(l.t * 4) * 0.2;
-        l.shaft.material.opacity = 0.28 + Math.sin(l.t * 2.5) * 0.08;
+        l.ring.material.opacity = (0.3 + Math.sin(l.t * 3) * 0.1) * Math.min(1, l.t / LOOT_LAND);
         // Picked up by walking over it, or it flies to you by itself before long (sooner if the staircase is waiting).
         if (land >= 1 && hero && hero.body.position.distanceTo(l.group.position.clone().setY(0)) < 0.9) this.collectLoot(i);
         else if (l.t > (this.hold ? LOOT_WAIT_STAIRS : LOOT_WAIT)) this.startLootFlight(l);
@@ -741,9 +728,7 @@ export class Scene {
     if (l.fly >= 0) return;
     l.fly = 0;
     l.from.copy(l.group.position);
-    l.shaft.visible = false;
     l.ring.visible = false;
-    l.halo.visible = false;
   }
 
   /** Picked up: a burst in its colour, and the UI shows its card. */
@@ -756,12 +741,8 @@ export class Scene {
     if (this.settings.particles) this.fx.burst(at, '#' + color.getHexString(), 22, 4.5, 0.08, 8, true);
     this.scene.remove(l.group);
     l.icon.dispose();
-    l.shaft.geometry.dispose();
-    l.shaft.material.dispose();
     l.ring.geometry.dispose();
     l.ring.material.dispose();
-    l.halo.geometry.dispose();
-    l.halo.material.dispose();
     // Picking it up while the staircase waits lets the party head down soon after the card.
     if (this.hold && !this.loot.length) this.hold.t = Math.min(this.hold.t, 1.4);
     this.onLoot?.(l.ev);
