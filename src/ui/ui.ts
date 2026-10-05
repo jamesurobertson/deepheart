@@ -1,10 +1,11 @@
-import { ABYSS, AWAKEN_FLOOR, COMPS, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABYSS, AWAKEN_FLOOR, CARDS, CARD_BY_ID, COMPS, GOLD_CARDS, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { DESCEND_FLOOR, FLOOR_KILLS, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
-import type { Scene } from '../render/scene.ts';
+import type { Drop, Scene } from '../render/scene.ts';
+import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
-import { G, charFit, sprite, spriteFit } from './px.ts';
+import { G, cardArt, charFit, sprite, spriteFit } from './px.ts';
 
 export interface UiHooks {
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
@@ -30,6 +31,13 @@ function icon(i: Icon, box = 36): string {
   const tier = i.tier !== undefined ? `<b class="tier" style="--tc:${TIER_COLORS[i.tier]}">${ROMAN[i.tier]}</b>` : '';
   const sub = i.sub ? `<span class="sub">${spriteFit(i.sub, 18)}</span>` : '';
   return `<span class="ico">${spriteFit(i.sprite, box)}${sub}${tier}</span>`;
+}
+
+/** A monster card as it sits in the collection: unknown (never slain) shows a "?", met shows a silhouette. */
+function cardFace(card: (typeof CARDS)[number], state: 'unknown' | 'met' | 'got', gilded = false, count = 0, box = 44): string {
+  const frame = gilded ? CARD_FRAME.gold : CARD_FRAME[card.kind];
+  const art = state === 'unknown' ? '<i class="mc-q">?</i>' : cardArt(card, box, card.id === 'rainbow-goblin' ? 'rainbow' : '');
+  return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'unknown' ? '???' : esc(card.name)}</span>${count > 1 ? `<b class="mc-n">×${count}</b>` : ''}</span>`;
 }
 
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
@@ -111,6 +119,9 @@ export class Ui {
   private strip = false;
   /** Relics found since the relic screen was last opened. */
   private newRelics = 0;
+  private newCards = 0;
+  /** Boss floors whose boss has been announced this session (it's only announced on a floor never beaten). */
+  private bossAnnounced = new Set<number>();
   private lootTimer = 0;
   private toldAwaken = false;
 
@@ -144,7 +155,7 @@ export class Ui {
       <div class="loot" hidden></div>
       <div class="ticker"><span></span></div>
       <nav class="dock">
-        <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy()}<span>Trophies</span></button>
+        <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy()}<span>Trophies</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics">${G.relic()}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.abyss()}<span>Descend</span><em class="badge" hidden></em></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats()}<span>Stats</span></button>
@@ -181,7 +192,7 @@ export class Ui {
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
       upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
-      relicBadge: q('[data-open=relics] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'),
+      relicBadge: q('[data-open=relics] .badge'), cardBadge: q('[data-open=trophies] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'),
     };
 
     COMPS.forEach((c, i) => {
@@ -201,7 +212,7 @@ export class Ui {
 
     this.bind();
     // A relic's card shows when it's picked up off the floor (the scene sets it down and tells us).
-    this.scene.onLoot = (ev) => this.showLoot(ev.id, ev.lv, ev.equipped, ev.star);
+    this.scene.onLoot = (ev) => (ev.t === 'relic' ? this.showLoot(ev.id, ev.lv, ev.equipped, ev.star) : this.showCard(ev));
     this.bindSheet();
     this.syncMode();
     this.syncMute();
@@ -679,7 +690,9 @@ export class Ui {
           if (this.scene.busy) this.pendingZone = ev.floor;
           else this.zoneBanner(ev.floor);
         }
-        if (ev.boss) {
+        // A boss is announced on a floor you've never beaten, once (not every retry, nor while you farm it).
+        if (ev.boss && ev.floor > g.s.bestCleared && !this.bossAnnounced.has(ev.floor)) {
+          this.bossAnnounced.add(ev.floor);
           const boss = g.monsters.find((m) => m.boss);
           const mods = g.bossMods(ev.floor).map((id) => MOD_BY_ID.get(id)!.name);
           const time = `Kill it in ${Math.round(g.bossTimeMax)} seconds`;
@@ -697,7 +710,7 @@ export class Ui {
           }
           this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold`, 'clutch');
         }
-        else this.banner('Victory!', `Floor ${ev.floor} conquered`, 'win');
+        else if (ev.first) this.banner('Victory!', `Floor ${ev.floor} conquered`, 'win');
         break;
       case 'bossFail':
         // The first wall: this is where the game teaches you to descend.
@@ -728,6 +741,14 @@ export class Ui {
         const title = REWARD_TEXT[ev.reward];
         const line = ev.reward === 'plunder' || ev.reward === 'rainbow' ? `+${fmt(ev.amount ?? 0)} gold` : ev.buff ? `${buffText(ev.buff)} for ${Math.round(ev.buff.dur)}s` : '';
         this.banner(title, line, ev.reward === 'rainbow' ? 'loot rainbow' : 'loot');
+        break;
+      }
+      case 'spawn': {
+        const m = g.monster(ev.id);
+        if (m?.boss && m.champ && !m.half) {
+          this.banner('CHAMPION BOSS!', `${m.def.name} · tougher, richer, and it might drop a gold card`, 'loot');
+          this.hooks.sound('drop4', { vol: 0.6 });
+        }
         break;
       }
       case 'raidSpawn':
@@ -1000,12 +1021,15 @@ export class Ui {
     const rb = this.el.relicBadge;
     rb.hidden = this.newRelics < 1;
     rb.textContent = `+${this.newRelics}`;
+    const cb = this.el.cardBadge;
+    cb.hidden = this.newCards < 1;
+    cb.textContent = `+${this.newCards}`;
     const rate = `${perSec(g.autoRate())}/s`;
     const rateEl = this.el.bladeRate.lastElementChild!;
     if (rateEl.textContent !== rate) rateEl.textContent = rate;
 
     this.hints();
-    if (this.modal && ['trophies', 'abyss', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
+    if (this.modal && ['trophies', 'cards', 'abyss', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
     this.refreshTip();
   }
 
@@ -1030,6 +1054,11 @@ export class Ui {
       // The boss steps aside for the vault; its clock is frozen.
       this.el.floorBar.style.width = `${g.bossTimeMax ? (Math.max(0, g.bossTime) / g.bossTimeMax) * 100 : 100}%`;
       this.el.floorBarT.textContent = 'Boss waits';
+      this.el.floorBox.classList.remove('urgent');
+    } else if (boss && !g.monsters.some((m) => m.boss)) {
+      // Farming a boss floor: the next one is on its way up.
+      this.el.floorBar.style.width = '0%';
+      this.el.floorBarT.textContent = 'Next boss coming…';
       this.el.floorBox.classList.remove('urgent');
     } else if (boss) {
       // The bar is the clock: it drains steadily. (The boss's health is the bar over its head.)
@@ -1262,6 +1291,21 @@ export class Ui {
       const t = TROPHIES.find((x) => x.id === id)!;
       return `<div class="tt-h">${icon(t.icon, 32)}<b>${esc(t.name)}</b><span class="tt-own">${g.hasTrophy(id) ? 'unlocked' : 'locked'}</span></div><p class="tt-d">${esc(t.desc)}</p>`;
     }
+    if (kind === 'card') {
+      const c = CARD_BY_ID.get(id)!;
+      const n = g.cardCount(id);
+      const slain = g.s.slain[id] ?? 0;
+      const gilded = g.hasGoldCard(id);
+      const known = n || slain || (c.kind === 'goblin' && g.s.raids);
+      const what = { monster: 'monster card', mid: 'mid-boss card', boss: 'boss card', goblin: 'goblin card' }[c.kind];
+      const head = `<div class="tt-h"><b style="color:${gilded ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${known ? `${esc(c.name)} Card` : '???'}</b><span class="tt-own">${n ? `×${n}${gilded ? ' · gold' : ''}` : what}</span></div>`;
+      const lines = c.where.map((w) => `<li>${esc(w)}</li>`).join('');
+      const own = g.s.cards[id];
+      const found = [own?.at ? `First card on ${c.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(own.at)}` : '', own?.goldAt ? `gold on #${fmt(own.goldAt)}` : ''].filter(Boolean).join(' · ');
+      const caught = id === 'rainbow-goblin' ? g.s.rainbows : g.s.raids - g.s.rainbows;
+      const tally = `<p class="tt-f">${c.kind === 'goblin' ? `Caught: ${fmt(caught)}` : `Slain: ${fmt(slain)}`}</p>${found ? `<p class="tt-f">${found}</p>` : ''}`;
+      return `${head}${known ? '' : '<p class="tt-d">Not met yet.</p>'}<ul class="tt-l">${lines}</ul>${tally}`;
+    }
     if (kind === 'aby') {
       const a = ABYSS.find((x) => x.id === id)!;
       const needs = (a.needs ?? []).filter((n) => !g.hasAbyss(n)).map((n) => ABYSS.find((x) => x.id === n)!.name);
@@ -1299,7 +1343,7 @@ export class Ui {
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
     if (kind === 'dock') {
       const text: Record<string, string> = {
-        trophies: `Trophies: ${g.s.trophies.length}/${TROPHIES.length}. Each gives +1% damage.`,
+        trophies: `Trophies: ${g.s.trophies.length}/${TROPHIES.length}. Each gives +1% damage. Cards: ${g.cardsFound()}/${CARDS.length}.`,
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
         abyss: (g.canDescend() ? `Descend now for ${fmt(g.pendingSouls())} souls.` : g.descendOpen() ? 'Beat a zone boss to bank souls.' : `The way down opens at the floor ${DESCEND_FLOOR} boss.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
         stats: 'Your numbers, and where every bonus comes from.',
@@ -1346,6 +1390,7 @@ export class Ui {
   openModal(name: string) {
     this.modal = name;
     if (name === 'relics') this.newRelics = 0;
+    if (name === 'cards') this.newCards = 0;
     this.el.modalWrap.hidden = false;
     this.renderModal();
   }
@@ -1365,7 +1410,9 @@ export class Ui {
     let html = '';
     if (name === 'trophies') {
       const n = g.s.trophies.length;
-      html = head('Trophies', `${n} / ${TROPHIES.length} · +${n}% damage`) + `<div class="tro-grid">${TROPHIES.map((t) => `<span class="tro ${g.hasTrophy(t.id) ? 'got' : ''}" data-tip="tro:${t.id}">${icon(t.icon, 28)}</span>`).join('')}</div>`;
+      html = head('Trophies', `${n} / ${TROPHIES.length} · +${n}% damage`) + this.troTabs('trophies') + `<div class="tro-grid">${TROPHIES.map((t) => `<span class="tro ${g.hasTrophy(t.id) ? 'got' : ''}" data-tip="tro:${t.id}">${icon(t.icon, 28)}</span>`).join('')}</div>`;
+    } else if (name === 'cards') {
+      html = head('Cards', `${g.cardsFound()} / ${CARDS.length} · ${g.goldCardsFound()} / ${GOLD_CARDS} gold`) + this.troTabs('cards') + this.cardsHtml();
     } else if (name === 'abyss') {
       html = head('The Abyss', `${G.soul()} ${fmt(g.s.souls)} souls · +${fmt(Math.round(g.s.souls * g.soulPower() * 100))}% damage`) + this.tabs('abyss') + this.abyssHtml();
     } else if (name === 'heart') {
@@ -1432,6 +1479,27 @@ export class Ui {
     return `<div class="descend-box">${desc}</div>
       <h3>Abyss powers <span class="muted">${G.soul(1.5)} ${fmt(g.soulsFree())} to spend</span></h3>
       <div class="aby-grid">${nodes}</div>`;
+  }
+
+  private troTabs(on: 'trophies' | 'cards') {
+    const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
+    return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${this.newCards ? ` <em class="tab-new">+${this.newCards}</em>` : ''}`)}</nav>`;
+  }
+
+  /** Every monster's card, zone by zone: a "?" for monsters never slain, a silhouette until the card turns up. */
+  private cardsHtml(): string {
+    const g = this.game;
+    const face = (c: (typeof CARDS)[number]) => {
+      const n = g.cardCount(c.id);
+      const state = n ? 'got' : g.s.slain[c.id] || (c.kind === 'goblin' && g.s.raids) ? 'met' : 'unknown';
+      return `<span class="mc-cell" data-tip="card:${c.id}">${cardFace(c, state, g.hasGoldCard(c.id), n)}</span>`;
+    };
+    const section = (title: string, cards: typeof CARDS) => {
+      const got = cards.filter((c) => g.cardCount(c.id)).length;
+      return `<h3>${esc(title)} <span class="muted">${got} / ${cards.length}</span></h3><div class="card-grid">${cards.map(face).join('')}</div>`;
+    };
+    return ZONES.map((z, i) => section(z.name, CARDS.filter((c) => c.zone === i))).join('')
+      + section('Treasure goblins', CARDS.filter((c) => c.zone < 0));
   }
 
   private statTabs(on: string) {
@@ -1614,6 +1682,28 @@ export class Ui {
     void el.offsetWidth;
     el.classList.add('in');
     this.hooks.sound(d.rarity >= 2 || star ? 'drop4' : 'drop2', { vol: 0.7 });
+    clearTimeout(this.lootTimer);
+    this.lootTimer = window.setTimeout(() => {
+      el.classList.remove('in');
+      this.lootTimer = window.setTimeout(() => (el.hidden = true), 400);
+    }, 3600);
+  }
+
+  /** A card picked up: it slides up like a relic, and a gold one gets a banner. */
+  private showCard(ev: Extract<Drop, { t: 'card' }>) {
+    const d = CARD_BY_ID.get(ev.id)!;
+    if (this.modal !== 'cards' && ev.first) this.newCards++;
+    const el = this.el.loot;
+    el.hidden = false;
+    el.style.setProperty('--rc', ev.gold ? CARD_FRAME.gold : CARD_FRAME[d.kind]);
+    el.className = `loot card-loot${ev.gold ? ' starred' : ''}`;
+    const head = ev.gold ? (ev.first ? 'New gold card!' : 'Gold card') : ev.first ? `New card · ${this.game.cardsFound()} / ${CARDS.length}` : 'Card';
+    const line = ev.first ? `Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)} · see Trophies → Cards` : `You have ${ev.count}`;
+    el.innerHTML = `<span class="loot-ico">${cardFace(d, 'got', ev.gold, 0, 40)}</span><span class="loot-t"><small>${head}</small><b>${esc(d.name)} Card</b><em>${line}</em></span>`;
+    void el.offsetWidth;
+    el.classList.add('in');
+    if (ev.gold) this.banner('GOLD CARD!', `${d.name} Card`, 'loot');
+    this.hooks.sound(ev.gold || d.kind !== 'monster' ? 'drop4' : 'drop3', { vol: 0.7 });
     clearTimeout(this.lootTimer);
     this.lootTimer = window.setTimeout(() => {
       el.classList.remove('in');

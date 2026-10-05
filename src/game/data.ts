@@ -114,7 +114,7 @@ export const ZONES: ZoneDef[] = [
   },
   {
     name: 'The Bone Crypts', tiles: 'crypt',
-    band: [m('skelet', 'Skeleton'), m('tiny_zombie', 'Rotling'), m('skelet', 'Bone Archer', 0.9), m('necromancer', 'Grave Priest', 0.9)],
+    band: [m('skelet', 'Skeleton'), m('tiny_zombie', 'Rotling'), m('skelet', 'Bone Archer', 0.9, 0xe8d49a), m('necromancer', 'Grave Priest', 0.9)],
     mid: m('ef_golem', 'Bone Golem', 1, 0xd8d0c0), boss: m('necromancer', 'The Lich', 1, 0xb0a0ff),
     lap: [m('cr_skeleton', 'Grave Walker'), m('cr_blue_wraith', 'Pale Wraith'), m('cr_frost_skeleton', 'Hooded Bones', 0.9, 0xd0c8ff)],
   },
@@ -127,24 +127,24 @@ export const ZONES: ZoneDef[] = [
   {
     name: 'The Sunken Tomb', tiles: 'tomb',
     band: [m('ef_gnollscout', 'Gnoll Scout', 0.9), m('ef_gnollbrute', 'Gnoll Brute', 1.2), m('ef_gnollshaman', 'Gnoll Shaman'), m('masked_orc', 'Tomb Raider')],
-    mid: m('ef_gnolloverseer', 'Gnoll Overseer'), boss: m('ef_golem', 'Tomb Golem'),
+    mid: m('ef_gnolloverseer', 'Gnoll Overseer'), boss: m('ef_golem', 'Tomb Golem', 1, 0xe8c888),
     lap: [m('cr_pirate', 'Drowned Pirate'), m('cr_pirate_captain', 'Drowned Captain', 1.2), m('cr_skeleton_pirate', 'Bone Corsair')],
   },
   {
     name: 'The Rotting Deep', tiles: 'crypt',
     band: [m('zombie', 'Zombie', 1.1), m('slug', 'Great Slug', 1.3), m('swampy', 'Bog Lurker', 1.2), m('muddy', 'Mudling', 1.1)],
     mid: m('ogre', 'Bloated Ogre', 1, 0xa0c070), boss: m('big_zombie', 'The Rotten King'),
-    lap: [m('cr_slime', 'Rot Slime', 1, 0xc0a0ff), m('cr_plague_crow', 'Carrion Crow'), m('cr_gourd', 'Rotten Gourd', 1.1, 0xc0d090)],
+    lap: [m('cr_slime', 'Rot Slime', 1, 0xc0a0ff), m('cr_plague_crow', 'Carrion Crow', 1, 0xc8a070), m('cr_gourd', 'Rotten Gourd', 1.1, 0xa8b870)],
   },
   {
     name: 'The Enchanted Grove', tiles: 'jungle',
-    band: [m('ef_centaur_m', 'Centaur'), m('ef_centaur_f', 'Centaur Archer', 0.9), m('ef_forestguardian', 'Grove Warden', 1.2), m('ef_wolf', 'Moon Wolf', 1, 0xc0c8ff)],
-    mid: m('ef_bear', 'Grove Bear', 1, 0xd0ffd0), boss: m('ef_ent', 'The Elder Ent'),
-    lap: [m('cr_gourd', 'Gourd Knight', 1.1), m('cr_green_thief', 'Grove Bandit'), m('cr_wizard', 'Mad Hermit', 0.9)],
+    band: [m('ef_centaur_m', 'Centaur'), m('ef_centaur_f', 'Centaur Archer', 0.9), m('ef_forestguardian', 'Grove Warden', 1.2), m('ef_wolf', 'Moon Wolf', 1, 0xb8a8ff)],
+    mid: m('ef_bear', 'Grove Bear', 1, 0xb0f0a0), boss: m('ef_ent', 'The Elder Ent'),
+    lap: [m('cr_gourd', 'Gourd Knight', 1.1), m('cr_green_thief', 'Grove Bandit', 1, 0xa8c8ff), m('cr_wizard', 'Mad Hermit', 0.9)],
   },
   {
     name: 'The Demon Gate', tiles: 'halls',
-    band: [m('chort', 'Chort'), m('wogol', 'Wogol', 1.1), m('imp', 'Imp', 0.8), m('masked_orc', 'Cultist', 1.2)],
+    band: [m('chort', 'Chort'), m('wogol', 'Wogol', 1.1), m('imp', 'Imp', 0.8), m('masked_orc', 'Cultist', 1.2, 0xff8a8a)],
     mid: m('ogre', 'Hellfire Ogre', 1, 0xff9070), boss: m('big_demon', 'Pit Lord'),
     lap: [m('cr_gold_knight', 'Gilded Zealot', 1.2), m('cr_purple_knight', 'Fallen Knight', 1.2), m('cr_king', 'Damned King', 1.1)],
   },
@@ -553,6 +553,61 @@ function fmtBig(n: number) {
   return n >= 1e6 ? n.toExponential(1).replace('e+', 'e') : String(n);
 }
 
+// ---------- cards ----------
+
+export type CardKind = 'monster' | 'mid' | 'boss' | 'goblin';
+
+/** One card per kind of monster, Ragnarok style: no bonus, just the collection. */
+export interface CardDef {
+  id: string;
+  name: string;
+  sprite: string;
+  tint?: number;
+  kind: CardKind;
+  /** Zone it's listed under (-1: the goblins). */
+  zone: number;
+  /** Where it turns up, one line per place. */
+  where: string[];
+  /** Champions of this kind can drop a gold copy (every card but the goblins'). */
+  gold: boolean;
+}
+
+const cardIds = new Map<string, string>();
+/** "Ogre Chieftain" → "ogre-chieftain". */
+export function cardId(name: string): string {
+  let id = cardIds.get(name);
+  if (!id) cardIds.set(name, (id = name.toLowerCase().replace(/[^a-z]+/g, '-')));
+  return id;
+}
+
+export const GOBLIN_CARD = 'treasure-goblin';
+export const RAINBOW_CARD = 'rainbow-goblin';
+
+function buildCards(): CardDef[] {
+  const out = new Map<string, CardDef>();
+  const add = (d: MonsterDef, kind: CardKind, zone: number, where: string) => {
+    const id = cardId(d.name);
+    const known = out.get(id);
+    if (known) known.where.push(where);
+    else out.set(id, { id, name: d.name, sprite: d.sprite, tint: d.tint, kind, zone, where: [where], gold: true });
+  };
+  ZONES.forEach((z, i) => {
+    const a = i * 10;
+    const name = z.name.replace(/^The /, '');
+    z.band.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 1}–${a + 9}`));
+    z.lap.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 81}–${a + 89}`));
+    add(z.mid, 'mid', i, `Floor ${a + 5} boss`);
+    add(z.boss, 'boss', i, `Floor ${a + 10} boss`);
+  });
+  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: ['Sometimes carried by a treasure goblin you catch'], gold: false });
+  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: ['Sometimes carried by a rainbow goblin you catch'], gold: false });
+  return [...out.values()];
+}
+
+export const CARDS = buildCards();
+export const CARD_BY_ID = new Map(CARDS.map((c) => [c.id, c]));
+export const GOLD_CARDS = CARDS.filter((c) => c.gold).length;
+
 // ---------- trophies ----------
 
 export type TrophyReq =
@@ -576,7 +631,9 @@ export type TrophyReq =
   | { t: 'vaults'; n: number }
   | { t: 'rainbows'; n: number }
   | { t: 'rampage'; n: number }
-  | { t: 'stars'; n: number };
+  | { t: 'stars'; n: number }
+  | { t: 'cards'; n: number }
+  | { t: 'goldCards'; n: number };
 
 export interface TrophyDef {
   id: string;
@@ -640,6 +697,8 @@ function buildTrophies(): TrophyDef[] {
   [1, 3, 10, 25].forEach((n, k) => out.push({ id: `awk${k}`, name: ['It Wakes', 'Heartbeat', 'Drumming Deep', 'The Heart Remembers'][k], desc: `Awaken the Heart ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'ui_heart_full', tier: k }, req: { t: 'awakens', n } }));
   const dpsNames = ['Scrapper', 'Fighter', 'Warrior', 'Warlord', 'Army', 'Legion', 'Cataclysm', 'Apocalypse', 'Extinction', 'World Breaker', 'Star Eater', 'Galaxy Killer', 'Heat Death', 'Big Bang', 'Googol'];
   [10, 1e3, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21, 1e24, 1e30, 1e36, 1e45, 1e60, 1e80, 1e100].forEach((n, k) => out.push({ id: `dps${k}`, name: dpsNames[k], desc: `Reach ${bigWords(n)} damage per second.`, icon: { sprite: 'weapon_waraxe', tier: Math.min(k, 10) }, req: { t: 'dps', n } }));
+  [1, 10, 25, 50, CARDS.length].forEach((n, k) => out.push({ id: `card${k}`, name: ['Card Carrier', 'Card Sharp', 'Monster Manual', 'Bestiary', 'Every Last Monster'][k], desc: n === 1 ? 'Find a monster card.' : n === CARDS.length ? 'Find every monster card.' : `Find ${n} different monster cards.`, icon: { sprite: 'imp', tier: k }, req: { t: 'cards', n } }));
+  [1, 5, 20].forEach((n, k) => out.push({ id: `gcard${k}`, name: ['Gilded', 'Golden Touch', 'Midas Deck'][k], desc: n === 1 ? 'Find a gold card (champions drop them).' : `Find ${n} different gold cards.`, icon: { sprite: 'big_demon', tier: k + 2 }, req: { t: 'goldCards', n } }));
   return out;
 }
 

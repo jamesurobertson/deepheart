@@ -819,3 +819,29 @@ body.compact .bd.wide td { padding-left: 6px; font-size: 15px; }
 /* Same height on every stats tab, so the tabs don't jump when you switch. */
 .modal.m-stats, .modal.m-party, .modal.m-records { height: min(700px, calc(100vh - 40px)); }
 body.compact .modal.m-stats, body.compact .modal.m-party, body.compact .modal.m-records { height: calc(100dvh - 16px - var(--safe-t) - var(--safe-b)); }
+
+/* ---------- monster cards ---------- */
+
+/* Ten across: no zone has more than ten cards, so each zone is one row on a wide screen. */
+.card-grid { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 10px 6px; }
+.mc-cell { display: block; }
+.mcard { position: relative; display: flex; flex-direction: column; width: 100%; height: 80px; padding: 3px; background: var(--fc); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px rgba(255, 255, 255, 0.3); }
+.mc-art { flex: 1; min-height: 0; display: grid; place-items: center; background: #241a2c; box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.45); overflow: hidden; }
+.mc-art .px { max-width: 100%; max-height: 100%; object-fit: contain; }
+.mc-art .rainbow { animation: rainbow 2s linear infinite; }
+.mc-name { height: 22px; flex: none; display: grid; place-items: center; margin-top: 3px; padding: 0 2px; background: #140e18; font: 500 10px/1 'Pixelify Sans'; color: #efe3cf; text-align: center; overflow: hidden; }
+.mc-n { position: absolute; right: -7px; top: -8px; padding: 1px 3px 0; background: #140e18; font: 400 17px/1 'Jersey 10'; color: #fff; box-shadow: 0 0 0 2px var(--ink); }
+.mc-q { font: 400 36px/1 'Jersey 10'; font-style: normal; color: rgba(255, 255, 255, 0.16); }
+.mcard.unknown { background: #3a2e3a; }
+.mcard.unknown .mc-name, .mcard.met .mc-name { color: var(--faint); }
+.mcard.met { background: color-mix(in srgb, var(--fc) 35%, #2a2028); }
+.mcard.met .mc-art .px { filter: brightness(0) opacity(0.55); }
+.mcard.gilded { animation: gilded 1.4s ease-in-out infinite alternate; }
+.mcard.gilded .mc-art { background: linear-gradient(160deg, #3a2a1c, #241a2c 60%); }
+@keyframes gilded { from { box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #fff6c8, 0 0 4px rgba(255, 208, 112, 0.4); } to { box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #fff6c8, 0 0 16px rgba(255, 208, 112, 0.95); } }
+.loot-ico .mcard { width: 52px; height: 66px; padding: 2px; }
+.mc-cell .mcard { max-width: 64px; margin: 0 auto; }
+.loot-ico .mc-name { display: none; }
+.tab-new { font: 400 16px/1 'Jersey 10'; font-style: normal; color: #7fd8ff; }
+body.compact .card-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 6px; }
+@media (prefers-reduced-motion: reduce) { .mcard.gilded, .mc-art .rainbow { animation: none; } }

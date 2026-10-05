@@ -92,6 +92,8 @@ async function boot() {
   if (import.meta.env.DEV) {
     // ?relics=always makes every boss drop a relic.
     if (params.get('relics') === 'always') game.debugRelics = true;
+    // ?cards=often makes cards drop hundreds of times as often, and champion bosses common.
+    if (params.get('cards') === 'often') game.debugCards = true;
     // step(n, click) advances n frames by hand: handy when the tab is in the background.
     const step = (n: number, click = false) => {
       for (let i = 0; i < n; i++) {
