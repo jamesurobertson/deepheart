@@ -731,10 +731,14 @@ export class Ui {
       case 'reveal': this.toast(`New companion for hire: <b>${COMPS[ev.comp].name}</b>`, COMPS[ev.comp].sprite); break;
       case 'buyUpg': this.upgKey = ''; break;
       case 'trophy': {
-        const t = TROPHIES.find((x) => x.id === ev.id)!;
-        this.toast(`Trophy: <b>${esc(t.name)}</b><small>${esc(t.desc)} +1% damage</small>`, t.icon.sprite, 'trophy');
-        const cur = CURSORS.find((c) => c.trophy === ev.id);
-        if (cur) this.toast(`New cursor: <b>${esc(cur.name)}</b><small>Pick it in Options</small>`, cur.sprite, 'trophy');
+        // A card trophy waits for its card: the card is collected when you've seen it, not when it drops.
+        const req = TROPHIES.find((x) => x.id === ev.id)!.req.t;
+        if ((req === 'cards' || req === 'goldCards') && (this.cardsComing > 0 || this.cardQueue.length)) {
+          this.heldTrophies.push(ev.id);
+          clearTimeout(this.heldTimer);
+          // (In case a card never gets picked up and shown.)
+          this.heldTimer = window.setTimeout(() => this.releaseTrophies(), 20000);
+        } else this.trophyToast(ev.id);
         break;
       }
       case 'raidCatch': {
@@ -753,7 +757,10 @@ export class Ui {
         break;
       }
       // The tink: something rare just dropped.
-      case 'card': this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 }); break;
+      case 'card':
+        this.cardsComing++;
+        this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 });
+        break;
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
       case 'fever': if (ev.on) this.banner('RAMPAGE!', `Clicks ×${fmt(g.feverMult())} · party damage ×${fmt(2 * g.rampageParty())} · ${g.rampageNext()?.left ?? 0} attacks to ×${fmt(g.rampageNext()?.mult ?? 0)}`, 'rampage'); break;
       case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, `Unstoppable · party damage ×${fmt(3 * g.rampageParty())}`, `rampage tier${ev.tier}`); break;
@@ -1705,6 +1712,24 @@ export class Ui {
   /** A card picked up: it slides up like a relic, and a gold one gets a banner. */
   /** Cards picked up and waiting their turn to be shown (they're shown one at a time). */
   private cardQueue: Extract<Drop, { t: 'card' }>[] = [];
+  /** Cards dropped in play and not yet shown, and the card trophies waiting on them. */
+  private cardsComing = 0;
+  private heldTrophies: string[] = [];
+  private heldTimer = 0;
+
+  private trophyToast(id: string) {
+    const t = TROPHIES.find((x) => x.id === id)!;
+    this.hooks.sound('drop2', { vol: 0.55 });
+    this.toast(`Trophy: <b>${esc(t.name)}</b><small>${esc(t.desc)} +1% damage</small>`, t.icon.sprite, 'trophy');
+    const cur = CURSORS.find((c) => c.trophy === id);
+    if (cur) this.toast(`New cursor: <b>${esc(cur.name)}</b><small>Pick it in Options</small>`, cur.sprite, 'trophy');
+  }
+
+  private releaseTrophies() {
+    clearTimeout(this.heldTimer);
+    this.cardsComing = 0;
+    for (const id of this.heldTrophies.splice(0)) this.trophyToast(id);
+  }
 
   private showCard(ev: Extract<Drop, { t: 'card' }>) {
     if (this.modal !== 'cards' && ev.first) this.newCards++;
@@ -1742,6 +1767,8 @@ export class Ui {
       el.remove();
       this.bump(dock);
       this.cardQueue.shift();
+      this.cardsComing = Math.max(0, this.cardsComing - 1);
+      if (!this.cardQueue.length && !this.cardsComing) this.releaseTrophies();
       this.revealCard();
     };
     el.querySelector('.cr-card')!.addEventListener('animationend', (e) => {

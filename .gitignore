@@ -4,3 +4,5 @@ dist
 assets-src/*.zip
 desktop/node_modules
 desktop/release
+# Bought (CC0, but kept private anyway): it ships packed into the atlas, the source files stay out of the repo.
+assets-src/0x72_DungeonTilesetII_sewers_v0.3

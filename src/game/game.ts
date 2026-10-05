@@ -54,8 +54,9 @@ const CHAMP_GOLD = 10;
 const CHAMP_BOSS_CHANCE = 1 / 150;
 const CHAMP_BOSS_HP = 3;
 const CHAMP_BOSS_GOLD = 10;
-/** Card drops: 1 in this many kills (Ragnarok's 0.01% for ordinary monsters), and so on. 1% is the best odds anything gets. */
-const CARD_ODDS = { monster: 10_000, boss: 2_500, champ: 100, champBoss: 100, goblin: 100, rainbow: 100 };
+/** Card drops: 1 in this many kills (or catches). A 12-hour absence is ~170k kills, so ordinary cards sit at 0.001%;
+ *  rainbow goblins are rare enough on their own to keep 1%, the best odds anything gets. */
+const CARD_ODDS = { monster: 100_000, boss: 25_000, champ: 10_000, champBoss: 1_000, goblin: 1_000, rainbow: 100 };
 /** Party damage is shown as numbers in batches this many seconds apart. */
 const DPS_SHOWN_EVERY = 0.35;
 /** Seconds before the boss of a floor you're farming climbs back up. */
@@ -403,6 +404,20 @@ export class Game {
     // Before Rainbow Hauls, every rainbow goblin caught opened the vault.
     if (s.rainbows === undefined) s.rainbows = s.vaults ?? 0;
     if (s.rainbowSeen === undefined) s.rainbowSeen = (s.rainbows ?? 0) > 0;
+    // The Rotting Deep's floor-45 boss used to be the Bloated Ogre: its cards and kills pass to the Sludge Walker.
+    const ogre = s.cards?.['bloated-ogre'];
+    if (ogre) {
+      const walker = (s.cards['sludge-walker'] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
+      walker.n = walker.n.map((n, i) => n + (ogre.n[i] ?? 0));
+      walker.gold = walker.gold.map((n, i) => n + (ogre.gold[i] ?? 0));
+      walker.at ??= ogre.at;
+      walker.goldAt ??= ogre.goldAt;
+      delete s.cards['bloated-ogre'];
+    }
+    if (s.slain?.['bloated-ogre']) {
+      s.slain['sludge-walker'] = (s.slain['sludge-walker'] ?? 0) + s.slain['bloated-ogre'];
+      delete s.slain['bloated-ogre'];
+    }
     // Trophies that no longer exist (retired ones) shouldn't keep counting toward the trophy bonus.
     if (s.trophies) s.trophies = s.trophies.filter((id) => TROPHIES.some((t) => t.id === id));
     const fresh = newSave();

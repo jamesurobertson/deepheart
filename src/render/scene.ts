@@ -19,13 +19,13 @@ const STAIRS = new THREE.Vector3(7.5, 0, -4);
 const LOOK = new THREE.Vector3(0, 1.1, 0.5);
 
 interface Palette { torch: number; fog: number; hemi: number; wall: [number, number, number]; floor: [number, number, number]; banner: string; goo: number }
-/** Lighting per zone, in the same order as ZONES. Tiles with their own colour (jungle, tomb) get a lighter wash. */
+/** Lighting per zone, in the same order as ZONES. Tiles with their own colour (jungle, tomb, sewer) get a lighter wash. */
 const PALETTES: Palette[] = [
   { torch: 0xff9a4a, fog: 0x0a0708, hemi: 0x6a5a78, wall: [0.66, 0.58, 0.6], floor: [1.1, 1.05, 1.02], banner: 'red', goo: 0 }, // Upper Halls
   { torch: 0x5ad6c8, fog: 0x04090b, hemi: 0x4a6a78, wall: [0.46, 0.62, 0.68], floor: [0.92, 1.08, 1.18], banner: 'blue', goo: 0 }, // Bone Crypts
   { torch: 0xa6e06a, fog: 0x050904, hemi: 0x55704a, wall: [1.6, 1.8, 1.5], floor: [1.6, 1.7, 1.5], banner: 'green', goo: 0 }, // Overgrown Warrens
   { torch: 0xffb35a, fog: 0x0c0806, hemi: 0x7a6450, wall: [0.74, 0.66, 0.58], floor: [0.95, 0.9, 0.84], banner: 'yellow', goo: 0 }, // Sunken Tomb
-  { torch: 0xb485ff, fog: 0x08060d, hemi: 0x5a4a82, wall: [0.56, 0.5, 0.66], floor: [1, 0.94, 1.1], banner: 'green', goo: 0.025 }, // Rotting Deep
+  { torch: 0x8aff4a, fog: 0x040905, hemi: 0x4a7050, wall: [0.8, 0.9, 0.76], floor: [0.78, 0.88, 0.74], banner: 'green', goo: 0.025 }, // Rotting Deep
   { torch: 0x8af0d8, fog: 0x04070b, hemi: 0x5a70a0, wall: [1.3, 1.55, 1.9], floor: [1.4, 1.55, 1.8], banner: 'blue', goo: 0 }, // Enchanted Grove
   { torch: 0xff5a3a, fog: 0x0b0505, hemi: 0x6a4a52, wall: [0.7, 0.44, 0.44], floor: [1.15, 0.95, 0.9], banner: 'red', goo: 0 }, // Demon Gate
   { torch: 0x9cc0ff, fog: 0x05070c, hemi: 0x5a6a8a, wall: [0.56, 0.72, 1], floor: [0.9, 1.1, 1.45], banner: 'blue', goo: 0 }, // Frozen Vault
@@ -124,6 +124,11 @@ interface MonView {
   /** Dying: seconds since death (-1 while alive). */
   dead: number;
   born: number;
+  /** Still climbing up through a grate (1 → 0), for monsters that emerge rather than take the stairs. */
+  rise: number;
+  fly: boolean;
+  /** More of the same creature rising around it (The Thing Below's other tentacles): all one monster. */
+  extras: PixelSprite[];
   /** Champions pulse gold and shed sparks; Goblin Vault hoarders glow softly. */
   glow: 'champ' | 'hoard' | null;
   /** A champion's gold ring at its feet. */
@@ -211,8 +216,8 @@ class Quads {
     this.quad([[x, y, z], [x + w, y, z], [x + w, y + h, z], [x, y + h, z]], r, [0, 0, 1]);
   }
 
-  top(x: number, y: number, z: number, r: Rect) {
-    this.quad([[x, y, z + 1], [x + 1, y, z + 1], [x + 1, y, z], [x, y, z]], r, [0, 1, 0]);
+  top(x: number, y: number, z: number, r: Rect, size = 1) {
+    this.quad([[x, y, z + size], [x + size, y, z + size], [x + size, y, z], [x, y, z]], r, [0, 1, 0]);
   }
 
   build() {
@@ -294,6 +299,7 @@ export class Scene {
   private band = -1;
   /** Animated scenery (fountains, eyes in the wall), rebuilt with the room. */
   private props: PixelSprite[] = [];
+  private hatch: THREE.Mesh | null = null;
 
   private mons = new Map<number, MonView>();
   private party: CompView[] = [];
@@ -510,9 +516,11 @@ export class Scene {
     const theme: Tiles = tilesFor(seed);
     const wall = new Quads(a);
     const floor = new Quads(a);
-    // Tile names for each theme. The jungle and tomb sets come from Omniboy's packs.
+    // Tile names for each theme. The jungle and tomb sets come from Omniboy's packs, the sewers from 0x72's.
+    const sewer = theme === 'sewer';
     const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : '';
-    const floors = [1, 2, 3, 4, 5, 6, 7, 8].map((i) => a.rect(`${pre}floor_${i}`));
+    const floors = sewer ? [] : [1, 2, 3, 4, 5, 6, 7, 8].map((i) => a.rect(`${pre}floor_${i}`));
+    const sewerFloor = sewer ? { plain: a.rect('sewer_floor_1'), worn: [a.rect('sewer_floor_2'), a.rect('sewer_floor_3')], odd: [a.rect('sewer_floor_drain'), a.rect('sewer_floor_drain'), a.rect('sewer_floor_grate')] } : null;
     // Crypts: ordinary flagstones with the Dark Dungeon's cracked, older tiles worked in.
     const cracked = Array.from({ length: 20 }, (_, i) => a.rect(`crypt_floor_${i + 1}`));
     // Omniboy's floor_1 carries a leaf / sand tuft and 7-8 are open pits, so their rooms lay the
@@ -520,23 +528,24 @@ export class Scene {
     const plain = pre ? floors[1] : floors[0];
     const worn = pre ? [floors[2], floors[3], floors[4], floors[5]] : floors.slice(1);
     const tile = () => {
+      if (sewerFloor) return r() < 0.012 ? sewerFloor.odd[Math.floor(r() * 3)] : r() < 0.85 ? sewerFloor.plain : sewerFloor.worn[Math.floor(r() * 2)];
       if (theme === 'crypt' && r() < 0.3) return cracked[Math.floor(r() * cracked.length)];
       if (pre && r() < 0.03) return floors[0];
       return r() < 0.72 ? plain : worn[Math.floor(r() * worn.length)];
     };
-    const mids = pre ? [a.rect(`${pre}wall_mid`), a.rect(`${pre}wall_mid_2`), a.rect(`${pre}wall_mid_3`)] : [a.rect('wall_mid')];
+    const mids = sewer ? [a.rect('sewer_wall_mid'), a.rect('sewer_wall_mid_2')] : pre ? [a.rect(`${pre}wall_mid`), a.rect(`${pre}wall_mid_2`), a.rect(`${pre}wall_mid_3`)] : [a.rect('wall_mid')];
     const mid = () => mids[r() < 0.8 ? 0 : Math.floor(r() * mids.length)];
-    const top = a.rect(pre ? `${pre}wall_top` : 'wall_top_mid');
+    const top = a.rect(sewer ? 'sewer_wall_top' : pre ? `${pre}wall_top` : 'wall_top_mid');
     const banner = a.rect(`${pre}wall_banner_${p.banner}`);
     // Whole-tile variations: worn bricks in the halls, leafy / carved bricks in the jungle and tomb.
     // (The jungle/tomb "hole" tiles read as missing tiles, so they're not used.)
     // (tomb_wall_deco_3 is blank in the source sheet.)
     const variants = pre ? [1, 2, 4, 5].map((i) => a.rect(`${pre}wall_deco_${i}`)) : [a.rect('wall_hole_1'), a.rect('wall_hole_2')];
-    const variantChance = pre ? 0.06 : 0.03;
+    const variantChance = sewer ? 0 : pre ? 0.06 : 0.03;
     // Goo is an overlay (it has see-through parts), so it goes on top of a normal brick.
     const goo = a.rect('wall_goo');
     const fountainX = -2;
-    const bannerAt = (x: number, y: number) => y === 5 && (x === -9 || x === 5 || x === 12);
+    const bannerAt = (x: number, y: number) => !sewer && y === 5 && (x === -9 || x === 5 || x === 12);
 
     for (let x = -24; x < 24; x++) {
       for (let y = 0; y < 13; y++) {
@@ -546,7 +555,7 @@ export class Scene {
       }
       for (let z = WALL_Z; z < 16; z++) floor.top(x, 0, z, tile());
     }
-    floor.top(Math.floor(STAIRS.x), 0.005, Math.floor(STAIRS.z), a.rect('floor_stairs'));
+    floor.top(Math.floor(STAIRS.x), 0.005, Math.floor(STAIRS.z), a.rect(sewer ? 'sewer_floor_stairs' : 'floor_stairs'));
 
     // Animated scenery: one wall fountain per room, drawn over the brick.
     const prop = (frames: Rect[], x: number, y: number, fps = 6) => {
@@ -557,7 +566,11 @@ export class Scene {
       return sp.mesh;
     };
     const fountain: THREE.Object3D[] = [];
-    if (pre) {
+    if (sewer) {
+      fountain.push(prop(a.anim('sewer_sludgefall'), fountainX, 0));
+      // Bats asleep on the wall, out of reach of the fighting.
+      [-16, -8.5, 4.5, 11].forEach((x, i) => fountain.push(prop([a.rect(`sewer_bat_hanging_${1 + (i % 2)}`)], x, 2.6 + r() * 0.8, 1)));
+    } else if (pre) {
       const kind = theme === 'tomb' ? 'lava' : 'water';
       fountain.push(prop([a.rect(`${pre}fountain_top`)], fountainX, 2), prop(a.anim(`${pre}fountain_${kind}`), fountainX, 1), prop(a.anim(`${pre}fountain_${kind}_basin`), fountainX, 0));
     } else {
@@ -566,17 +579,19 @@ export class Scene {
     }
 
     // Columns (or statues) along the back wall, in front of the brick.
-    const pillars = pre ? [a.rect(`${pre}statue_1`), a.rect(`${pre}statue_2`)] : [a.rect('column')];
+    const pillars = sewer ? [a.rect('sewer_pillar_1'), a.rect('sewer_pillar_2')] : pre ? [a.rect(`${pre}statue_1`), a.rect(`${pre}statue_2`)] : [a.rect('column')];
     [-13, -5.5, 2, 9.5].forEach((x, i) => {
       const pr = pillars[i % pillars.length];
-      floor.face(x - 0.5, 0, WALL_Z + 0.35, pr, pr.w / 16, pre ? pr.h / 16 : 3);
+      floor.face(x - 0.5, 0, WALL_Z + 0.35, pr, pr.w / 16, pre || sewer ? pr.h / 16 : 3);
     });
-    // A few bones along the foot of the wall, kept clear of the columns and fountain.
-    const skull = a.rect('skull');
-    for (let i = 0; i < 6; i++) {
+    // A few bones along the foot of the wall (in the sewers, pots, crates and rubble), clear of the columns and fountain.
+    const junk = sewer ? ['sewer_pot_1', 'sewer_pot_2', 'sewer_pot_3', 'sewer_crate', 'sewer_crate_small', 'sewer_rock_1', 'sewer_rock_2', 'skull'].map((n) => a.rect(n)) : [a.rect('skull')];
+    for (let i = 0; i < (sewer ? 9 : 6); i++) {
       const x = -14 + r() * 28;
       if ([-13, -5.5, 2, 9.5, fountainX + 0.5].some((c) => Math.abs(c - x) < 1)) continue;
-      floor.face(x, 0, WALL_Z + 0.5 + r() * 0.6, skull, 0.7, 0.7);
+      const j = junk[Math.floor(r() * junk.length)];
+      const size = (sewer ? 0.6 : 0.7) / 16;
+      floor.face(x, 0, WALL_Z + 0.5 + r() * 0.6, j, j.w * size, j.h * size);
     }
     // The vault is heaped with treasure: open chests along the wall, coins everywhere the fight isn't.
     if (loot) {
@@ -612,7 +627,20 @@ export class Scene {
       group.add(f);
       this.flames.push(f);
       this.torchLights[i].position.set(x - 0.5, 4.3, WALL_Z + 1.2);
+      // The sewers burn their own green braziers; the plain flame stays (unseen) to drive the flicker.
+      if (sewer) {
+        f.visible = false;
+        group.add(prop(a.anim('sewer_flame'), x - 1, 3.6, 8));
+      }
     });
+    // The last floor before the sewers: the way down is a manhole (shown on that floor only, see update).
+    this.hatch = null;
+    if (!loot && !sewer && tilesFor(seed + 1) === 'sewer') {
+      const q = new Quads(a);
+      q.top(Math.floor(STAIRS.x), 0.01, Math.floor(STAIRS.z), a.rect('sewer_floor_hatch'));
+      this.hatch = new THREE.Mesh(q.build(), this.floorMat);
+      group.add(this.hatch);
+    }
     return group;
   }
 
@@ -1140,14 +1168,17 @@ export class Scene {
     const inner = new THREE.Group();
     inner.add(sprite.mesh);
     body.add(inner, blobShadow(m.boss ? 2.2 : 0.9));
-    // Halves of a split boss climb out where it fell; everything else comes up the stairs.
-    if (m.half) body.position.set(m.x * this.squeeze, 0, m.z * this.deep);
+    // Halves of a split boss climb out where it fell, and some things burst up through the floor where they'll
+    // fight; everything else comes up the stairs.
+    const emerge = m.def.move === 'emerge';
+    if (m.half || emerge) body.position.set(m.x * this.squeeze, 0, m.z * this.deep);
     else body.position.copy(STAIRS).add(new THREE.Vector3(Math.random() * 0.6, 0, Math.random() * 0.6));
     body.scale.setScalar(0.01);
     this.scene.add(body);
     // Ordinary monsters ~1.2× (tall ones capped at ~2 units); bosses ~3.4 units tall whatever their art.
     const h = run[0].h / 16;
     let scale = m.boss ? Math.max(1.5, Math.min(2.6, 3.4 / h)) : Math.min(1.2, 2.1 / h);
+    if (emerge && m.boss && !m.half) scale *= 1.5;
     if (m.mods.includes('giant')) scale *= 1.3;
     if (m.half) scale *= 0.7;
     if (m.champ) scale *= m.boss ? 1.12 : 1.35;
@@ -1170,17 +1201,49 @@ export class Scene {
       ring.position.y = 0.03;
       body.add(ring);
     }
-    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: 0, glow: m.champ ? 'champ' : m.vault ? 'hoard' : null, ring });
-    if (this.settings.particles) this.fx.burst(STAIRS.clone().setY(0.4), '#6a5a78', 6, 2, 0.08, 6);
+    // It comes up through the floor, which stays broken open under it. A boss brings more of itself: smaller
+    // tentacles out of grates around the great one.
+    const extras: PixelSprite[] = [];
+    if (emerge) {
+      const q = new Quads(this.atlas);
+      const hole = (x: number, z: number, size: number, tile: string) => q.top(x - size / 2, 0.012, z - size / 2, this.atlas.rect(tile), size);
+      if (m.boss && !m.half) {
+        hole(0, 0, 3.2, 'sewer_floor_hole');
+        for (const [x, z, size, fps] of [[-1.9, -1.4, 0.5, 7], [2.6, -0.2, 0.6, 10], [1.5, 1.5, 0.45, 12]]) {
+          const extra = new PixelSprite(this.atlas.texture, this.atlas.size, run, { fps, flip: x > 0 });
+          extra.update(Math.random());
+          extra.mesh.material.color.copy(tint);
+          const holder = new THREE.Group();
+          holder.position.set(x / scale, 0, z / scale);
+          holder.scale.setScalar(size);
+          holder.add(extra.mesh);
+          inner.add(holder);
+          extras.push(extra);
+          hole(x, z, 1.6 * size * 2, 'sewer_floor_grate');
+        }
+      } else hole(0, 0, m.boss ? 2 : 1, 'sewer_floor_grate');
+      const mesh = new THREE.Mesh(q.build(), this.floorMat);
+      mesh.userData.ownGeometry = true;
+      body.add(mesh);
+      body.scale.setScalar(1);
+    }
+    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: emerge ? 1 : 0, rise: emerge ? 1 : 0, fly: m.def.move === 'fly', extras, glow: m.champ ? 'champ' : m.vault ? 'hoard' : null, ring });
+    const from = emerge ? body.position : STAIRS;
+    if (this.settings.particles) {
+      if (emerge) this.fx.burst(from.clone().setY(0.3), '#7ad04a', m.boss ? 40 : 14, m.boss ? 5 : 3, 0.1, 10);
+      else this.fx.burst(from.clone().setY(0.4), '#6a5a78', 6, 2, 0.08, 6);
+    }
     if (m.boss && !m.half) {
-      this.fx.light(STAIRS.clone().setY(2), 0xff4040, 30, 1, 12);
-      this.addShake(0.3);
+      this.fx.light(from.clone().setY(2), emerge ? 0x8aff5a : 0xff4040, 30, 1, 12);
+      this.addShake(emerge ? 0.6 : 0.3);
     }
   }
 
   private removeView(v: MonView) {
     this.scene.remove(v.body);
+    for (const o of v.body.children) if (o instanceof THREE.Mesh && o.userData.ownGeometry) o.geometry.dispose();
     v.sprite.dispose();
+    for (const extra of v.extras) extra.dispose();
     v.ring?.geometry.dispose();
     v.ring?.material.dispose();
     this.mons.delete(v.id);
@@ -1203,6 +1266,8 @@ export class Scene {
         this.removeView(v);
         continue;
       }
+      // (Whatever is already waiting on the next floor stays out of the stairway.)
+      v.body.visible = this.cine?.phase !== 'stairs';
       v.target.x = v.spotX * this.squeeze;
       v.target.z = v.spotZ * this.deep;
       v.born = Math.min(1, v.born + dt * 3);
@@ -1221,6 +1286,7 @@ export class Scene {
       v.hopY = Math.max(0, v.hopY + v.hopV * dt);
       if (v.hopY === 0) v.hopV = 0;
       v.sprite.flash = v.flash;
+      for (const extra of v.extras) extra.flash = v.flash;
       if (v.glow) {
         const g = v.glow === 'champ' ? 0.22 + Math.sin(this.time * 7 + v.id) * 0.12 : 0.08;
         if (v.ring) {
@@ -1236,7 +1302,17 @@ export class Scene {
       v.inner.scale.set(base * (1 + v.squash * 0.25), base * (1 - v.squash * 0.3), base);
       v.inner.position.x = v.knock;
       v.inner.position.y = v.hopY;
+      // Rising out of the floor (the floor hides what's still below it), or flying a little above it.
+      if (v.rise > 0) {
+        v.rise = Math.max(0, v.rise - dt * (v.boss ? 0.8 : 1.6));
+        v.inner.position.y -= v.height * v.rise * v.rise;
+      }
+      if (v.fly) v.inner.position.y += 0.7 + Math.sin(this.time * 5 + v.id) * 0.15;
       v.sprite.update(dt);
+      for (const extra of v.extras) {
+        extra.mesh.material.emissive.copy(v.sprite.mesh.material.emissive);
+        extra.update(dt);
+      }
     }
   }
 
@@ -1265,6 +1341,7 @@ export class Scene {
 
   private updateRaiders(dt: number, game: Game) {
     const r = this.raider;
+    if (r) r.group.visible = this.cine?.phase !== 'stairs';
     if (r && game.raid && game.raid.id === r.id) {
       const t = game.raid.t;
       // Zig-zags across the front of the chamber, taunting you.
@@ -1665,12 +1742,12 @@ export class Scene {
     // Dress the stairwell in the new zone's tiles and light.
     const pal = corrupt(PALETTES[c.zone % PALETTES.length], Math.floor(c.zone / ZONES.length));
     const theme = tilesFor(c.zone);
-    const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : '';
+    const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : theme === 'sewer' ? 'sewer_' : '';
     const a = this.atlas;
-    const floors = theme === 'crypt' ? [a.rect('crypt_floor_1'), a.rect('crypt_floor_5')] : [a.rect(`${pre}floor_${pre ? 2 : 1}`), a.rect(`${pre}floor_3`)];
+    const floors = theme === 'crypt' ? [a.rect('crypt_floor_1'), a.rect('crypt_floor_5')] : theme === 'sewer' ? [a.rect('sewer_floor_1'), a.rect('sewer_floor_2')] : [a.rect(`${pre}floor_${pre ? 2 : 1}`), a.rect(`${pre}floor_3`)];
     // Back wall dim, stairs bright: the flights have to stand out from the tower wall.
-    this.wallMat.color.setRGB(...pal.wall).multiplyScalar(0.7);
-    this.floorMat.color.setRGB(...pal.floor).multiplyScalar(1.15);
+    this.wallMat.color.setRGB(...pal.wall).multiplyScalar(0.45);
+    this.floorMat.color.setRGB(...pal.floor).multiplyScalar(1.45);
     this.flameMat.color.setHex(pal.torch).lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(1.4);
     for (const l of this.torchLights) l.color.setHex(pal.torch);
     (this.scene.background as THREE.Color).setHex(pal.fog);
@@ -1678,7 +1755,7 @@ export class Scene {
     fog.color.setHex(pal.fog);
     fog.near = 20;
     fog.far = 50;
-    const well = buildStairwell(a, { wall: a.rect(`${pre}wall_mid`), top: a.rect(pre ? `${pre}wall_top` : 'wall_top_mid'), floor: floors }, { wall: this.wallMat, floor: this.floorMat, flame: this.flameMat });
+    const well = buildStairwell(a, { wall: a.rect(`${pre}wall_mid`), floor: floors }, { wall: this.wallMat, floor: this.floorMat, flame: this.flameMat });
     c.well = well.group;
     c.flames = well.flames;
     this.scene.add(well.group);
@@ -1687,16 +1764,20 @@ export class Scene {
     // The walkers: the whole party, two abreast (or a lone squire), your hero leading the way.
     const leads = (p: CompView) => (p.comp === this.heroComp ? 0 : 1);
     const who = this.party.length ? [...this.party].sort((x, y) => leads(x) - leads(y) || x.comp - y.comp).map((p) => COMPS[p.comp]) : [COMPS[0]];
-    for (const def of who) {
+    who.forEach((def, i) => {
       const { run } = a.creature(def.sprite);
       const w = new PixelSprite(a.texture, a.size, run, { fps: 10 });
       w.mesh.scale.multiplyScalar(this.compScale(def) * 0.96);
+      // Each switchback runs under the flight just walked down, which would hide them; draw them over the steps
+      // instead, the near one of each pair last.
+      w.mesh.material.depthTest = false;
+      w.mesh.renderOrder = i % 2 ? 10 : 11;
       this.scene.add(w.mesh);
       c.walkers.push(w);
       const sh = blobShadow(0.9);
       this.scene.add(sh);
       c.shadows.push(sh);
-    }
+    });
   }
 
   private arrive() {
@@ -1749,7 +1830,7 @@ export class Scene {
       fade = Math.max(0, (c.t - 0.6) / 0.4);
       if (c.t >= 1) this.descend();
     } else if (c.phase === 'stairs') {
-      // Pairs file down the tower; the camera pans slower than they walk, so the whole column passes through view.
+      // Pairs file down the stairs; the camera pans slower than they walk, so the whole column passes through view.
       const pairs = Math.ceil(c.walkers.length / 2);
       const gap = 1.05;
       const walk = 5.4;
@@ -1763,16 +1844,15 @@ export class Scene {
         const p = stairPoint(at);
         w.mesh.position.set(p.x, p.y + Math.abs(Math.sin((c.t + i) * 11)) * 0.05, p.z + 0.15 - side * 0.45);
         w.mesh.rotation.set(0, 0, 0);
-        w.flip = stairPoint(at + 0.3).x < p.x;
         c.shadows[i].position.set(p.x, p.y + 0.02, p.z + 0.15 - side * 0.45);
         w.update(dt);
       });
-      // Straight-on cutaway of the tower, panning down with the column.
+      // Side-on view of the stairway, following the column down.
       const head = stairPoint(Math.min(lead - 2, 1 + c.t * pan + Math.min(tail, 4)));
       const dist = this.camBase.z - this.look.z;
       const y = head.y + 1.2;
-      this.camera.position.set(0, y + dist * 0.2, dist);
-      this.camera.lookAt(0, y, 0);
+      this.camera.position.set(head.x, y + dist * 0.2, dist);
+      this.camera.lookAt(head.x, y, 0);
       c.flames.forEach((f, i) => f.scale.set(1, 0.85 + Math.sin(this.time * 13 + i) * 0.12, 1));
       this.torchLights[0].position.set(head.x, head.y + 2, 2);
       this.torchLights[1].position.copy(stairPoint(lead + 8)).add(new THREE.Vector3(0, 2, 1));
@@ -1782,8 +1862,8 @@ export class Scene {
       this.hemi.intensity = 1.7;
       this.key.intensity = 1.4;
       const fog = this.scene.fog as THREE.Fog;
-      fog.near = dist + 6;
-      fog.far = dist + 30;
+      fog.near = dist + 1.5;
+      fog.far = dist + 7;
       fade = Math.max(0, 1 - c.t / 0.35, (c.t - (dur - 0.35)) / 0.35);
       if (c.t >= dur) this.arrive();
     } else {
@@ -2050,6 +2130,8 @@ export class Scene {
     });
 
     for (const pr of this.props) pr.update(dt);
+    // (Still there while the party heads out to it: the game has moved on to the next floor by then.)
+    if (this.hatch) this.hatch.visible = this.lastFloor % 10 === 0 || !!this.hold || this.cine?.phase === 'exit';
     // (The staircase waits for any relic on the floor to be picked up.)
     if (this.hold && !this.clutch && !this.loot.length && (this.hold.t -= dt) <= 0) {
       this.startCinematic(this.hold.zone);

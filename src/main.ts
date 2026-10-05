@@ -111,13 +111,24 @@ async function boot() {
     if (params.get('relics') === 'always') game.debugRelics = true;
     // ?cards=often makes cards drop hundreds of times as often, and champion bosses common.
     if (params.get('cards') === 'often') game.debugCards = true;
+    // ?deepest=40 stands you on floor 40 as the deepest of this descent, with a party that can beat its boss, so the
+    // way down into the next zone plays. Use it with ?slot= to leave your own run alone.
+    const deepest = Number(params.get('deepest'));
+    if (deepest > 1) {
+      const s = game.s;
+      Object.assign(s, { maxFloor: deepest, bestFloor: Math.max(s.bestFloor, deepest), bestCleared: Math.max(s.bestCleared, deepest - 1), auto: true });
+      s.owned = s.owned.map((n) => Math.max(n, 40 + deepest * 4));
+      game.invalidate();
+      game.goFloor(deepest);
+      scene.rebuild(game);
+    }
     // step(n, click) advances n frames by hand: handy when the tab is in the background.
     const step = (n: number, click = false) => {
       for (let i = 0; i < n; i++) {
         const f = game.focus();
         const at = f && scene.screenOf(f.id);
         if (click && i % 6 === 0 && f && at) game.click(f.id, at.x, at.y + at.h * 0.4);
-        game.update(1 / 60);
+        if (!scene.busy) game.update(1 / 60);
         for (const ev of game.events.splice(0)) {
           scene.handle(ev, game);
           ui.handle(ev);
@@ -268,7 +279,6 @@ function playSound(sfx: Sfx, ev: GameEvent) {
     case 'buyComp': sfx.play('coins', { vol: 0.5, jitter: 0.08 }); break;
     case 'reveal': sfx.play('levelup', { vol: 0.5 }); break;
     case 'buyUpg': sfx.play('equip', { vol: 0.55, jitter: 0.05 }); break;
-    case 'trophy': sfx.play('drop2', { vol: 0.55 }); break;
     // A rainbow goblin sounds like any other: it's a surprise.
     case 'raidSpawn': sfx.play('drop1', { vol: 0.7, rate: 1.2 }); break;
     case 'raidCatch':

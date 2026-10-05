@@ -81,12 +81,14 @@ export interface MonsterDef {
   big?: boolean;
   /** Colour wash for variants (frost trolls and the like), as 0xRRGGBB. */
   tint?: number;
+  /** Arrives differently: bursts up through a floor grate, or flies in above the floor. */
+  move?: 'emerge' | 'fly';
 }
 
-const m = (sprite: string, name: string, hp = 1, tint?: number): MonsterDef => ({ sprite, name, hp, tint });
+const m = (sprite: string, name: string, hp = 1, tint?: number, move?: MonsterDef['move']): MonsterDef => ({ sprite, name, hp, tint, move });
 
 /** Tile theme a zone is built from (see the renderer). */
-export type Tiles = 'halls' | 'crypt' | 'jungle' | 'tomb';
+export type Tiles = 'halls' | 'crypt' | 'jungle' | 'tomb' | 'sewer';
 
 export interface ZoneDef {
   name: string;
@@ -131,10 +133,10 @@ export const ZONES: ZoneDef[] = [
     lap: [m('cr_pirate', 'Drowned Pirate'), m('cr_pirate_captain', 'Drowned Captain', 1.2), m('cr_skeleton_pirate', 'Bone Corsair')],
   },
   {
-    name: 'The Rotting Deep', tiles: 'crypt',
-    band: [m('zombie', 'Zombie', 1.1), m('slug', 'Great Slug', 1.3), m('swampy', 'Bog Lurker', 1.2), m('muddy', 'Mudling', 1.1)],
-    mid: m('ogre', 'Bloated Ogre', 1, 0xa0c070), boss: m('big_zombie', 'The Rotten King'),
-    lap: [m('cr_slime', 'Rot Slime', 1, 0xc0a0ff), m('cr_plague_crow', 'Carrion Crow', 1, 0xc8a070), m('cr_gourd', 'Rotten Gourd', 1.1, 0xa8b870)],
+    name: 'The Rotting Deep', tiles: 'sewer',
+    band: [m('zombie', 'Zombie', 1.1), m('slug', 'Great Slug', 1.3), m('swampy', 'Bog Lurker', 1.2), m('muddy', 'Mudling', 1.1), m('sw_bat', 'Sewer Bat', 0.8, undefined, 'fly')],
+    mid: m('sw_slugbot', 'Sludge Walker'), boss: m('sw_tentacle', 'The Thing Below', 1, undefined, 'emerge'),
+    lap: [m('cr_slime', 'Rot Slime', 1, 0xc0a0ff), m('cr_plague_crow', 'Carrion Crow', 1, 0xc8a070), m('cr_gourd', 'Rotten Gourd', 1.1, 0xa8b870), m('big_zombie', 'The Rotten King', 1.4)],
   },
   {
     name: 'The Enchanted Grove', tiles: 'jungle',
@@ -196,9 +198,9 @@ export function bandFor(floor: number): MonsterDef[] {
 }
 
 /** Each lap builds the zones from a different tileset, so a repeat zone is a new place, not a recolour. */
-const THEMES: Tiles[] = ['halls', 'crypt', 'jungle', 'tomb'];
+const THEMES: Tiles[] = ['halls', 'crypt', 'jungle', 'tomb', 'sewer'];
 /** How far each lap shifts the tileset: the first repeat jumps furthest (dungeon stone ↔ jungle and desert). */
-const THEME_SHIFT = [0, 2, 1, 3];
+const THEME_SHIFT = [0, 2, 4, 1, 3];
 export function tilesFor(zone: number): Tiles {
   const lap = Math.floor(zone / ZONES.length);
   const base = ZONES[zone % ZONES.length].tiles;

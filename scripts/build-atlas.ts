@@ -1,6 +1,6 @@
 /**
  * Packs every sprite the game uses into one sheet: the 0x72 DungeonTileset II atlas plus
- * the CC0 add-on packs in assets-src (zone tilesets, Enchanted Forest and CR+ creatures, DevWizard's spells).
+ * the CC0 add-on packs in assets-src (zone tilesets, Enchanted Forest and CR+ creatures, the Sewers, DevWizard's spells).
  *
  *   node scripts/build-atlas.ts
  *
@@ -8,7 +8,7 @@
  * format as the original tile list, so animations stay `${base}_anim_f${n}`).
  * Dependency-free: a tiny PNG reader/writer for 8-bit RGBA images.
  */
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { deflateSync, inflateSync, crc32 } from 'node:zlib';
 import { join } from 'node:path';
 
@@ -221,6 +221,53 @@ for (const [zone, file] of [['jungle', 'omnibo_jungledungeon - copia.png'], ['to
       for (let k = 0; k < 8; k++) add(`cr_${name}_${k < 4 ? 'idle' : 'run'}_anim_f${k % 4}`, img, gx + k * 16 + box.x, box.y, box.x2 - box.x, box.y2 - box.y);
     });
   }
+}
+
+// DungeonTileset II Sewers (0x72, bought): room tiles become `sewer_*`; the three creatures `sw_*`, each cropped to
+// its frames' union. Its folder is gitignored, so on a new machine it has to be unzipped into assets-src by hand.
+{
+  const dir = join(SRC, '0x72_DungeonTilesetII_sewers_v0.3');
+  if (!existsSync(dir)) throw new Error(`${dir} is missing: unzip the Sewers pack there (it's kept out of git)`);
+  const high = readPng(join(dir, 'atlas_walls_high-16x32.png'));
+  add('sewer_wall_mid', high, 27, 80);
+  add('sewer_wall_mid_2', high, 37, 80);
+  add('sewer_wall_top', high, 27, 107);
+  const floor = readPng(join(dir, 'floor.png'));
+  const tiles: [string, number, number][] = [
+    ['floor_1', 0, 0], ['floor_2', 3, 4], ['floor_3', 4, 4], ['floor_drain', 5, 0], ['floor_grate', 1, 4],
+    ['floor_spikes', 1, 0], ['floor_hatch', 2, 4], ['floor_stairs', 0, 4], ['floor_hole', 4, 2],
+  ];
+  for (const [name, c, r] of tiles) add(`sewer_${name}`, floor, c * 16, r * 16);
+  const items = readPng(join(dir, 'items.png'));
+  for (let k = 0; k < 3; k++) add(`sewer_sludgefall_anim_f${k}`, items, 176 + k * 16, 99, 16, 27);
+  for (let k = 0; k < 5; k++) add(`sewer_flame_anim_f${k}`, items, 144 + k * 16, 35, 16, 28);
+  add('sewer_pillar_1', items, 0, 144, 16, 48);
+  add('sewer_pillar_2', items, 16, 144, 16, 48);
+  add('sewer_bat_hanging_1', items, 0, 128, 16, 14);
+  add('sewer_bat_hanging_2', items, 16, 128, 16, 14);
+  add('sewer_pot_1', items, 38, 167, 20, 25);
+  add('sewer_pot_2', items, 69, 167, 20, 25);
+  add('sewer_pot_3', items, 101, 167, 20, 25);
+  add('sewer_crate', items, 37, 132, 21, 28);
+  add('sewer_crate_small', items, 65, 140, 14, 20);
+  add('sewer_rock_1', items, 149, 2, 21, 12);
+  add('sewer_rock_2', items, 180, 5, 21, 9);
+
+  const creature = (slug: string, anims: [string, string[]][]) => {
+    const all = anims.flatMap(([, files]) => files.map((f) => readPng(join(dir, 'frames', f))));
+    let box: { x: number; y: number; x2: number; y2: number } | null = null;
+    for (const img of all) {
+      const b = bbox(img);
+      if (!b) continue;
+      box = box ? { x: Math.min(box.x, b.x), y: Math.min(box.y, b.y), x2: Math.max(box.x2, b.x + b.w), y2: Math.max(box.y2, b.y + b.h) } : { x: b.x, y: b.y, x2: b.x + b.w, y2: b.y + b.h };
+    }
+    let i = 0;
+    for (const [anim, files] of anims) files.forEach((_, k) => add(`${slug}_${anim}_anim_f${k}`, all[i++], box!.x, box!.y, box!.x2 - box!.x, box!.y2 - box!.y));
+  };
+  const frames = (base: string, n: number, sep = '_f') => Array.from({ length: n }, (_, k) => `${base}${sep}${k + 1}.png`);
+  creature('sw_bat', [['idle', frames('bat', 4)]]);
+  creature('sw_slugbot', [['idle', frames('slugbot_idle', 4)], ['run', frames('slugbot_walk', 8)]]);
+  creature('sw_tentacle', [['idle', frames('tentacle', 8, '-f')]]);
 }
 
 // Pixel Art Spells (DevWizard, CC0): horizontal strips of 16px frames.
