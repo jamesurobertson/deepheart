@@ -36,7 +36,7 @@ function icon(i: Icon, box = 36): string {
 /** A monster card as it sits in the collection: unknown (never slain) shows a "?", met shows a silhouette. */
 function cardFace(card: (typeof CARDS)[number], state: 'unknown' | 'met' | 'got', gilded = false, box = 44): string {
   const frame = gilded ? CARD_FRAME.gold : CARD_FRAME[card.kind];
-  const art = state === 'unknown' ? '<i class="mc-q">?</i>' : cardArt(card, box, card.id === 'rainbow-goblin' ? 'rainbow' : '');
+  const art = state === 'unknown' ? '<i class="mc-q">?</i>' : cardArt(card, box, card.id === 'rainbow-goblin' && state === 'got' ? 'rainbow' : '');
   return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'unknown' ? '???' : esc(card.name)}</span></span>`;
 }
 
