@@ -44,8 +44,8 @@ const RAMPAGE_TIERS = [{ click: 1, dps: 2 }, { click: 2, dps: 3 }];
 const RAMPAGE_EXTEND = 3;
 /** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
 const CLUTCH_GOLD = 1.5;
-/** Any monster that climbs the stairs (from floor 3) has this chance of being a champion: tougher, glowing, and worth a
- *  little more than a goblin's plunder. */
+/** Any monster that climbs the stairs has this chance of being a champion: tougher, glowing, and worth a little more
+ *  than a goblin's plunder. */
 const CHAMP_CHANCE = 0.01;
 const CHAMP_HP = 6;
 const CHAMP_GOLD = 50;
@@ -704,7 +704,7 @@ export class Game {
   private spawn() {
     const band = bandFor(this.s.floor);
     const def = band[Math.floor(Math.random() * band.length)];
-    const champ = this.s.floor > 2 && Math.random() < CHAMP_CHANCE;
+    const champ = Math.random() < CHAMP_CHANCE;
     const hp = floorHp(this.s.floor).times(def.hp * TRASH * (champ ? CHAMP_HP : 1));
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.7, mods: [], champ, ...this.spot(false) };
     this.monsters.push(m);
