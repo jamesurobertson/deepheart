@@ -120,6 +120,8 @@ export class Ui {
   /** Relics found since the relic screen was last opened. */
   private newRelics = 0;
   private newCards = 0;
+  /** Cards found while away, revealed once the welcome-back panel is collected. */
+  private offlineCards: Extract<Drop, { t: 'card' }>[] = [];
   /** Boss floors whose boss has been announced this session (it's only announced on a floor never beaten). */
   private bossAnnounced = new Set<number>();
   private lootTimer = 0;
@@ -1160,6 +1162,8 @@ export class Ui {
     // Meeting your hero: first on the field, then (once there's someone to switch to) the star that picks one.
     else if (g.s.heroTips === 0 && g.heroIndex() >= 0) state = 'hero';
     else if (g.s.heroTips === 1 && g.s.owned.filter((n) => n > 0).length >= 2) state = 'star';
+    // Hints point at the battlefield and shop, so they wait while a panel covers them.
+    if (this.modal) state = '';
     if (state !== this.hintState) this.tourAt = performance.now();
     const shown = performance.now() - this.tourAt;
     // The words stay put at the top of the battlefield (a hero on the move is hard to read beside); a small marker
@@ -1392,6 +1396,7 @@ export class Ui {
   }
 
   closeModal() {
+    if (this.modal === 'offline') for (const card of this.offlineCards.splice(0)) this.showCard(card);
     this.modal = null;
     this.el.modalWrap.hidden = true;
     this.hideTip();
@@ -1846,8 +1851,24 @@ export class Ui {
         <p>Your party kept fighting${pace}, killed <b>${kills}</b>${o.floor ? ` and reached <b>floor ${o.floor}</b>` : ''}, and looted</p>
         <div class="offline-v">${sprite('coin', 5)}<b>${fmt(o.gold)}</b></div>
         <p class="muted">gold</p>
+        ${o.cards.length ? `<p>and found <b>${o.cards.length === 1 ? 'a card' : `${o.cards.length} cards`}</b></p><div class="offline-cards">${this.offlineCardsHtml(o.cards)}</div>` : ''}
         <button class="btn primary big" data-act="close">Collect</button>
       </div>`;
+    // Collecting plays the reveal for each card that's new to you (repeats are just counted here).
+    this.offlineCards = o.cards.filter((c) => c.first);
+  }
+
+  /** Cards found while away, one per kind with how many came, new ones first. */
+  private offlineCardsHtml(cards: Extract<Drop, { t: 'card' }>[]) {
+    const groups = new Map<string, { n: number; first: boolean }>();
+    for (const c of cards) {
+      const group = groups.get(c.id) ?? { n: 0, first: false };
+      group.n++;
+      group.first ||= c.first;
+      groups.set(c.id, group);
+    }
+    return [...groups].sort((a, b) => Number(b[1].first) - Number(a[1].first)).map(([id, { n, first }]) =>
+      `<span class="oc${first ? ' new' : ''}">${cardFace(CARD_BY_ID.get(id)!, 'got', false, 32)}${n > 1 ? `<b class="oc-n">×${n}</b>` : ''}${first ? '<em class="oc-new">New</em>' : ''}</span>`).join('');
   }
 
 }

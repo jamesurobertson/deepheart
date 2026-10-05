@@ -889,3 +889,9 @@ body.compact .cr-text b { font-size: 32px; }
 .tt-got { margin: 6px 0 0; font-size: 14px; color: var(--gold-hi); }
 .here-mark { margin-left: 8px; font: 400 11px/1 'Silkscreen'; font-style: normal; letter-spacing: 0.5px; color: var(--gold); opacity: 0.85; }
 .mc-cell.here .mcard::after { content: ''; position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; background: var(--gold-hi); box-shadow: 0 0 0 2px var(--ink), 0 0 8px rgba(255, 210, 100, 0.8); }
+.offline-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 2px 0 14px; }
+.offline-cards .mcard { width: 52px; height: 70px; padding: 2px; }
+.offline-cards .mc-name { display: none; }
+.offline-cards .oc { position: relative; }
+.oc-n { position: absolute; right: -8px; top: -8px; padding: 1px 3px 0; background: #140e18; font: 400 16px/1 'Jersey 10'; color: #fff; box-shadow: 0 0 0 2px var(--ink); }
+.oc-new { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); padding: 2px 4px 1px; background: var(--gold); font: 400 9px/1 'Silkscreen'; font-style: normal; color: var(--ink); box-shadow: 0 0 0 2px var(--ink); }

@@ -324,6 +324,8 @@ export interface OfflineSummary {
   pct: number;
   /** New deepest floor reached while away, if any. */
   floor?: number;
+  /** Cards found while away (the same odds as at the keyboard; champions don't turn up, so no gold ones). */
+  cards: Extract<GameEvent, { t: 'card' }>[];
 }
 
 /** Health of an ordinary monster on a floor (the classic clicker curve). */
@@ -1628,10 +1630,15 @@ export class Game {
     const gold = floorGold(f).times(kills * TRASH * this.c.gold);
     this.earn(gold);
     this.s.kills += kills;
+    // Every kill counts toward its monster's card, and rolls for it, as it would have at the keyboard.
+    const band = bandFor(f);
+    const before = this.events.length;
+    for (let k = 0; k < kills; k++) this.rollCard(this.slay(band[Math.floor(Math.random() * band.length)]), false, 'sweep');
+    const cards = this.events.slice(before).filter((e): e is Extract<GameEvent, { t: 'card' }> => e.t === 'card');
     this.s.playTime += secs;
     this.s.runTime += secs;
     this.checkTrophies();
-    return { seconds: secs, gold, kills, pct };
+    return { seconds: secs, gold, kills, pct, cards };
   }
 
   abyssList() {
