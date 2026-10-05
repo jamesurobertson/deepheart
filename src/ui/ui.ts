@@ -1346,7 +1346,7 @@ export class Ui {
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
     if (kind === 'dock') {
       const text: Record<string, string> = {
-        trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length} (each gives +1% damage) and monster cards ${g.cardsFound()}/${CARDS.length}.`,
+        trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length} (each gives +1% damage) and ${g.cardsFound()} monster card${g.cardsFound() === 1 ? '' : 's'}.`,
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
         abyss: (g.canDescend() ? `Descend now for ${fmt(g.pendingSouls())} souls.` : g.descendOpen() ? 'Beat a zone boss to bank souls.' : `The way down opens at the floor ${DESCEND_FLOOR} boss.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
         stats: 'Your numbers, and where every bonus comes from.',
@@ -1615,7 +1615,7 @@ export class Ui {
       ['Floor', `${s.floor} (deepest this descent ${s.maxFloor})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
       ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses beaten', fmt(s.bosses)],
       ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Goblin Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
-      ['Descents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ['Relics', `${g.relicsFound()} / ${RELICS.length}`], ['Cards', `${g.cardsFound()} / ${CARDS.length}`],
+      ['Descents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ['Relics', `${g.relicsFound()} / ${RELICS.length}`], ['Cards found', fmt(g.cardsFound())],
       ['This descent', duration(s.runTime)], ['Time played', duration(s.playTime)],
     ];
     return `<dl class="stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
@@ -1722,7 +1722,7 @@ export class Ui {
     const to = dock.getBoundingClientRect();
     el.style.setProperty('--tx', `${to.left + to.width / 2 - mid.x}px`);
     el.style.setProperty('--ty', `${to.top + to.height / 2 - mid.y}px`);
-    const head = ev.gold ? (ev.first ? 'New gold card!' : 'Gold card!') : ev.first ? `New card · ${this.game.cardsFound()} / ${CARDS.length}` : 'Card';
+    const head = ev.gold ? (ev.first ? 'New gold card!' : 'Gold card!') : ev.first ? 'New card!' : 'Card';
     const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
       <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.heart(7)}</div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96)}</div></div></div>
