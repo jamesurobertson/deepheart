@@ -1,4 +1,4 @@
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, ASCEND_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, TRAITS, isTraitId, milestoneAt, type AbilityId, ABYSS, CARDS, CARD_BY_ID, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, milestoneIndex, milestoneMult, nextMilestone, bandFor, bossFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, ASCEND_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, TRAITS, isTraitId, milestoneAt, type AbilityId, ABYSS, CARDS, CARD_BY_ID, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { DESCEND_FLOOR, FLOOR_KILLS, isBossFloor, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -1282,7 +1282,8 @@ export class Ui {
 
   /** One chip per active buff: built once (so its pop-in plays once), then only the timer updates. */
   private renderBuffs(buffs: Buff[]) {
-    const active = buffs.filter((b) => b.id !== 'fever');
+    // Skills count down on their own squares (and Rampage on its bar), so only the rest get a chip here.
+    const active = buffs.filter((b) => b.id !== 'fever' && !ABILITY_BY_ID.has(b.id as AbilityId));
     const box = this.el.buffs;
     for (const chip of [...box.children] as HTMLElement[]) {
       if (!active.some((b) => b.id === chip.dataset.buff)) chip.remove();
@@ -1723,7 +1724,7 @@ export class Ui {
         <ul class="tt-l">
           ${g.s.owned[i] ? `<li>Deals <b>${fmt(g.compDps(i))}</b> damage/sec (${(share * 100).toFixed(1)}% of your party)</li>` : ''}
           <li>Next ${q.n > 1 ? `${q.n} levels` : 'level'}: <b class="up">+${fmt(next)}</b> damage/sec</li>
-          <li>Next ×${milestoneMult(i, milestoneIndex(nextMilestone(g.s.owned[i])))} damage at level ${nextMilestone(g.s.owned[i])}</li>
+          ${nextMilestone(g.s.owned[i]) !== null ? `<li>Next ×2 damage at level ${nextMilestone(g.s.owned[i])}</li>` : ''}
         </ul>
         <p class="tt-f">“${esc(def.flavor)}”</p>`;
     }

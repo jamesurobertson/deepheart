@@ -256,108 +256,79 @@ export type Req =
   | { t: 'trophies'; n: number }
   | { t: 'fevers'; n: number };
 
-/** Companion levels that unlock a ×2 damage upgrade. Past the last one, another comes every MILESTONE_STEP levels, forever. */
-const MILESTONES = [10, 25, 50, 75, 100, 200, 500, 1000, 1500, 2000];
-const MILESTONE_STEP = 1000;
+/** Companion levels that unlock a ×2 damage upgrade (its traits, bought on its row). There are none past level 100. */
+const MILESTONES = [10, 25, 50, 75, 100];
 /** Each companion level costs this much more than the last (about 3.9 levels a floor against ×1.55 health). */
 export const COST_GROWTH = 1.12;
-/** Upgrade cost as a multiple of the companion's hire price, for the fixed milestones up to 500. */
-const MILESTONE_COST = [16, 190, 5_000, 1.5e5, 5e6, 1e12, 1e31];
-/** Each companion's milestone upgrades, one per fixed milestone (levels 10 to 1500); past the last, it repeats as II, III… */
+/** Upgrade cost as a multiple of the companion's hire price. */
+const MILESTONE_COST = [16, 190, 5_000, 1.5e5, 5e6];
+/** Each companion's milestone upgrades, one per milestone. */
 const MILESTONE_NAMES: Record<string, string[]> = {
-  squire: ['Practice Swing', 'Eager Beaver', 'Training Wheels', 'Squire Power', 'Overachiever', 'Squire to Greatness', 'Knight Shift', 'Dubbed', 'Sir Squire'],
-  ranger: ['Near Miss', 'Mostly Accurate', 'Long Shot', 'Quiver Wit', 'Bullseye-ish', 'Arrow-gant', 'Free Range-r', 'Out of Range', 'Never Misses (Really)'],
-  brawler: ['Knuckle Down', 'Short Fuse', 'Punch Line', 'Gold Digger', 'Beard Punch', 'Fist Bump', 'Mother Lode', 'Brawl Street', 'Dwarf Star'],
-  apprentice: ['One Trick', 'Spark of Genius', 'Shock Value', 'Fast Learner', 'Bolt from the Blue', 'Hair Raising', 'Thunderstruck', "Master's Degree", 'Strikes Twice'],
-  hunter: ['Cold Blooded', 'Keen Nose', 'Scent Trail', 'Tail Gate', 'Scale Up', 'Shed Skin', 'Smell of Victory', 'Lizard King', 'Apex Predator'],
-  shieldmaiden: ['Shield Bash', 'Board Meeting', 'Living Wall', 'Best Defense', 'Bash Course', 'Plate Expectations', 'Shield Slam', 'Unbreakable', 'Shield of Legend'],
-  thief: ['Light Fingers', 'Sticky Fingers', 'Pickpocket', 'Knife to Meet You', 'Steal of a Deal', 'Shadow Boxing', 'Hidden Blade', 'Grand Theft', 'Daylight Robbery'],
-  dancer: ['First Position', 'Pirouette', 'Dance Off', 'Cutting a Rug', 'Sword Dance', 'Encore', 'Blade Runner', 'Standing Ovation', 'Final Bow'],
-  corsair: ['Sea Legs', 'Plunder Ground', 'Shiver Me Timbers', 'Sunken Treasure', 'Below Deck', "Captain's Log", "Davy Jones' Locker", 'High Tide', 'The Deep Blue'],
-  runesmith: ['Chisel In', 'Floor Plan', 'Rune for Cover', 'Set in Stone', 'Groundbreaking', 'Rune-ing Out of Room', 'Rock Bottom', 'Earth-Shattering', 'Rune Lord'],
-  paladin: ['Holy Moly', 'Purge Party', 'Smite Club', 'Light Work', 'Holy Order', 'Righteous Fury', 'Divine Intervention', 'Saintly Smite', 'Crusader'],
-  stormcaller: ['Brainstorm', 'Under the Weather', 'Cloud Cover', 'Storm Front', 'Eye of the Storm', 'Weather Warning', 'Perfect Storm', 'Forecast: Doom', 'Act of God'],
-  venomblade: ['Toxic Trait', 'Bad Blood', 'Bite Back', 'Poison Pen', 'Forked Tongue', 'Deadly Dose', 'Pure Venom', 'Snake Eyes', 'Lethal Injection'],
-  doctor: ['Second Opinion', 'Bedside Manner', 'House Call', "Doctor's Orders", 'Bad Prognosis', 'Mask Up', 'Terminal Diagnosis', 'Malpractice', 'Black Death'],
-  frostimp: ['Cold Snap', 'Chill Out', 'Ice Breaker', 'Frostbite', 'Cold Shoulder', 'Snow Day', 'Brain Freeze', 'Ice Age', 'Absolute Zero'],
-  hollow: ['Gourd Duty', 'Pumpkin Spice', 'Carved Up', 'Patch Work', 'Squash Them', 'Hollow Victory', 'Jack of All Blades', 'Gourd of Honor', 'Harvest Moon'],
-  oathbreaker: ['Promise Ring', 'Broken Vow', 'Fine Print', 'Word Breaker', 'No Take-Backs', 'Oath of Swinging', 'Vow of Violence', 'Last Promise', 'Oath Unbound'],
-  archmage: ['Old School', 'Back in My Day', 'Spell Check', 'Arch Rival', 'Senior Moment', 'Grand Magus', 'Ancient History', 'Wizened', 'Arch Nemesis'],
-  wraith: ['Ghost Note', 'Haunting Melody', 'Spirited', 'Dead Ringer', 'Soul Music', 'Grave Tune', 'Wail of a Time', 'Swan Song', 'Unbound'],
-  necro: ['Change of Heart', 'Grave Mistake', 'Dead Serious', 'Bone to Pick', 'Raise the Stakes', 'Skeleton Crew', 'Lower the Dead', 'Turned Coat', 'Final Rest'],
-  king: ['Royal Pain', 'Throne Away', 'Heavy Is the Head', "King's Ransom", 'Royal Decree', 'Divine Right', 'Uncrowned', 'Long Live the King', 'Return of the King'],
-  angel: ['Fall Guy', 'Grounded', 'Fallen Grace', 'Wing It', 'Halo Effect', 'Hell Bent', 'Heaven Sent', 'Divine Comedy', 'Second Coming'],
-  ogre: ['Good Boy', 'Pebble Dash', 'Rock Solid', 'Big Softie', 'Boulder Dash', 'Heavy Hitter', 'Ogre-achiever', 'Ogre-kill', 'Landslide'],
-  demon: ['Terms and Conditions', 'Blood Pact', 'Hell to Pay', "Devil's Advocate", 'Hellfire', 'Soul Contract', 'Infernal Affairs', 'Deal with the Devil', 'Hell Unleashed'],
+  squire: ['Practice Swing', 'Eager Beaver', 'Training Wheels', 'Squire Power', 'Overachiever'],
+  ranger: ['Near Miss', 'Mostly Accurate', 'Long Shot', 'Quiver Wit', 'Bullseye-ish'],
+  brawler: ['Knuckle Down', 'Short Fuse', 'Punch Line', 'Gold Digger', 'Beard Punch'],
+  apprentice: ['One Trick', 'Spark of Genius', 'Shock Value', 'Fast Learner', 'Bolt from the Blue'],
+  hunter: ['Cold Blooded', 'Keen Nose', 'Scent Trail', 'Tail Gate', 'Scale Up'],
+  shieldmaiden: ['Shield Bash', 'Board Meeting', 'Living Wall', 'Best Defense', 'Bash Course'],
+  thief: ['Light Fingers', 'Sticky Fingers', 'Pickpocket', 'Knife to Meet You', 'Steal of a Deal'],
+  dancer: ['First Position', 'Pirouette', 'Dance Off', 'Cutting a Rug', 'Sword Dance'],
+  corsair: ['Sea Legs', 'Plunder Ground', 'Shiver Me Timbers', 'Sunken Treasure', 'Below Deck'],
+  runesmith: ['Chisel In', 'Floor Plan', 'Rune for Cover', 'Set in Stone', 'Groundbreaking'],
+  paladin: ['Holy Moly', 'Purge Party', 'Smite Club', 'Light Work', 'Holy Order'],
+  stormcaller: ['Brainstorm', 'Under the Weather', 'Cloud Cover', 'Storm Front', 'Eye of the Storm'],
+  venomblade: ['Toxic Trait', 'Bad Blood', 'Bite Back', 'Poison Pen', 'Forked Tongue'],
+  doctor: ['Second Opinion', 'Bedside Manner', 'House Call', "Doctor's Orders", 'Bad Prognosis'],
+  frostimp: ['Cold Snap', 'Chill Out', 'Ice Breaker', 'Frostbite', 'Cold Shoulder'],
+  hollow: ['Gourd Duty', 'Pumpkin Spice', 'Carved Up', 'Patch Work', 'Squash Them'],
+  oathbreaker: ['Promise Ring', 'Broken Vow', 'Fine Print', 'Word Breaker', 'No Take-Backs'],
+  archmage: ['Old School', 'Back in My Day', 'Spell Check', 'Arch Rival', 'Senior Moment'],
+  wraith: ['Ghost Note', 'Haunting Melody', 'Spirited', 'Dead Ringer', 'Soul Music'],
+  necro: ['Change of Heart', 'Grave Mistake', 'Dead Serious', 'Bone to Pick', 'Raise the Stakes'],
+  king: ['Royal Pain', 'Throne Away', 'Heavy Is the Head', "King's Ransom", 'Royal Decree'],
+  angel: ['Fall Guy', 'Grounded', 'Fallen Grace', 'Wing It', 'Halo Effect'],
+  ogre: ['Good Boy', 'Pebble Dash', 'Rock Solid', 'Big Softie', 'Boulder Dash'],
+  demon: ['Terms and Conditions', 'Blood Pact', 'Hell to Pay', "Devil's Advocate", 'Hellfire'],
 };
-/** Milestone upgrades built per companion (the bot's companions top out around level 7,400 in 16 hours). */
-const MILESTONE_TIERS = 20;
 export const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
 
 /** The level of a companion's k-th milestone (k from 0). */
-export function milestoneAt(k: number) {
-  const last = MILESTONES.length - 1;
-  return k <= last ? MILESTONES[k] : MILESTONES[last] + (k - last) * MILESTONE_STEP;
+export const milestoneAt = (k: number) => MILESTONES[k];
+
+/** The first milestone above this level (null past the last). */
+export function nextMilestone(level: number): number | null {
+  return MILESTONES.find((m) => m > level) ?? null;
 }
 
-/** Milestones from this one on (level 200) are graded by companion; the early ones are ×2 for everyone, which keeps the opening's pace. */
-const GRADED_FROM = 5;
-
-/** Damage multiplier of a companion's k-th milestone upgrade: ×2 early on; from level 200, ×2 for the newest companion and a
- *  little more for each older one, so the older companions catch up as milestones pile up instead of fading out. */
-export function milestoneMult(comp: number, k = GRADED_FROM) {
-  return k < GRADED_FROM ? 2 : Math.round((2 + 0.1 * (COMPS.length - 1 - comp)) * 10) / 10;
-}
-
-/** Which milestone (from 0) sits at this level. */
-export function milestoneIndex(level: number) {
-  let k = 0;
-  while (milestoneAt(k) < level) k++;
-  return k;
-}
-
-/** The first milestone above this level. */
-export function nextMilestone(level: number) {
-  for (const m of MILESTONES) if (m > level) return m;
-  const last = MILESTONES[MILESTONES.length - 1];
-  return last + (Math.floor((level - last) / MILESTONE_STEP) + 1) * MILESTONE_STEP;
-}
-
-/** From level 1000 on, a milestone costs about what Unmade did at level 500 next to that level's own price. */
-const milestoneCost = (k: number) => MILESTONE_COST[k] ?? 2e6 * COST_GROWTH ** milestoneAt(k);
-
-/** A line of flavour under each of those upgrades (the repeats past the last share its line). */
+/** A line of flavour under each of those upgrades. */
 const MILESTONE_FLAVOR: Record<string, string[]> = {
-  squire: ['He practises on everything. Mostly monsters.', 'Up before dawn. Swinging before breakfast.', "The training wheels are off. He's never been faster.", 'Small squire. Big swing.', 'Extra credit, paid in monsters.', "Still not a knight. Doesn't need to be.", 'Works nights now. The monsters hate it.', 'Knighted at last. By himself. It counts.', 'Sir Squire, if you please.'],
-  ranger: ['Closer than last time. That counts.', 'Eight out of ten monsters agree.', 'She hit something two floors down. Probably a monster.', 'Sharp arrows. Sharper comebacks.', "It's the thought that counts. The arrow helps.", "She's earned it. Ask her, she'll tell you.", 'Roams where she likes. Shoots what she likes.', 'Nothing is. She checked.', 'Okay. Fine. Rarely.'],
-  brawler: ["He's taking this seriously now. Very seriously.", "Don't mention his height. Or anything.", 'He tells the joke. The monster gets the punch.', 'Every hole he digs has gold in it. Or a monster. Both are fine.', 'Nobody knows how. Nobody wants a demonstration.', 'Friendly, from anyone else.', "He's found the gold. He's staying for the punching.", 'Every corridor is his corridor now.', 'Small, dense and very, very hot-tempered.'],
-  apprentice: ["It's a good trick.", 'Mostly sparks. Some genius.', 'Monsters find him shocking.', "Learned a second spell. It's also lightning.", 'Also from the red, the green and the ceiling.', "His hair hasn't lain flat in weeks.", 'The thunder follows him now. It wants to learn.', 'Graduated. The school is still on fire.', 'Lightning does. He made sure.'],
-  hunter: ['Feels nothing. Hits everything.', 'Smells fear. Also lunch.', 'Follows it three floors down and back.', 'Gets too close. On purpose.', 'Grows a little every time something dies.', 'Left the old one behind. It was slowing him down.', 'Smells like monster. Lots of it.', 'Wears the crown. Eats the competition.', 'The food chain has been updated.'],
-  shieldmaiden: ['Defense is just offense, waiting.', 'The shield meets the face. Meeting adjourned.', "Walls don't usually chase you.", 'Is a good offense. Is also a good shield.', 'She teaches it. Monsters fail it.', 'She expects you to fall over. You will.', 'The sword is getting jealous.', 'The shield. Also her. Also her record.', 'Songs will be sung about it. Not by the monsters.'],
-  thief: ["Your purse feels lighter. That's normal.", 'The knives come back. So does your gold, mostly.', 'Monsters have pockets. Had.', 'He says it every time. Every knife.', "He's very proud of this price. Don't ask why.", 'The shadow is winning.', 'Where? Exactly.', "He stole the monster's turn.", "There's no daylight down here. He brought some."],
-  dancer: ["Also the monster's last position.", 'One spin, three slices.', 'The monsters lost. Badly. Fatally.', 'And everything standing on it.', "Don't stand too close. Don't stand at all.", "Nobody asked. He's doing it anyway.", 'Never stops moving. Never stops cutting.', "The monsters still aren't clapping. They can't.", 'The curtain falls. So does everyone else.'],
-  corsair: ['Steady on any floor. Even the wet ones.', "Everything down here is treasure if you're brave enough.", 'The monsters shiver first.', 'Found it. Kept it. Hit things with it.', 'The lower the deck, the bigger the haul.', 'Day forty: still underground. Still winning.', 'The Captain has the key now.', 'The underground sea is rising. So is the body count.', 'Deeper than the dungeon. Ask the Captain.'],
-  runesmith: ['Every swing leaves a mark. Some marks explode.', 'The plan: the floor explodes.', "Monsters run. Runes don't care.", "The runes are permanent. The monsters aren't.", 'Literally.', "Every floor is carved. She's started on the walls.", 'Nowhere to go but boom.', 'The dungeon would like a word.', 'The floors bow to her. Then explode.'],
-  paladin: ['A prayer and a punch.', "Everyone's invited. Nobody leaves.", 'First rule: smite.', 'Purging is easy when you glow.', 'The order is: hit it again.', 'Furious, but righteously.', 'The gods intervened. On his side.', 'So holy it hurts. Mostly them.', 'The crusade has no end. Neither does the dungeon.'],
-  stormcaller: ['Her best ideas come with lightning.', 'The monsters are. Permanently.', 'Indoors, somehow.', "She's always at the front of it.", 'Calm in the middle. Chaos everywhere else.', 'Too late now.', "She's been practising.", 'Scattered monsters, followed by none.', "Insurance won't cover this."],
-  venomblade: ["She poisons everything. It's a lot.", 'Theirs, mostly.', 'Monsters bite. She bites back harder.', 'She writes their names on the blades. Then delivers them.', 'Says one thing. Stabs another.', 'A little goes a long way. She uses a lot.', 'Nothing but.', 'The monsters rolled poorly.', 'Every blade. Every single one.'],
-  doctor: ['Also: dying.', 'Terrible. Effective.', 'Comes to you. Unfortunately.', 'Rest. Permanently.', 'For them. Always for them.', 'The beak is not for decoration.', 'Treatable, in his professional opinion, by dying.', 'The board has received complaints. From the afterlife.', 'His specialty.'],
-  frostimp: ['Snaps. Things. Cold.', "It won't. Ever.", 'Breaks the ice. And the monster.', 'Bites, too.', 'Monsters get it. Then they get frozen.', "Nobody's going anywhere.", 'Monsters forget how to move.', "The dungeon's getting colder. The imp's getting happier.", 'Colder than that, actually.'],
-  hollow: ['Reporting for it.', 'Seasonal. Lethal.', "The pumpkin's smile gets wider every fight.", 'Fresh from the patch. Ready to work.', 'Pun intended.', 'Nothing inside. Everything outside is dead.', 'Master of the lantern.', "Stands guard. Doesn't rot.", 'Reaping season.'],
-  oathbreaker: ["Doesn't count. Never did.", "Another one. He's keeping count.", 'He read it. Then ignored it.', 'His word means nothing. His sword means everything.', 'Swings first. Never apologises.', 'The last oath standing.', "This one he'll keep.", "Never stop swinging. He hasn't.", 'No vows left. Only swinging.'],
-  archmage: ['The original school. He built it.', 'Monsters were bigger. He was faster.', 'Every spell checked. Every monster checked out.', "He has one. It's the dungeon.", 'Forgot what he was casting. Cast it anyway. Worked.', 'Grander every day.', 'Which is what the monsters become.', 'Wise, wrinkled and wildly dangerous.', 'Of everything down here.'],
-  wraith: ['Heard but not seen. Then felt.', "Monsters can't get it out of their heads.", 'Enthusiastic, for the dead.', 'Sounds like doom. Is doom.', 'Played on monsters.', 'The last thing they hear.', "It's having one.", "Every song is someone's last.", 'No chains left. Just the song.'],
-  necro: ['Used to raise them. Now he lowers them.', 'The monsters made it.', 'About the job. About the dead.', 'With every skeleton he ever raised.', 'And then drive them in.', 'His old friends. Now on your side.', 'Six feet, as is tradition.', 'Fits better this way.', 'He grants it. Forcefully.'],
-  king: ["A pain in every monster's neck.", "He's fine about it. Mostly.", 'Heavy is the fist, too.', "Nobody's paying it. He's taking it.", 'All monsters: begone.', 'And a divine left.', 'Still kingly. Still angry.', 'Everyone else, not so much.', "He's back. He's furious."],
-  angel: ['Took the fall. Gave back worse.', 'Literally. Angrily.', 'Not so graceful now. Much more punchy.', 'No plan. Lots of wing.', 'Monsters see it. Then they see nothing.', 'Fell from heaven. Headed further down.', 'Return to sender.', "The monsters don't find it funny.", 'Landed swinging. Again.'],
-  ogre: ["Yes he is. Who's a good boy? Pebble is.", 'Pebble runs. Things break.', 'Pebble is not small. Pebble is never small.', 'To you. Only to you.', 'Pebble got bigger.', "Pebble hit it. It's gone.", 'Pebble tries very hard.', "Pebble doesn't do half measures.", 'Pebble won.'],
-  demon: ['Nobody reads them. The monsters should have.', "Mostly the monsters' blood.", "And it's collecting.", 'Argues for violence. Wins.', 'Brought from home.', 'Signed in blood. Paid in monsters.', 'Strictly business.', "It's a good deal. For you.", 'The contract allows it.'],
+  squire: ['He practises on everything. Mostly monsters.', 'Up before dawn. Swinging before breakfast.', "The training wheels are off. He's never been faster.", 'Small squire. Big swing.', 'Extra credit, paid in monsters.'],
+  ranger: ['Closer than last time. That counts.', 'Eight out of ten monsters agree.', 'She hit something two floors down. Probably a monster.', 'Sharp arrows. Sharper comebacks.', "It's the thought that counts. The arrow helps."],
+  brawler: ["He's taking this seriously now. Very seriously.", "Don't mention his height. Or anything.", 'He tells the joke. The monster gets the punch.', 'Every hole he digs has gold in it. Or a monster. Both are fine.', 'Nobody knows how. Nobody wants a demonstration.'],
+  apprentice: ["It's a good trick.", 'Mostly sparks. Some genius.', 'Monsters find him shocking.', "Learned a second spell. It's also lightning.", 'Also from the red, the green and the ceiling.'],
+  hunter: ['Feels nothing. Hits everything.', 'Smells fear. Also lunch.', 'Follows it three floors down and back.', 'Gets too close. On purpose.', 'Grows a little every time something dies.'],
+  shieldmaiden: ['Defense is just offense, waiting.', 'The shield meets the face. Meeting adjourned.', "Walls don't usually chase you.", 'Is a good offense. Is also a good shield.', 'She teaches it. Monsters fail it.'],
+  thief: ["Your purse feels lighter. That's normal.", 'The knives come back. So does your gold, mostly.', 'Monsters have pockets. Had.', 'He says it every time. Every knife.', "He's very proud of this price. Don't ask why."],
+  dancer: ["Also the monster's last position.", 'One spin, three slices.', 'The monsters lost. Badly. Fatally.', 'And everything standing on it.', "Don't stand too close. Don't stand at all."],
+  corsair: ['Steady on any floor. Even the wet ones.', "Everything down here is treasure if you're brave enough.", 'The monsters shiver first.', 'Found it. Kept it. Hit things with it.', 'The lower the deck, the bigger the haul.'],
+  runesmith: ['Every swing leaves a mark. Some marks explode.', 'The plan: the floor explodes.', "Monsters run. Runes don't care.", "The runes are permanent. The monsters aren't.", 'Literally.'],
+  paladin: ['A prayer and a punch.', "Everyone's invited. Nobody leaves.", 'First rule: smite.', 'Purging is easy when you glow.', 'The order is: hit it again.'],
+  stormcaller: ['Her best ideas come with lightning.', 'The monsters are. Permanently.', 'Indoors, somehow.', "She's always at the front of it.", 'Calm in the middle. Chaos everywhere else.'],
+  venomblade: ["She poisons everything. It's a lot.", 'Theirs, mostly.', 'Monsters bite. She bites back harder.', 'She writes their names on the blades. Then delivers them.', 'Says one thing. Stabs another.'],
+  doctor: ['Also: dying.', 'Terrible. Effective.', 'Comes to you. Unfortunately.', 'Rest. Permanently.', 'For them. Always for them.'],
+  frostimp: ['Snaps. Things. Cold.', "It won't. Ever.", 'Breaks the ice. And the monster.', 'Bites, too.', 'Monsters get it. Then they get frozen.'],
+  hollow: ['Reporting for it.', 'Seasonal. Lethal.', "The pumpkin's smile gets wider every fight.", 'Fresh from the patch. Ready to work.', 'Pun intended.'],
+  oathbreaker: ["Doesn't count. Never did.", "Another one. He's keeping count.", 'He read it. Then ignored it.', 'His word means nothing. His sword means everything.', 'Swings first. Never apologises.'],
+  archmage: ['The original school. He built it.', 'Monsters were bigger. He was faster.', 'Every spell checked. Every monster checked out.', "He has one. It's the dungeon.", 'Forgot what he was casting. Cast it anyway. Worked.'],
+  wraith: ['Heard but not seen. Then felt.', "Monsters can't get it out of their heads.", 'Enthusiastic, for the dead.', 'Sounds like doom. Is doom.', 'Played on monsters.'],
+  necro: ['Used to raise them. Now he lowers them.', 'The monsters made it.', 'About the job. About the dead.', 'With every skeleton he ever raised.', 'And then drive them in.'],
+  king: ["A pain in every monster's neck.", "He's fine about it. Mostly.", 'Heavy is the fist, too.', "Nobody's paying it. He's taking it.", 'All monsters: begone.'],
+  angel: ['Took the fall. Gave back worse.', 'Literally. Angrily.', 'Not so graceful now. Much more punchy.', 'No plan. Lots of wing.', 'Monsters see it. Then they see nothing.'],
+  ogre: ["Yes he is. Who's a good boy? Pebble is.", 'Pebble runs. Things break.', 'Pebble is not small. Pebble is never small.', 'To you. Only to you.', 'Pebble got bigger.'],
+  demon: ['Nobody reads them. The monsters should have.', "Mostly the monsters' blood.", "And it's collecting.", 'Argues for violence. Wins.', 'Brought from home.'],
 };
 
 function milestoneName(comp: string, k: number) {
-  const names = MILESTONE_NAMES[comp];
-  const last = names.length - 1;
-  return k <= last ? names[k] : `${names[last]} ${ROMAN[k - last] ?? k - last + 1}`;
+  return MILESTONE_NAMES[comp][k];
 }
 
 const CLICK_UPGS: [string, string, number, number][] = [
@@ -406,11 +377,11 @@ const SYNERGIES: [number, number, string][] = ([
 
 /** Crits grow through the sharp-eyed companions' milestones (by milestone index): chance in %, or extra crit damage. */
 const CRIT_BONUS: Record<string, Record<number, { chance?: number; add?: number }>> = {
-  ranger: { 2: { chance: 2 }, 4: { chance: 2 }, 6: { chance: 3 } },
-  hunter: { 2: { add: 1 }, 5: { add: 1 } },
-  thief: { 1: { chance: 2 }, 3: { chance: 3 }, 6: { add: 1 } },
+  ranger: { 2: { chance: 2 }, 3: { chance: 2 }, 4: { chance: 3 } },
+  hunter: { 2: { add: 1 }, 4: { add: 1 } },
+  thief: { 1: { chance: 2 }, 3: { chance: 3 }, 4: { add: 1 } },
   dancer: { 2: { add: 1 }, 4: { add: 1 } },
-  venomblade: { 1: { chance: 3 }, 3: { add: 2 }, 5: { chance: 3 } },
+  venomblade: { 1: { chance: 3 }, 3: { add: 2 }, 4: { chance: 3 } },
 };
 const critText = (b: { chance?: number; add?: number }) => (b.chance ? ` Crit chance +${b.chance}%.` : ` Crit damage +${b.add}×.`);
 
@@ -423,16 +394,15 @@ const CLEAVES: [string, number, number, number][] = [
 function buildUpgrades(): UpgDef[] {
   const out: UpgDef[] = [];
   COMPS.forEach((comp, i) => {
-    for (let k = 0; k < MILESTONE_TIERS; k++) {
-      const cost = comp.cost * milestoneCost(k);
+    for (let k = 0; k < MILESTONES.length; k++) {
+      const cost = comp.cost * MILESTONE_COST[k];
       const crit = CRIT_BONUS[comp.id]?.[k];
-      if (!Number.isFinite(cost)) break;
       out.push({
-        id: `m${i}_${k}`, name: milestoneName(comp.id, k), flavor: MILESTONE_FLAVOR[comp.id][Math.min(k, 8)],
-        desc: `${comp.name} deals ×${milestoneMult(i, k)} damage.${crit ? critText(crit) : ''}`,
+        id: `m${i}_${k}`, name: milestoneName(comp.id, k), flavor: MILESTONE_FLAVOR[comp.id][k],
+        desc: `${comp.name} deals ×2 damage.${crit ? critText(crit) : ''}`,
         bonus: crit ? { t: 'crit', chance: (crit.chance ?? 0) / 100, add: crit.add } : undefined,
         cost, icon: { sprite: comp.sprite, tier: Math.min(k, ROMAN.length - 1) },
-        effect: { t: 'comp', comp: i, mult: milestoneMult(i, k) }, req: { t: 'owned', comp: i, n: milestoneAt(k) },
+        effect: { t: 'comp', comp: i, mult: 2 }, req: { t: 'owned', comp: i, n: milestoneAt(k) },
       });
     }
   });

@@ -875,7 +875,9 @@ export class Game {
   compQuote(i: number): { n: number; cost: Decimal } {
     const mode = this.s.settings.buyMode;
     if (mode === 'next') {
-      const n = nextMilestone(this.s.owned[i]) - this.s.owned[i];
+      // Up to the next milestone (one level at a time past the last).
+      const next = nextMilestone(this.s.owned[i]);
+      const n = next === null ? 1 : next - this.s.owned[i];
       return { n, cost: this.compCost(i, n) };
     }
     if (mode > 0) return { n: mode, cost: this.compCost(i, mode) };
