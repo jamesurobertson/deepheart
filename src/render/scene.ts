@@ -11,7 +11,7 @@ import { GradeShader, tiltShift } from './post.ts';
 import { buildStairwell, stairPoint } from './stairwell.ts';
 import { CARD_FRAME, CARD_H, CARD_W, cardBackTexture, cardTexture } from './cards.ts';
 import { CARD_BY_ID, COMPS, RELIC_BY_ID, ZONES, corruptionOf, tilesFor, zoneOf, type Attack, type CompDef, type Tiles } from '../game/data.ts';
-import type { Game, GameEvent, Monster } from '../game/game.ts';
+import { VAULT_LENGTH, type Game, type GameEvent, type Monster, type VaultChest } from '../game/game.ts';
 
 const WALL_Z = -6;
 const STAIRS = new THREE.Vector3(7.5, 0, -4);
@@ -31,11 +31,17 @@ const PALETTES: Palette[] = [
   { torch: 0x9cc0ff, fog: 0x05070c, hemi: 0x5a6a8a, wall: [0.56, 0.72, 1], floor: [0.9, 1.1, 1.45], banner: 'blue', goo: 0 }, // Frozen Vault
 ];
 
-/** The Goblin Vault: gilded stone, with torches that cycle through the rainbow (see update). */
+/** The Rainbow Vault: gilded stone, with torches that cycle through the rainbow (see update). */
 const VAULT_PALETTE: Palette = { torch: 0xffd070, fog: 0x0d0616, hemi: 0x9a78b0, wall: [1.3, 1.08, 0.6], floor: [1.4, 1.2, 0.75], banner: 'yellow', goo: 0 };
 /** Seconds the party runs toward the portal before the flash, and the fade back in after it. */
-const TRIP_GO = 0.95;
-const TRIP_ARRIVE = 0.55;
+/** The walk into a rainbow portal: it opens (seconds), the chosen one sets off walking, pauses on the threshold, steps
+ *  through, and the light takes the screen. */
+const TRIP_OPEN = 1.1;
+const TRIP_WALK_SPEED = 4.2;
+const TRIP_PAUSE = 0.35;
+const TRIP_STEP_IN = 0.55;
+const TRIP_FLASH = 0.5;
+const TRIP_ARRIVE = 0.7;
 
 /** A zone's palette on a later lap: torches, light and stone pulled toward the lap's colour, the dark a shade deeper. */
 function corrupt(p: Palette, lap: number): Palette {
@@ -48,6 +54,12 @@ function corrupt(p: Palette, lap: number): Palette {
 
 /** Your hero's top walking speed (world units a second). */
 const HERO_SPEED = 6.5;
+/** The rainbow's bands, outside in. */
+const RAINBOW = [0xff4a4a, 0xff9a3a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0x6a6aff, 0xc46aff];
+/** How close your vault hero has to come to a chest to throw it open (world units). */
+const CHEST_REACH = 1.1;
+/** A loose coin on the vault floor, as big as the painted ones further off. */
+const COIN_SIZE = 1.15;
 
 /** A clutch kill's slow motion: real seconds until the release burst, and until time is back to full speed. */
 const CLUTCH_RELEASE = 0.9;
@@ -129,8 +141,8 @@ interface MonView {
   fly: boolean;
   /** More of the same creature rising around it (The Thing Below's other tentacles): all one monster. */
   extras: PixelSprite[];
-  /** Champions pulse gold and shed sparks; Goblin Vault hoarders glow softly. */
-  glow: 'champ' | 'hoard' | null;
+  /** Champions pulse gold and shed sparks. */
+  glow: 'champ' | null;
   /** A champion's gold ring at its feet. */
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial> | null;
 }
@@ -183,6 +195,19 @@ interface RaiderView {
   sparkle: number;
   rainbow: boolean;
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+}
+
+/** A chest in the Rainbow Vault: pops up, glints while shut, and bursts open in a fountain of coins. */
+interface ChestView {
+  id: number;
+  group: THREE.Group;
+  inner: THREE.Group;
+  sprite: PixelSprite;
+  rainbow: boolean;
+  open: boolean;
+  /** 0 → 1 as it pops up out of the floor (starts below 0 so they arrive one after another). */
+  born: number;
+  aura: THREE.Sprite | null;
 }
 
 interface Chest {
@@ -306,7 +331,8 @@ export class Scene {
   /** Screen areas your hero keeps out of (the dock), set by the UI. */
   heroBlocked: DOMRect[] = [];
   /** Steering for your hero, set by the UI each frame: the pointer over the battlefield, and WASD / arrow keys. */
-  heroInput: { aim: { x: number; y: number } | null; keys: { x: number; z: number }; stay: boolean } = { aim: null, keys: { x: 0, z: 0 }, stay: false };
+  /** `idle`: no mouse or keys for a while (in the vault, the hero then sees itself out once the chests are done). */
+  heroInput: { aim: { x: number; y: number } | null; keys: { x: number; z: number }; stay: boolean; idle: boolean } = { aim: null, keys: { x: 0, z: 0 }, stay: false, idle: false };
   private heroRing: THREE.Mesh | null = null;
   private heroVel = new THREE.Vector3();
   /** Seconds the hero keeps facing what it just attacked before turning back to where it's walking. */
@@ -346,9 +372,34 @@ export class Scene {
   /** A pause (the loot card is up) before the staircase starts. */
   private hold: { zone: number; t: number } | null = null;
   private relicDropped = false;
-  /** In the Goblin Vault's treasure room, and the portal trip in or out of it (the game pauses during the run-up). */
+  /** In the Rainbow Vault's treasure room, and the portal trip in or out of it (the game pauses during the run-up). */
   private inVaultRoom = false;
-  private trip: { into: boolean; phase: 'go' | 'arrive'; t: number; portal: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial> } | null = null;
+  /** The vault's chests on the floor. */
+  private vaultChests = new Map<number, ChestView>();
+  /** Treasure goblins loose in the vault: they scurry about and run from your hero. */
+  private vaultGoblins = new Map<number, { group: THREE.Group; sprite: PixelSprite; rainbow: boolean; goal: THREE.Vector3; caught: number }>();
+  /** The vault's loose coins, spinning on the floor until the hero runs over them. */
+  private vaultCoins = new Map<number, { sprite: PixelSprite; mesh: THREE.Object3D; up: number }>();
+  /** Rainbows that rise out of opened chests and fade. */
+  private arcs: { group: THREE.Group; t: number; life: number }[] = [];
+  /** The room's own rainbows, which shimmer while you're in it. */
+  private roomArcs: THREE.Mesh[] = [];
+  /** A rainbow goblin was caught: the world slows while you choose who goes through the portal. */
+  private vaultPick = false;
+  /** Who went into the vault (alone; the rest wait outside). */
+  private vaultHero = -1;
+  /** A Rainbow Chest's short slow-motion beat, in real seconds left. */
+  private jackpotT = 0;
+  /** The camera's sideways slide down the vault's long hall, following your hero. */
+  private pan = 0;
+  /** The vault's way out, at the far end of the hall. */
+  private exitPortal: THREE.Group | null = null;
+  /** Where the last treasure goblin was caught. */
+  private caughtAt = new THREE.Vector3();
+  /** The huge rainbow that rises from a caught rainbow goblin while you choose (timed in real seconds: the world is slowed). */
+  private pickArc: { group: THREE.Group; t: number } | null = null;
+  /** `reached`: when the walker got to the doorway (trip seconds), -1 until then. */
+  private trip: { into: boolean; phase: 'go' | 'arrive'; t: number; portal: THREE.Group; reached: number } | null = null;
   private sparkleT = 0;
   private cine: { phase: 'exit' | 'stairs' | 'arrive'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[] } | null = null;
   /** Black card in front of the camera for fades. */
@@ -479,12 +530,49 @@ export class Scene {
     }
     for (const pr of this.props) pr.dispose();
     this.props = [];
+    this.roomArcs = [];
   }
 
-  /** Swap between the zone's room and the Goblin Vault's treasure room. */
+  private disposeGroup(group: THREE.Object3D) {
+    group.removeFromParent();
+    group.traverse((o) => {
+      if (!(o instanceof THREE.Mesh || o instanceof THREE.Sprite)) return;
+      o.geometry.dispose();
+      (o.material as THREE.Material).dispose();
+    });
+  }
+
+  /** A rainbow: seven half-rings, outside in (centred on the group's origin, standing up). */
+  private rainbowArc(radius: number, width: number, opacity: number): THREE.Group {
+    const group = new THREE.Group();
+    RAINBOW.forEach((color, i) => {
+      const outer = radius - i * width;
+      const band = new THREE.Mesh(
+        new THREE.RingGeometry(outer - width, outer, 64, 1, 0, Math.PI),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+      );
+      band.userData.ownMaterial = true;
+      band.userData.opacity = opacity;
+      group.add(band);
+    });
+    return group;
+  }
+
+  /** Swap between the zone's room and the Rainbow Vault's treasure room. */
   private setVaultRoom(on: boolean) {
     this.inVaultRoom = on;
+    // Only the one you chose goes in; the rest wait on the floor.
+    for (const c of this.party) c.body.visible = !on || c.comp === this.vaultHero;
     if (!on) {
+      for (const v of this.vaultChests.values()) this.disposeGroup(v.group);
+      this.vaultChests.clear();
+      for (const c of this.vaultCoins.values()) this.disposeGroup(c.mesh);
+      this.vaultCoins.clear();
+      for (const g of this.vaultGoblins.values()) this.disposeGroup(g.group);
+      this.vaultGoblins.clear();
+      if (this.exitPortal) this.disposeGroup(this.exitPortal);
+      this.exitPortal = null;
+      this.pan = 0;
       this.band = -1;
       this.setBand(zoneOf(this.lastFloor));
       return;
@@ -495,6 +583,9 @@ export class Scene {
     this.room = this.buildRoom(0, true);
     this.scene.add(this.room);
     this.applyPalette();
+    // The way out: a rainbow portal at the far end of the hall.
+    this.exitPortal = this.rainbowPortal((VAULT_LENGTH + 2) * this.squeeze);
+    this.scene.add(this.exitPortal);
   }
 
   private applyPalette() {
@@ -547,7 +638,9 @@ export class Scene {
     const fountainX = -2;
     const bannerAt = (x: number, y: number) => !sewer && y === 5 && (x === -9 || x === 5 || x === 12);
 
-    for (let x = -24; x < 24; x++) {
+    // The vault is a long hall the camera slides down.
+    const xEnd = loot ? 24 + Math.ceil(VAULT_LENGTH) + 12 : 24;
+    for (let x = -24; x < xEnd; x++) {
       for (let y = 0; y < 13; y++) {
         const rect = y === 12 ? top : bannerAt(x, y) ? banner : x !== fountainX && r() < variantChance ? variants[Math.floor(r() * variants.length)] : mid();
         wall.face(x, y, WALL_Z, rect);
@@ -593,32 +686,50 @@ export class Scene {
       const size = (sewer ? 0.6 : 0.7) / 16;
       floor.face(x, 0, WALL_Z + 0.5 + r() * 0.6, j, j.w * size, j.h * size);
     }
-    // The vault is heaped with treasure: open chests along the wall, coins everywhere the fight isn't.
+    // The vault is heaped with treasure: coins everywhere the chests aren't (no painted chests: the real ones are on the floor).
     if (loot) {
-      const chest = a.anim('chest_full_open')[2];
       const coin = a.anim('coin')[0];
       const flask = a.rect('flask_big_yellow');
-      [-15, -10.5, -8, 4, 6.5, 12].forEach((x) => floor.face(x, 0, WALL_Z + 0.6 + r() * 0.4, chest, 1.1, 1.1));
-      for (let i = 0; i < 140; i++) {
-        const x = -20 + r() * 40;
+      for (let i = 0; i < 140 + VAULT_LENGTH * 4; i++) {
+        const x = -20 + r() * (xEnd + 16);
         const z = WALL_Z + 0.4 + r() * 18;
-        if (x > -9 && x < 8 && z > -3.5 && z < 6.5) continue;
+        // (Not where you can walk: those coins are real ones, picked up as you run over them.)
+        if (z < 9.5) continue;
         floor.face(x, 0, z, r() < 0.08 ? flask : coin, 0.42, 0.42);
       }
     }
 
     const group = new THREE.Group();
     group.add(new THREE.Mesh(wall.build(), this.wallMat), new THREE.Mesh(floor.build(), this.floorMat), ...fountain);
-    // A great rainbow arched across the vault's back wall.
+    // Rainbows everywhere: a great one across the back wall, a giant faint one behind it, and smaller ones rising from
+    // the corners (all shimmer, see updateVaultRoom).
     if (loot) {
-      const bands = [0xff4a4a, 0xff9a3a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0x6a6aff, 0xc46aff];
-      bands.forEach((color, i) => {
-        const outer = 9.4 - i * 0.55;
-        const band = new THREE.Mesh(new THREE.RingGeometry(outer - 0.55, outer, 64, 1, 0, Math.PI), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
-        band.position.set(-1, 0.6, WALL_Z + 0.05);
-        band.userData.ownMaterial = true;
-        group.add(band);
-      });
+      const arcs: [number, number, number, number, number][] = [
+        // x, y, radius, band width, opacity
+        [-1, 0.6, 9.4, 0.55, 0.5],
+        [-1, -2, 17, 0.9, 0.2],
+        [-14, 0.4, 5, 0.32, 0.45],
+        [12.5, 0.4, 5, 0.32, 0.45],
+        [-6.5, 2.4, 3.2, 0.22, 0.35],
+        [5.5, 2.4, 3.2, 0.22, 0.35],
+      ];
+      // Out in the room too: faint arches standing up out of the floor, big and small, all down the hall.
+      for (let x = -10; x < xEnd - 8; x += 4 + r() * 4) {
+        const standing = this.rainbowArc(1.4 + r() * 2.6, 0.12 + r() * 0.06, 0.15);
+        standing.position.set(x, 0, WALL_Z + 2.5 + r() * 7);
+        standing.rotation.y = (r() - 0.5) * 0.6;
+        group.add(standing);
+        standing.children.forEach((b) => this.roomArcs.push(b as THREE.Mesh));
+      }
+      // The same set again every 30 units down the hall.
+      for (let shift = 0; shift < xEnd; shift += 30) {
+        for (const [x, y, radius, width, opacity] of arcs) {
+          const arc = this.rainbowArc(radius, width, opacity);
+          arc.position.set(x + shift, y, WALL_Z + 0.05 + (radius > 10 ? -0.02 : 0.01));
+          group.add(arc);
+          arc.children.forEach((b) => this.roomArcs.push(b as THREE.Mesh));
+        }
+      }
     }
     this.flames = [];
     [-12, -2, 6, 14].forEach((x, i) => {
@@ -882,7 +993,7 @@ export class Scene {
     for (const c of this.party) {
       c.home.x = c.homeX * this.squeeze;
       c.home.z = c.homeZ * this.deep;
-      if (c.comp === hero) continue;
+      if (c.comp === hero || !c.body.visible) continue;
       const def = COMPS[c.comp];
       const p = c.body.position;
       const a = c.act;
@@ -1191,7 +1302,7 @@ export class Scene {
     // Later laps: everything that climbs the stairs wears the corruption's colour.
     // (From the floor, not the room: the vault's treasure room has no lap.)
     const lap = Math.floor(zoneOf(this.lastFloor) / ZONES.length);
-    if (lap && !m.vault) tint.lerp(tint.clone().multiply(new THREE.Color(corruptionOf(lap).tint)), 0.7);
+    if (lap) tint.lerp(tint.clone().multiply(new THREE.Color(corruptionOf(lap).tint)), 0.7);
     sprite.mesh.material.color.copy(tint);
     if (m.half && this.settings.particles) this.fx.burst(body.position.clone().setY(1), '#d58aff', 14, 4, 0.08, 8);
     let ring: MonView['ring'] = null;
@@ -1227,7 +1338,7 @@ export class Scene {
       body.add(mesh);
       body.scale.setScalar(1);
     }
-    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: emerge ? 1 : 0, rise: emerge ? 1 : 0, fly: m.def.move === 'fly', extras, glow: m.champ ? 'champ' : m.vault ? 'hoard' : null, ring });
+    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: emerge ? 1 : 0, rise: emerge ? 1 : 0, fly: m.def.move === 'fly', extras, glow: m.champ ? 'champ' : null, ring });
     const from = emerge ? body.position : STAIRS;
     if (this.settings.particles) {
       if (emerge) this.fx.burst(from.clone().setY(0.3), '#7ad04a', m.boss ? 40 : 14, m.boss ? 5 : 3, 0.1, 10);
@@ -1497,10 +1608,12 @@ export class Scene {
           this.react(v, 0.15);
           break;
         }
-        if (ev.kind === 'auto') {
-          // Phantom Blade: a ghostly blue cut.
-          this.fx.swipe(at, 0x9fd8ff, v.boss ? 1.3 : 0.75);
-          this.react(v, 0.15);
+        if (ev.kind === 'auto' || ev.kind === 'autoCrit') {
+          // Phantom Blade: a ghostly blue cut; a crit cuts bigger with a spark (no slow motion: the blade crits often).
+          const blade = ev.kind === 'autoCrit';
+          this.fx.swipe(at, 0x9fd8ff, (v.boss ? 1.3 : 0.75) * (blade ? 1.4 : 1));
+          if (blade) this.fx.star(at, 0xffffff, 1.2, 0.15);
+          this.react(v, blade ? 0.3 : 0.15);
           break;
         }
         const crit = ev.kind === 'crit';
@@ -1610,7 +1723,49 @@ export class Scene {
         this.addShake(0.25 + ev.tier * 0.15);
         this.fx.light(new THREE.Vector3(1.5 * this.squeeze, 2, 1), 0xff3050, 30 + ev.tier * 20, 0.8, 14);
         break;
+      case 'vaultPick': {
+        this.vaultPick = true;
+        this.addShake(0.3);
+        this.fx.light(this.caughtAt.clone().setY(2), 0xff7ad8, 60, 1.2, 22);
+        // A huge rainbow arcs up out of the spot where the goblin was caught.
+        if (this.pickArc) this.disposeGroup(this.pickArc.group);
+        const arc = this.rainbowArc(7, 0.55, 0.75);
+        // (Kept to the middle of the floor so the whole arch shows: goblins are often caught near the edge.)
+        arc.position.set(Math.max(-5, Math.min(4, this.caughtAt.x)), 0, Math.min(0, this.caughtAt.z));
+        arc.scale.setScalar(0.01);
+        this.scene.add(arc);
+        this.pickArc = { group: arc, t: 0 };
+        if (this.settings.particles) for (const color of RAINBOW) this.fx.burst(this.caughtAt.clone().setY(0.6), color, 8, 6, 0.08, 4, true);
+        break;
+      }
+      case 'chest':
+        this.openChestView(ev.id, ev.rainbow);
+        break;
+      case 'vaultGoblin': {
+        const g = this.vaultGoblins.get(ev.id);
+        if (g) {
+          g.caught = 0;
+          const at = g.group.position.clone().setY(1);
+          if (this.settings.particles) {
+            this.fx.burst(at, '#ffd070', ev.rainbow ? 40 : 16, ev.rainbow ? 7 : 5, 0.08, 12, true);
+            if (ev.rainbow) for (const color of RAINBOW) this.fx.burst(at, color, 6, 6, 0.07, 6, true);
+          }
+          this.fx.light(at, ev.rainbow ? 0xff8ae0 : 0xffd070, ev.rainbow ? 40 : 20, 0.4, 8);
+          this.addShake(ev.rainbow ? 0.35 : 0.1);
+        }
+        break;
+      }
+      case 'vaultCoin': {
+        const c = this.vaultCoins.get(ev.id);
+        if (c) {
+          c.up = 0;
+          if (this.settings.particles) this.fx.burst(c.mesh.position.clone().setY(0.3), '#ffe28a', 4, 2, 0.05, 6, true);
+        }
+        break;
+      }
       case 'vault':
+        this.vaultPick = false;
+        if (ev.on) this.vaultHero = game.vault?.hero ?? game.heroIndex();
         this.collectAllLoot();
         if (ev.on) {
           this.fx.light(STAIRS.clone().setY(2), 0xffd070, 60, 1.5, 20);
@@ -1629,6 +1784,7 @@ export class Scene {
         r.t = 0;
         this.leaving.push(r);
         const at = r.group.position.clone();
+        this.caughtAt = at.clone();
         if (this.settings.particles) this.fx.burst(at.clone().setY(1), '#ffffff', 22, 5, 0.09, 10, true);
         this.fx.light(at.clone().setY(1.2), 0xffd070, 25, 0.4, 8);
         this.addShake(0.15);
@@ -1686,6 +1842,26 @@ export class Scene {
   /** How fast the world runs this frame: a clutch kill's slow motion, timed in real seconds so it always takes as
    *  long. Starts slow, lets go with a burst, and eases back to full speed. */
   timeScale(realDt: number) {
+    // The pick's rainbow grows and lingers in real time, then fades once you've chosen.
+    const pa = this.pickArc;
+    if (pa) {
+      pa.t += realDt;
+      const grow = Math.min(1, pa.t / 0.8);
+      pa.group.scale.setScalar(Math.max(0.01, 1 - (1 - grow) ** 3));
+      if (!this.vaultPick) {
+        const fade = Math.max(0, 1 - (pa.t - (pa.group.userData.chosenAt ??= pa.t)) / 0.6);
+        pa.group.children.forEach((b) => ((b as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = (b.userData.opacity as number) * fade);
+        if (fade <= 0) {
+          this.disposeGroup(pa.group);
+          this.pickArc = null;
+        }
+      }
+    }
+    if (this.vaultPick) return 0.12;
+    if (this.jackpotT > 0) {
+      this.jackpotT -= realDt;
+      return 0.3;
+    }
     const c = this.clutch;
     if (!c) return 1;
     c.t += realDt;
@@ -1926,9 +2102,15 @@ export class Scene {
       return !!s && Math.abs(x - s.x) < Math.max(18, s.h * 0.5) && y > s.y - 8 && y < s.y + s.h + 10;
     });
 
+    // In the vault, the shut chests are what to go for.
+    const shut = this.inVaultRoom ? [...this.vaultChests.values()].filter((v) => !v.open && v.born >= 1) : [];
+    const nearestChest = shut.reduce<ChestView | null>((best, v) => (!best || v.group.position.distanceToSquared(p) < best.group.position.distanceToSquared(p) ? v : best), null);
+
     // Where to go: the keys (then a moment standing where they left it), the mouse, or, left alone, the nearest
     // monster (home when the room is clear). Pointing at or near a monster means "go and fight that one".
-    const { aim, keys, stay } = this.heroInput;
+    const { keys, stay, idle } = this.heroInput;
+    // In the vault, a mouse left resting for a long while counts as no one steering.
+    const aim = this.inVaultRoom && idle ? null : this.heroInput.aim;
     let goal: THREE.Vector3 | null = null;
     const steer = new THREE.Vector3(keys.x, 0, keys.z);
     if (steer.lengthSq() > 0) goal = p.clone().add(steer.normalize().multiplyScalar(3));
@@ -1939,10 +2121,12 @@ export class Scene {
       const on = pointedAt(aim.x, aim.y) ?? (near && near.body.position.distanceTo(spot) < radius(near) + 0.8 ? near : null);
       goal = on ? besideOf(on) : spot;
     } else {
-      // Left alone, the hero goes for loot on the floor first, then the nearest monster.
+      // Left alone, the hero goes for loot on the floor first (a chest, in the vault), then the nearest monster.
       const drop = this.loot.find((l) => l.fly < 0);
       const prey = nearest(p);
-      goal = drop ? drop.group.position.clone().setY(0) : prey ? besideOf(prey) : c.home.clone();
+      // (With every chest open, the vault's hero sees itself out.)
+      const out = this.inVaultRoom && !nearestChest && this.exitPortal ? this.exitPortal.position.clone().setY(0) : null;
+      goal = nearestChest ? nearestChest.group.position.clone() : out ?? (drop ? drop.group.position.clone().setY(0) : prey ? besideOf(prey) : c.home.clone());
     }
 
     // Walk there smoothly: ease in and out, ignore tiny nudges until already walking, settle on arrival.
@@ -1952,7 +2136,10 @@ export class Scene {
       const d = goal.sub(p).setY(0);
       const dist = d.length();
       const walking = this.heroVel.length() > 0.4;
-      if (dist > (walking ? 0.08 : 0.45)) want.copy(d).setLength(HERO_SPEED * (1 + this.fever * 0.3) * Math.min(1, dist / 0.9));
+      // In the vault you sprint when you steer; left alone the hero ambles chest to chest (so "every chest" takes you).
+      const steered = !!aim || steer.lengthSq() > 0;
+      const speed = HERO_SPEED * (1 + this.fever * 0.3) * (this.inVaultRoom ? (steered ? 1.35 : 0.35) : 1);
+      if (dist > (walking ? 0.08 : 0.45)) want.copy(d).setLength(speed * Math.min(1, dist / 0.9));
     }
     this.heroVel.lerp(want, Math.min(1, dt * 12));
     if (want.lengthSq() === 0 && this.heroVel.length() < 0.15) this.heroVel.set(0, 0, 0);
@@ -2010,6 +2197,14 @@ export class Scene {
     c.inner.scale.set(c.base * (1 - c.stretch * 0.1), c.base * (1 + c.stretch * 0.15), c.base);
     c.inner.rotation.z = 0;
 
+    // Goblins the hero runs into are caught.
+    if (this.inVaultRoom) for (const [id, g] of this.vaultGoblins) if (g.caught < 0 && g.group.position.distanceTo(p) < 1.6) game.catchVaultGoblin(id);
+    // Loose coins under the hero's feet are scooped up.
+    if (this.inVaultRoom) for (const [id, coin] of this.vaultCoins) if (coin.up < 0 && coin.mesh.position.distanceTo(p) < 0.85) game.pickCoin(id);
+    // Any shut chest the hero runs into flies open; the far portal takes them back out.
+    for (const v of shut) if (v.group.position.distanceTo(p) < CHEST_REACH * (v.rainbow ? 1.4 : 1)) game.openChest(v.id);
+    if (this.exitPortal && !this.trip && this.exitPortal.position.clone().setY(0).distanceTo(p) < 1.6) game.leaveVault();
+
     // Treasure goblins don't get past you.
     const r = this.raider;
     if (r && r.state === 'run' && game.raid && r.group.position.distanceTo(p) < 1.3) game.catchRaid();
@@ -2036,6 +2231,13 @@ export class Scene {
     return this.toScreen(c.body.position.clone().setY(h + 0.15));
   }
 
+  /** Where your hero stands on screen (their feet), or null with no hero on the field. */
+  heroFeet(game: Game): { x: number; y: number } | null {
+    const c = this.party.find((p) => p.comp === game.heroIndex());
+    if (!c || !c.body.visible) return null;
+    return this.toScreen(c.body.position.clone().setY(0));
+  }
+
   /** A gold ring under whoever is your hero. */
   private markHero(c: CompView) {
     if (this.heroComp === c.comp && this.heroRing) return;
@@ -2050,17 +2252,259 @@ export class Scene {
 
   // ---------- goblin vault ----------
 
-  /** A rainbow portal opens; the party runs into it and the flash carries them to the other room. */
-  private startTrip(into: boolean) {
-    if (this.trip) {
-      this.scene.remove(this.trip.portal);
-      this.trip.portal.geometry.dispose();
+  /** The vault's chests: new ones pop up one after another, shut ones glint, Rainbow Chests glow every colour. */
+  private updateVaultChests(dt: number, game: Game) {
+    const list = game.vault?.chests ?? [];
+    list.forEach((c, k) => {
+      if (!this.vaultChests.has(c.id)) this.addVaultChest(c, -k * 0.05);
+    });
+    this.updateVaultGoblins(dt, game);
+    // Loose coins spin where they lie; a picked one hops up and vanishes.
+    for (const c of game.vault?.coins ?? []) {
+      if (c.taken || this.vaultCoins.has(c.id)) continue;
+      const sprite = new PixelSprite(this.atlas.texture, this.atlas.size, this.atlas.anim('coin'), { fps: 8 });
+      sprite.update(Math.random());
+      const mesh = new THREE.Group();
+      mesh.add(sprite.mesh);
+      mesh.scale.setScalar(COIN_SIZE);
+      mesh.position.set(c.x * this.squeeze, 0, c.z * this.deep);
+      this.scene.add(mesh);
+      this.vaultCoins.set(c.id, { sprite, mesh, up: -1 });
     }
-    const portal = new THREE.Mesh(new THREE.CircleGeometry(1.6, 40), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
-    portal.position.set(9 * this.squeeze, 1.6, 0.5 * this.deep);
+    for (const [id, c] of this.vaultCoins) {
+      c.sprite.update(dt);
+      if (c.up < 0) continue;
+      c.up += dt;
+      c.mesh.position.y = c.up * 6 - c.up * c.up * 8;
+      c.mesh.scale.setScalar(Math.max(0.01, COIN_SIZE * (1 - c.up * 2.5)));
+      if (c.up > 0.4) {
+        this.disposeGroup(c.mesh);
+        this.vaultCoins.delete(id);
+      }
+    }
+    for (const v of this.vaultChests.values()) {
+      v.born = Math.min(1, v.born + dt * 3);
+      const b = Math.max(0, v.born);
+      // A little overshoot as it lands.
+      const pop = b < 1 ? 1 + Math.sin(b * Math.PI) * 0.35 : 1;
+      v.group.scale.setScalar(Math.max(0.01, b * pop));
+      if (v.born > 0 && v.born - dt * 3 <= 0 && this.settings.particles) this.fx.burst(v.group.position.clone().setY(0.2), '#ffe9a8', 6, 2, 0.06, 6, true);
+      if (v.aura) {
+        v.aura.material.color.setHSL((this.time * 0.5 + v.id * 0.1) % 1, 0.9, 0.6);
+        v.aura.material.opacity = v.open ? Math.max(0, v.aura.material.opacity - dt) : 0.55 + Math.sin(this.time * 5) * 0.2;
+      }
+      if (!v.open && this.settings.particles && Math.random() < dt * (v.rainbow ? 6 : 0.8)) {
+        const at = v.group.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0.4 + Math.random() * 0.6, 0.2));
+        this.fx.star(at, v.rainbow ? new THREE.Color().setHSL(Math.random(), 1, 0.7) : 0xfff0b0, 0.35, 0.25);
+      }
+      // Shut chests breathe; an opened one settles after its pop.
+      const breathe = v.open ? 0 : Math.sin(this.time * 3 + v.id) * 0.04;
+      v.inner.scale.y += ((v.inner.userData.base as number) * (1 + breathe) - v.inner.scale.y) * Math.min(1, dt * 10);
+      v.sprite.update(dt);
+    }
+    for (let i = this.arcs.length - 1; i >= 0; i--) {
+      const a = this.arcs[i];
+      a.t += dt;
+      const k = a.t / a.life;
+      a.group.scale.setScalar(Math.min(1, a.t / 0.25));
+      a.group.position.y += dt * 0.4;
+      a.group.children.forEach((b) => ((b as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = (b.userData.opacity as number) * (1 - k * k));
+      if (k >= 1) {
+        this.disposeGroup(a.group);
+        this.arcs.splice(i, 1);
+      }
+    }
+  }
+
+  /** Vault goblins amble between random spots down the hall and scamper off when your hero comes close (slower than a
+   *  sprint, so a short chase always catches them). */
+  private updateVaultGoblins(dt: number, game: Game) {
+    const hero = this.party.find((c) => c.comp === this.vaultHero)?.body.position;
+    const minX = -12 * this.squeeze;
+    const maxX = (VAULT_LENGTH - 4) * this.squeeze;
+    const spot = () => new THREE.Vector3(minX + Math.random() * (maxX - minX), 0, (-2.6 + Math.random() * 5.6) * this.deep);
+    for (const g of game.vault?.goblins ?? []) {
+      if (g.caught || this.vaultGoblins.has(g.id)) continue;
+      const { run } = this.atlas.creature('goblin');
+      const sprite = new PixelSprite(this.atlas.texture, this.atlas.size, run, { fps: 14 });
+      // (Only a hint of the gold glow: the vault is bright enough to wash them out.)
+      sprite.mesh.material.emissive.setRGB(0.06, 0.04, 0);
+      const inner = new THREE.Group();
+      inner.scale.setScalar(g.rainbow ? 1.7 : 1.3);
+      inner.add(sprite.mesh);
+      const group = new THREE.Group();
+      group.add(inner, blobShadow(0.8));
+      group.position.set(g.x * this.squeeze, 0, g.z * this.deep);
+      this.scene.add(group);
+      this.vaultGoblins.set(g.id, { group, sprite, rainbow: g.rainbow, goal: spot(), caught: -1 });
+    }
+    for (const [id, v] of this.vaultGoblins) {
+      const p = v.group.position;
+      if (v.caught >= 0) {
+        // Caught: a hop, a spin, gone.
+        v.caught += dt;
+        p.y = v.caught * 5 - v.caught * v.caught * 12;
+        v.group.rotation.y += dt * 20;
+        v.group.scale.setScalar(Math.max(0.01, 1 - v.caught * 2.5));
+        if (v.caught > 0.4) {
+          this.disposeGroup(v.group);
+          this.vaultGoblins.delete(id);
+        }
+        continue;
+      }
+      let dir = v.goal.clone().sub(p).setY(0);
+      let speed = 1.4;
+      const away = hero ? p.clone().sub(hero).setY(0) : null;
+      if (away && away.length() < 2.6) {
+        dir = away;
+        speed = v.rainbow ? 3.6 : 3;
+      } else if (dir.length() < 0.4) v.goal = spot();
+      if (dir.lengthSq() > 1e-6) p.add(dir.setLength(speed * dt));
+      p.x = Math.max(minX, Math.min(maxX, p.x));
+      p.z = Math.max(WALL_Z + 1, Math.min(3.2 * this.deep, p.z));
+      if (Math.abs(dir.x) > 0.05) v.sprite.flip = dir.x < 0;
+      if (v.rainbow) v.sprite.mesh.material.color.setHSL((this.time * 0.8 + id * 0.1) % 1, 0.9, 0.65);
+      v.sprite.update(dt * (speed / 3));
+    }
+  }
+
+  /** Is a vault goblin under the cursor? (Clicking one catches it.) */
+  hitVaultGoblin(x: number, y: number): number | null {
+    for (const [id, v] of this.vaultGoblins) {
+      if (v.caught >= 0) continue;
+      const c = this.toScreen(v.group.position.clone().setY(0.8));
+      if (Math.hypot(x - c.x, y - c.y) < 44) return id;
+    }
+    return null;
+  }
+
+  /** Where a vault goblin is on screen. */
+  goblinScreen(id: number): { x: number; y: number } | null {
+    const v = this.vaultGoblins.get(id);
+    return v ? this.toScreen(v.group.position.clone().setY(0.9)) : null;
+  }
+
+  private addVaultChest(c: VaultChest, born: number) {
+    const frames = this.atlas.anim('chest_full_open');
+    const sprite = new PixelSprite(this.atlas.texture, this.atlas.size, [frames[0]], { fps: 14 });
+    const inner = new THREE.Group();
+    inner.add(sprite.mesh);
+    const base = c.rainbow ? 2 : 1.25;
+    inner.scale.setScalar(base);
+    inner.userData.base = base;
+    const group = new THREE.Group();
+    group.add(inner, blobShadow(c.rainbow ? 1.6 : 1));
+    let aura: THREE.Sprite | null = null;
+    if (c.rainbow) {
+      aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false }));
+      aura.scale.setScalar(4);
+      aura.position.y = 1;
+      group.add(aura);
+      // A Rainbow Chest carries its own little rainbow.
+      const arc = this.rainbowArc(1.6, 0.12, 0.55);
+      arc.position.set(0, 0.2, -0.1);
+      group.add(arc);
+    }
+    group.position.set(c.x * this.squeeze, 0, c.z * this.deep);
+    group.scale.setScalar(0.01);
+    this.scene.add(group);
+    this.vaultChests.set(c.id, { id: c.id, group, inner, sprite, rainbow: c.rainbow, open: c.open, born, aura });
+  }
+
+  /** The lid flies open: a fountain of coins, a rainbow rising out of it, and for a Rainbow Chest a slow-motion jackpot. */
+  private openChestView(id: number, rainbow: boolean) {
+    const v = this.vaultChests.get(id);
+    if (!v || v.open) return;
+    v.open = true;
+    v.sprite.play(this.atlas.anim('chest_full_open'), 14, false);
+    v.inner.scale.y = (v.inner.userData.base as number) * 1.35;
+    const at = v.group.position.clone();
+    const top = at.clone().setY(rainbow ? 1.4 : 0.8);
+    if (this.settings.particles) {
+      this.fx.burst(top, '#ffd070', rainbow ? 90 : 28, rainbow ? 9 : 6, 0.1, 14, true);
+      for (const color of RAINBOW) this.fx.burst(top, color, rainbow ? 10 : 3, rainbow ? 7 : 4.5, 0.07, 6, true);
+    }
+    this.fx.light(top, new THREE.Color().setHSL(Math.random(), 0.9, 0.6), rainbow ? 90 : 30, rainbow ? 1 : 0.4, rainbow ? 18 : 8);
+    const arc = this.rainbowArc(rainbow ? 3.4 : 1.3, rainbow ? 0.3 : 0.11, 0.7);
+    arc.position.copy(at).setY(0.1);
+    arc.scale.setScalar(0.01);
+    this.scene.add(arc);
+    this.arcs.push({ group: arc, t: 0, life: rainbow ? 2.4 : 1.1 });
+    this.addShake(rainbow ? 0.7 : 0.12);
+    if (rainbow) {
+      this.fx.shockwave(at, 6);
+      this.fx.beam(at.x, at.z, '#ffffff', 4);
+      if (this.settings.cinematics) this.jackpotT = 0.7;
+    }
+  }
+
+  /** A rainbow oval in the back wall: a shimmering doorway ringed in the rainbow's seven bands. Its foot is on the floor. */
+  private rainbowPortal(x: number): THREE.Group {
+    const group = new THREE.Group();
+    const oval = new THREE.Group();
+    oval.scale.set(0.75, 1.2, 1);
+    oval.position.y = 1.6;
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(1.25, 48), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+    disc.name = 'disc';
+    oval.add(disc);
+    RAINBOW.forEach((color, i) => {
+      const r0 = 1.25 + i * 0.1;
+      oval.add(new THREE.Mesh(new THREE.RingGeometry(r0, r0 + 0.1, 48), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })));
+    });
+    group.add(oval);
+    group.position.set(x, 0, WALL_Z + 0.12);
+    return group;
+  }
+
+  /** A portal's swirl: the doorway cycles the rainbow and breathes, throwing off coloured sparks. */
+  private animatePortal(portal: THREE.Group, dt: number) {
+    const disc = portal.getObjectByName('disc') as THREE.Mesh | undefined;
+    if (disc) (disc.material as THREE.MeshBasicMaterial).color.setHSL((this.time * 0.6) % 1, 0.9, 0.65);
+    const oval = portal.children[0];
+    oval.scale.set(0.75 * (1 + Math.sin(this.time * 5) * 0.04), 1.2 * (1 + Math.sin(this.time * 5 + 1) * 0.04), 1);
+    if (this.settings.particles && Math.random() < dt * 25) {
+      const at = portal.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2.2, 0.3 + Math.random() * 3, 0.2));
+      this.fx.burst(at, new THREE.Color().setHSL(Math.random(), 0.9, 0.65), 2, 2, 0.07, 2, true);
+    }
+  }
+
+  /** Where the vault's way out is on screen (for its label), or null outside the vault. */
+  exitScreen(): { x: number; y: number } | null {
+    return this.exitPortal ? this.toScreen(this.exitPortal.position.clone().setY(0).setZ(WALL_Z + 0.9)) : null;
+  }
+
+  /** The cursor sweeps up loose vault coins it passes over (chests still need your hero). */
+  sweepVaultCoins(x: number, y: number, game: Game) {
+    if (!this.inVaultRoom) return;
+    for (const [id, c] of this.vaultCoins) {
+      if (c.up >= 0) continue;
+      const s = this.toScreen(c.mesh.position.clone().setY(0.2));
+      if (Math.hypot(s.x - x, s.y - y) < 36) game.pickCoin(id);
+    }
+  }
+
+  /** Where a loose vault coin is on screen. */
+  coinScreen(id: number): { x: number; y: number } | null {
+    const c = this.vaultCoins.get(id);
+    return c ? this.toScreen(c.mesh.position.clone().setY(0.3)) : null;
+  }
+
+  /** Where a vault chest is on screen (for the coins that fly from it to the bank). */
+  chestScreen(id: number): { x: number; y: number } | null {
+    const v = this.vaultChests.get(id);
+    return v ? this.toScreen(v.group.position.clone().setY(v.rainbow ? 1.2 : 0.7)) : null;
+  }
+
+  /** A rainbow oval opens in the back wall behind whoever goes; they walk into it and the flash carries them across. */
+  private startTrip(into: boolean) {
+    if (this.trip) this.disposeGroup(this.trip.portal);
+    const hero = this.party.find((c) => c.comp === this.vaultHero);
+    const portal = this.rainbowPortal(hero ? hero.body.position.x : 0);
     portal.scale.setScalar(0.01);
     this.scene.add(portal);
-    this.trip = { into, phase: 'go', t: 0, portal };
+    this.trip = { into, phase: 'go', t: 0, portal, reached: -1 };
+    this.fx.light(portal.position.clone().setY(2), 0xff9ae0, 40, TRIP_OPEN, 14);
+    this.addShake(0.25);
   }
 
   private updateTrip(dt: number) {
@@ -2070,27 +2514,53 @@ export class Scene {
     let fade = 0;
     if (trip.phase === 'go') {
       const portal = trip.portal;
-      portal.scale.setScalar(Math.min(1, trip.t / 0.3) * (1 + Math.sin(this.time * 9) * 0.06));
-      portal.rotation.z += dt * 3;
-      portal.material.color.setHSL(hue, 0.9, 0.6);
-      if (this.settings.particles && Math.random() < 0.6) {
-        this.fx.burst(portal.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, 0)), new THREE.Color().setHSL(Math.random(), 0.9, 0.65), 3, 2.5, 0.08, 2, true);
-      }
+      // The oval slowly tears open out of the wall (easing out, a slight overshoot), then swirls.
+      const open = Math.min(1, trip.t / TRIP_OPEN);
+      const eased = 1 - (1 - open) ** 3;
+      portal.scale.setScalar(Math.max(0.01, eased * (1 + Math.sin(open * Math.PI) * 0.12)));
+      this.animatePortal(portal, dt);
+      if (open < 1 && this.settings.particles && Math.random() < dt * 30) this.fx.burst(portal.position.clone().setY(0.2), '#ffe2ff', 3, 3, 0.06, 6, true);
+      // Only the one who goes (both ways) walks to it, stops on the threshold, and steps through; the rest wait.
+      const door = portal.position.clone().setZ(WALL_Z + 0.95);
       for (const p of this.party) {
+        if (p.comp !== this.vaultHero) continue;
         p.act = null;
-        if (trip.t > 0.2) p.body.position.x += dt * 11;
-        p.sprite.flip = false;
-        p.sprite.play(p.run);
-        p.sprite.update(dt);
+        const pos = p.body.position;
+        const d = door.clone().sub(pos).setY(0);
+        const walking = trip.t > TRIP_OPEN * 0.7 && trip.reached < 0;
+        if (walking) {
+          const step = TRIP_WALK_SPEED * dt;
+          if (d.length() > step) pos.add(d.setLength(step));
+          else {
+            pos.copy(door);
+            trip.reached = trip.t;
+          }
+          if (Math.abs(d.x) > 0.1) p.sprite.flip = d.x < 0;
+        }
+        // On the threshold for a beat, then shrinking into the light.
+        const inT = trip.reached < 0 ? 0 : Math.max(0, trip.t - trip.reached - TRIP_PAUSE) / TRIP_STEP_IN;
+        p.body.scale.setScalar(Math.max(0.01, 1 - inT));
+        p.body.position.y = inT > 0 ? Math.sin(Math.min(1, inT) * Math.PI) * 0.4 : 0;
+        p.sprite.play(walking ? p.run : p.idle);
+        p.sprite.update(dt * (walking ? 0.6 : 1));
+        if (inT > 0 && inT - dt / TRIP_STEP_IN <= 0) {
+          this.fx.light(door.clone().setY(1.6), 0xffffff, 80, 0.6, 16);
+          if (this.settings.particles) for (const color of RAINBOW) this.fx.burst(door.clone().setY(1.2), color, 6, 4, 0.08, 4, true);
+          this.addShake(0.3);
+        }
       }
-      fade = Math.max(0, (trip.t - 0.55) / (TRIP_GO - 0.55));
-      if (trip.t >= TRIP_GO) {
+      const gone = trip.reached < 0 ? Infinity : trip.reached + TRIP_PAUSE + TRIP_STEP_IN;
+      fade = Math.max(0, (trip.t - gone) / TRIP_FLASH);
+      if (trip.t >= gone + TRIP_FLASH || trip.t > 8) {
         this.setVaultRoom(trip.into);
-        this.scene.remove(portal);
-        portal.geometry.dispose();
-        portal.material.dispose();
-        // Everyone tumbles in from the left of the new room.
-        for (const p of this.party) p.body.position.set(-15 - Math.random() * 3, 0, p.home.z);
+        this.disposeGroup(portal);
+        // The vault's hero tumbles in from the left of the new room (the rest never left the floor).
+        for (const p of this.party) {
+          if (p.comp !== this.vaultHero) continue;
+          p.body.position.set(-15 - Math.random() * 3, 0, p.home.z);
+          p.body.scale.setScalar(1);
+          p.body.position.y = 0;
+        }
         trip.phase = 'arrive';
         trip.t = 0;
         this.addShake(0.3);
@@ -2107,6 +2577,14 @@ export class Scene {
   /** The treasure room shimmers: torches cycle the rainbow and coins glint across the floor. */
   private updateVaultRoom(dt: number) {
     const hue = this.time * 0.15;
+    if (this.exitPortal) {
+      this.animatePortal(this.exitPortal, dt);
+      // A steady glow in front of the way out, so it reads as a door rather than another rainbow on the wall.
+      if (Math.random() < dt * 3) this.fx.light(this.exitPortal.position.clone().setY(1.6).setZ(WALL_Z + 1.5), new THREE.Color().setHSL((this.time * 0.6) % 1, 0.8, 0.7), 22, 0.5, 9);
+    }
+    // The torches' light travels down the hall with the camera.
+    [-12, -2, 6, 14].forEach((x, i) => (this.torchLights[i].position.x = x - 0.5 + this.pan));
+    this.roomArcs.forEach((b, i) => ((b.material as THREE.MeshBasicMaterial).opacity = (b.userData.opacity as number) * (0.7 + 0.3 * Math.sin(this.time * 2.2 + i * 0.6))));
     this.torchLights.forEach((l, i) => l.color.setHSL((hue + i / 4) % 1, 0.85, 0.6));
     this.hemi.color.setHSL((hue + 0.5) % 1, 0.45, 0.55);
     this.flameMat.color.setHSL(hue % 1, 0.9, 0.7).multiplyScalar(1.4);
@@ -2114,7 +2592,7 @@ export class Scene {
     this.sparkleT -= dt;
     if (this.sparkleT > 0) return;
     this.sparkleT = 0.12;
-    const at = new THREE.Vector3(-14 + Math.random() * 28, 0.2 + Math.random() * 0.6, WALL_Z + 0.6 + Math.random() * 12);
+    const at = new THREE.Vector3(this.pan - 14 + Math.random() * 28, 0.2 + Math.random() * 0.6, WALL_Z + 0.6 + Math.random() * 12);
     this.fx.burst(at, new THREE.Color().setHSL(Math.random(), 0.9, 0.7), 4, 1.6, 0.06, 3, true);
   }
 
@@ -2142,6 +2620,7 @@ export class Scene {
     if (this.cine) this.updateCinematic(dt);
     if (this.trip) this.updateTrip(dt);
     if (this.inVaultRoom) this.updateVaultRoom(dt);
+    if (this.inVaultRoom || this.arcs.length) this.updateVaultChests(dt, game);
     const holding = (this.cine && this.cine.phase !== 'arrive') || this.trip?.phase === 'go';
     this.updateMonsters(dt, game);
     if (!holding) {
@@ -2158,11 +2637,28 @@ export class Scene {
     this.grade.uniforms.warmth.value = 0.06 + this.fever * 0.08;
     this.grade.uniforms.vignette.value = 0.55 + this.fever * 0.25;
 
+    // In the vault the camera slides down the hall after your hero.
+    if (this.inVaultRoom) {
+      const hero = this.party.find((c) => c.comp === this.vaultHero);
+      const end = (VAULT_LENGTH + 2) * this.squeeze - 4;
+      const want = hero ? Math.max(0, Math.min(end, hero.body.position.x)) : this.pan;
+      this.pan += (want - this.pan) * Math.min(1, dt * 3);
+    }
     this.shake = Math.max(0, this.shake - dt * 1.6);
     const sh = this.shake * this.shake * 2.2;
     if (this.cine?.phase !== 'stairs') {
-      this.camera.position.set(this.camBase.x + (Math.random() - 0.5) * sh, this.camBase.y + (Math.random() - 0.5) * sh, this.camBase.z);
+      this.camera.position.set(this.camBase.x + this.pan + (Math.random() - 0.5) * sh, this.camBase.y + (Math.random() - 0.5) * sh, this.camBase.z);
       const look = this.look.clone();
+      look.x += this.pan;
+      // Walking into a rainbow portal: the camera eases in on the doorway.
+      const tr = this.trip;
+      if (tr?.phase === 'go' && this.settings.cinematics) {
+        const k = Math.min(1, tr.t / (TRIP_OPEN + 1));
+        const push = k * k * (3 - 2 * k);
+        const focus = tr.portal.position.clone().setY(1.6);
+        this.camera.position.lerp(focus.clone().add(new THREE.Vector3(0, 3, 9)), push * 0.35);
+        look.lerp(focus, push * 0.5);
+      }
       // A clutch kill: push in on the fallen boss and drain the colour, then let both go with the release.
       const c = this.clutch;
       if (c) {

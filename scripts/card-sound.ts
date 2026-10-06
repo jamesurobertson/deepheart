@@ -1,7 +1,8 @@
 /**
  * Synthesizes the card drop sounds: a quick retro "you got something" arpeggio (C6 E6 G6 C7 in square waves), and for
- * gold cards the same arpeggio answered a fifth higher a beat later, with high glints on top.
- *   node scripts/card-sound.ts  ->  public/assets/sfx/card.mp3, public/assets/sfx/cardgold.mp3
+ * gold cards the same arpeggio answered a fifth higher a beat later, with high glints on top. Also the Goblin Vault's
+ * chests: a soft pop and a rising sparkle of coin chimes, and for a Rainbow Chest a jackpot shower.
+ *   node scripts/card-sound.ts  ->  public/assets/sfx/card.mp3, cardgold.mp3, treasure.mp3, jackpot.mp3
  */
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, unlinkSync } from 'node:fs';
@@ -34,6 +35,23 @@ function ping(out: Float32Array, t0: number, f: number, vol: number) {
     if (env < 1e-4) break;
     out[i0 + k] += Math.sin(TAU * f * t) * env * vol;
   }
+}
+
+/** A soft "pop" as a lid flies open: a low thump under a short puff of noise. */
+function pop(out: Float32Array, t0: number, vol: number) {
+  const i0 = Math.round(t0 * RATE);
+  let lp = 0;
+  for (let k = 0; k < 0.12 * RATE && i0 + k < out.length; k++) {
+    const t = k / RATE;
+    lp += ((Math.random() * 2 - 1) - lp) * 0.25;
+    out[i0 + k] += (Math.sin(TAU * (190 - t * 600) * t) * Math.exp(-t * 40) + lp * Math.exp(-t * 60) * 0.6) * vol;
+  }
+}
+
+/** Coin chimes rising: bright sine pings up a major arpeggio, with a few random glints above. */
+function sparkle(out: Float32Array, t0: number, p: number, vol: number, glints: number) {
+  [1568, 1976, 2349, 3136].forEach((f, k) => ping(out, t0 + k * 0.045, f * p, vol * (0.7 + k * 0.1)));
+  for (let k = 0; k < glints; k++) ping(out, t0 + 0.05 + Math.random() * 0.35, 3500 + Math.random() * 3000, vol * 0.25);
 }
 
 /** A small, bright room: four combs into the dry signal. */
@@ -79,6 +97,17 @@ function render(name: string, seconds: number, build: (out: Float32Array) => voi
 }
 
 render('card', 1.2, (out) => itemGet(out, 0, 1, 1));
+render('treasure', 0.9, (out) => {
+  pop(out, 0, 0.9);
+  sparkle(out, 0.03, 1, 0.5, 5);
+});
+render('jackpot', 2.2, (out) => {
+  pop(out, 0, 1);
+  itemGet(out, 0.04, 1, 0.8);
+  sparkle(out, 0.2, 1.335, 0.5, 0);
+  // A long shower of coin glints.
+  for (let k = 0; k < 40; k++) ping(out, 0.3 + Math.random() * 1.4, 2500 + Math.random() * 4000, 0.12);
+});
 render('cardgold', 1.6, (out) => {
   itemGet(out, 0, 1, 1);
   itemGet(out, 0.14, 1.498, 0.8);

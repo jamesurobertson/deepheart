@@ -66,7 +66,7 @@ async function boot() {
     if (resetting) return;
     try {
       game.s.lastSave = Date.now();
-      localStorage.setItem(SAVE_KEY, JSON.stringify(game.s));
+      localStorage.setItem(SAVE_KEY, JSON.stringify(game.saveState()));
     } catch { /* storage unavailable: play continues unsaved */ }
   };
 
@@ -79,7 +79,7 @@ async function boot() {
     },
     exportSave: () => {
       save();
-      return btoa(unescape(encodeURIComponent(JSON.stringify(game.s))));
+      return btoa(unescape(encodeURIComponent(JSON.stringify(game.saveState()))));
     },
     importSave: (text) => {
       try {
@@ -111,6 +111,11 @@ async function boot() {
     if (params.get('relics') === 'always') game.debugRelics = true;
     // ?cards=often makes cards drop hundreds of times as often, and champion bosses common.
     if (params.get('cards') === 'often') game.debugCards = true;
+    // ?goblin=rainbow makes every treasure goblin a rainbow goblin that opens the vault, one every few seconds.
+    if (params.get('goblin') === 'rainbow') {
+      game.debugRainbow = true;
+      game.s.raidTimer = Math.min(game.s.raidTimer, 3);
+    }
     // ?deepest=40 stands you on floor 40 as the deepest of this descent, with a party that can beat its boss, so the
     // way down into the next zone plays. Use it with ?slot= to leave your own run alone.
     const deepest = Number(params.get('deepest'));
@@ -239,7 +244,7 @@ async function boot() {
   requestAnimationFrame(frame);
 }
 
-/** Each zone has its own track; bosses get the boss themes (the zone boss the bigger one); the Goblin Vault its own calm one. */
+/** Each zone has its own track; bosses get the boss themes (the zone boss the bigger one); the Rainbow Vault its own calm one. */
 const ZONE_TRACKS: Track[] = ['halls', 'crypts', 'warrens', 'tomb', 'rotting', 'grove', 'demon', 'frozen'];
 function trackFor(game: Game): Track {
   if (game.s.buffs.some((b) => b.id === 'vault')) return 'vault';
@@ -275,6 +280,9 @@ function playSound(sfx: Sfx, ev: GameEvent) {
       break;
     case 'rampage': sfx.play('mega', { vol: 0.6, rate: 1 + ev.tier * 0.2 }); break;
     case 'vault': sfx.play(ev.on ? 'drop4' : 'coins', { vol: 0.8 }); break;
+    case 'vaultPick': sfx.play('awaken', { vol: 0.7, rate: 0.8 }); break;
+    case 'vaultGoblin': sfx.play('kill', { vol: 0.5, rate: ev.rainbow ? 0.9 : 1.15 }); break;
+    case 'chest': sfx.play(ev.rainbow ? 'jackpot' : 'treasure', { vol: ev.rainbow ? 0.9 : 0.6, jitter: ev.rainbow ? 0 : 0.06 }); break;
     case 'bossFail': sfx.play('death', { vol: 0.6 }); break;
     case 'buyComp': sfx.play('coins', { vol: 0.5, jitter: 0.08 }); break;
     case 'reveal': sfx.play('levelup', { vol: 0.5 }); break;

@@ -1,4 +1,4 @@
-import { ABYSS, AWAKEN_FLOOR, CARDS, CARD_BY_ID, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, milestoneIndex, milestoneMult, nextMilestone, bandFor, bossFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, ASCEND_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, TRAITS, isTraitId, milestoneAt, type AbilityId, ABYSS, CARDS, CARD_BY_ID, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, milestoneIndex, milestoneMult, nextMilestone, bandFor, bossFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { DESCEND_FLOOR, FLOOR_KILLS, isBossFloor, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -17,20 +17,25 @@ export interface UiHooks {
 }
 
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
-const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', soulstorm: 'Soul Storm!', vault: 'Goblin Vault!', rainbow: 'Rainbow Haul!' };
+const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', soulstorm: 'Soul Storm!', vault: 'Rainbow Vault!', rainbow: 'Rainbow Haul!' };
 const MAX_POPS = 90;
 const RARITY_COLORS = ['#c9b8a0', '#5fa8ff', '#c77dff', '#ffb13d'];
 
 /** Little coloured labels for boss modifiers. */
 const modChips = (mods: ModId[]) => mods.map((id) => `<em class="mod" style="--mc:${MOD_BY_ID.get(id)!.color}">${MOD_BY_ID.get(id)!.name}</em>`).join('');
 const MAX_COINS = 24;
+/** How close your hero or the cursor has to come to a coin to pick it up (px). */
+const COIN_REACH = 52;
+/** Coins start leaning toward whoever's collecting from this far out (px). */
+const COIN_MAGNET = 110;
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 function icon(i: Icon, box = 36): string {
+  // Two companions (a synergy): side by side, a little overlapped.
+  if (i.sub) return `<span class="ico pair">${charFit(i.sprite, box * 0.8)}${charFit(i.sub, box * 0.8)}</span>`;
   const tier = i.tier !== undefined ? `<b class="tier" style="--tc:${TIER_COLORS[i.tier]}">${ROMAN[i.tier]}</b>` : '';
-  const sub = i.sub ? `<span class="sub">${spriteFit(i.sub, 18)}</span>` : '';
-  return `<span class="ico">${spriteFit(i.sprite, box)}${sub}${tier}</span>`;
+  return `<span class="ico">${spriteFit(i.sprite, box)}${tier}</span>`;
 }
 
 /** A monster card as it sits in the collection: one you don't have yet is a dark silhouette. */
@@ -39,6 +44,16 @@ function cardFace(card: (typeof CARDS)[number], state: 'locked' | 'got', gilded 
   const art = cardArt(card, box, state === 'got' && card.id === 'rainbow-goblin' ? 'rainbow' : '', lap);
   return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'locked' ? '???' : esc(card.name)}</span></span>`;
 }
+
+/** A companion's first milestones (`m{comp}_{k}`, k < TRAITS) are its traits, bought on its own row. */
+const isTrait = isTraitId;
+
+/** The skills you press, in column order: their number keys (passive abilities don't get one). */
+const KEYED = ABILITIES.filter((a) => a.kind !== 'passive').map((a) => a.id);
+const abilityKey = (id: AbilityId) => KEYED.indexOf(id) + 1;
+
+/** "4:05" for a cooldown. */
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.ceil(s % 60) % 60).padStart(2, '0')}`;
 
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
 
@@ -52,7 +67,9 @@ const perSec = (n: number) => (n < 100 ? String(Math.round(n * 100) / 100) : fmt
 const starsOf = (lv: number) => (relicStars(lv) ? ` <span class="stars">${'★'.repeat(relicStars(lv))}</span>` : '');
 
 function buffText(b: Buff) {
-  if (b.id === 'vault') return 'hoarders everywhere';
+  if (b.id === 'cleave') return 'clicks hit every monster';
+  if (b.id === 'flurry') return '10 clicks a second';
+  if (b.blade && b.blade > 1) return `Phantom Blade ×${b.blade}`;
   if (b.dps > 1 && b.click > 1) return `×${b.dps} damage`;
   if (b.dps > 1) return `×${b.dps} companion damage`;
   if (b.click > 1) return `×${b.click} click damage`;
@@ -79,6 +96,8 @@ export class Ui {
   private bars = new Map<number, HTMLElement>();
   /** Gold on the counter, easing toward the real bank. */
   private shown = new Decimal(0);
+  /** Gold banked whose coins are still on their way up to the counter. */
+  private inFlight = new Decimal(0);
   private newsT = 0;
   private newsIdx = -1;
   private modal: string | null = null;
@@ -150,13 +169,16 @@ export class Ui {
           <button class="btn icon sm" data-act="floorUp" aria-label="Next floor">${G.right()}</button>
           <button class="btn small auto" data-act="auto" data-tip="auto">Auto</button>
         </div>
-        <div class="fever" data-tip="fever"><i></i><span>Rampage</span></div>
+        <div class="fever on" hidden><i></i><span></span><b class="fever-face">${charFit(COMPS[ABILITY_BY_ID.get('rampage')!.comp].sprite, 26)}</b></div>
         <div class="buffs"></div>
       </div>
       <div class="bars"></div>
       <div class="hint" hidden></div>
+      <button class="btn vault-leave" data-act="leaveVault" hidden>Leave the vault</button>
+      <div class="vault-pick" hidden><b>A rainbow portal has appeared!</b><span>Choose a companion to send in</span><div class="vp-faces"></div></div>
       <div class="hero-mark" hidden>▼</div>
       <div class="raid-mark" hidden><b>!</b></div>
+      <div class="exit-mark" hidden><i>▲</i><b>Way out</b></div>
       <div class="letterbox" aria-hidden="true"></div>
       <div class="banner" hidden><b></b><span></span></div>
       <div class="loot" hidden></div>
@@ -170,6 +192,8 @@ export class Ui {
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu(3)}<span>Options</span></button>
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute"></button>
       </nav>
+      <nav class="abilities" aria-label="Abilities"></nav>
+      <div class="drops"></div>
       <aside class="shop">
         <header class="shop-head"><h2>Your Party</h2><span class="shop-sub"></span><span class="sheet-grip" aria-hidden="true"></span></header>
         <section class="upgs">
@@ -195,11 +219,11 @@ export class Ui {
       bank: q('.bank-v'), bankIco: q('.bank-ico'), dps: q('.dps-v'), click: q('.click-v'), rate: q('.rate'),
       floorN: q('.floor-n'), floorSub: q('.floor-sub'), floorBar: q('.floor-bar i'), floorBarT: q('.floor-bar span'), floorBox: q('.floor'),
       down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
-      fever: q('.fever'), feverBar: q('.fever i'), feverLabel: q('.fever span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), heroMark: q('.hero-mark'), raid: q('.raid-mark'),
+      fever: q('.fever'), feverBar: q('.fever > i'), feverLabel: q('.fever > span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), vaultPick: q('.vault-pick'), vaultLeave: q('.vault-leave'), vaultFaces: q('.vp-faces'), heroMark: q('.hero-mark'), raid: q('.raid-mark'), exitMark: q('.exit-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
       upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), autoUpg: q('.auto-upg'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
-      relicBadge: q('[data-open=relics] .badge'), cardBadge: q('[data-open=trophies] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'),
+      relicBadge: q('[data-open=relics] .badge'), cardBadge: q('[data-open=trophies] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
     };
 
     COMPS.forEach((c, i) => {
@@ -209,13 +233,25 @@ export class Ui {
       row.dataset.tip = `comp:${i}`;
       row.innerHTML = `
         <span class="gen-ico">${charFit(c.sprite, 40)}</span>
-        <span class="gen-mid"><b class="gen-name"></b><span class="gen-cost"></span></span>
+        <span class="gen-mid"><b class="gen-name"></b><span class="gen-cost"></span><span class="traits"></span></span>
         <span class="gen-right"><b class="gen-lv"></b><small class="gen-dps"></small></span>
         <span class="gen-hero" data-hero="${i}" data-tip="hero:${i}">★</span>`;
       this.el.gens.appendChild(row);
       this.rows.push(row);
       this.rowCache.push('');
     });
+
+    // Skills you press first (top to bottom matches keys 1–9), then the always-on ones after a gap.
+    const column = [...ABILITIES.filter((a) => a.kind !== 'passive'), ...ABILITIES.filter((a) => a.kind === 'passive')];
+    for (const a of column) {
+      const slot = document.createElement('button');
+      slot.className = 'ab locked';
+      slot.dataset.ability = a.id;
+      if (a.kind === 'passive' && a === column.find((x) => x.kind === 'passive')) slot.dataset.gap = '';
+      slot.dataset.tip = `ab:${a.id}`;
+      slot.innerHTML = `${charFit(COMPS[a.comp].sprite, 30)}<span class="ab-fill"></span><span class="ab-time"></span><span class="ab-lock">${G.lock()}</span>${a.kind === 'passive' ? '' : `<span class="ab-key">${abilityKey(a.id)}</span>`}`;
+      this.el.abilities.appendChild(slot);
+    }
 
     this.bind();
     // A relic's card shows when it's picked up off the floor (the scene sets it down and tells us).
@@ -245,7 +281,9 @@ export class Ui {
     body.toggle('phone', sheet);
     body.toggle('compact', compact);
     const shop = this.el.shop.getBoundingClientRect();
-    const freeW = sheet ? w : shop.left;
+    // The ability column stands between the fight and the party panel (on a phone it's a row along the bottom instead).
+    const column = sheet ? 0 : this.el.abilities.getBoundingClientRect().width;
+    const freeW = sheet ? w : shop.left - column;
     const freeH = sheet ? shop.top : h;
     this.field = { w: freeW, h: freeH };
     this.root.style.setProperty('--free-w', `${freeW}px`);
@@ -254,9 +292,9 @@ export class Ui {
     const dock = this.root.querySelector('.dock')!.getBoundingClientRect();
     this.root.style.setProperty('--dock-r', `${Math.round(dock.right + 20)}px`);
     // Frame the fight below the HUD (the floor bar is the last part that always shows).
-    const hud = (compact ? this.el.fever.hidden ? this.el.floorBox : this.el.fever : this.el.floorBox).getBoundingClientRect();
+    const hud = this.el.floorBox.getBoundingClientRect();
     this.hudTop = compact ? Math.round(hud.bottom + 4) : 0;
-    this.scene.setViewport(sheet ? 0 : w - shop.left, sheet ? h - shop.top : 0, this.hudTop);
+    this.scene.setViewport(sheet ? 0 : w - shop.left + column, sheet ? h - shop.top : 0, this.hudTop);
   }
 
   /** Portrait sheet: folded (header only), half (default) or full height. */
@@ -326,6 +364,11 @@ export class Ui {
         this.game.catchRaid();
         return;
       }
+      const goblin = this.game.vault ? this.scene.hitVaultGoblin(e.clientX, e.clientY) : null;
+      if (goblin !== null) {
+        this.game.catchVaultGoblin(goblin);
+        return;
+      }
       // On a touch screen, a finger held on the battlefield leads your hero (lift it and they fight on their own).
       if (e.pointerType !== 'mouse') {
         this.fingerDown = true;
@@ -347,6 +390,7 @@ export class Ui {
     // A clicked button lets go of keyboard focus, so Space goes back to attacking instead of pressing it again.
     addEventListener('pointerup', (e) => {
       if (!this.spaceHeld) this.game.hold = null;
+      if (e.pointerType !== 'mouse') this.coinPointer = null;
       if (e.pointerType !== 'mouse' && this.fingerDown) {
         this.fingerDown = false;
         this.heroAim = null;
@@ -357,7 +401,7 @@ export class Ui {
     addEventListener('blur', letGo);
     addEventListener('pointermove', (e) => {
       const t = e.target as HTMLElement;
-      const over = !t.closest('#ui button, #ui .shop, #ui .pnl') && (this.scene.overMonster(e.clientX, e.clientY) || this.scene.overLoot(e.clientX, e.clientY) || (!!this.game.raid && this.scene.hitRaider(e.clientX, e.clientY)));
+      const over = !t.closest('#ui button, #ui .shop, #ui .pnl') && (this.scene.overMonster(e.clientX, e.clientY) || this.scene.overLoot(e.clientX, e.clientY) || (!!this.game.raid && this.scene.hitRaider(e.clientX, e.clientY)) || (!!this.game.vault && this.scene.hitVaultGoblin(e.clientX, e.clientY) !== null));
       document.body.classList.toggle('grab', over);
       // Over the battlefield, a mouse gets a sword instead of an arrow.
       // The whole dock strip counts as the dock, gaps between its buttons included: a normal cursor there, and no steering.
@@ -367,6 +411,8 @@ export class Ui {
       this.el.blade.hidden = !field;
       document.body.classList.toggle('blade-on', field);
       this.pointer = field ? { x: e.clientX, y: e.clientY } : null;
+      this.coinPointer = { x: e.clientX, y: e.clientY };
+      this.inputAt = performance.now();
       this.mouseStale = false;
       // Your hero follows the mouse anywhere over the battlefield, HUD overlays included. Reaching for a button
       // leaves them heading where you last pointed; over the party panel (or off the window) they fight on their own.
@@ -377,30 +423,49 @@ export class Ui {
           this.heroAim = { x: e.clientX, y: e.clientY };
         }
       } else if (this.fingerDown) this.heroAim = { x: e.clientX, y: e.clientY };
-      // Holding the attack down follows the cursor onto whichever monster it's over now.
+      // Holding the attack down follows the cursor onto whichever monster it's over now; off the battlefield it goes back
+      // to the front monster (x -1: the swing shows on whoever is hit, never over the panels).
       if (this.game.hold) {
-        this.game.hold.x = e.clientX;
-        this.game.hold.y = e.clientY;
-        this.game.hold.id = this.scene.pick(e.clientX, e.clientY);
+        this.game.hold.x = field ? e.clientX : -1;
+        this.game.hold.y = field ? e.clientY : -1;
+        this.game.hold.id = field ? this.scene.pick(e.clientX, e.clientY) : null;
       }
       if (field) this.el.blade.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
     });
     document.addEventListener('pointerleave', () => {
+      this.coinPointer = null;
       this.heroAim = null;
       this.el.blade.hidden = true;
       document.body.classList.remove('blade-on');
     });
     addEventListener('keydown', (e) => {
+      this.inputAt = performance.now();
       if ((e.target as HTMLElement).closest('input, textarea')) return;
       if (e.key === 'Escape' && this.modal) this.closeModal();
+      // U buys the next upgrade: the first (cheapest) one in the Upgrades grid.
+      if (e.key.toLowerCase() === 'u' && !e.repeat && !this.modal) {
+        const next = this.el.upgGrid.querySelector<HTMLElement>('.upg');
+        if (next) {
+          if (this.game.buyUpg(next.dataset.upg!)) this.hideTip();
+          else this.deny(next);
+        }
+      }
+      // 1–9 use the abilities in the column, in order.
+      if (/^[1-9]$/.test(e.key) && !e.repeat && !this.modal) {
+        const id = KEYED[Number(e.key) - 1];
+        const slot = id && this.el.abilities.querySelector<HTMLElement>(`[data-ability="${id}"]`);
+        if (slot) {
+          // Cooling down, still charging or not unlocked yet: the same "no" as clicking it.
+          if (this.game.useAbility(id)) this.refreshTip();
+          else this.deny(slot);
+        }
+      }
       // Holding Space attacks just like holding the mouse down.
       if ((e.key === ' ' || e.key === 'Enter') && !e.repeat && !this.modal && !(e.target as HTMLElement).closest('button')) {
         e.preventDefault();
         if (this.scene.busy) return;
         // The sword swings where the cursor is, or at the front monster if the cursor's off the field.
-        const f = this.game.focus();
-        const s = f && this.scene.screenOf(f.id);
-        const at = this.pointer ?? (s ? { x: s.x, y: s.y + s.h * 0.4 } : { x: -1, y: -1 });
+        const at = this.pointer ?? { x: -1, y: -1 };
         if (e.key === ' ') {
           this.spaceHeld = true;
           this.game.hold = { id: null, ...at };
@@ -439,6 +504,25 @@ export class Ui {
           this.hooks.sound('toggle', { vol: 0.6 });
           this.refreshTip();
         }
+        return;
+      }
+      const pick = t.closest<HTMLElement>('[data-vault-hero]');
+      if (pick) {
+        this.enterVault(Number(pick.dataset.vaultHero));
+        return;
+      }
+      const ability = t.closest<HTMLElement>('[data-ability]');
+      if (ability) {
+        if (this.game.useAbility(ability.dataset.ability as AbilityId)) this.refreshTip();
+        else this.deny(ability);
+        return;
+      }
+      // A trait square never falls through to the row (that would level the companion instead).
+      const trait = t.closest<HTMLElement>('.trait');
+      if (trait) {
+        if (trait.classList.contains('got')) return;
+        if (trait.dataset.trait && this.game.buyUpg(trait.dataset.trait)) this.refreshTip();
+        else this.deny(trait);
         return;
       }
       const comp = t.closest<HTMLElement>('[data-comp]');
@@ -493,6 +577,13 @@ export class Ui {
           this.renderModal();
           this.refreshTip();
         } else this.deny(heart);
+        return;
+      }
+      const curse = t.closest<HTMLElement>('[data-curse]');
+      if (curse) {
+        this.curseChoice = this.curseChoice === curse.dataset.curse ? null : curse.dataset.curse!;
+        this.hooks.sound('toggle', { vol: 0.5 });
+        this.renderModal();
         return;
       }
       const aby = t.closest<HTMLElement>('[data-aby]');
@@ -647,6 +738,7 @@ export class Ui {
       case 'awakenGo': this.doAwaken(); break;
       case 'heartBack': this.modal = 'heart'; this.renderModal(); break;
       case 'descendGo': this.doDescend(); break;
+      case 'leaveVault': this.game.leaveVault(); break;
       case 'abyssBack': this.modal = 'abyss'; this.renderModal(); break;
     }
   }
@@ -666,15 +758,23 @@ export class Ui {
   handle(ev: GameEvent) {
     const g = this.game;
     switch (ev.t) {
-      case 'click':
-        if (ev.x >= 0) this.swing(ev.x, ev.y, ev.crit);
+      case 'click': {
+        if (ev.x >= 0) {
+          this.swing(ev.x, ev.y, ev.crit);
+          break;
+        }
+        const f = g.focus();
+        const s = f && this.scene.screenOf(f.id);
+        if (s) this.swing(s.x, s.y + s.h * 0.4, ev.crit);
         break;
+      }
       case 'hit': {
-        if (!g.s.settings.numbers && ev.kind !== 'crit') break;
+        if (!g.s.settings.numbers && ev.kind !== 'crit' && ev.kind !== 'autoCrit') break;
         const s = this.scene.screenOf(ev.id);
         if (!s) break;
         if (ev.kind === 'dps') this.pop(s.x + (Math.random() - 0.5) * 30, s.y + s.h * 0.2, fmt(ev.amount), 'p-dps');
         else if (ev.kind === 'cleave' || ev.kind === 'auto') this.pop(s.x + (Math.random() - 0.5) * 40, s.y + s.h * 0.3, fmt(ev.amount), 'p-cleave');
+        else if (ev.kind === 'autoCrit') this.pop(s.x + (Math.random() - 0.5) * 40, s.y + s.h * 0.25, fmt(ev.amount), 'p-crit');
         // Pop classes are prefixed so they can't collide with HUD classes (the Rampage meter is .fever).
         // Numbers always rise from the monster that was hit, wherever you tapped.
         else this.pop(s.x + (Math.random() - 0.5) * s.h * 0.5, s.y + s.h * 0.2, fmt(ev.amount), `p-${ev.kind}`);
@@ -685,13 +785,22 @@ export class Ui {
         if (!s) break;
         this.pop(s.x, s.y + s.h * 0.5, `+${fmt(ev.gold)}`, ev.boss || ev.champ ? 'p-gold p-big' : 'p-gold');
         if (ev.champ) this.pop(s.x, s.y - 10, 'CHAMPION!', 'p-champ');
-        this.coinFly(s.x, s.y + s.h * 0.6, ev.boss ? 8 : ev.champ ? 10 : 1);
+        break;
+      }
+      case 'drop': this.dropCoins(ev.id, ev.from, ev.big, ev.gold); break;
+      case 'bank': this.bankCoins(ev.id, ev.by); break;
+      case 'ability': {
+        const a = ABILITY_BY_ID.get(ev.id)!;
+        if (ev.unlocked) {
+          this.toast(`<b>Ability unlocked: ${esc(a.name)}</b><small>${esc(g.abilityText(a.id))}</small>`, 'flask_big_yellow', 'trophy');
+          this.hooks.sound('levelup', { vol: 0.6 });
+        } else this.hooks.sound('awaken', { vol: 0.5 });
         break;
       }
       case 'sweep': {
         const at = this.scene.fieldScreen();
         this.pop(at.x, at.y, `Swept! +${fmt(ev.gold)}`, 'p-gold p-sweep');
-        this.coinFly(at.x, at.y + 20, 4);
+        this.coinFly(at.x, at.y + 20, 4, ev.gold);
         break;
       }
       case 'floor':
@@ -736,11 +845,6 @@ export class Ui {
         if (g.s.descents === 0 && ev.floor >= DESCEND_FLOOR && g.canDescend()) this.banner('The way up opens', 'Ascend to come back stronger', 'fail');
         else this.banner('The boss held', 'Your party falls back to grow stronger', 'fail');
         break;
-      case 'souls': {
-        const s = this.scene.screenOf(ev.id);
-        if (s) this.pop(s.x, s.y + s.h * 0.1, `+${fmt(ev.souls)} souls`, 'p-soul');
-        break;
-      }
       case 'retreat': this.toast(`Floor ${ev.floor} is too tough for now. Falling back.`, 'skull'); break;
       case 'buyComp':
         this.rowCache[ev.comp] = '';
@@ -780,13 +884,54 @@ export class Ui {
         this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 });
         break;
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
-      case 'fever': if (ev.on) this.banner('RAMPAGE!', `Clicks ×${fmt(g.feverMult())} · party damage ×${fmt(2 * g.rampageParty())} · ${g.rampageNext()?.left ?? 0} attacks to ×${fmt(g.rampageNext()?.mult ?? 0)}`, 'rampage'); break;
-      case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, `Unstoppable · party damage ×${fmt(3 * g.rampageParty())}`, `rampage tier${ev.tier}`); break;
+      case 'fever': if (ev.on) this.banner(`RAMPAGE ×${fmt(g.feverMult())}!`, `Keep attacking for ×${fmt(g.rampageNext()?.mult ?? g.feverMult())}`, 'rampage'); break;
+      case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, 'Full power', `rampage tier${ev.tier}`); break;
+      case 'vaultPick': this.showVaultPick(); break;
       case 'vault':
-        if (ev.on) this.banner('GOBLIN VAULT!', 'The room fills with hoarders. Get them all!', 'loot rainbow');
-        else this.toast(`The vault closes. Haul: <b>+${fmt(ev.gold)} gold</b>`, 'chest_full_open', 'trophy');
+        this.closeVaultPick();
+        this.el.vaultLeave.hidden = !ev.on;
+        // The floor's tracker means nothing in the vault.
+        document.body.classList.toggle('in-vault', ev.on);
+        if (ev.on) this.banner('RAINBOW VAULT!', 'Open every chest!', 'loot rainbow');
+        else this.toast(`You leave the vault. Haul: <b>+${fmt(ev.gold)} gold</b>`, 'chest_full_open', 'trophy');
         break;
-      case 'abyss': this.toast(`Abyss power: <b>${esc(ABYSS.find((a) => a.id === ev.id)!.name)}</b>`, 'flask_big_red'); break;
+      case 'vaultAll': this.banner('EVERY CHEST!', `+${fmt(ev.gold)} gold bonus`, 'loot rainbow'); break;
+      case 'chest': this.chestOpened(ev.id, ev.gold, ev.rainbow); break;
+      case 'vaultGoblin': {
+        const at = this.scene.goblinScreen(ev.id);
+        this.hooks.sound('coins', { vol: ev.rainbow ? 0.7 : 0.45, rate: ev.rainbow ? 0.9 : 1.1 });
+        if (at) {
+          this.pop(at.x, at.y - 20, `+${fmt(ev.gold)}`, ev.rainbow ? 'p-pick p-big' : 'p-pick');
+          this.sparkle(at.x, at.y, ev.rainbow ? 14 : 8);
+          this.coinFly(at.x, at.y, ev.rainbow ? 16 : 5, ev.gold);
+        }
+        break;
+      }
+      case 'vaultCoin': {
+        // A tick that climbs as you sweep a run of them.
+        const at = this.scene.coinScreen(ev.id);
+        const now = performance.now();
+        this.coinRun = now - this.coinRunAt < 500 ? Math.min(this.coinRun + 1, 20) : 0;
+        this.coinRunAt = now;
+        this.hooks.sound('coins', { vol: 0.18, rate: 1.3 + this.coinRun * 0.03 });
+        if (at) {
+          this.pop(at.x, at.y - 14, `+${fmt(ev.gold)}`, 'p-pick');
+          this.coinFly(at.x, at.y, 1, ev.gold);
+        }
+        break;
+      }
+      case 'abyss': this.toast(`Abyss power: <b>${esc(ABYSS.find((a) => a.id === ev.id)!.name)}</b>${ev.lv > 1 ? ` level ${ev.lv}` : ''}`, 'flask_big_red'); break;
+      case 'descend': {
+        const m = ASCEND_MILESTONES.find((x) => x.at === g.s.descents);
+        if (m) this.toast(`<b>Milestone: ${esc(m.name)}</b><small>${esc(m.desc)}</small>`, 'skull', 'trophy');
+        break;
+      }
+      case 'curse': {
+        const c = CURSE_BY_ID.get(ev.id)!;
+        this.toast(`<b>${esc(c.name)}: tier ${ev.tier} broken</b><small>${esc(c.reward(ev.tier))}</small>`, 'skull', 'trophy');
+        this.hooks.sound('levelup', { vol: 0.6 });
+        break;
+      }
       case 'heal': {
         if (!g.s.settings.numbers) break;
         const s = this.scene.screenOf(ev.id);
@@ -853,11 +998,20 @@ export class Ui {
   }
 
   /** Coins arc from a kill up into the gold counter. */
-  private coinFly(x: number, y: number, n: number) {
+  /** Coins fly up to the bank: a little hop, then a spinning arc that speeds up into the counter. `value` is the gold they
+   *  carry: the counter counts it as each one lands, so the number goes up when the coins arrive, not before. */
+  private coinFly(x: number, y: number, n: number, value?: Decimal) {
     const target = this.el.bankIco.getBoundingClientRect();
     const tx = target.left + target.width / 2;
     const ty = target.top + target.height / 2;
-    for (let i = 0; i < n && this.coins < MAX_COINS; i++) {
+    const share = value ? value.div(n) : null;
+    if (value) this.inFlight = this.inFlight.plus(value);
+    for (let i = 0; i < n; i++) {
+      if (this.coins >= MAX_COINS) {
+        // Too many in the air already: this one's gold just counts.
+        if (share) this.inFlight = Decimal.max(0, this.inFlight.minus(share));
+        continue;
+      }
       this.coins++;
       const c = document.createElement('i');
       c.className = 'coin-fly';
@@ -865,19 +1019,34 @@ export class Ui {
       c.style.left = `${x}px`;
       c.style.top = `${y}px`;
       this.el.pops.appendChild(c);
-      const mid = { x: x + (Math.random() - 0.5) * 120, y: y - 60 - Math.random() * 60 };
+      const hop = { x: (Math.random() - 0.5) * 30, y: -22 - Math.random() * 14 };
+      const bend = { x: x + (tx - x) * 0.35 + (Math.random() - 0.5) * 140, y: y + (ty - y) * 0.35 - 40 - Math.random() * 50 };
       const anim = c.animate([
-        { transform: 'translate(-50%, -50%) scale(0.6)' },
-        { transform: `translate(calc(-50% + ${mid.x - x}px), calc(-50% + ${mid.y - y}px)) scale(1.1)`, offset: 0.35 },
-        { transform: `translate(calc(-50% + ${tx - x}px), calc(-50% + ${ty - y}px)) scale(0.7)` },
-      ], { duration: 650 + Math.random() * 250 + i * 40, easing: 'cubic-bezier(.5,0,.8,.6)' });
+        { transform: 'translate(-50%, -50%) scale(1)' },
+        { transform: `translate(calc(-50% + ${hop.x}px), calc(-50% + ${hop.y}px)) scale(1.35)`, offset: 0.16, easing: 'cubic-bezier(.3,0,.6,1)' },
+        { transform: `translate(calc(-50% + ${bend.x - x}px), calc(-50% + ${bend.y - y}px)) scale(1.1)`, offset: 0.5, easing: 'cubic-bezier(.5,0,1,.7)' },
+        { transform: `translate(calc(-50% + ${tx - x}px), calc(-50% + ${ty - y}px)) scale(0.55)` },
+      ], { duration: 720 + Math.random() * 160, delay: i * 55, easing: 'linear', fill: 'backwards' });
       anim.onfinish = () => {
         c.remove();
         this.coins--;
-        this.bump(this.el.bankIco);
+        if (share) this.inFlight = Decimal.max(0, this.inFlight.minus(share));
+        this.coinArrived(tx, ty);
       };
     }
   }
+
+  /** A coin reaches the bank: the coin bumps, the number flashes, a couple of sparks. */
+  private coinArrived(x: number, y: number) {
+    this.bump(this.el.bankIco);
+    this.bump(this.el.bank);
+    const now = performance.now();
+    if (now - this.arrivedAt > 90) {
+      this.arrivedAt = now;
+      this.sparkle(x, y, 4);
+    }
+  }
+  private arrivedAt = 0;
 
   toast(html: string, spr: string, cls = '') {
     const el = document.createElement('div');
@@ -948,20 +1117,28 @@ export class Ui {
       if (at) mark.style.transform = `translate(${at.x}px, ${at.y}px)`;
       mark.style.visibility = at ? 'visible' : 'hidden';
     }
+    // Flurry clicks wherever you point, like holding the attack down.
+    const flurry = g.s.buffs.some((b) => b.id === 'flurry');
+    g.aim = flurry && this.pointer && !this.modal ? { id: this.scene.pick(this.pointer.x, this.pointer.y), ...this.pointer } : null;
+    const feet = this.scene.heroFeet(g);
+    this.sweepCoins([feet, this.coinPointer].filter((p) => p !== null));
+    if (g.vault && this.coinPointer && !this.modal) this.scene.sweepVaultCoins(this.coinPointer.x, this.coinPointer.y, g);
     if (this.keys.size) this.keyedAt = performance.now();
     this.scene.heroBlocked = [this.el.dock.getBoundingClientRect()];
     const input = this.scene.heroInput;
     input.aim = !this.modal && !this.mouseStale ? this.heroAim : null;
     input.keys = { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), z: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
     input.stay = this.mouseStale && !this.keys.size && performance.now() - this.keyedAt < 4000;
-    const bank = g.s.gold;
+    input.idle = performance.now() - this.inputAt > 20_000;
+    // Gold still flying up to the bank isn't counted until its coin lands.
+    const bank = Decimal.max(0, g.s.gold.minus(this.inFlight));
     this.shown = bank.lt(this.shown) || bank.minus(this.shown).lt(1) ? bank : this.shown.plus(bank.minus(this.shown).times(Math.min(1, dt * 10)));
     this.el.bank.textContent = fmt(this.shown);
 
-    // Health bars over wounded monsters.
+    // Health bars over every monster that has arrived.
     const seen = new Set<number>();
     for (const m of g.monsters) {
-      if (m.hp >= m.max && !m.boss) continue;
+      if (m.arrive > 0 && !m.boss) continue;
       const s = this.scene.screenOf(m.id);
       if (!s) continue;
       seen.add(m.id);
@@ -983,6 +1160,11 @@ export class Ui {
       bar.remove();
       this.bars.delete(id);
     }
+
+    // The vault's way out wears a label (it's on the wall among the rainbows).
+    const exit = g.vault ? this.scene.exitScreen() : null;
+    this.el.exitMark.hidden = !exit || exit.x > this.field.w + 40;
+    if (exit) this.el.exitMark.style.transform = `translate(${Math.round(exit.x)}px, ${Math.round(exit.y)}px)`;
 
     const rp = g.raid ? this.scene.raiderScreen() : null;
     this.el.raid.hidden = !rp;
@@ -1006,27 +1188,29 @@ export class Ui {
       // The knife is tiny, so it gets drawn a size up.
       this.el.bladeIn.innerHTML = sprite(blade, blade === 'weapon_knife' ? 3 : 2);
     }
-    this.el.dps.textContent = fmt(g.dps());
-    this.el.click.textContent = fmt(g.clickDamage());
+    this.el.dps.textContent = fmt(g.dpsTotal());
+    this.el.click.textContent = fmt(g.clickTotal());
     this.el.rate.classList.toggle('boosted', g.s.buffs.some((b) => b.id !== 'fever'));
 
     this.renderFloor();
 
+    // A running Rampage shows under the floor: time left, and how far to the next step.
     const fever = g.s.buffs.find((b) => b.id === 'fever');
-    this.el.fever.hidden = g.s.clicks < 1 && !fever;
-    this.el.fever.classList.toggle('on', !!fever);
-    this.el.feverBar.style.width = `${(fever ? fever.t / fever.dur : g.s.fervor) * 100}%`;
-    // While it runs, the meter says where the Rampage stands and how far the next step is.
-    const next = fever ? g.rampageNext() : null;
-    const label = !fever ? 'Rampage' : next ? `×${fmt(g.feverMult())} · ${next.left} more for ×${fmt(next.mult)}` : `×${fmt(g.feverMult())} · max!`;
-    if (this.el.feverLabel.textContent !== label) this.el.feverLabel.textContent = label;
+    this.el.fever.hidden = !fever;
+    if (fever) {
+      this.el.feverBar.style.width = `${(fever.t / fever.dur) * 100}%`;
+      const next = g.rampageNext();
+      const label = next ? `×${fmt(g.feverMult())} · keep attacking!` : `×${fmt(g.feverMult())}!`;
+      if (this.el.feverLabel.textContent !== label) this.el.feverLabel.textContent = label;
+    }
 
     this.renderBuffs(g.s.buffs);
+    this.renderAbilities();
     this.renderRows();
     this.renderUpgrades();
     this.el.shopSub.textContent = `${g.s.owned.filter((n) => n > 0).length} companions · ${g.s.upgrades.length} upgrades`;
     if (document.body.classList.contains('compact')) {
-      const hud = (this.el.fever.hidden ? this.el.floorBox : this.el.fever).getBoundingClientRect();
+      const hud = this.el.floorBox.getBoundingClientRect();
       if (Math.abs(Math.round(hud.bottom + 4) - this.hudTop) > 6) this.layout();
     }
 
@@ -1106,24 +1290,29 @@ export class Ui {
     for (const b of active) {
       let chip = box.querySelector<HTMLElement>(`[data-buff="${b.id}"]`);
       if (!chip) {
+        const ability = ABILITY_BY_ID.get(b.id as AbilityId);
         const ico = b.id === 'bloodlust' ? 'flask_big_red' : b.id === 'heartstorm' ? 'weapon_golden_sword' : b.id === 'soulstorm' ? 'chest_mimic_open' : b.id === 'vault' ? 'chest_full_open' : 'coin';
         chip = document.createElement('div');
         chip.className = `buff ${b.id}`;
         chip.dataset.buff = b.id;
-        chip.innerHTML = `<span class="buff-ico">${spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(b.name)}</b><small></small></span><em class="buff-bar"></em>`;
+        chip.innerHTML = `<span class="buff-ico">${ability ? charFit(COMPS[ability.comp].sprite, 24) : spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(b.name)}</b><small></small></span><em class="buff-bar"></em>`;
         box.appendChild(chip);
       }
       // Phones only have room for the countdown; the icon says which buff it is.
-      const text = document.body.classList.contains('phone') ? `${Math.ceil(b.t)}s` : `${buffText(b)} · ${Math.ceil(b.t)}s`;
+      const vault = b.id === 'vault' ? this.game.vault : null;
+      const what = vault ? `${vault.chests.filter((c) => c.open).length}/${vault.chests.length} chests` : buffText(b);
+      const time = Number.isFinite(b.t) ? `${Math.ceil(b.t)}s` : '';
+      const text = document.body.classList.contains('phone') ? time || what : [what, time].filter(Boolean).join(' · ');
       const small = chip.querySelector('small')!;
       if (small.textContent !== text) small.textContent = text;
-      (chip.querySelector('.buff-bar') as HTMLElement).style.width = `${(b.t / b.dur) * 100}%`;
+      (chip.querySelector('.buff-bar') as HTMLElement).style.width = Number.isFinite(b.t) ? `${(b.t / b.dur) * 100}%` : '100%';
     }
   }
 
   private renderRows() {
     const g = this.game;
     const revealed = g.s.revealed;
+    const offer = new Set(g.shopUpgrades().map((u) => u.id));
     COMPS.forEach((def, i) => {
       const row = this.rows[i];
       if (i > revealed) {
@@ -1141,7 +1330,8 @@ export class Ui {
       row.classList.toggle('mystery', mystery || locked);
       row.style.setProperty('--prog', locked ? '0%' : `${Math.min(1, g.s.gold.div(q.cost).toNumber()) * 100}%`);
       const lv = g.s.owned[i];
-      const key = [mystery, locked, q.n, q.cost.toString(), lv, can, g.s.settings.notation, Math.round(g.compDps(i).plus(1).log10() * 20)].join('|');
+      const traits = lv > 0 && !locked && !mystery ? this.traitStates(i, offer) : [];
+      const key = [mystery, locked, q.n, q.cost.toString(), lv, can, g.s.settings.notation, Math.round(g.compDps(i).plus(1).log10() * 20), traits.join('')].join('|');
       if (key === this.rowCache[i]) return;
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
@@ -1149,12 +1339,219 @@ export class Ui {
       row.querySelector('.gen-cost')!.innerHTML = locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.descents)}</span>` : gold(q.cost, can ? 'ok' : 'no');
       row.querySelector('.gen-lv')!.textContent = lv ? `Lv ${lv}` : '';
       row.querySelector('.gen-dps')!.textContent = lv ? `${fmt(g.compDps(i))} dps` : '';
+      // Owned traits and the next one only: the rest show up as you buy your way along.
+      const shown = traits.findIndex((st) => st !== 'got');
+      row.querySelector('.traits')!.innerHTML = traits.slice(0, shown < 0 ? traits.length : shown + 1).map((state, k) => {
+        const id = `m${i}_${k}`;
+        const ability = ABILITY_BY_UPGRADE.get(id);
+        // Still to come: the level it opens at (the ability's star stays, so you can see one is coming).
+        const inner = ability ? '✦' : state === 'later' ? '' : '×2';
+        const label = state === 'later' ? `<small>${milestoneAt(k)}</small>` : '';
+        return `<span class="trait ${state}${ability ? ' ability' : ''}" data-tip="upg:${id}"${state === 'buy' || state === 'reached' ? ` data-trait="${id}"` : ''}>${inner}${label}</span>`;
+      }).join('');
     });
+  }
+
+  /** Each of a companion's traits: owned, affordable now, reached but too dear, or a level still to come. */
+  private traitStates(i: number, offer: Set<string>) {
+    const g = this.game;
+    return Array.from({ length: TRAITS }, (_, k) => {
+      const id = `m${i}_${k}`;
+      if (g.hasUpgrade(id)) return 'got';
+      if (!offer.has(id)) return 'later';
+      return g.s.gold.gte(g.upgCost(UPG_BY_ID.get(id)!)) ? 'buy' : 'reached';
+    });
+  }
+
+  /** The ability column: locked, always on, ready, running (time left), cooling down, or charging (Rampage). */
+  private renderAbilities() {
+    const g = this.game;
+    for (const slot of this.el.abilities.children as HTMLCollectionOf<HTMLElement>) {
+      const id = slot.dataset.ability as AbilityId;
+      const a = ABILITY_BY_ID.get(id)!;
+      // Rampage runs as the 'fever' buff, and charges instead of cooling down.
+      const buff = g.s.buffs.find((b) => b.id === (id === 'rampage' ? 'fever' : id));
+      const cd = g.abilityCooldown(id);
+      const charging = a.kind === 'charge' && !buff && g.s.fervor < 1;
+      const state = !g.abilityUnlocked(id) ? 'locked' : a.kind === 'passive' ? 'passive' : buff ? 'active' : charging ? 'charging' : cd > 0 ? 'cooling' : 'ready';
+      if (slot.dataset.state !== state) {
+        slot.dataset.state = state;
+        slot.className = `ab ${state}`;
+      }
+      const fill = buff && state === 'active' ? 1 - buff.t / buff.dur : state === 'cooling' ? cd / (a.cooldown ?? 1) : state === 'charging' ? g.s.fervor : 0;
+      slot.style.setProperty('--cd', `${fill * 100}%`);
+      const time = buff && state === 'active' ? `${Math.ceil(buff.t)}s` : state === 'cooling' ? clock(cd) : state === 'charging' ? `${Math.floor(g.s.fervor * 100)}%` : '';
+      const label = slot.querySelector('.ab-time')!;
+      if (label.textContent !== time) label.textContent = time;
+    }
+  }
+
+  /** A kill's gold: it bursts out of the monster, bounces to a stop and glints on the floor until it's swept up (or flies
+   *  to the bank by itself). Bosses and champions spray a handful of coins; picking up any of them takes the pile. */
+  private coinPiles = new Map<number, { coins: { el: HTMLElement; x: number; y: number }[]; gold: Decimal; landsAt: number }>();
+  private pickCombo = 0;
+  private pickAt = 0;
+
+  private dropCoins(id: number, from: number, big: boolean, value: Decimal) {
+    const at = this.scene.screenOf(from);
+    if (!at) return;
+    const sx = at.x;
+    const sy = at.y + at.h * 0.4;
+    const coins = Array.from({ length: big ? 5 : 1 }, (_, k) => {
+      const angle = big ? (k / 5) * Math.PI * 2 + Math.random() * 0.6 : Math.random() * Math.PI * 2;
+      const reach = big ? 50 + Math.random() * 40 : 20 + Math.random() * 30;
+      const x = sx + Math.cos(angle) * reach;
+      const y = at.y + at.h * 0.9 + Math.sin(angle) * reach * 0.35;
+      const el = document.createElement('i');
+      el.className = 'drop spinning';
+      el.innerHTML = sprite('coin', 3);
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      this.el.drops.appendChild(el);
+      // Out of the monster in an arc, a hard landing, one small bounce, then it settles and glints.
+      const dx = sx - x;
+      const dy = sy - y;
+      const peak = 60 + Math.random() * 40;
+      const anim = el.animate([
+        { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.5) rotate(0deg)` },
+        { transform: `translate(calc(-50% + ${dx * 0.45}px), calc(-50% + ${dy * 0.45 - peak}px)) scale(1.15) rotate(200deg)`, offset: 0.45 },
+        { transform: 'translate(-50%, -50%) scale(1) rotate(360deg)', offset: 0.75 },
+        { transform: 'translate(-50%, calc(-50% - 9px)) scale(1)', offset: 0.87 },
+        { transform: 'translate(-50%, -50%) scale(1)' },
+      ], { duration: 620 + Math.random() * 160, easing: 'cubic-bezier(.3,.6,.5,1)' });
+      anim.onfinish = () => {
+        el.classList.remove('spinning');
+        el.classList.add('landed');
+      };
+      return { el, x, y };
+    });
+    this.coinPiles.set(id, { coins, gold: value, landsAt: performance.now() + 300 });
+  }
+
+  /** When the mouse or keys were last used (the vault's hero sees itself out after a long while without). */
+  private inputAt = performance.now();
+
+  /** Where the cursor (or a finger still on the screen) is, for picking up gold. */
+  private coinPointer: { x: number; y: number } | null = null;
+
+  /** Your hero and the cursor (or a finger) sweep up any gold close to them: no pixel hunting. */
+  private sweepCoins(collectors: { x: number; y: number }[]) {
+    if (this.modal || !collectors.length) return;
+    const now = performance.now();
+    for (const [id, pile] of this.coinPiles) {
+      if (now < pile.landsAt) continue;
+      let take = false;
+      for (const c of pile.coins) {
+        // Each coin answers to whichever collector is nearest.
+        let near = collectors[0];
+        for (const p of collectors) if (Math.hypot(c.x - p.x, c.y - p.y) < Math.hypot(c.x - near.x, c.y - near.y)) near = p;
+        const { x, y } = near;
+        const d = Math.hypot(c.x - x, c.y - y);
+        if (d < COIN_REACH) take = true;
+        // Within the magnet's pull, coins lean toward the collector, more the closer it is.
+        const pull = d < COIN_MAGNET ? 0.4 * (1 - d / COIN_MAGNET) : 0;
+        c.el.style.translate = pull ? `${(x - c.x) * pull}px ${(y - c.y) * pull}px` : '';
+      }
+      if (take) this.game.collectGold(id);
+    }
+  }
+
+  // ---------- goblin vault ----------
+
+  private vaultPickTimer = 0;
+  private coinRun = 0;
+  private coinRunAt = 0;
+
+  /** Everything slows: your companions' faces come up, and you pick who goes through the portal. */
+  private showVaultPick() {
+    const g = this.game;
+    const hero = Math.max(0, g.heroIndex());
+    // Each face rises in after the one before it (the rainbow goes up first, see the CSS delays).
+    const party = COMPS.map((c, i) => [c, i] as const).filter(([, i]) => g.s.owned[i] > 0);
+    this.el.vaultFaces.innerHTML = party.map(([c, i], k) => `<button class="vp-face${i === hero ? ' hero' : ''}" data-vault-hero="${i}" style="--k:${k}">${charFit(c.sprite, 44)}<small>${esc(c.name)}</small></button>`).join('');
+    this.el.vaultPick.hidden = false;
+    this.hideTip();
+    // Left alone, your hero goes.
+    clearTimeout(this.vaultPickTimer);
+    this.vaultPickTimer = window.setTimeout(() => this.enterVault(hero), 10_000);
+  }
+
+  private enterVault(comp: number) {
+    this.closeVaultPick();
+    this.game.enterVault(comp);
+  }
+
+  private closeVaultPick() {
+    clearTimeout(this.vaultPickTimer);
+    this.el.vaultPick.hidden = true;
+  }
+
+  /** A chest bursts: its coins pour up out of it and stream into the bank, the pitch climbing as you chain them. */
+  private chestOpened(id: number, gold: Decimal, rainbow: boolean) {
+    const at = this.scene.chestScreen(id);
+    const now = performance.now();
+    this.pickCombo = now - this.pickAt < 900 ? Math.min(this.pickCombo + 1, 14) : 0;
+    this.pickAt = now;
+    // (The chest's own sound plays from the game event; this is the coins, climbing as you chain chests.)
+    this.hooks.sound('coins', { vol: 0.3, rate: 1 + this.pickCombo * 0.05 });
+    if (rainbow) this.banner('RAINBOW CHEST!', `+${fmt(gold)} gold`, 'loot rainbow');
+    if (!at) {
+      this.coinFly(this.field.w / 2, this.field.h / 2, rainbow ? 30 : 8, gold);
+      return;
+    }
+    this.pop(at.x, at.y - 24, `+${fmt(gold)}`, rainbow ? 'p-pick p-big' : 'p-pick');
+    this.sparkle(at.x, at.y, rainbow ? 16 : 9);
+    this.coinFly(at.x, at.y, rainbow ? 30 : 8, gold);
+  }
+
+  private bankCoins(id: number, by: 'hand' | 'time' | 'all') {
+    const pile = this.coinPiles.get(id);
+    if (!pile) return;
+    this.coinPiles.delete(id);
+    if (by === 'hand') {
+      // A quick run of pickups climbs in pitch.
+      const now = performance.now();
+      this.pickCombo = now - this.pickAt < 700 ? Math.min(this.pickCombo + 1, 12) : 0;
+      this.pickAt = now;
+      this.hooks.sound('coins', { vol: 0.35, rate: 1 + this.pickCombo * 0.06 });
+    }
+    if (by !== 'all') {
+      const first = pile.coins[0];
+      this.pop(first.x, first.y - 18, `+${fmt(pile.gold)}`, 'p-pick');
+    }
+    for (const c of pile.coins) {
+      const r = c.el.getBoundingClientRect();
+      c.el.remove();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      if (by === 'hand') this.sparkle(cx, cy);
+      // Leaving a floor banks everything at once: a few coins make the trip, not all of them.
+      if (by !== 'all' || this.coins < 6) this.coinFly(cx, cy, 1, pile.gold.div(pile.coins.length));
+    }
+  }
+
+  /** A little burst of gold sparks where a coin was picked up. */
+  private sparkle(x: number, y: number, n = 7) {
+    const burst = document.createElement('i');
+    burst.className = 'sparks';
+    burst.style.left = `${x}px`;
+    burst.style.top = `${y}px`;
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + Math.random() * 0.5;
+      const d = 18 + Math.random() * 16;
+      const spark = document.createElement('b');
+      spark.style.setProperty('--dx', `${Math.cos(a) * d}px`);
+      spark.style.setProperty('--dy', `${Math.sin(a) * d}px`);
+      burst.appendChild(spark);
+    }
+    this.el.drops.appendChild(burst);
+    setTimeout(() => burst.remove(), 500);
   }
 
   private renderUpgrades() {
     const g = this.game;
-    const list = g.shopUpgrades();
+    // A companion's first traits are bought on its own row, not here.
+    const list = g.shopUpgrades().filter((u) => !isTrait(u.id));
     const key = list.map((u) => u.id).join(',') + g.s.settings.notation;
     if (key !== this.upgKey) {
       this.upgKey = key;
@@ -1167,8 +1564,8 @@ export class Ui {
       if (can) affordable++;
       b.classList.toggle('can', can);
     });
-    this.el.buyAll.hidden = !g.hasAbyss('purser') || affordable < 2;
-    const auto = g.hasAbyss('quartermaster');
+    this.el.buyAll.hidden = !g.milestone('buyall') || affordable < 2;
+    const auto = g.milestone('quartermaster');
     this.el.autoUpg.hidden = !auto;
     if (auto) {
       const label = `Auto: ${g.s.settings.autoUpg ? 'on' : 'off'}`;
@@ -1189,11 +1586,17 @@ export class Ui {
   private hints() {
     const g = this.game;
     let state = '';
+    const firstRun = g.s.descents === 0 && g.s.awakens === 0;
+    const noUpgrades = g.s.upgradesKnown.length === 0;
+    const upgradeRow = noUpgrades ? this.rows.findIndex((row) => row.querySelector('.trait.buy')) : -1;
     if (g.s.clicks < 6) state = 'click';
-    else if (g.s.owned.every((n) => n === 0) && g.s.gold >= g.compCost(0)) state = 'hire';
+    else if (g.s.owned.every((n) => n === 0) && g.s.gold.gte(g.compCost(0))) state = firstRun ? 'hire' : 'nudge';
     else if (g.raid && g.s.raids === 0) state = 'raid';
     // Meeting your hero: first on the field, then (once there's someone to switch to) the star that picks one.
     else if (g.s.heroTips === 0 && g.heroIndex() >= 0) state = 'hero';
+    else if (upgradeRow >= 0) state = 'upgrade';
+    else if (firstRun && noUpgrades && g.s.owned[0] === 1 && g.s.gold.gte(g.compCost(0))) state = 'level';
+    else if (g.s.fevers === 0 && g.rampageReady()) state = 'rampage';
     else if (g.s.heroTips === 1 && g.s.owned.filter((n) => n > 0).length >= 2) state = 'star';
     // Hints point at the battlefield and shop, so they wait while a panel covers them.
     if (this.modal) state = '';
@@ -1207,15 +1610,14 @@ export class Ui {
       this.el.hint.style.visibility = 'visible';
       if (shown > 10_000) g.s.heroTips = 1;
     } else if (state === 'star') {
-      const star = this.rows[this.starPick()]?.querySelector('.gen-hero')?.getBoundingClientRect();
-      const visible = !!star && star.width > 0 && star.top > 0 && star.bottom < innerHeight;
-      // Beside the star when there's room to its left (the party panel on the right); above it otherwise (the phone sheet).
-      const above = !!star && star.left < 340;
-      this.el.hint.classList.toggle('point-right', !above);
-      this.el.hint.classList.toggle('point-down', above);
-      if (star) this.el.hint.style.transform = above ? `translate(${star.left + star.width / 2}px, ${star.top - 6}px)` : `translate(${star.left - 12}px, ${star.top + star.height / 2}px)`;
-      this.el.hint.style.visibility = visible ? 'visible' : 'hidden';
+      this.pointAt(this.rows[this.starPick()]?.querySelector('.gen-hero'));
       if (shown > 15_000) g.s.heroTips = 2;
+    } else if (state === 'hire' || state === 'level') {
+      this.pointAt(this.rows[0]);
+    } else if (state === 'rampage') {
+      this.pointAt(this.el.abilities.querySelector('[data-ability="rampage"]'));
+    } else if (state === 'upgrade') {
+      this.pointAt(this.rows[upgradeRow].querySelector('.trait.buy'));
     }
     if (state === 'click') {
       const f = g.focus();
@@ -1226,16 +1628,33 @@ export class Ui {
     }
     if (state === this.hintState) return;
     this.hintState = state;
-    this.el.hint.hidden = !['click', 'hero', 'star'].includes(state);
-    if (state !== 'star') this.el.hint.classList.remove('point-right', 'point-down');
+    const pointing = ['star', 'hire', 'level', 'upgrade', 'rampage'].includes(state);
+    this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero';
+    if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero');
     this.el.shop.classList.toggle('show-stars', state === 'star');
     this.el.hint.innerHTML = state === 'hero'
       ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : 'they follow your mouse'}</small></b>`
       : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click their ★ to switch</small></b>`
-        : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
-    this.rows[0].classList.toggle('nudge', state === 'hire');
+        : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>Companions fight for you, even while you're away</small></b>`
+          : state === 'level' ? `<b>Keep ${this.touch ? 'tapping' : 'clicking'} to level up<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
+            : state === 'rampage' ? `<b>Rampage is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it, or save it for a boss</small></b>`
+            : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.touch ? 'Tap' : 'Click'} the ×2 to double ${esc(COMPS[upgradeRow]?.name ?? 'their')}'s damage</small></b>`
+              : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
+    this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
+  }
+
+  /** Moves the hint's arrow onto something in the party panel: beside it when there's room to its left (the panel on the
+   *  right), above it otherwise (the phone sheet). Hidden while it's scrolled out of view. */
+  private pointAt(target: Element | null | undefined) {
+    const rect = target?.getBoundingClientRect();
+    const visible = !!rect && rect.width > 0 && rect.top > 0 && rect.bottom < innerHeight;
+    const above = !!rect && rect.left < 340;
+    this.el.hint.classList.toggle('point-right', !above);
+    this.el.hint.classList.toggle('point-down', above);
+    if (rect) this.el.hint.style.transform = above ? `translate(${rect.left + rect.width / 2}px, ${rect.top - 6}px)` : `translate(${rect.left - 12}px, ${rect.top + rect.height / 2}px)`;
+    this.el.hint.style.visibility = visible ? 'visible' : 'hidden';
   }
 
   /** Who the star tip suggests trying as your hero: the first companion you have who isn't your hero already. */
@@ -1318,9 +1737,27 @@ export class Ui {
       const u = UPG_BY_ID.get(id);
       if (!u) return '';
       const cost = g.upgCost(u);
-      return `<div class="tt-h">${icon(u.icon, 32)}<b>${esc(u.name)}</b><span class="tt-own">upgrade</span></div>
+      const forSkill = u.needs ? `${ABILITY_BY_ID.get(u.needs)!.name} upgrade` : 'upgrade';
+      return `<div class="tt-h">${icon(u.icon, 32)}<b>${esc(u.name)}</b><span class="tt-own">${forSkill}</span></div>
         <div class="tt-cost">${gold(cost, g.s.gold.gte(cost) ? 'ok' : 'no')}</div>
-        <p class="tt-d">${esc(u.desc)}</p>${this.upgPreview(u)}`;
+        <p class="tt-d">${esc(u.desc)}</p>${u.flavor ? `<p class="tt-flavor">${esc(u.flavor)}</p>` : ''}${ABILITY_BY_UPGRADE.has(u.id) ? `<p class="tt-gain">Unlocks ${esc(ABILITY_BY_UPGRADE.get(u.id)!.name)}: ${esc(g.abilityText(ABILITY_BY_UPGRADE.get(u.id)!.id))}</p>` : ''}${this.upgPreview(u)}`;
+    }
+    if (kind === 'ab') {
+      const a = ABILITY_BY_ID.get(id as AbilityId)!;
+      const comp = COMPS[a.comp];
+      const cd = g.abilityCooldown(a.id);
+      const key = this.touch ? '' : ` (or press ${abilityKey(a.id)})`;
+      const fever = a.id === 'rampage' ? g.s.buffs.find((b) => b.id === 'fever') : undefined;
+      const next = fever ? g.rampageNext() : null;
+      const status = !g.abilityUnlocked(a.id)
+        ? `Unlocked by the ${comp.name}.`
+        : a.kind === 'passive' ? 'Always on.'
+          : fever ? (next ? `×${fmt(g.feverMult())}. Keep attacking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
+            : a.kind === 'charge' && g.s.fervor < 1 ? `${Math.floor(g.s.fervor * 100)}% charged.`
+              : cd > 0 ? `Ready again in ${duration(cd)}.` : `Ready. Click to use it${key}.`;
+      const timing = a.kind === 'button' ? `<ul class="tt-l"><li>Lasts ${a.dur}s · cooldown ${duration(a.cooldown ?? 0)}</li></ul>` : '';
+      return `<div class="tt-h"><b>${esc(a.name)}</b><span class="tt-own">${a.kind === 'passive' ? 'always on' : this.touch ? 'ability' : `key ${abilityKey(a.id)}`}</span></div>
+        <p class="tt-d">${esc(g.abilityText(a.id))}</p>${timing}<p class="tt-f">${status}</p>`;
     }
     if (kind === 'tro') {
       const t = TROPHIES.find((x) => x.id === id)!;
@@ -1345,7 +1782,12 @@ export class Ui {
     }
     if (kind === 'aby') {
       const a = ABYSS.find((x) => x.id === id)!;
-      return `<div class="tt-h">${spriteFit(a.icon, 32)}<b>${esc(a.name)}</b><span class="tt-own">${g.hasAbyss(id) ? 'owned' : `${a.cost} souls`}</span></div><p class="tt-d">${esc(a.desc)}</p>`;
+      const lv = g.abyssLv(id);
+      const maxed = lv >= a.max;
+      const now = lv ? `<li>Now: ${esc(a.desc(lv))}</li>` : '';
+      const next = maxed ? '<li>Maxed.</li>' : `<li>${lv ? 'Next level' : 'First level'}: <b class="up">${esc(a.desc(lv + 1))}</b></li>`;
+      return `<div class="tt-h">${spriteFit(a.icon, 32)}<b>${esc(a.name)}</b><span class="tt-own">${lv ? `level ${lv}${Number.isFinite(a.max) ? `/${a.max}` : ''}` : 'abyss power'}</span></div>
+        ${maxed ? '' : `<div class="tt-cost">${G.soul(1.5)} ${fmt(g.abyssCost(id))} souls</div>`}<ul class="tt-l">${now}${next}</ul>`;
     }
     if (kind === 'rel') {
       const d = RELIC_BY_ID.get(id)!;
@@ -1375,7 +1817,6 @@ export class Ui {
       const now = g.heroIndex() === i;
       return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach. Click the ★ again to have no hero.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p>`;
     }
-    if (kind === 'fever') return `<div class="tt-h"><b>Rampage</b></div><p class="tt-d">Attack by hand to fill this: click, or just hold the mouse or Space down. When it's full, your attacks deal ×${fmt(g.feverMult())} damage and your party hits ×${fmt(2 * g.rampageParty())} as hard for a few seconds. Keep attacking through it to push the Rampage to ×10; the meter counts down the attacks.</p>`;
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it. Turns back on by itself once your party is much stronger.'}</p>`;
     if (kind === 'dock') {
       const text: Record<string, string> = {
@@ -1396,8 +1837,7 @@ export class Ui {
     const g = this.game;
     const e = u.effect;
     let gain = new Decimal(0);
-    if (e.t === 'comp') gain = g.compDps(e.comp);
-    else if (e.t === 'global') gain = g.baseDps().times(e.pct);
+    if (e.t === 'global') gain = g.baseDps().times(e.pct);
     if (gain.lte(0)) return '';
     return `<p class="tt-gain">≈ +${fmt(gain)} damage/sec</p>`;
   }
@@ -1492,29 +1932,70 @@ export class Ui {
   private abyssHtml(): string {
     const g = this.game;
     const pending = g.pendingSouls();
-    // What a descent adds on top of the souls you already have: the number that says whether it's worth it.
-    const gain = (pending * g.soulPower()) / (1 + g.s.souls * g.soulPower());
-    const advice = gain >= 1 ? `<p class="advice good">A big step. Ascending now is a great deal.</p>`
-      : gain >= 0.5 ? `<p class="advice good">Worth it: ascending now makes you much stronger.</p>`
-        : `<p class="advice">Only +${Math.round(gain * 100)}%. Beat another zone boss first.</p>`;
-    const desc = g.canDescend()
+    const curse = this.curseChoice ? CURSE_BY_ID.get(this.curseChoice) : undefined;
+    const desc = g.canDescend() && pending < 1
+      ? `<p>The curse can be lifted: ascend to leave this descent. No new souls yet.</p>
+         <button class="btn primary big" data-act="descend">Ascend${curse ? ` cursed: ${esc(curse.name)}` : ''}</button>`
+      : g.canDescend()
       ? `<p>The way up is open.</p>
-         <button class="btn primary big" data-act="descend">Ascend for ${G.soul()} ${fmt(pending)} souls</button>
-         ${advice}
+         <button class="btn primary big" data-act="descend">Ascend${curse ? ` cursed: ${esc(curse.name)}` : ''} for ${G.soul()} ${fmt(pending)} souls</button>
          <p class="muted">+${fmt(Math.round(pending * g.soulPower() * 100))}% damage, forever.</p>`
       : !g.descendOpen()
         ? `<p>The way up opens at the <b>floor ${g.ascendFloor()}</b> boss.</p>
            <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / g.ascendFloor()) * 100)}%"></i></div>`
-        : `<p>Beat a zone boss to bank souls.</p>`;
+        : `<p>Earn more gold for your next soul.</p>`;
+    const active = g.s.curse ? CURSE_BY_ID.get(g.s.curse) : undefined;
+    const activeLine = active
+      ? `<p class="curse-now"><b>This descent is cursed: ${esc(active.name)}.</b> ${esc(active.rule)}${g.curseTier(active.id) < CURSE_FLOORS.length ? ` Reach floor ${CURSE_FLOORS[g.curseTier(active.id)]} for tier ${g.curseTier(active.id) + 1}.` : ' Every tier broken.'}</p>`
+      : '';
     const nodes = ABYSS.map((a) => {
-      const owned = g.hasAbyss(a.id);
-      const afford = g.soulsFree() >= a.cost;
-      return `<button class="aby ${owned ? 'owned' : afford ? 'can' : 'avail'}" data-aby="${a.id}" data-tip="aby:${a.id}" ${owned ? 'disabled' : ''}>
-        <span class="aby-ico">${spriteFit(a.icon, 32)}</span><b>${esc(a.name)}</b><small>${owned ? 'Owned' : `${G.soul(1.5)} ${a.cost}`}</small></button>`;
+      const lv = g.abyssLv(a.id);
+      const maxed = lv >= a.max;
+      const afford = !maxed && g.soulsFree() >= g.abyssCost(a.id);
+      return `<button class="aby ${maxed ? 'owned' : afford ? 'can' : 'avail'}" data-aby="${a.id}" data-tip="aby:${a.id}" ${maxed ? 'disabled' : ''}>
+        <span class="aby-ico">${spriteFit(a.icon, 32)}</span><b>${esc(a.name)}${lv ? ` <i class="lv">${lv}</i>` : ''}</b><small>${maxed ? 'Maxed' : `${G.soul(1.5)} ${fmt(g.abyssCost(a.id))}`}</small></button>`;
     }).join('');
-    return `<div class="descend-box">${desc}</div>
+    return `<div class="descend-box">${activeLine}${desc}</div>
+      ${this.cursesHtml()}
+      ${this.milestonesHtml()}
       <h3>Abyss powers <span class="muted">${G.soul(1.5)} ${fmt(g.soulsFree())} to spend</span></h3>
       <div class="aby-grid">${nodes}</div>`;
+  }
+
+  /** The curse chosen for the next ascent (null: an ordinary descent). */
+  private curseChoice: string | null = null;
+
+  /** Cursed descents on offer: pick one before ascending. Each shows its rule, its tiers so far and the next reward. */
+  private cursesHtml(): string {
+    const g = this.game;
+    const open = g.cursesOpen();
+    if (!open.length) {
+      const left = CURSES_FROM - g.s.descents;
+      return g.s.descents ? `<h3>Cursed descents <span class="muted">open after ${CURSES_FROM} ascents (${left} to go)</span></h3>` : '';
+    }
+    if (this.curseChoice && !open.some((c) => c.id === this.curseChoice)) this.curseChoice = null;
+    const cards = open.map((c) => {
+      const tier = g.curseTier(c.id);
+      const done = tier >= CURSE_FLOORS.length;
+      const pips = CURSE_FLOORS.map((_, k) => (k < tier ? '★' : '☆')).join('');
+      return `<button class="curse${this.curseChoice === c.id ? ' on' : ''}${done ? ' done' : ''}" data-curse="${c.id}">
+        <b>${esc(c.name)} <span class="stars">${pips}</span></b>
+        <small>${esc(c.rule)}</small>
+        <em>${done ? `Beaten: ${esc(c.reward(tier))}` : `Floor ${CURSE_FLOORS[tier]}: ${esc(c.reward(tier + 1))}`}</em>
+      </button>`;
+    }).join('');
+    return `<h3>Cursed descents <span class="muted">pick one, then ascend</span></h3><div class="curse-grid">${cards}</div>`;
+  }
+
+  /** What ascending more often brings: every milestone, the next one called out. */
+  private milestonesHtml(): string {
+    const g = this.game;
+    const d = g.s.descents;
+    // Only the ones you've reached: the rest are surprises.
+    const got = ASCEND_MILESTONES.filter((m) => d >= m.at);
+    if (!got.length) return '';
+    const items = got.map((m) => `<li class="got"><span class="ms-at">${m.at}</span><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></li>`).join('');
+    return `<h3>Ascent milestones <span class="muted">${d} ascent${d === 1 ? '' : 's'}</span></h3><ul class="milestones">${items}</ul>`;
   }
 
   private troTabs(on: 'trophies' | 'cards') {
@@ -1613,12 +2094,12 @@ export class Ui {
       row('+ Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} upgrades` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`) +
       mul('Buffs right now', b.buffClick, buffNames('click'), 'Frenzy…') +
       total('Per click', fmt(g.clickDamage())) +
-      row('During Rampage', x(g.feverMult()), 'clicks while the Rampage meter is full'));
+      row('During Rampage', x(g.feverMult()), 'all your damage while a Rampage runs'));
 
     const crit = table('Critical hits',
-      row('Chance', pc(g.critChance()), `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} upgrades` : ''}${p.critRelic ? ` + ${pc(p.critRelic)} ${relicName('hawk')}` : ''}`) +
-      row('Damage', x(g.critMult()), `×${p.critMultBase} base${p.critMultUpg > 1 ? ` × ${p.critMultUpg} upgrades` : ''}${p.critMultRelic > 1 ? ` × ${p.critMultRelic} ${relicName('razor')}` : ''}`) +
-      row('Cleave', g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? `clicks also hit every other monster${p.cleaveRelic ? ` (${pc(p.cleaveRelic)} from ${relicName('cleaver')})` : ''}` : 'Cleave upgrades and the Headsman\'s Cleaver', !g.cleave()));
+      row('Chance', pc(g.critChance()), g.abilityUnlocked('crit') ? `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} companions` : ''}${p.critRelic ? ` + ${pc(p.critRelic)} ${relicName('hawk')}` : ''}` : `locked: unlocked by the ${COMPS[ABILITY_BY_ID.get('crit')!.comp].name}`, !g.abilityUnlocked('crit')) +
+      row('Damage', x(g.critMult()), `×${p.critMultBase} base${p.critMultUpg ? ` + ${p.critMultUpg} companions` : ''}${p.critMultRelic > 1 ? ` × ${p.critMultRelic} ${relicName('razor')}` : ''}`) +
+      row('Cleave', g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? `clicks also hit every other monster: 10% base${p.cleaveRelic ? ` + ${pc(p.cleaveRelic)} ${relicName('cleaver')}` : ''}${p.cleaveUpg > 1 ? `, ${x(p.cleaveUpg)} from upgrades` : ''}` : g.abilityUnlocked('cleave') ? 'only while the Cleave skill runs' : `locked: unlocked by the ${COMPS[ABILITY_BY_ID.get('cleave')!.comp].name}`, !g.cleave()));
 
     const goldT = table('Gold',
       mul('Upgrades', p.goldUpg, 'tonics in the shop') +
@@ -1626,26 +2107,24 @@ export class Ui {
       mul('Buffs right now', b.buffGold, buffNames('gold'), 'Gold Rush') +
       total('Gold from monsters', x(g.goldMult())));
 
-    const baseTime = g.hasAbyss('patience') ? 45 : 30;
+    const baseTime = 30 + 3 * g.abyssLv('patience');
     const glass = Math.min(30, 3 * g.relic('time'));
     const bane = g.heartLv('bane');
     const boss = table('Bosses',
       mul(`Damage to bosses (${relicName('slayer')})`, 1 + g.relic('boss'), 'Relic', 'A relic') +
-      row('Time to beat a boss', `${baseTime + glass}s`, `${baseTime}s${g.hasAbyss('patience') ? ' (Patient Hunter)' : ''}${glass ? ` + ${glass}s ${relicName('glass')}` : ''} · Enraged halves it, Giant adds half`) +
+      row('Time to beat a boss', `${baseTime + glass}s`, `${baseTime}s${g.hasAbyss('patience') ? ` (Patient Hunter ${g.abyssLv('patience')})` : ''}${glass ? ` + ${glass}s ${relicName('glass')}` : ''} · Enraged halves it, Giant adds half`) +
       row('Armored blocks', pc(g.armor()), `of companion damage${g.relic('pierce') ? ` (${relicName('pick')} helps)` : ''}`) +
       row('Regenerating heals', `${pc(g.regen())}/s`, g.relic('rot') ? `${relicName('rot')} helps` : 'of its health') +
       row('Modifier strength', pc(g.modBite()), bane ? `Warden's Bane level ${bane}` : 'Warden\'s Bane (a Heart power) weakens them', !bane));
 
-    const next = g.nextBossSouls();
-    const offline = g.hasAbyss('night') ? 1 : g.hasAbyss('pulse') ? 0.5 : 0.25;
+    const offline = g.offlineSpeed();
     const souls = table('Souls and the Heart',
-      row('Each soul gives', `+${Math.round(g.soulPower() * 100)}% damage`, g.hasAbyss('crown') ? 'Crown of the Deep' : g.hasAbyss('roots') ? 'Deep Roots' : 'more with Deep Roots / Crown of the Deep') +
+      row('Each soul gives', `+${(g.soulPower() * 100).toFixed(1)}% damage`, g.hasAbyss('roots') ? `Deep Roots ${g.abyssLv('roots')}` : 'more with Deep Roots') +
       row('Souls', fmt(g.s.souls), `${fmt(g.soulsFree())} unspent`) +
-      row('Banked this descent', fmt(g.pendingSouls()), 'paid out when you ascend') +
-      row(`Next zone boss (floor ${next.floor})`, `+${fmt(next.souls)}`, 'souls when beaten') +
+      row('An ascent now pays', fmt(g.pendingSouls()), 'from all the gold since your last awakening') +
       mul('Soul gain', g.soulGainMult(), `${g.relic('souls') ? `${relicName('cage')} ` : ''}${g.heartLv('siphon') ? `Soul Siphon ${g.heartLv('siphon')}` : ''}`.trim(), 'Soul Cage (relic), Soul Siphon (Heart)') +
       row('Heartstones', fmt(g.s.stones), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`) +
-      row('Offline speed', pc(offline), offline < 1 ? 'Restless Dead / Endless Night raise it' : 'Endless Night'));
+      row('Speed while away', pc(offline), offline < 1 ? 'Restless Dead raises it' : 'Restless Dead'));
 
     return `<div class="bd-grid">${dps}${click}${crit}${goldT}${boss}${souls}</div>`;
   }
@@ -1671,7 +2150,7 @@ export class Ui {
     const rows: [string, string][] = [
       ['Floor', `${s.floor} (deepest this descent ${s.maxFloor})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
       ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses beaten', fmt(s.bosses)],
-      ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Goblin Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
+      ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rainbow Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
       ['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ['Relics', `${g.relicsFound()} / ${RELICS.length}`], ['Cards found', fmt(g.cardsFound())],
       ['This descent', duration(s.runTime)], ['Time played', duration(s.playTime)],
     ];
@@ -1693,10 +2172,9 @@ export class Ui {
     const best = Math.max(g.s.cycleBest, g.s.maxFloor);
     const box = g.canAwaken()
       ? `<p>Awakening gives up your <b>souls</b> and <b>abyss powers</b> for heartstones. Relics, trophies, cards and the companions you've met stay.</p>
-         <button class="btn primary big heart-go" data-act="awaken">Awaken for ${G.heart()} ${fmt(pending)} heartstones</button>
-         <p class="muted">Paid for your deepest floor since the last awakening (floor ${best}). Each floor deeper pays 5% more.</p>`
-      : `<p>Reach <b>floor ${AWAKEN_FLOOR}</b> to awaken the Heart. The deeper you get first, the more heartstones it pays.</p>
-         <div class="bar heart-bar"><i style="width:${Math.min(100, (best / AWAKEN_FLOOR) * 100)}%"></i></div>
+         <button class="btn primary big heart-go" data-act="awaken">Awaken for ${G.heart()} ${fmt(pending)} heartstones</button>`
+      : `<p>Reach <b>floor ${g.awakenFloor()}</b> to awaken the Heart. The more souls you've earned by then, the more heartstones it pays.</p>
+         <div class="bar heart-bar"><i style="width:${Math.min(100, (best / g.awakenFloor()) * 100)}%"></i></div>
          <p class="muted">Deepest since you last awakened: floor ${best}</p>`;
     const nodes = HEART.map((h) => {
       const lv = g.heartLv(h.id);
@@ -1880,6 +2358,7 @@ export class Ui {
       <div class="confirm">
         <p>Leave it all behind for <b>${G.soul()} ${fmt(pending)} souls</b>.</p>
         <p>+${fmt(Math.round(pending * g.soulPower() * 100))}% damage, forever.</p>
+        ${this.curseChoice ? `<p class="omen">The next descent is cursed: ${esc(CURSE_BY_ID.get(this.curseChoice)!.name)}. ${esc(CURSE_BY_ID.get(this.curseChoice)!.rule)}</p>` : ''}
         <div class="set-row"><button class="btn" data-act="abyssBack">Not yet</button><button class="btn primary big" data-act="descendGo">Ascend</button></div>
       </div>`;
   }
@@ -1896,7 +2375,8 @@ export class Ui {
     c.querySelector('span')!.textContent = 'The deep remembers you.';
     this.hooks.sound('descend', { vol: 0.8 });
     setTimeout(() => {
-      g.descend();
+      g.descend(this.curseChoice);
+      this.curseChoice = null;
       this.shown = new Decimal(0);
       this.rowCache.fill('');
       this.upgKey = '';

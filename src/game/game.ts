@@ -1,12 +1,16 @@
 import Decimal from 'break_infinity.js';
 import {
-  ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, HOARDERS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
-  CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, nextMilestone,
+  ABYSS, ABYSS_BY_ID, CARD_BY_ID, ASCEND_MILESTONES, COST_GROWTH, FURY, SOUL_POWER, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
+  CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
+  type AbilityId, type MilestoneId,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
 export const SAVE_VERSION = 2;
-const COST_GROWTH = 1.07;
+export { COST_GROWTH };
+/** COST_GROWTH^k, remembered: level costs ask for the same powers over and over. */
+const costPows: Decimal[] = [];
+const costPow = (k: number) => (costPows[k] ??= Decimal.pow(COST_GROWTH, k));
 /** Kills needed to clear a normal floor. */
 export const FLOOR_KILLS = 25;
 /** A boss guards every Nth floor. */
@@ -21,6 +25,16 @@ const SWEEP_SECONDS = 1;
 const SWEEP_GAP = 0.6;
 /** Damage multiplier a pair upgrade gives each partner. */
 const SYNERGY_MULT = 2;
+/** Seconds a kill's gold lies on the floor before it flies to the bank by itself (your hero or the cursor grabs it sooner). */
+const GOLD_WAIT = 6;
+/** Most piles of gold on the floor at once: past this the oldest is banked straight away. */
+const MAX_DROPS = 40;
+/** Base cleave once the Dwarf Brawler's Cleave is unlocked. */
+const CLEAVE_BASE = 0.1;
+/** Abilities stay unlocked once found (true), or are earned again every run with their traits (false). */
+const ABILITIES_KEEP = false;
+/** Chance the goblin snare catches a treasure goblin you didn't. */
+const SNARE_CHANCE = 0.4;
 /** Seconds between the Quartermaster's shopping trips. */
 const REBUY_GAP = 0.5;
 /** Ordinary monsters are a fraction of a floor's base health: many small kills. */
@@ -39,12 +53,14 @@ const AUTO_BASE = 1;
 /** A new companion is revealed once the gold earned this run reaches this share of their price. */
 const REVEAL_AT = 0.7;
 const FEVER_TIME = 10;
+/** Clicks a second the Squire's Flurry makes for you. */
+const FLURRY_RATE = 10;
 /** Attacks by hand that fill the Rampage meter (about 12 seconds of holding). */
 const FEVER_CLICKS = 60;
-/** Attacks by hand during a Rampage that push it to its top tier, and what each tier does: clicks ×5 then ×10
- *  (nothing raises that further), party damage ×2 then ×3 (the Unstoppable upgrade and Blood Drum add to it). */
+/** Attacks during a Rampage that push it to its top tier, and each tier's multiplier on all your damage (the
+ *  Unstoppable upgrade and the Blood Drum add to both). */
 const RAMPAGE_STEPS = [20];
-const RAMPAGE_TIERS = [{ click: 1, dps: 2 }, { click: 2, dps: 3 }];
+const RAMPAGE_TIERS = [5, 10];
 const RAMPAGE_EXTEND = 3;
 /** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
 const CLUTCH_GOLD = 1.5;
@@ -65,40 +81,52 @@ const CARD_ODDS = { monster: 100_000, boss: 25_000, champ: 10_000, champBoss: 1_
 const DPS_SHOWN_EVERY = 0.35;
 /** Seconds before the boss of a floor you're farming climbs back up. */
 const BOSS_RESPAWN = 2.5;
-/** Share of treasure goblins that are rainbow goblins. Catching one opens the Goblin Vault a quarter of the time
+/** Share of treasure goblins that are rainbow goblins. Catching one opens the Rainbow Vault a quarter of the time
  *  (always the first time); otherwise it drops a Rainbow Haul of RAINBOW_HAUL times a goblin's plunder. */
 const RAINBOW_CHANCE = 1 / 8;
 const VAULT_CHANCE = 0.25;
 const RAINBOW_HAUL = 3;
-const VAULT_TIME = 20;
-const VAULT_ON = 16;
-const VAULT_GAP = 0.1;
-/** Hoarders fall in this many seconds of party damage each and drop this many times a monster's gold, so a vault is
- *  worth roughly a quarter of an hour of ordinary fighting even without clicking. */
-const VAULT_HP = 0.15;
-const VAULT_GOLD = 15;
-const BASE_CRIT = 0.04;
-const BASE_CRIT_MULT = 8;
+/** Chests in the vault (spread down a long hall that scrolls), how many of them are Rainbow Chests (2 or 3), and what a
+ *  Rainbow Chest holds next to an ordinary one. There's no clock: you leave through the exit portal when you like. */
+const VAULT_CHESTS = 40;
+/** How far down the hall the chests go (in the floor's units; the fight's floor is about -9 to 9). */
+export const VAULT_LENGTH = 62;
+const RAINBOW_CHEST_WEIGHT = 10;
+/** Everything in the vault together, in a floor's monster gold: about what its old room of hoarders paid. */
+const VAULT_PAY = 800;
+/** Opening every chest before time runs out adds this share of the vault's worth. */
+const VAULT_ALL_BONUS = 0.2;
+/** Loose coins scattered down the vault's hall (run over them), and the share of the vault's worth they hold together. */
+const VAULT_COINS = 140;
+const VAULT_COIN_SHARE = 0.15;
+/** Treasure goblins loose in the vault (and 1 or 2 rainbow ones), worth this much of an ordinary chest each: gold only. */
+const VAULT_GOBLINS = 12;
+const VAULT_GOBLIN_CHESTS = 0.5;
+const VAULT_RAINBOW_GOBLIN_CHESTS = 6;
+const BASE_CRIT = 0.03;
+const BASE_CRIT_MULT = 2;
 const OFFLINE_CAP = 72 * 3600;
 /** The way up first opens at this floor's boss. */
 export const DESCEND_FLOOR = 30;
-/** Each ascent after that needs a boss at least this many floors past where the last one ended, so short runs can't be farmed for souls. */
-const ASCEND_STEP = 10;
-const SOUL_GROWTH = 1.1;
 /**
- * Pacing knobs, in one place (the balance script overrides them to search for good values).
- * - The floor 10 and 20 bosses pay `earlySouls` (enough that the first descent feels like a leap).
- *   Zone bosses pay `bossSouls` souls at floor 30, +10% a floor up to `soulTaper`, then only `soulLate`
- *   a floor: that's the wall. Zone bosses have `zoneBoss`× the health of mid-bosses.
- * - Awakening at floor f pays stoneBase × stoneGrowth^(f − AWAKEN_FLOOR) heartstones.
- * - Heart of Fury multiplies all damage by `fury` per level.
- * - Fury levels cost 2^n, so each floor deeper pays about fury^log2(stoneGrowth) more damage (×1.176 at 1.05).
- *   Keep `deepHp` just above that: higher and every awakening takes longer to recover from, lower and it snowballs.
+ * Pacing knobs, in one place (the balance tools override them to search for good values).
+ * - Souls (Part III of the idle-maths series, "lifetime" style): all the souls you've earned since your last awakening
+ *   come to (gold earned since then / `soulGold`)^`soulExp` (a cube root), times the soul-gain bonuses. An ascent pays what's new, so 8× the
+ *   gold doubles your souls, and going deeper always pays, the same depth again only a little.
+ * - Heartstones the same way, a level up: (every soul ever earned / `stoneSouls`)^`stoneExp` in all; an awakening pays what's new.
+ * - Heart of Fury multiplies all damage by `fury` per level. Zone bosses have `zoneBoss`× the health of mid-bosses.
+ * - Up to floor 140 each floor has about `hpBase`× the health of the last, past it `deepHp`×; a monster is worth
+ *   1/`goldDiv` of its health in gold. Each soul gives +`soulPower` damage. `abyssGrowth` steepens every Abyss power's
+ *   cost curve (1 = as listed in data.ts).
+ * - Each ascent after the first needs a boss at least `ascendStep` floors past where the last one ended, so short runs
+ *   can't be farmed for ascend milestones.
+ * - Each awakening needs `awakenStep` more floors than the last; `heartGrowth` steepens Heart power costs like
+ *   `abyssGrowth` does Abyss ones.
  */
-export const TUNE = { earlySouls: [20, 60], soulTaper: 90, soulLate: 1.04, stoneBase: 5, stoneGrowth: 1.05, fury: 10, deepHp: 1.18, bossSouls: 50, zoneBoss: 2 };
+export const TUNE = { hpBase: 1.55, goldDiv: 15, soulGold: 1e8, soulExp: 1 / 3, soulPower: SOUL_POWER, abyssGrowth: 3.5, stoneSouls: 8, stoneExp: 0.37, fury: FURY, deepHp: 1.55, zoneBoss: 2, ascendStep: 10, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
 
 export interface Buff {
-  id: RaidReward | 'fever';
+  id: RaidReward | 'fever' | AbilityId;
   name: string;
   t: number;
   dur: number;
@@ -108,6 +136,8 @@ export interface Buff {
   click: number;
   /** Gold multiplier. */
   gold: number;
+  /** Phantom Blade speed multiplier. */
+  blade?: number;
 }
 
 export interface Settings {
@@ -144,7 +174,19 @@ export interface SaveState {
   upgrades: string[];
   /** Every upgrade ever bought, across ascents and awakenings (the Quartermaster rebuys these). */
   upgradesKnown: string[];
-  abyss: string[];
+  /** Seconds left before each ability can be used again (carried across ascents). */
+  cooldowns: Record<string, number>;
+  /** Abilities ever unlocked (they stay if ABILITIES_KEEP). */
+  abilitiesFound: string[];
+  /** Levels of each Abyss power. */
+  abyssLv: Record<string, number>;
+  /** Gold earned since the last awakening: souls are its cube root. */
+  cycleGold: Decimal;
+  /** Souls earned in earlier awakening cycles: heartstones are the cube root of all souls ever. */
+  soulsLifetime: number;
+  /** The curse on this descent (null for none), and the reward tier reached under each curse. */
+  curse: string | null;
+  curseTiers: Record<string, number>;
   trophies: string[];
   souls: number;
   spentSouls: number;
@@ -164,7 +206,6 @@ export interface SaveState {
   /** Deepest floor ever cleared (floor trophies count these). */
   bestCleared: number;
   /** Souls banked this descent from zone bosses; paid out when you descend. */
-  runSouls: number;
   floorKills: number;
   /** Move on as soon as a floor is cleared. */
   auto: boolean;
@@ -187,7 +228,7 @@ export interface SaveState {
   /** Unspent heartstones. */
   stones: number;
   awakens: number;
-  /** Bosses beaten in the last seconds, champions slain, Goblin Vaults opened, highest Rampage tier reached. */
+  /** Bosses beaten in the last seconds, champions slain, Rainbow Vaults opened, highest Rampage tier reached. */
   clutches: number;
   champions: number;
   vaults: number;
@@ -214,13 +255,23 @@ export interface SaveState {
 export function newSave(): SaveState {
   return {
     v: SAVE_VERSION, gold: new Decimal(0), runGold: new Decimal(0), totalGold: new Decimal(0), kills: 0, bosses: 0, clicks: 0, crits: 0,
-    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], abyss: [], trophies: [], souls: 0, spentSouls: 0,
+    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], abyssLv: {}, cycleGold: new Decimal(0), soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
-    floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
+    floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
     relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'sci', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
+}
+
+/** A chest in the Rainbow Vault, where it stands (the same floor space as monsters) and what's in it. */
+export interface VaultChest {
+  id: number;
+  x: number;
+  z: number;
+  rainbow: boolean;
+  gold: Decimal;
+  open: boolean;
 }
 
 export interface Monster {
@@ -240,11 +291,9 @@ export interface Monster {
   half?: boolean;
   /** A champion: tougher, glowing, and full of gold. */
   champ?: boolean;
-  /** A hoarder in the Goblin Vault: doesn't count toward the floor. */
-  vault?: boolean;
 }
 
-export type HitKind = 'click' | 'crit' | 'dps' | 'cleave' | 'auto' | 'fever';
+export type HitKind = 'click' | 'crit' | 'dps' | 'cleave' | 'auto' | 'autoCrit' | 'fever';
 
 export type GameEvent =
   | { t: 'hit'; id: number; amount: Decimal; kind: HitKind; x?: number; y?: number }
@@ -255,20 +304,29 @@ export type GameEvent =
   | { t: 'sweep'; floor: number; gold: Decimal }
   | { t: 'bossFail'; floor: number }
   | { t: 'bossWin'; floor: number; first: boolean; clutch?: { left: number; gold: Decimal } }
-  | { t: 'souls'; id: number; floor: number; souls: number }
   | { t: 'retreat'; floor: number }
   | { t: 'buyComp'; comp: number; n: number }
   | { t: 'reveal'; comp: number }
   | { t: 'buyUpg'; id: string }
+  | { t: 'ability'; id: AbilityId; unlocked?: boolean }
+  /** A kill's gold lands on the floor (`from` is the monster), and later goes to the bank. */
+  | { t: 'drop'; id: number; from: number; gold: Decimal; big: boolean }
+  | { t: 'bank'; id: number; by: 'hand' | 'time' | 'all' }
   | { t: 'trophy'; id: string }
   | { t: 'raidSpawn'; id: number; from: -1 | 1; rainbow: boolean }
   | { t: 'rampage'; tier: number; click: number }
   | { t: 'vault'; on: boolean; gold: Decimal }
+  | { t: 'vaultAll'; gold: Decimal }
+  | { t: 'vaultCoin'; id: number; gold: Decimal }
+  | { t: 'vaultGoblin'; id: number; gold: Decimal; rainbow: boolean }
+  | { t: 'vaultPick' }
+  | { t: 'chest'; id: number; gold: Decimal; rainbow: boolean }
   | { t: 'raidCatch'; id: number; reward: RaidReward; amount?: Decimal; buff?: Buff }
   | { t: 'raidEscape'; id: number }
   | { t: 'fever'; on: boolean }
   | { t: 'descend'; souls: number }
-  | { t: 'abyss'; id: string }
+  | { t: 'abyss'; id: string; lv: number }
+  | { t: 'curse'; id: string; tier: number }
   | { t: 'relic'; id: string; lv: number; floor: number; equipped: boolean; star: number }
   | { t: 'split'; id: number; into: [number, number] }
   | { t: 'heal'; id: number; amount: Decimal }
@@ -319,6 +377,8 @@ interface Computed {
   critMult: number;
   cleave: number;
   gold: number;
+  /** Phantom Blade attacks a second before buffs. */
+  autoBase: number;
 }
 
 export interface Raid {
@@ -328,6 +388,8 @@ export interface Raid {
   t: number;
   stay: number;
   rainbow: boolean;
+  /** The goblin snare has had its one try at this goblin. */
+  snareTried?: boolean;
 }
 
 export interface OfflineSummary {
@@ -344,12 +406,12 @@ export interface OfflineSummary {
 
 /** Health of an ordinary monster on a floor (the classic clicker curve). */
 export function floorHp(f: number): Decimal {
-  if (f <= 140) return new Decimal(10 * (f - 1 + 1.55 ** (f - 1)));
+  if (f <= 140) return new Decimal(10 * (f - 1 + TUNE.hpBase ** (f - 1)));
   return floorHp(140).times(Decimal.pow(TUNE.deepHp, f - 140));
 }
 
 export function floorGold(f: number): Decimal {
-  return Decimal.max(1, floorHp(f).div(15).ceil());
+  return Decimal.max(1, floorHp(f).div(TUNE.goldDiv).ceil());
 }
 
 export const isBossFloor = (f: number) => f % BOSS_EVERY === 0;
@@ -372,16 +434,25 @@ export class Game {
   /** Rampage tier (0–2) and clicks landed during this Rampage. */
   rampageTier = 0;
   private rampageClicks = 0;
-  /** The floor's monsters wait here while the Goblin Vault is open. */
+  private flurryAcc = 0;
+  /** The floor's monsters wait here while the Rainbow Vault is open. */
   private stash: Monster[] = [];
   private vaultOn = false;
-  private vaultGold = new Decimal(0);
+  /** The open Rainbow Vault: its chests, who went in, and what it's paid so far. */
+  vault: {
+    chests: VaultChest[];
+    coins: { id: number; x: number; z: number; gold: Decimal; taken: boolean }[];
+    goblins: { id: number; x: number; z: number; rainbow: boolean; gold: Decimal; caught: boolean }[];
+    hero: number;
+    gold: Decimal;
+  } | null = null;
+  /** A rainbow goblin was just caught: waiting for you to pick who goes through the portal. */
+  vaultPick = false;
   /** Seconds since the last kill: too long and your party falls back a floor. */
   private stuckT = 0;
   private owned = new Set<string>();
   private known = new Set<string>();
   private rebuyT = 0;
-  private abyssSet = new Set<string>();
   private trophySet = new Set<string>();
   private cache: Computed | null = null;
   private trophyTimer = 0;
@@ -390,11 +461,14 @@ export class Game {
   private manualCd = 0;
   /** Held down on the battlefield (mouse, finger or Space): attack by hand at MANUAL_RATE until let go. */
   hold: { id: number | null; x: number; y: number } | null = null;
+  /** Where the cursor is over the battlefield (set by the UI while Flurry runs): Flurry hits what you point at. */
+  aim: { id: number | null; x: number; y: number } | null = null;
   /** Testing only (?relics=always): every boss drops a relic, every time. */
   debugRelics = false;
   /** Testing only (?cards=often): cards drop hundreds of times as often, and champion bosses are common. */
   debugCards = false;
-  private sinceClick = 99;
+  /** Testing only (?goblin=rainbow): every treasure goblin is a rainbow goblin that opens the vault, and they come often. */
+  debugRainbow = false;
   /** DPS damage waiting to be shown as numbers, per monster. */
   private dpsShown = new Map<number, Decimal>();
   private healShown = new Map<number, Decimal>();
@@ -409,8 +483,6 @@ export class Game {
     // Saves from before awakening existed: the whole history counts as the first cycle.
     if (s.cycleBest === undefined) s.cycleBest = s.bestFloor ?? 1;
     if (s.bestCleared === undefined) s.bestCleared = (s.bestFloor ?? 1) - 1;
-    // Souls used to be paid for depth at descent time; carry what this descent was worth over.
-    if (s.runSouls === undefined) s.runSouls = Math.floor(10 * 1.1 ** (Math.min(s.maxFloor ?? 1, 90) - 30) * 1.04 ** Math.max(0, (s.maxFloor ?? 1) - 90));
     // Auto-hire (the Quartermaster Heart power) is gone; whoever bought it gets the heartstones back.
     if (s.heart?.quarter) {
       s.stones = (s.stones ?? 0) + 4;
@@ -445,19 +517,37 @@ export class Game {
       });
     }
     s.upgradesKnown ??= [...(s.upgrades ?? [])];
+    // Retired upgrades (the old crit-only ones) drop out.
+    s.upgrades = (s.upgrades ?? []).filter((id) => UPG_BY_ID.has(id));
+    s.upgradesKnown = s.upgradesKnown.filter((id) => UPG_BY_ID.has(id));
     // Trophies that no longer exist (retired ones) shouldn't keep counting toward the trophy bonus.
     if (s.trophies) s.trophies = s.trophies.filter((id) => TROPHIES.some((t) => t.id === id));
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
+    // Abyss powers became levelled: every soul spent on the old one-off powers comes back to spend again.
+    const legacy = s as unknown as { abyss?: string[]; runSouls?: number };
+    if (legacy.abyss) {
+      s.spentSouls = 0;
+      s.abyssLv = {};
+      delete legacy.abyss;
+    }
+    delete legacy.runSouls;
     // Saved as plain numbers (older saves) or strings (Decimal's JSON form).
-    for (const k of ['gold', 'runGold', 'totalGold', 'failDps', 'bestDps'] as const) s[k] = new Decimal(s[k] ?? 0);
+    for (const k of ['gold', 'runGold', 'totalGold', 'failDps', 'bestDps', 'cycleGold'] as const) s[k] = new Decimal(s[k] ?? 0);
     while (s.owned.length < COMPS.length) s.owned.push(0);
     this.owned = new Set(s.upgrades);
     this.known = new Set(s.upgradesKnown);
-    this.abyssSet = new Set(s.abyss);
+    // Saves from before the soul formula: pick up where their souls already are (nothing owed, nothing lost).
+    if (s.cycleGold.eq(0) && s.souls > 0) s.cycleGold = new Decimal(TUNE.soulGold).times(Decimal.pow(s.souls / this.soulGainMult(), 1 / TUNE.soulExp));
+    if (!s.soulsLifetime && this.stonesEarned() > 0) s.soulsLifetime = Math.max(0, TUNE.stoneSouls * this.stonesEarned() ** (1 / TUNE.stoneExp) - s.souls);
     this.trophySet = new Set(s.trophies);
+    // A vault doesn't survive a reload (its chests aren't saved): you're back on the floor.
+    s.buffs = s.buffs.filter((b) => b.id !== 'vault');
+    // Pick up where you left off on this floor (its monsters respawn, the kills so far still count).
+    const kills = s.floorKills ?? 0;
     this.enterFloor(s.floor, true);
+    if (!this.bossFloor()) s.floorKills = Math.min(kills, FLOOR_KILLS);
   }
 
   // ---------- lookups ----------
@@ -466,8 +556,84 @@ export class Game {
     return this.owned.has(id);
   }
 
+  // ---------- abilities ----------
+
+  /** Unlocked while its companion trait is owned this run (or for good, if ABILITIES_KEEP and it was ever found). */
+  abilityUnlocked(id: AbilityId) {
+    const a = ABILITY_BY_ID.get(id)!;
+    return this.owned.has(abilityUpgrade(a)) || (ABILITIES_KEEP && this.s.abilitiesFound.includes(id));
+  }
+
+  abilityCooldown(id: AbilityId) {
+    return this.s.cooldowns[id] ?? 0;
+  }
+
+  /** Use a button ability: its buff for a while, then its cooldown (Rampage: unleash a full meter). */
+  useAbility(id: AbilityId) {
+    const a = ABILITY_BY_ID.get(id);
+    if (id === 'rampage') return this.unleashRampage();
+    if (!a || a.kind !== 'button' || !this.abilityUnlocked(id) || this.abilityCooldown(id) > 0) return false;
+    const dur = a.dur ?? 0;
+    const buff: Buff = { id, name: a.name, t: dur, dur, dps: 1, click: 1, gold: 1 };
+    if (id === 'drums') buff.dps = 2;
+    else if (id === 'treasure') buff.gold = 3;
+    else if (id === 'legion') buff.blade = 10;
+    this.addBuff(buff);
+    this.s.cooldowns[id] = a.cooldown ?? 0;
+    this.events.push({ t: 'ability', id });
+    return true;
+  }
+
+  /** Share of full speed the party fights at while you're away. */
+  offlineSpeed() {
+    return Math.min(1, 0.25 + 0.15 * this.abyssLv('pulse'));
+  }
+
+  abyssLv(id: string) {
+    return this.s.abyssLv[id] ?? 0;
+  }
+
   hasAbyss(id: string) {
-    return this.abyssSet.has(id);
+    return this.abyssLv(id) > 0;
+  }
+
+  /** A reward for how many times you've ascended. */
+  milestone(id: MilestoneId) {
+    return this.s.descents >= ASCEND_MILESTONES.find((m) => m.id === id)!.at;
+  }
+
+  // ---------- cursed descents ----------
+
+  /** This curse's rule is in force (Two Curses brings Iron Wardens and Mending Dark). */
+  curseActive(id: string) {
+    const c = this.s.curse;
+    return c === id || (c === 'two' && (id === 'iron' || id === 'mending'));
+  }
+
+  curseTier(id: string) {
+    return this.s.curseTiers[id] ?? 0;
+  }
+
+  /** Curses on offer: none before CURSES_FROM ascents, then a couple, one more every 5 ascents; Two Curses once every
+   *  other curse has been beaten at least once. */
+  cursesOpen() {
+    const d = this.s.descents;
+    if (d < CURSES_FROM) return [];
+    const plain = CURSES.filter((c) => c.id !== 'two');
+    const open = plain.slice(0, Math.min(plain.length, 2 + Math.floor((d - CURSES_FROM) / 5)));
+    if (plain.every((c) => this.curseTier(c.id) > 0)) open.push(CURSE_BY_ID.get('two')!);
+    return open;
+  }
+
+  /** A cursed descent reaching its next reward floor earns that tier for good. */
+  private checkCurse() {
+    const id = this.s.curse;
+    if (!id) return;
+    const tier = this.curseTier(id);
+    if (tier >= CURSE_FLOORS.length || this.s.maxFloor < CURSE_FLOORS[tier]) return;
+    this.s.curseTiers[id] = tier + 1;
+    this.invalidate();
+    this.events.push({ t: 'curse', id, tier: tier + 1 });
   }
 
   hasTrophy(id: string) {
@@ -483,6 +649,7 @@ export class Game {
     for (const id of this.s.upgrades) {
       const u = UPG_BY_ID.get(id);
       if (u) out.push(u.effect);
+      if (u?.bonus) out.push(u.bonus);
     }
     return out;
   }
@@ -515,7 +682,7 @@ export class Game {
   }
 
   soulPower() {
-    return this.hasAbyss('crown') ? 0.04 : this.hasAbyss('roots') ? 0.03 : 0.02;
+    return TUNE.soulPower + 0.002 * this.abyssLv('roots');
   }
 
   soulMult() {
@@ -523,10 +690,10 @@ export class Game {
   }
 
   trophyMult() {
-    const n = this.s.trophies.length;
-    let m = 1 + n * 0.01;
-    for (const e of this.effects()) if (e.t === 'trophy') m *= 1 + n * e.k;
-    return m;
+    // Trophy upgrades add to what each trophy gives (multiplying them compounds with every new trophy and runs away).
+    let perTrophy = 0.01;
+    for (const e of this.effects()) if (e.t === 'trophy') perTrophy += e.k;
+    return 1 + this.s.trophies.length * perTrophy;
   }
 
   private compute() {
@@ -534,15 +701,15 @@ export class Game {
     const effects = this.effects();
     const tier = COMPS.map(() => 1);
     const syn = COMPS.map(() => 1);
-    const twin = this.hasAbyss('twin') ? 2 : 1;
+    const twin = 1 + this.abyssLv('twin');
     const whet = 1 + this.relic('click');
     let blades = 1;
     let clickDpsUpg = 0;
     let global = 0;
     let gold = 0;
     let critUpg = 0;
-    let critMultUpg = 1;
-    let cleaveUpg = 0;
+    let critMultUpg = 0;
+    let cleaveUpg = 1;
     for (const e of effects) {
       if (e.t === 'comp') tier[e.comp] *= e.mult;
       else if (e.t === 'click') blades *= e.mult;
@@ -551,8 +718,8 @@ export class Game {
       else if (e.t === 'gold') gold += e.pct;
       else if (e.t === 'crit') {
         if (e.chance) critUpg += e.chance;
-        if (e.mult) critMultUpg *= e.mult;
-      } else if (e.t === 'cleave') cleaveUpg += e.pct;
+        if (e.add) critMultUpg += e.add;
+      } else if (e.t === 'cleave') cleaveUpg *= 1 + e.pct;
       else if (e.t === 'syn') {
         // Flat, so a pair never outgrows the pricier companions above it.
         syn[e.a] *= SYNERGY_MULT;
@@ -582,10 +749,11 @@ export class Game {
     const click = all.times(twin * whet * blades).plus(dps.times(parts.clickDps));
     this.cache = {
       dps, perComp, baseComp, parts, all, click,
-      crit: parts.critBase + parts.critUpg + parts.critRelic,
-      critMult: parts.critMultBase * parts.critMultUpg * parts.critMultRelic,
-      cleave: parts.cleaveUpg + parts.cleaveRelic,
+      crit: this.abilityUnlocked('crit') ? parts.critBase + parts.critUpg + parts.critRelic : 0,
+      critMult: (parts.critMultBase + parts.critMultUpg) * parts.critMultRelic,
+      cleave: this.abilityUnlocked('cleave') && this.s.buffs.some((b) => b.id === 'cleave') ? (CLEAVE_BASE + parts.cleaveRelic) * parts.cleaveUpg : 0,
       gold: parts.goldUpg * parts.goldRelic,
+      autoBase: AUTO_BASE + this.abyssLv('hands') + [0, 0.5, 1, 2][this.curseTier('silent')] + 0.5 * this.relic('phantom') + effects.reduce((sum, e) => sum + (e.t === 'auto' ? e.add : 0), 0),
     };
     return this.cache;
   }
@@ -626,6 +794,21 @@ export class Game {
     return this.c.click.times(this.buffMult('click'));
   }
 
+  /** One of your clicks right now, as it lands: Rampage included, plus cleave on every other monster in the room. */
+  clickTotal() {
+    const fever = this.s.buffs.some((b) => b.id === 'fever') ? this.feverMult() : 1;
+    return this.clickDamage().times(fever * (1 + this.cleave() * Math.max(0, this.monsters.length - 1)));
+  }
+
+  /** Everything that isn't your own clicking, per second: the party and the Phantom Blade (with its cleave). */
+  dpsTotal() {
+    return this.dps().plus(this.clickTotal().times(this.autoRate()));
+  }
+
+  hasUpgrade(id: string) {
+    return this.owned.has(id);
+  }
+
   critChance() {
     return this.c.crit;
   }
@@ -638,25 +821,36 @@ export class Game {
     return this.c.cleave;
   }
 
+  /** What an ability does right now, with your upgrades and relics counted (whether or not it's unlocked or running). */
+  abilityText(id: AbilityId): string {
+    const p = this.c.parts;
+    const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
+    if (id === 'crit') return `Your clicks and Phantom Blade can land critical hits: a ${pct(p.critBase + p.critUpg + p.critRelic)} chance for ×${+((p.critMultBase + p.critMultUpg) * p.critMultRelic).toFixed(2)} damage.`;
+    if (id === 'cleave') return `Your clicks also hit every other monster for ${pct((CLEAVE_BASE + p.cleaveRelic) * p.cleaveUpg)} damage.`;
+    if (id === 'rampage') return `Attacks charge it. Unleash for ×${+this.feverMult(0).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s. Keep attacking for ×${+this.feverMult(1).toFixed(1)}.`;
+    return ABILITY_BY_ID.get(id)!.desc;
+  }
+
   goldMult() {
     return this.c.gold * this.buffMult('gold');
   }
 
-  feverMult() {
-    return 5 * RAMPAGE_TIERS[this.rampageTier].click;
+  /** A running Rampage's multiplier on all your damage. */
+  feverMult(tier = this.rampageTier) {
+    return RAMPAGE_TIERS[tier] + this.rampageBonus();
   }
 
-  /** How much harder the party hits during a Rampage on top of its tier: the Unstoppable upgrade and the Blood Drum. */
-  rampageParty() {
-    let p = 1 + 0.25 * this.relic('rampage');
-    for (const e of this.effects()) if (e.t === 'fever' && e.power) p *= e.power;
-    return p;
+  /** Added to the Rampage multiplier: the Unstoppable upgrade and the Blood Drum. */
+  private rampageBonus() {
+    let bonus = this.relic('rampage');
+    for (const e of this.effects()) if (e.t === 'fever' && e.power) bonus += e.power;
+    return bonus;
   }
 
-  /** Clicks still needed for the next Rampage tier and the click multiplier it brings (null at the top tier). */
+  /** Attacks still needed for the next Rampage tier and the multiplier it brings (null at the top tier). */
   rampageNext(): { left: number; mult: number } | null {
     if (this.rampageTier >= RAMPAGE_STEPS.length) return null;
-    return { left: RAMPAGE_STEPS[this.rampageTier] - this.rampageClicks, mult: 5 * RAMPAGE_TIERS[this.rampageTier + 1].click };
+    return { left: RAMPAGE_STEPS[this.rampageTier] - this.rampageClicks, mult: this.feverMult(this.rampageTier + 1) };
   }
 
   inVault() {
@@ -664,19 +858,18 @@ export class Game {
   }
 
   monsterGold(m: Monster) {
-    const k = m.boss ? 8 * (m.champ ? CHAMP_BOSS_GOLD : 1) : TRASH * (m.champ ? CHAMP_GOLD : m.vault ? VAULT_GOLD : 1);
+    const k = m.boss ? 8 * (m.champ ? CHAMP_BOSS_GOLD : 1) : TRASH * (m.champ ? CHAMP_GOLD : 1);
     return Decimal.max(1, floorGold(this.s.floor).times(k)).times(this.goldMult()).ceil();
   }
 
   // ---------- costs ----------
 
   private compBase(i: number) {
-    return COMPS[i].cost * (this.hasAbyss('tithe') ? 0.9 : 1);
+    return COMPS[i].cost * 0.97 ** this.abyssLv('tithe');
   }
 
   compCost(i: number, n = 1) {
-    const k = this.s.owned[i];
-    return Decimal.pow(COST_GROWTH, k).times(Decimal.pow(COST_GROWTH, n).minus(1)).times(this.compBase(i) / (COST_GROWTH - 1)).ceil();
+    return costPow(this.s.owned[i]).times(costPow(n).minus(1)).times(this.compBase(i) / (COST_GROWTH - 1)).ceil();
   }
 
   compQuote(i: number): { n: number; cost: Decimal } {
@@ -693,7 +886,9 @@ export class Game {
   }
 
   upgCost(u: UpgDef) {
-    return u.cost * (this.hasAbyss('bargain') ? 0.9 : 1);
+    // Traits get cheaper by beating A Small Party, everything else by beating Lean Purse.
+    const curse = isTraitId(u.id) ? 1 - 0.1 * this.curseTier('small') : 1 - 0.1 * this.curseTier('lean');
+    return u.cost * 0.95 ** this.abyssLv('bargain') * curse;
   }
 
   compUnlocked(i: number) {
@@ -704,6 +899,7 @@ export class Game {
 
   /** Move to a floor. `cleared`: because the last one was just cleared (the UI and scene make a moment of it). */
   private enterFloor(f: number, quiet = false, cleared = false, bossDelay = 0) {
+    this.bankAllDrops();
     this.s.floor = f;
     this.s.floorKills = 0;
     this.stuckT = 0;
@@ -711,7 +907,7 @@ export class Game {
     this.spawnT = 0.3;
     this.bossTime = 0;
     this.stash = [];
-    // During the Goblin Vault the boss waits until the vault closes.
+    // During the Rainbow Vault the boss waits until the vault closes.
     if (bossDelay) this.spawnT = bossDelay;
     else if (isBossFloor(f) && !this.inVault()) this.spawnBoss();
     if (!quiet) this.events.push({ t: 'floor', floor: f, boss: isBossFloor(f), cleared });
@@ -763,41 +959,115 @@ export class Game {
     this.events.push({ t: 'spawn', id: m.id });
   }
 
-  private spawnHoarder() {
-    // Health from your own strength only, so a vault pays out in full even on a floor you're stuck on.
-    const hp = Decimal.max(this.dps().times(VAULT_HP), this.clickDamage());
-    const def = HOARDERS[Math.floor(Math.random() * HOARDERS.length)];
-    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.4, mods: [], vault: true, ...this.spot(false) };
-    this.monsters.push(m);
-    this.events.push({ t: 'spawn', id: m.id });
+  /** Who goes through the portal (any companion you have; your hero if the choice is left). */
+  enterVault(comp: number) {
+    if (!this.vaultPick) return false;
+    this.vaultPick = false;
+    this.openVault(this.s.owned[comp] > 0 ? comp : Math.max(0, this.heroIndex()));
+    return true;
   }
 
-  /** The rainbow goblin's prize: the floor steps aside and the room fills with hoarders. */
-  private openVault() {
+  /** The rainbow goblin's prize: the floor steps aside for a room full of treasure chests. */
+  private openVault(hero: number) {
     this.s.vaults++;
-    // Another rainbow goblin while the vault is open keeps it open longer.
-    const open = this.s.buffs.find((b) => b.id === 'vault');
-    if (open) {
-      open.t += VAULT_TIME;
-      open.dur += VAULT_TIME;
-      return;
-    }
-    this.vaultGold = new Decimal(0);
     this.stash = this.monsters;
     this.monsters = [];
-    this.spawnT = 0;
-    this.addBuff({ id: 'vault', name: 'Goblin Vault', t: VAULT_TIME, dur: VAULT_TIME, dps: 1, click: 1, gold: 1 });
+    const coin = floorGold(this.s.floor).times(TRASH * VAULT_PAY * VAULT_COIN_SHARE * this.goldMult()).div(VAULT_COINS);
+    const coins = Array.from({ length: VAULT_COINS }, () => ({ id: this.seq++, x: -12 + Math.random() * (VAULT_LENGTH + 10), z: -3 + Math.random() * 6.5, gold: coin, taken: false }));
+    const chest = floorGold(this.s.floor).times(TRASH * VAULT_PAY * this.goldMult()).div(VAULT_CHESTS);
+    const rainbows = Math.random() < 0.5 ? 2 : 1;
+    const goblins = Array.from({ length: VAULT_GOBLINS + rainbows }, (_, k) => {
+      const rainbow = k < rainbows;
+      return { id: this.seq++, x: -6 + Math.random() * (VAULT_LENGTH - 12), z: -2.5 + Math.random() * 5, rainbow, gold: chest.times(rainbow ? VAULT_RAINBOW_GOBLIN_CHESTS : VAULT_GOBLIN_CHESTS), caught: false };
+    });
+    this.vault = { chests: this.makeChests(VAULT_CHESTS, Math.random() < 0.5 ? 3 : 2), coins, goblins, hero, gold: new Decimal(0) };
+    this.addBuff({ id: 'vault', name: 'Rainbow Vault', t: Infinity, dur: Infinity, dps: 1, click: 1, gold: 1 });
     this.vaultOn = true;
     this.events.push({ t: 'vault', on: true, gold: new Decimal(0) });
   }
 
+  /** Chests spread over the floor, kept apart from each other; the vault's worth shared out (a Rainbow Chest counts many). */
+  private makeChests(n: number, rainbows: number): VaultChest[] {
+    const worth = floorGold(this.s.floor).times(TRASH * VAULT_PAY * this.goldMult()).times(n / VAULT_CHESTS);
+    const each = worth.div(n - rainbows + rainbows * RAINBOW_CHEST_WEIGHT);
+    const out: VaultChest[] = [];
+    for (let k = 0; k < n; k++) {
+      let best = { x: 0, z: 0 };
+      let bestD = -1;
+      for (let tries = 0; tries < 16; tries++) {
+        // (The last stretch of the hall is left clear, in front of the way out.)
+        const p = { x: -8.5 + Math.random() * (VAULT_LENGTH - 10), z: -2.7 + Math.random() * 5.4 };
+        const d = Math.min(99, ...out.map((c) => Math.hypot(c.x - p.x, (c.z - p.z) * 1.6)));
+        if (d > bestD) {
+          bestD = d;
+          best = p;
+        }
+      }
+      const rainbow = k < rainbows;
+      out.push({ id: this.seq++, ...best, rainbow, gold: each.times(rainbow ? RAINBOW_CHEST_WEIGHT : 1), open: false });
+    }
+    return out;
+  }
+
+  /** Your vault hero reached a chest: it bursts open and pays out. Opening the last one pays a bonus on top. */
+  openChest(id: number) {
+    const v = this.vault;
+    const c = v?.chests.find((x) => x.id === id);
+    if (!v || !c || c.open) return false;
+    c.open = true;
+    this.earn(c.gold);
+    v.gold = v.gold.plus(c.gold);
+    this.events.push({ t: 'chest', id, gold: c.gold, rainbow: c.rainbow });
+    if (v.chests.every((x) => x.open)) {
+      const bonus = v.chests.reduce((sum, x) => sum.plus(x.gold), new Decimal(0)).times(VAULT_ALL_BONUS);
+      this.earn(bonus);
+      v.gold = v.gold.plus(bonus);
+      this.events.push({ t: 'vaultAll', gold: bonus });
+    }
+    return true;
+  }
+
+  /** A loose coin on the vault floor, scooped up in passing. */
+  pickCoin(id: number) {
+    const v = this.vault;
+    const c = v?.coins.find((x) => x.id === id);
+    if (!v || !c || c.taken) return false;
+    c.taken = true;
+    this.earn(c.gold);
+    v.gold = v.gold.plus(c.gold);
+    this.events.push({ t: 'vaultCoin', id, gold: c.gold });
+    return true;
+  }
+
+  /** A goblin caught in the vault: gold only (they don't count as catches, and there's no prize to roll). */
+  catchVaultGoblin(id: number) {
+    const v = this.vault;
+    const g = v?.goblins.find((x) => x.id === id);
+    if (!v || !g || g.caught) return false;
+    g.caught = true;
+    this.earn(g.gold);
+    v.gold = v.gold.plus(g.gold);
+    this.events.push({ t: 'vaultGoblin', id, gold: g.gold, rainbow: g.rainbow });
+    return true;
+  }
+
+  /** Out through the exit portal (whenever you like). */
+  leaveVault() {
+    if (!this.vault) return false;
+    this.closeVault();
+    return true;
+  }
+
   private closeVault() {
     this.vaultOn = false;
-    // Hoarders still standing slip away; the floor's own monsters climb back up the stairs.
-    this.monsters = this.stash.filter((m) => !m.vault).map((m) => ({ ...m, arrive: m.boss ? 1.5 : 0.7 }));
+    this.s.buffs = this.s.buffs.filter((b) => b.id !== 'vault');
+    this.invalidate();
+    // The floor's own monsters climb back up the stairs.
+    this.monsters = this.stash.map((m) => ({ ...m, arrive: m.boss ? 1.5 : 0.7 }));
     this.stash = [];
     this.spawnT = 0.3;
-    this.events.push({ t: 'vault', on: false, gold: this.vaultGold });
+    this.events.push({ t: 'vault', on: false, gold: this.vault?.gold ?? new Decimal(0) });
+    this.vault = null;
   }
 
   /** Modifiers on this floor's boss. */
@@ -807,18 +1077,22 @@ export class Game {
 
   private spawnBoss() {
     const def = bossFor(this.s.floor);
-    const mods = this.bossMods();
+    const mods = [...this.bossMods()];
+    if (this.curseActive('iron') && !mods.includes('armored')) mods.push('armored');
+    if (this.curseActive('mending') && !mods.includes('regen')) mods.push('regen');
     const bite = this.modBite();
     const giant = mods.includes('giant');
-    // Zone bosses from floor 30 on are the walls; the first two just teach you what a boss is.
+    // Zone bosses from floor 30 on are the walls; the first two just teach you what a boss is, and the rest before the
+    // floor-30 boss are a little softer so the first wall is that one.
     const zone = this.s.floor % 10 === 0 && this.s.floor >= DESCEND_FLOOR ? TUNE.zoneBoss : 1;
-    const first = this.s.floor <= 10 ? 0.5 : 1;
+    const first = this.s.floor <= 10 ? 0.5 : this.s.floor < DESCEND_FLOOR ? 0.5 : 1;
     // Only on a boss floor you've beaten before, so a champion never stands in the way of new ground.
     const champ = this.s.floor < this.s.bestFloor && Math.random() < (this.debugCards ? 0.34 : CHAMP_BOSS_CHANCE);
     const hp = floorHp(this.s.floor).times(8 * zone * first * (giant ? 1 + 2 * bite : 1) * (champ ? CHAMP_BOSS_HP : 1));
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, champ, ...this.spot(true) };
     this.monsters.push(m);
-    let time = (this.hasAbyss('patience') ? 45 : BOSS_TIME) + Math.min(30, 3 * this.relic('time'));
+    let time = BOSS_TIME + 3 * this.abyssLv('patience') + 5 * this.curseTier('fuse') + Math.min(30, 3 * this.relic('time'));
+    if (this.curseActive('fuse')) time *= 0.5;
     if (mods.includes('enraged')) time *= 1 - 0.5 * bite;
     if (giant || champ) time *= 1.5;
     this.bossTimeMax = time;
@@ -828,12 +1102,12 @@ export class Game {
 
   /** Share of companion damage an armored boss shrugs off. */
   armor() {
-    return 0.75 * 0.7 ** this.relic('pierce') * this.modBite();
+    return 0.75 * 0.7 ** this.relic('pierce') * this.modBite() * (1 - 0.2 * this.curseTier('iron'));
   }
 
   /** Share of its health a regenerating boss heals per second. */
   regen() {
-    return 0.03 * 0.7 ** this.relic('rot') * this.modBite();
+    return 0.03 * 0.7 ** this.relic('rot') * this.modBite() * (1 - 0.25 * this.curseTier('mending'));
   }
 
   monster(id: number) {
@@ -871,16 +1145,12 @@ export class Game {
       this.dpsShown.delete(m.id);
     }
     const gold = this.monsterGold(m);
-    this.earn(gold);
+    this.dropGold(gold, m);
     this.s.kills++;
     this.killAcc++;
     this.stuckT = 0;
     if (m.champ && !m.half) this.s.champions++;
     this.events.push({ t: 'kill', id: m.id, gold, boss: m.boss, by, champ: m.champ });
-    if (m.vault) {
-      this.vaultGold = this.vaultGold.plus(gold);
-      return;
-    }
     if (!m.boss) this.rollCard(this.slay(m.def), !!m.champ, 'kill');
     if (m.boss && m.mods.includes('split') && !m.half) {
       // Two halves climb out of the body; the clock keeps running.
@@ -913,12 +1183,6 @@ export class Game {
       this.unlockNext();
       this.events.push({ t: 'bossWin', floor: this.s.floor, first: firstClear, clutch });
       this.rollCard(this.slay(m.def), !!m.champ, 'kill', true);
-      // Each boss pays its souls once a descent: farming its floor afterwards doesn't.
-      const souls = firstWin ? this.bossSouls(this.s.floor) : 0;
-      if (souls > 0) {
-        this.s.runSouls += souls;
-        this.events.push({ t: 'souls', id: m.id, floor: this.s.floor, souls });
-      }
       if (firstWin || this.debugRelics) this.rollRelic(this.s.floor);
       if (this.s.auto) this.enterFloor(this.s.floor + 1);
       else this.enterFloor(this.s.floor, false, false, BOSS_RESPAWN);
@@ -932,8 +1196,7 @@ export class Game {
   }
 
   /** Strong enough to clear what's left of this floor at once (the toughest monster type counts for all of them).
-   *  Only while auto-advancing: with auto off you're staying to farm the floor (and a reload, which restarts its kill
-   *  count, shouldn't sweep it again for free). */
+   *  Only while auto-advancing: with auto off you're staying to farm the floor. */
   private canSweep() {
     if (!this.s.auto || this.bossFloor() || this.s.floorKills >= FLOOR_KILLS) return false;
     const toughest = Math.max(...bandFor(this.s.floor).map((d) => d.hp));
@@ -971,6 +1234,7 @@ export class Game {
     if (s.floor + 1 > s.maxFloor) {
       s.maxFloor = s.floor + 1;
       s.bestFloor = Math.max(s.bestFloor, s.maxFloor);
+      this.checkCurse();
     }
   }
 
@@ -980,32 +1244,34 @@ export class Game {
   }
 
   /** Click a monster (or, if it's gone, whatever's in front). `x, y` are screen coords for numbers. */
-  click(id: number | null, x: number, y: number, auto = false) {
+  click(id: number | null, x: number, y: number, auto = false, flurry = false) {
     const target = (id !== null ? this.monster(id) : undefined) ?? this.focus();
     if (!target) return new Decimal(0);
     if (!auto) {
-      if (this.manualCd > 0) return new Decimal(0);
-      this.manualCd = 1 / MANUAL_RATE;
+      if (this.curseActive('silent')) return new Decimal(0);
+      // Flurry's clicks are on top of your own, so they don't wait for the hand's cooldown.
+      if (!flurry) {
+        if (this.manualCd > 0) return new Decimal(0);
+        this.manualCd = 1 / MANUAL_RATE;
+      }
     }
-    const crit = !auto && Math.random() < this.critChance();
+    const crit = Math.random() < this.critChance();
     const fever = this.s.buffs.some((b) => b.id === 'fever');
     let amount = this.clickDamage().times(crit ? this.critMult() : 1);
     if (fever) amount = amount.times(this.feverMult());
     const others = this.cleave() > 0 ? this.monsters.filter((m) => m !== target) : [];
-    this.damage(target, amount, auto ? 'auto' : crit ? 'crit' : fever ? 'fever' : 'click', x, y);
+    this.damage(target, amount, auto ? (crit ? 'autoCrit' : 'auto') : crit ? 'crit' : fever ? 'fever' : 'click', x, y);
     for (const m of others) if (this.monsters.includes(m)) this.damage(m, amount.times(this.cleave()), 'cleave');
+    if (crit) this.s.crits++;
     if (!auto) {
       this.s.clicks++;
-      if (crit) this.s.crits++;
-      this.sinceClick = 0;
       this.events.push({ t: 'click', crit, x, y });
       if (fever) this.pushRampage();
-      else {
+      else if (this.rampageUnlocked() && !this.curseActive('norampage')) {
         let fill = 1 / FEVER_CLICKS;
         for (const e of this.effects()) if (e.t === 'fever' && e.fill) fill *= e.fill;
-        if (this.hasAbyss('dreams')) fill *= 1.5;
+        fill *= (1 + 0.15 * this.abyssLv('dreams')) * (1 + 0.2 * this.curseTier('norampage'));
         this.s.fervor = Math.min(1, this.s.fervor + fill);
-        if (this.s.fervor >= 1) this.startFever();
       }
     }
     return amount;
@@ -1014,6 +1280,7 @@ export class Game {
   /** Your hero: the companion you picked, or the first one you hired if that one's gone. -1 for none (before your
    *  first hire, or when you've chosen to go without). */
   heroIndex() {
+    if (this.vault) return this.vault.hero;
     if (this.s.hero < 0) return -1;
     if (this.s.owned[this.s.hero] > 0) return this.s.hero;
     return this.s.owned.findIndex((n) => n > 0);
@@ -1032,19 +1299,19 @@ export class Game {
 
   /** Phantom Blade attacks a second: a slow start, faster with shop upgrades, Abyss powers and the Phantom Hilt. */
   autoRate() {
-    let rate = AUTO_BASE + (this.hasAbyss('hands') ? 1 : 0) + (this.hasAbyss('hands2') ? 3 : 0) + 0.5 * this.relic('phantom');
-    for (const e of this.effects()) if (e.t === 'auto') rate += e.add;
+    let rate = this.c.autoBase;
+    for (const b of this.s.buffs) rate *= b.blade ?? 1;
     return rate;
   }
 
-  /** Keep attacking through a Rampage and it climbs from ×5 clicks to ×10, with more party damage and a little more time. */
+  /** Keep attacking through a Rampage and it climbs to its top tier, with a little more time. */
   private pushRampage() {
     if (this.rampageTier >= RAMPAGE_STEPS.length) return;
     if (++this.rampageClicks < RAMPAGE_STEPS[this.rampageTier]) return;
     this.rampageTier++;
     const b = this.s.buffs.find((x) => x.id === 'fever');
     if (b) {
-      b.dps = RAMPAGE_TIERS[this.rampageTier].dps * this.rampageParty();
+      b.dps = this.feverMult();
       b.t += RAMPAGE_EXTEND;
       b.dur += RAMPAGE_EXTEND;
     }
@@ -1053,14 +1320,35 @@ export class Game {
     this.events.push({ t: 'rampage', tier: this.rampageTier, click: this.feverMult() });
   }
 
+  rampageUnlocked() {
+    return this.abilityUnlocked('rampage');
+  }
+
+  /** The meter is full and waiting to be unleashed. */
+  rampageReady() {
+    return this.rampageUnlocked() && this.s.fervor >= 1 && !this.s.buffs.some((b) => b.id === 'fever');
+  }
+
+  /** Unleash a full Rampage meter (the player's call: save it for a boss, or spend it now). */
+  unleashRampage() {
+    if (!this.rampageReady()) return false;
+    this.startFever();
+    return true;
+  }
+
+  /** Seconds a Rampage lasts (before attacking through it adds a little). */
+  rampageDuration() {
+    let dur = FEVER_TIME;
+    for (const e of this.effects()) if (e.t === 'fever' && e.dur) dur *= e.dur;
+    return dur * (1 + 0.15 * this.abyssLv('dreams'));
+  }
+
   private startFever() {
     this.rampageTier = 0;
     this.rampageClicks = 0;
-    let dur = FEVER_TIME;
-    for (const e of this.effects()) if (e.t === 'fever' && e.dur) dur *= e.dur;
-    if (this.hasAbyss('dreams')) dur *= 1.5;
+    const dur = this.rampageDuration();
     this.s.fevers++;
-    this.addBuff({ id: 'fever', name: 'Rampage', t: dur, dur, dps: RAMPAGE_TIERS[0].dps * this.rampageParty(), click: 1, gold: 1 });
+    this.addBuff({ id: 'fever', name: 'Rampage', t: dur, dur, dps: this.feverMult(0), click: 1, gold: 1 });
     this.events.push({ t: 'fever', on: true });
   }
 
@@ -1073,9 +1361,12 @@ export class Game {
 
   // ---------- shop ----------
 
-  buyComp(i: number) {
+  /** Hire levels of a companion: as many as the buy mode says, or exactly `count`. */
+  buyComp(i: number, count?: number) {
     if (!this.compUnlocked(i)) return false;
-    const { n, cost } = this.compQuote(i);
+    // A Small Party: six companions at most on this descent.
+    if (this.curseActive('small') && this.s.owned[i] === 0 && this.s.owned.filter((n) => n > 0).length >= 6) return false;
+    const { n, cost } = count ? { n: count, cost: this.compCost(i, count) } : this.compQuote(i);
     if (this.s.gold.lt(cost)) return false;
     this.s.gold = this.s.gold.minus(cost);
     this.s.owned[i] += n;
@@ -1087,6 +1378,7 @@ export class Game {
   buyUpg(id: string) {
     const u = UPG_BY_ID.get(id);
     if (!u || this.owned.has(id)) return false;
+    if (this.curseActive('lean') && !isTraitId(id)) return false;
     const cost = this.upgCost(u);
     if (this.s.gold.lt(cost)) return false;
     this.s.gold = this.s.gold.minus(cost);
@@ -1095,6 +1387,11 @@ export class Game {
     if (!this.known.has(id)) {
       this.known.add(id);
       this.s.upgradesKnown.push(id);
+    }
+    const ability = ABILITY_BY_UPGRADE.get(id);
+    if (ability) {
+      if (!this.s.abilitiesFound.includes(ability.id)) this.s.abilitiesFound.push(ability.id);
+      this.events.push({ t: 'ability', id: ability.id, unlocked: true });
     }
     this.invalidate();
     this.events.push({ t: 'buyUpg', id });
@@ -1125,7 +1422,8 @@ export class Game {
   }
 
   shopUpgrades(): UpgDef[] {
-    return UPGRADES.filter((u) => !this.owned.has(u.id) && this.reqMet(u.req)).sort((a, b) => a.cost - b.cost);
+    const lean = this.curseActive('lean');
+    return UPGRADES.filter((u) => !this.owned.has(u.id) && this.reqMet(u.req) && (!u.needs || this.abilityUnlocked(u.needs)) && (!lean || isTraitId(u.id))).sort((a, b) => a.cost - b.cost);
   }
 
   // ---------- treasure goblins ----------
@@ -1137,9 +1435,13 @@ export class Game {
     this.s.raids++;
     if (r.rainbow) this.s.rainbows++;
     if (this.cardRoll(r.rainbow ? CARD_ODDS.rainbow : CARD_ODDS.goblin)) this.giveCard(r.rainbow ? RAINBOW_CARD : GOBLIN_CARD, false, 'raid');
-    if (r.rainbow && (this.s.vaults === 0 || Math.random() < VAULT_CHANCE)) {
+    if (r.rainbow && (this.s.vaults === 0 || this.debugRainbow || Math.random() < VAULT_CHANCE)) {
       this.events.push({ t: 'raidCatch', id: r.id, reward: 'vault' });
-      this.openVault();
+      // Everything slows while you choose who goes in.
+      if (!this.vaultPick) {
+        this.vaultPick = true;
+        this.events.push({ t: 'vaultPick' });
+      }
       this.scheduleRaid();
       return true;
     }
@@ -1189,15 +1491,15 @@ export class Game {
   }
 
   private scheduleRaid() {
-    let f = (this.hasAbyss('lure') ? 1.25 : 1) * (1 + 0.3 * this.relic('goblin'));
+    let f = (1 + 0.1 * this.abyssLv('lure')) * (1 + 0.3 * this.relic('goblin'));
     for (const e of this.effects()) if (e.t === 'raid' && e.freq) f *= e.freq;
-    this.s.raidTimer = (RAID_MIN + Math.random() * (RAID_MAX - RAID_MIN)) / f;
+    this.s.raidTimer = this.debugRainbow ? 5 : (RAID_MIN + Math.random() * (RAID_MAX - RAID_MIN)) / f;
   }
 
   private spawnRaid() {
     const from = Math.random() < 0.5 ? -1 : 1;
     // Your first goblin is always an ordinary one; rainbows only turn up once you know what to do with a goblin.
-    const rainbow = this.s.raids > 0 && Math.random() < RAINBOW_CHANCE;
+    const rainbow = this.debugRainbow || (this.s.raids > 0 && Math.random() < RAINBOW_CHANCE);
     // The first rainbow goblin lingers, so it's caught (and the vault seen) rather than missed.
     const stay = rainbow && this.s.vaults === 0 ? RAID_STAY * 1.8 : RAID_STAY;
     this.raid = { id: this.seq++, from, t: 0, stay, rainbow };
@@ -1208,53 +1510,44 @@ export class Game {
   // ---------- prestige ----------
 
   /** Souls a zone boss on this floor pays when beaten (before relics and Heart powers). */
-  baseBossSouls(floor: number) {
-    if (floor % 10 !== 0) return 0;
-    if (floor < DESCEND_FLOOR) return floor === 0 ? 0 : TUNE.earlySouls[floor / 10 - 1];
-    const early = Math.min(floor, TUNE.soulTaper) - DESCEND_FLOOR;
-    const late = Math.max(0, floor - TUNE.soulTaper);
-    return Math.floor(TUNE.bossSouls * SOUL_GROWTH ** early * TUNE.soulLate ** late);
-  }
-
   soulGainMult() {
-    return (1 + 0.15 * this.relic('souls')) * (1 + this.heartLv('siphon'));
+    return (1 + 0.15 * this.relic('souls')) * (1 + this.heartLv('siphon')) * [1, 1.25, 1.5, 2][this.curseTier('two')];
   }
 
-  bossSouls(floor: number) {
-    return Math.floor(this.baseBossSouls(floor) * this.soulGainMult());
+  /** All the souls this awakening cycle has earned so far: the cube root of its gold (see TUNE). */
+  soulTarget() {
+    const roots = this.s.cycleGold.div(TUNE.soulGold).pow(TUNE.soulExp).toNumber();
+    return Math.floor(roots * this.soulGainMult());
   }
 
   /** Souls a descent would pay right now: everything banked from bosses this descent. */
   pendingSouls() {
-    return this.s.runSouls;
+    return Math.max(0, this.soulTarget() - this.s.souls);
   }
 
   /** The boss floor this run has to reach before the way up opens. */
   ascendFloor() {
-    return Math.max(DESCEND_FLOOR, Math.ceil((this.s.lastAscent + ASCEND_STEP) / 10) * 10);
+    // A cursed run can always be left (at the first gate): it's shallower than the run before it.
+    if (this.s.curse) return DESCEND_FLOOR;
+    return Math.max(DESCEND_FLOOR, Math.ceil((this.s.lastAscent + TUNE.ascendStep) / 10) * 10);
   }
 
   descendOpen() {
     return this.s.maxFloor >= this.ascendFloor();
   }
 
-  /** The next zone boss you haven't beaten this descent, and what it pays. */
-  nextBossSouls() {
-    const floor = Math.max(10, Math.ceil(this.s.maxFloor / 10) * 10);
-    return { floor, souls: this.bossSouls(floor) };
-  }
-
   canDescend() {
-    return this.descendOpen() && this.pendingSouls() >= 1;
+    return this.descendOpen() && (this.pendingSouls() >= 1 || this.s.curse !== null);
   }
 
-  descend() {
+  /** Ascend, optionally into a cursed descent (one of `cursesOpen()`). */
+  descend(curse: string | null = null) {
     if (!this.canDescend()) return false;
     const gained = this.pendingSouls();
     this.s.souls += gained;
-    this.s.runSouls = 0;
     this.s.descents++;
-    this.s.lastAscent = this.s.maxFloor;
+    if (!this.s.curse) this.s.lastAscent = this.s.maxFloor;
+    this.s.curse = curse && this.cursesOpen().some((c) => c.id === curse) ? curse : null;
     this.resetRun();
     this.events.push({ t: 'descend', souls: gained });
     return true;
@@ -1263,6 +1556,7 @@ export class Game {
   /** Back to the top: gold, companions and upgrades go; souls, relics and trophies stay. */
   private resetRun() {
     const s = this.s;
+    this.bankAllDrops();
     s.gold = new Decimal(0);
     s.runGold = new Decimal(0);
     s.owned = COMPS.map(() => 0);
@@ -1271,6 +1565,8 @@ export class Game {
     s.fervor = 0;
     this.stash = [];
     this.vaultOn = false;
+    this.vault = null;
+    this.vaultPick = false;
     this.rampageTier = 0;
     s.revealed = 0;
     s.runTime = 0;
@@ -1279,7 +1575,7 @@ export class Game {
     this.owned.clear();
     this.raid = null;
     this.scheduleRaid();
-    const start = this.hasAbyss('skip') ? 10 : 1;
+    const start = 1 + 5 * this.abyssLv('skip');
     s.maxFloor = start;
     this.applyStartingParty();
     this.invalidate();
@@ -1287,29 +1583,32 @@ export class Game {
   }
 
   private applyStartingParty() {
-    if (!this.hasAbyss('heirloom')) return;
-    this.s.owned[0] = Math.max(this.s.owned[0], 10);
-    this.s.owned[1] = Math.max(this.s.owned[1], 10);
+    if (!this.milestone('veterans')) return;
+    for (const i of [0, 1, 2]) this.s.owned[i] = Math.max(this.s.owned[i], 25);
   }
 
   soulsFree() {
     return this.s.souls - this.s.spentSouls;
   }
 
+  /** Another level of this Abyss power is on offer (it isn't maxed). */
   abyssAvailable(id: string) {
     const a = ABYSS_BY_ID.get(id);
-    return !!a && !this.abyssSet.has(id);
+    return !!a && this.abyssLv(id) < a.max;
+  }
+
+  abyssCost(id: string) {
+    const a = ABYSS_BY_ID.get(id)!;
+    const base = a.cost(0);
+    return Math.ceil(base * (a.cost(this.abyssLv(id)) / base) ** TUNE.abyssGrowth);
   }
 
   buyAbyss(id: string) {
-    const a = ABYSS_BY_ID.get(id);
-    if (!a || !this.abyssAvailable(id) || this.soulsFree() < a.cost) return false;
-    this.s.spentSouls += a.cost;
-    this.s.abyss.push(id);
-    this.abyssSet.add(id);
-    if (id === 'heirloom') this.applyStartingParty();
+    if (!this.abyssAvailable(id) || this.soulsFree() < this.abyssCost(id)) return false;
+    this.s.spentSouls += this.abyssCost(id);
+    this.s.abyssLv[id] = this.abyssLv(id) + 1;
     this.invalidate();
-    this.events.push({ t: 'abyss', id });
+    this.events.push({ t: 'abyss', id, lv: this.s.abyssLv[id] });
     return true;
   }
 
@@ -1368,16 +1667,29 @@ export class Game {
   // ---------- the heart ----------
 
   canAwaken() {
-    return this.pendingStones() >= 1;
+    return this.s.cycleBest >= this.awakenFloor() && this.pendingStones() >= 1;
+  }
+
+  /** The depth this cycle has to reach before the Heart can be awakened: deeper each time (`awakenStep` more floors). */
+  awakenFloor() {
+    return TUNE.awakenFloor + TUNE.awakenStep * this.s.awakens;
   }
 
   /** Heartstones an awakening would pay: grows with the deepest floor since the last one. */
-  stonesFor(floor: number) {
-    return floor < AWAKEN_FLOOR ? 0 : Math.floor(TUNE.stoneBase * TUNE.stoneGrowth ** (floor - AWAKEN_FLOOR));
+  /** Every heartstone earned: the ones in hand and the ones spent on Heart powers. */
+  stonesEarned() {
+    let spent = 0;
+    for (const id in this.s.heart) {
+      const h = HEART_BY_ID.get(id);
+      if (h) for (let l = 0; l < this.s.heart[id]; l++) spent += h.cost(l);
+    }
+    return this.s.stones + spent;
   }
 
+  /** Heartstones an awakening would pay: the cube root of every soul ever earned, less what's already been paid. */
   pendingStones() {
-    return this.stonesFor(this.s.cycleBest);
+    const total = Math.floor(((this.s.soulsLifetime + this.s.souls) / TUNE.stoneSouls) ** TUNE.stoneExp);
+    return Math.max(0, total - this.stonesEarned());
   }
 
   awaken() {
@@ -1388,20 +1700,23 @@ export class Game {
     s.awakens++;
     s.cycleBest = 0;
     s.lastAscent = 0;
-    s.runSouls = 0;
+    s.soulsLifetime += s.souls;
     s.souls = 0;
     s.spentSouls = 0;
-    // Echoing Abyss keeps the cheap powers, free.
-    s.abyss = this.heartLv('echo') ? s.abyss.filter((id) => ABYSS_BY_ID.get(id)!.cost <= 100) : [];
-    this.abyssSet = new Set(s.abyss);
+    s.cycleGold = new Decimal(0);
+    s.curse = null;
+    // Echoing Abyss keeps the first level of every power, free.
+    const keep = this.heartLv('echo') > 0;
+    s.abyssLv = keep ? Object.fromEntries(Object.entries(s.abyssLv).map(([id, lv]) => [id, Math.min(lv, 1)])) : {};
     this.resetRun();
     this.events.push({ t: 'awaken', stones: gained });
     return true;
   }
 
-  heartCost(id: string) {
+  heartCost(id: string, lv = this.heartLv(id)) {
     const h = HEART_BY_ID.get(id)!;
-    return h.cost(this.heartLv(id));
+    const base = h.cost(0);
+    return Math.ceil(base * (h.cost(lv) / base) ** TUNE.heartGrowth);
   }
 
   heartMaxed(id: string) {
@@ -1455,10 +1770,12 @@ export class Game {
   }
 
   /** Have you killed one of this card's monster (for the goblins, caught one)? Until then its card is a mystery. */
+  /** You've met a monster once you've killed one or been as deep as it lives (goblins: once you've caught one). */
   cardMet(id: string) {
     if (id === GOBLIN_CARD) return this.s.raids - this.s.rainbows > 0;
     if (id === RAINBOW_CARD) return this.s.rainbows > 0;
-    return (this.s.slain[id] ?? 0) > 0;
+    const card = CARD_BY_ID.get(id);
+    return (this.s.slain[id] ?? 0) > 0 || (!!card && card.floor <= this.s.bestFloor);
   }
 
   /** Copies of a card owned, plain and gold together. */
@@ -1524,7 +1841,43 @@ export class Game {
 
   // ---------- time ----------
 
+  /** Gold on the floor, oldest first: each pile goes to the bank after GOLD_WAIT seconds, or sooner when picked up. */
+  drops: { id: number; gold: Decimal; t: number }[] = [];
+  private dropSeq = 0;
+
+  private dropGold(gold: Decimal, from: Monster) {
+    const id = ++this.dropSeq;
+    this.drops.push({ id, gold, t: 0 });
+    this.events.push({ t: 'drop', id, from: from.id, gold, big: from.boss || !!from.champ });
+    if (this.drops.length > MAX_DROPS) this.bankDrop(0, 'time');
+  }
+
+  private bankDrop(i: number, by: 'hand' | 'time' | 'all') {
+    const [d] = this.drops.splice(i, 1);
+    this.earn(d.gold);
+    this.events.push({ t: 'bank', id: d.id, by });
+  }
+
+  /** Hovering a pile of gold picks it up. */
+  collectGold(id: number) {
+    const i = this.drops.findIndex((d) => d.id === id);
+    if (i >= 0) this.bankDrop(i, 'hand');
+  }
+
+  /** The save as it would be with the gold on the floor already banked (a save never loses it). */
+  saveState(): SaveState {
+    const lying = this.drops.reduce((sum, d) => sum.plus(d.gold), new Decimal(0));
+    if (lying.eq(0)) return this.s;
+    return { ...this.s, gold: this.s.gold.plus(lying), runGold: this.s.runGold.plus(lying), totalGold: this.s.totalGold.plus(lying) };
+  }
+
+  /** Everything on the floor goes to the bank: leaving the floor, ascending. */
+  bankAllDrops() {
+    while (this.drops.length) this.bankDrop(0, 'all');
+  }
+
   private earn(n: Decimal) {
+    this.s.cycleGold = this.s.cycleGold.plus(n);
     this.s.gold = this.s.gold.plus(n);
     this.s.runGold = this.s.runGold.plus(n);
     this.s.totalGold = this.s.totalGold.plus(n);
@@ -1533,22 +1886,23 @@ export class Game {
   update(dt: number) {
     const s = this.s;
     s.playTime += dt;
+    for (const d of this.drops) d.t += dt;
+    while (this.drops.length && this.drops[0].t >= GOLD_WAIT) this.bankDrop(0, 'time');
+    for (const id in s.cooldowns) if ((s.cooldowns[id] -= dt) <= 0) delete s.cooldowns[id];
     s.runTime += dt;
 
     const vault = this.inVault();
     if (this.vaultOn && !vault) this.closeVault();
     this.vaultOn = vault;
 
-    // Keep the field full of monsters (bosses come alone).
+    // Keep the field full of monsters (bosses come alone; the vault has only its chests).
     if (vault) {
-      this.spawnT -= dt;
-      if (this.spawnT <= 0 && this.monsters.length < VAULT_ON) {
-        this.spawnHoarder();
-        this.spawnT = VAULT_GAP;
-      }
+      // (Nothing spawns in the vault.)
     } else if (!this.bossFloor()) {
       this.spawnT -= dt;
-      if (this.spawnT <= 0 && this.monsters.length < MAX_ON) {
+      // No more monsters than the floor still needs, so it ends on its last one (farming with auto off: no limit).
+      const cap = s.auto && s.floorKills < FLOOR_KILLS ? Math.min(MAX_ON, this.floorLeft()) : MAX_ON;
+      if (this.spawnT <= 0 && this.monsters.length < cap) {
         this.spawn();
         this.spawnT = SPAWN_GAP;
       }
@@ -1604,8 +1958,6 @@ export class Game {
       this.invalidate();
     }
 
-    this.sinceClick += dt;
-    if (this.sinceClick > 0.6 && !s.buffs.some((b) => b.id === 'fever')) s.fervor = Math.max(0, s.fervor - dt * 0.12);
 
     // Regenerating bosses.
     for (const m of this.monsters) {
@@ -1619,13 +1971,18 @@ export class Game {
     this.rebuyT -= dt;
     if (this.rebuyT <= 0) {
       this.rebuyT = REBUY_GAP;
-      if (s.settings.autoUpg && this.hasAbyss('quartermaster')) this.buyAllUpgs(true);
+      if (s.settings.autoUpg && this.milestone('quartermaster')) this.buyAllUpgs(true);
     }
 
     // Phantom Blade.
     // Attacking by hand while held down, then the Phantom Blade on its own.
     this.manualCd = Math.max(0, this.manualCd - dt);
     if (this.hold && this.manualCd <= 0) this.click(this.hold.id, this.hold.x, this.hold.y);
+    if (s.buffs.some((b) => b.id === 'flurry')) {
+      this.flurryAcc += dt * FLURRY_RATE;
+      const at = this.aim ?? { id: null, x: -1, y: -1 };
+      for (; this.flurryAcc >= 1; this.flurryAcc--) this.click(at.id, at.x, at.y, false, true);
+    } else this.flurryAcc = 0;
     const rate = this.autoRate();
     if (rate) {
       this.autoClick += dt * rate;
@@ -1638,13 +1995,21 @@ export class Game {
     // Treasure goblins.
     if (this.raid) {
       this.raid.t += dt / this.raid.stay;
+      // The goblin snare (an ascent milestone) gets one try at each goblin, halfway across.
+      if (this.milestone('snare') && !this.raid.snareTried && this.raid.t > 0.5) {
+        this.raid.snareTried = true;
+        if (Math.random() < SNARE_CHANCE) this.catchRaid();
+      }
+    }
+    if (this.raid) {
       if (this.raid.t >= 1) {
         this.events.push({ t: 'raidEscape', id: this.raid.id });
         this.raid = null;
         s.missed++;
         this.scheduleRaid();
       }
-    } else if (s.kills > 15) {
+    } else if (s.kills > 15 && !this.vault && !this.vaultPick) {
+      // (None turn up while the vault is open: it has its own goblins.)
       s.raidTimer -= dt;
       if (s.raidTimer <= 0) this.spawnRaid();
     }
@@ -1697,8 +2062,9 @@ export class Game {
    */
   applyOffline(seconds: number): OfflineSummary {
     const secs = Math.min(seconds, OFFLINE_CAP);
-    const pct = this.hasAbyss('night') ? 1 : this.hasAbyss('pulse') ? 0.5 : 0.25;
+    const pct = this.offlineSpeed();
     this.s.buffs = this.s.buffs.filter((b) => (b.t -= secs) > 0);
+    for (const id in this.s.cooldowns) if ((this.s.cooldowns[id] -= secs) <= 0) delete this.s.cooldowns[id];
     this.invalidate();
     const f = isBossFloor(this.s.floor) ? Math.max(1, this.s.floor - 1) : this.s.floor;
     const perSec = Math.min(1 / SPAWN_GAP, this.baseDps().div(floorHp(f).times(TRASH)).toNumber());

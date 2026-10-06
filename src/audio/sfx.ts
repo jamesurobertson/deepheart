@@ -8,6 +8,7 @@ const NAMES = [
   'hurt0', 'hurt1', 'hurt2', 'hurt3', 'hurt4', 'step0', 'step1', 'step2', 'step3', 'step4',
   'mega', 'kill', 'chest', 'coins', 'equip', 'salvage', 'click', 'toggle', 'open', 'close',
   'levelup', 'descend', 'death', 'drop1', 'drop2', 'drop3', 'drop4', 'awaken', 'boss', 'bosskill', 'card', 'cardgold',
+  'treasure', 'jackpot',
 ] as const;
 export type SfxName = (typeof NAMES)[number];
 
