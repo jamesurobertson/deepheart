@@ -260,7 +260,7 @@ export function newSave(): SaveState {
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
     relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
-    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'sci', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
+    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
 

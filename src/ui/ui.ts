@@ -1741,7 +1741,8 @@ export class Ui {
       const forSkill = u.needs ? `${ABILITY_BY_ID.get(u.needs)!.name} upgrade` : 'upgrade';
       return `<div class="tt-h">${icon(u.icon, 32)}<b>${esc(u.name)}</b><span class="tt-own">${forSkill}</span></div>
         <div class="tt-cost">${gold(cost, g.s.gold.gte(cost) ? 'ok' : 'no')}</div>
-        <p class="tt-d">${esc(u.desc)}</p>${u.flavor ? `<p class="tt-flavor">${esc(u.flavor)}</p>` : ''}${ABILITY_BY_UPGRADE.has(u.id) ? `<p class="tt-gain">Unlocks ${esc(ABILITY_BY_UPGRADE.get(u.id)!.name)}: ${esc(g.abilityText(ABILITY_BY_UPGRADE.get(u.id)!.id))}</p>` : ''}${this.upgPreview(u)}`;
+        ${ABILITY_BY_UPGRADE.has(u.id) ? `<p class="tt-gain">Unlocks ${esc(ABILITY_BY_UPGRADE.get(u.id)!.name)}: ${esc(g.abilityText(ABILITY_BY_UPGRADE.get(u.id)!.id))}</p>` : ''}
+        <p class="tt-d">${esc(u.desc)}</p>${this.upgPreview(u)}${u.flavor ? `<p class="tt-flavor">${esc(u.flavor)}</p>` : ''}`;
     }
     if (kind === 'ab') {
       const a = ABILITY_BY_ID.get(id as AbilityId)!;
