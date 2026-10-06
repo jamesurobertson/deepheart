@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Atlas } from './atlas.ts';
-import type { CardDef } from '../game/data.ts';
+import { corruptionOf, type CardDef } from '../game/data.ts';
 
 /** Frame colours: ordinary monsters in parchment, mid-bosses blue, zone bosses purple, goblins copper, gold copies gold. */
 export const CARD_FRAME: Record<CardDef['kind'] | 'gold', string> = {
@@ -13,9 +13,10 @@ export const CARD_FRAME: Record<CardDef['kind'] | 'gold', string> = {
 
 const portraits = new Map<string, HTMLCanvasElement>();
 
-/** A card's monster at its own pixel size, trimmed and tinted the way it looks in the dungeon. */
-export function portrait(atlas: Atlas, card: CardDef): HTMLCanvasElement {
-  const hit = portraits.get(card.id);
+/** A card's monster at its own pixel size, trimmed and tinted the way it looks in the dungeon (on a later lap, with that lap's corruption). */
+export function portrait(atlas: Atlas, card: CardDef, lap = 0): HTMLCanvasElement {
+  const key = `${card.id}:${lap}`;
+  const hit = portraits.get(key);
   if (hit) return hit;
   const r = atlas.trimmed(atlas.creature(card.sprite).idle[0]);
   const c = document.createElement('canvas');
@@ -23,20 +24,28 @@ export function portrait(atlas: Atlas, card: CardDef): HTMLCanvasElement {
   c.height = r.h;
   const g = c.getContext('2d')!;
   g.drawImage(atlas.texture.image as HTMLImageElement, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-  if (card.tint !== undefined) {
+  const base = card.tint ?? 0xffffff;
+  let t = [(base >> 16) & 255, (base >> 8) & 255, base & 255];
+  if (lap) {
+    // The same mix the dungeon uses on corrupted monsters (scene.ts): 70% of the way to the lap's colour.
+    const k = corruptionOf(lap).tint;
+    const lapTint = [(k >> 16) & 255, (k >> 8) & 255, k & 255];
+    t = t.map((v, i) => v + ((v * lapTint[i]) / 255 - v) * 0.7);
+  }
+  if (card.tint !== undefined || lap) {
     const img = g.getImageData(0, 0, r.w, r.h);
-    const t = [(card.tint >> 16) & 255, (card.tint >> 8) & 255, card.tint & 255];
     for (let i = 0; i < img.data.length; i += 4) for (let k = 0; k < 3; k++) img.data[i + k] = (img.data[i + k] * t[k]) / 255;
     g.putImageData(img, 0, 0);
   }
-  portraits.set(card.id, c);
+  portraits.set(key, c);
   return c;
 }
 
 const urls = new Map<string, string>();
-export function portraitUrl(atlas: Atlas, card: CardDef): string {
-  let url = urls.get(card.id);
-  if (!url) urls.set(card.id, (url = portrait(atlas, card).toDataURL()));
+export function portraitUrl(atlas: Atlas, card: CardDef, lap = 0): string {
+  const key = `${card.id}:${lap}`;
+  let url = urls.get(key);
+  if (!url) urls.set(key, (url = portrait(atlas, card, lap).toDataURL()));
   return url;
 }
 

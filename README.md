@@ -26,7 +26,7 @@ you've already beaten, is the rarest thing in the dungeon. They do nothing excep
 - **A party that fights for you.** Hire companions with the gold they earn, level them into the thousands, and pick a
   hero to lead around the room with your mouse (or a finger).
 - **Relics** from bosses: sixteen of them, each answering a boss modifier or pushing a build.
-- **Descend** for souls, **awaken the Heart** for heartstones: two prestige layers, and every run back down is faster
+- **Ascend** for souls, **awaken the Heart** for heartstones: two prestige layers, and every run back down is faster
   than the last.
 - **Treasure goblins** that run for the exit with your loot. Every so often one is a rainbow. Catch it and find out.
 - **No bottom.** After floor 80 the zones come back corrupted, then abyssal, hollow, eternal, and the numbers keep

@@ -1,7 +1,7 @@
 import Decimal from 'break_infinity.js';
 import {
   ABYSS, ABYSS_BY_ID, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, HOARDERS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
-  CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf,
+  CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, nextMilestone,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
@@ -19,6 +19,10 @@ const SPAWN_GAP = 0.12;
 const SWEEP_SECONDS = 1;
 /** Seconds between swept floors, so a blitz through old floors still reads as one. */
 const SWEEP_GAP = 0.6;
+/** Damage multiplier a pair upgrade gives each partner. */
+const SYNERGY_MULT = 2;
+/** Seconds between the Quartermaster's shopping trips. */
+const REBUY_GAP = 0.5;
 /** Ordinary monsters are a fraction of a floor's base health: many small kills. */
 const TRASH = 0.4;
 /** Every click deals this share of your companions' damage, before upgrades. */
@@ -76,8 +80,10 @@ const VAULT_GOLD = 15;
 const BASE_CRIT = 0.04;
 const BASE_CRIT_MULT = 8;
 const OFFLINE_CAP = 72 * 3600;
-/** The first time, the way down opens when you reach this floor's boss. */
+/** The way up first opens at this floor's boss. */
 export const DESCEND_FLOOR = 30;
+/** Each ascent after that needs a boss at least this many floors past where the last one ended, so short runs can't be farmed for souls. */
+const ASCEND_STEP = 10;
 const SOUL_GROWTH = 1.1;
 /**
  * Pacing knobs, in one place (the balance script overrides them to search for good values).
@@ -113,12 +119,15 @@ export interface Settings {
   shake: boolean;
   numbers: boolean;
   notation: 'short' | 'sci';
-  buyMode: 1 | 10 | 100 | -1;
+  /** Levels per hire: a fixed count, up to the next milestone, or as many as you can afford (-1). */
+  buyMode: 1 | 10 | 100 | 'next' | -1;
   blood: boolean;
   /** Staircase interlude between zones. */
   cinematics: boolean;
   /** Cursor skin id (see CURSORS). */
   cursor: string;
+  /** Quartermaster: rebuy upgrades you've bought before. */
+  autoUpg: boolean;
 }
 
 export interface SaveState {
@@ -133,6 +142,8 @@ export interface SaveState {
   crits: number;
   owned: number[];
   upgrades: string[];
+  /** Every upgrade ever bought, across ascents and awakenings (the Quartermaster rebuys these). */
+  upgradesKnown: string[];
   abyss: string[];
   trophies: string[];
   souls: number;
@@ -195,18 +206,20 @@ export interface SaveState {
   slain: Record<string, number>;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
   cycleBest: number;
+  /** Deepest floor of the run you last ascended from (0 after an awakening): the next ascent has to go further. */
+  lastAscent: number;
   settings: Settings;
 }
 
 export function newSave(): SaveState {
   return {
     v: SAVE_VERSION, gold: new Decimal(0), runGold: new Decimal(0), totalGold: new Decimal(0), kills: 0, bosses: 0, clicks: 0, crits: 0,
-    owned: COMPS.map(() => 0), upgrades: [], abyss: [], trophies: [], souls: 0, spentSouls: 0,
+    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], abyss: [], trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, runSouls: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, cards: {}, slain: {},
-    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto' },
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
+    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'sci', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
 
@@ -366,6 +379,8 @@ export class Game {
   /** Seconds since the last kill: too long and your party falls back a floor. */
   private stuckT = 0;
   private owned = new Set<string>();
+  private known = new Set<string>();
+  private rebuyT = 0;
   private abyssSet = new Set<string>();
   private trophySet = new Set<string>();
   private cache: Computed | null = null;
@@ -418,6 +433,18 @@ export class Game {
       s.slain['sludge-walker'] = (s.slain['sludge-walker'] ?? 0) + s.slain['bloated-ogre'];
       delete s.slain['bloated-ogre'];
     }
+    // Companion milestone upgrades were renumbered (new levels, no end). The levels both lists share carry over;
+    // the old 150/250/300/400 ones are gone.
+    if (s.upgrades) {
+      const OLD_TO_NEW: Record<number, number> = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 6: 5, 10: 6 };
+      s.upgrades = s.upgrades.flatMap((id) => {
+        const old = /^c(\d+)t(\d+)$/.exec(id);
+        if (!old) return [id];
+        const tier = OLD_TO_NEW[Number(old[2])];
+        return tier === undefined ? [] : [`m${old[1]}_${tier}`];
+      });
+    }
+    s.upgradesKnown ??= [...(s.upgrades ?? [])];
     // Trophies that no longer exist (retired ones) shouldn't keep counting toward the trophy bonus.
     if (s.trophies) s.trophies = s.trophies.filter((id) => TROPHIES.some((t) => t.id === id));
     const fresh = newSave();
@@ -427,6 +454,7 @@ export class Game {
     for (const k of ['gold', 'runGold', 'totalGold', 'failDps', 'bestDps'] as const) s[k] = new Decimal(s[k] ?? 0);
     while (s.owned.length < COMPS.length) s.owned.push(0);
     this.owned = new Set(s.upgrades);
+    this.known = new Set(s.upgradesKnown);
     this.abyssSet = new Set(s.abyss);
     this.trophySet = new Set(s.trophies);
     this.enterFloor(s.floor, true);
@@ -526,8 +554,9 @@ export class Game {
         if (e.mult) critMultUpg *= e.mult;
       } else if (e.t === 'cleave') cleaveUpg += e.pct;
       else if (e.t === 'syn') {
-        syn[e.a] *= 1 + 0.05 * s.owned[e.b];
-        syn[e.b] *= 1 + 0.01 * s.owned[e.a];
+        // Flat, so a pair never outgrows the pricier companions above it.
+        syn[e.a] *= SYNERGY_MULT;
+        syn[e.b] *= SYNERGY_MULT;
       }
     }
     // Every multiplier, kept apart so the stats page can show where the numbers come from.
@@ -652,6 +681,10 @@ export class Game {
 
   compQuote(i: number): { n: number; cost: Decimal } {
     const mode = this.s.settings.buyMode;
+    if (mode === 'next') {
+      const n = nextMilestone(this.s.owned[i]) - this.s.owned[i];
+      return { n, cost: this.compCost(i, n) };
+    }
     if (mode > 0) return { n: mode, cost: this.compCost(i, mode) };
     const base = Decimal.pow(COST_GROWTH, this.s.owned[i]).times(this.compBase(i));
     // Most levels affordable: solve base × (g^n − 1) / (g − 1) ≤ gold for n.
@@ -1059,9 +1092,24 @@ export class Game {
     this.s.gold = this.s.gold.minus(cost);
     this.s.upgrades.push(id);
     this.owned.add(id);
+    if (!this.known.has(id)) {
+      this.known.add(id);
+      this.s.upgradesKnown.push(id);
+    }
     this.invalidate();
     this.events.push({ t: 'buyUpg', id });
     return true;
+  }
+
+  /** Purser's Buy all: every affordable upgrade, cheapest first. */
+  buyAllUpgs(onlyKnown = false) {
+    let n = 0;
+    for (const u of this.shopUpgrades()) {
+      if (onlyKnown && !this.known.has(u.id)) continue;
+      if (this.s.gold.lt(this.upgCost(u))) break;
+      if (this.buyUpg(u.id)) n++;
+    }
+    return n;
   }
 
   private reqMet(r: Req): boolean {
@@ -1181,9 +1229,13 @@ export class Game {
     return this.s.runSouls;
   }
 
-  /** The way down opens at the floor 30 boss the first time; after that you can always go. */
+  /** The boss floor this run has to reach before the way up opens. */
+  ascendFloor() {
+    return Math.max(DESCEND_FLOOR, Math.ceil((this.s.lastAscent + ASCEND_STEP) / 10) * 10);
+  }
+
   descendOpen() {
-    return this.s.descents > 0 || this.s.maxFloor >= DESCEND_FLOOR;
+    return this.s.maxFloor >= this.ascendFloor();
   }
 
   /** The next zone boss you haven't beaten this descent, and what it pays. */
@@ -1202,6 +1254,7 @@ export class Game {
     this.s.souls += gained;
     this.s.runSouls = 0;
     this.s.descents++;
+    this.s.lastAscent = this.s.maxFloor;
     this.resetRun();
     this.events.push({ t: 'descend', souls: gained });
     return true;
@@ -1245,7 +1298,7 @@ export class Game {
 
   abyssAvailable(id: string) {
     const a = ABYSS_BY_ID.get(id);
-    return !!a && !this.abyssSet.has(id) && (a.needs ?? []).every((n) => this.abyssSet.has(n));
+    return !!a && !this.abyssSet.has(id);
   }
 
   buyAbyss(id: string) {
@@ -1334,6 +1387,7 @@ export class Game {
     s.stones += gained;
     s.awakens++;
     s.cycleBest = 0;
+    s.lastAscent = 0;
     s.runSouls = 0;
     s.souls = 0;
     s.spentSouls = 0;
@@ -1559,6 +1613,13 @@ export class Game {
       const heal = Decimal.min(m.max.minus(m.hp), m.max.times(this.regen() * dt));
       m.hp = m.hp.plus(heal);
       this.healShown.set(m.id, (this.healShown.get(m.id) ?? new Decimal(0)).plus(heal));
+    }
+
+    // Quartermaster: rebuy what you've bought before (new upgrades stay yours to find).
+    this.rebuyT -= dt;
+    if (this.rebuyT <= 0) {
+      this.rebuyT = REBUY_GAP;
+      if (s.settings.autoUpg && this.hasAbyss('quartermaster')) this.buyAllUpgs(true);
     }
 
     // Phantom Blade.

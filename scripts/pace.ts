@@ -33,6 +33,9 @@ const TARGET = {
   replayRuns: 3,
 };
 
+/** Companion milestones never end, so 'every upgrade' means everything up to the level-2000 milestone. */
+const CORE_UPGRADES = new Set(UPGRADES.filter((u) => u.req.t !== 'owned' || u.req.n <= 2000).map((u) => u.id));
+
 interface Run {
   start: number;
   /** Seconds after the start of the run that each floor was first reached. */
@@ -136,7 +139,7 @@ function simulate(name: string, hours: number): Report {
       for (const id of game.s.abyss) firstTime(t, `a:${id}`, 'new abyss power');
       for (const id of Object.keys(game.s.heart)) firstTime(t, `h:${id}`, 'new Heart power');
       for (const [id, lv] of Object.entries(game.s.relics)) if (relicStars(lv)) firstTime(t, `s:${id}:${relicStars(lv)}`, 'relic star');
-      if (game.s.upgrades.length === UPGRADES.length) allUpgradesAt ??= t;
+      if (game.s.upgrades.filter((id) => CORE_UPGRADES.has(id)).length === CORE_UPGRADES.size) allUpgradesAt ??= t;
       if (Math.floor(t / 900) !== Math.floor((t - sim.dt) / 900)) curve.push([t, game.s.bestFloor]);
     },
   });
@@ -194,7 +197,7 @@ function print(r: Report, checks: Check[]) {
   for (const c of checks) console.log(`  ${c.ok ? 'PASS' : 'FAIL'}  ${c.line}`);
   const content = [
     r.allRelicsAt === null ? 'relics not all found' : `all relics by ${duration(r.allRelicsAt)}`,
-    r.allUpgradesAt === null ? 'upgrades never all bought in one run' : `all upgrades by ${duration(r.allUpgradesAt)}`,
+    r.allUpgradesAt === null ? 'upgrades (to the level-2000 milestones) never all bought in one run' : `all upgrades to the level-2000 milestones by ${duration(r.allUpgradesAt)}`,
   ];
   console.log(`  info  ${content.join(', ')}`);
   console.log(`  info  after each awakening, back past the old deepest floor in: ${r.recover.map((x) => (x === null ? 'never' : duration(x))).join(', ') || 'no awakenings'}`);

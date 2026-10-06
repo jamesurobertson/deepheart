@@ -250,10 +250,52 @@ export type Req =
   | { t: 'trophies'; n: number }
   | { t: 'fevers'; n: number };
 
-const TIER_AT = [10, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500];
-const TIER_COST = [10, 60, 500, 5_000, 5e4, 1e6, 1e8, 1e10, 1e13, 1e17, 1e21];
-const TIER_NAMES = ['Sharpened', 'Tempered', 'Veteran', 'Elite', 'Champion', 'Legendary', 'Mythic', 'Godforged', 'Abyssal', 'Eternal', 'Unmade'];
+/** Companion levels that unlock a ×2 damage upgrade. Past the last one, another comes every MILESTONE_STEP levels, forever. */
+const MILESTONES = [10, 25, 50, 75, 100, 200, 500, 1000, 1500, 2000];
+const MILESTONE_STEP = 1000;
+/** Upgrade cost as a multiple of the companion's hire price, for the fixed milestones up to 500. */
+const MILESTONE_COST = [10, 60, 500, 5_000, 5e4, 1e8, 1e21];
+const MILESTONE_NAMES = ['Sharpened', 'Tempered', 'Veteran', 'Elite', 'Champion', 'Mythic', 'Abyssal', 'Eternal', 'Unmade'];
+/** Milestone upgrades built per companion (the bot's companions top out around level 7,400 in 16 hours). */
+const MILESTONE_TIERS = 20;
 export const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+
+/** The level of a companion's k-th milestone (k from 0). */
+export function milestoneAt(k: number) {
+  const last = MILESTONES.length - 1;
+  return k <= last ? MILESTONES[k] : MILESTONES[last] + (k - last) * MILESTONE_STEP;
+}
+
+/** Milestones from this one on (level 200) are graded by companion; the early ones are ×2 for everyone, which keeps the opening's pace. */
+const GRADED_FROM = 5;
+
+/** Damage multiplier of a companion's k-th milestone upgrade: ×2 early on; from level 200, ×2 for the newest companion and a
+ *  little more for each older one, so the older companions catch up as milestones pile up instead of fading out. */
+export function milestoneMult(comp: number, k = GRADED_FROM) {
+  return k < GRADED_FROM ? 2 : Math.round((2 + 0.1 * (COMPS.length - 1 - comp)) * 10) / 10;
+}
+
+/** Which milestone (from 0) sits at this level. */
+export function milestoneIndex(level: number) {
+  let k = 0;
+  while (milestoneAt(k) < level) k++;
+  return k;
+}
+
+/** The first milestone above this level. */
+export function nextMilestone(level: number) {
+  for (const m of MILESTONES) if (m > level) return m;
+  const last = MILESTONES[MILESTONES.length - 1];
+  return last + (Math.floor((level - last) / MILESTONE_STEP) + 1) * MILESTONE_STEP;
+}
+
+/** From level 1000 on, a milestone costs about what Unmade did at level 500 next to that level's own price. */
+const milestoneCost = (k: number) => MILESTONE_COST[k] ?? 2e6 * 1.07 ** milestoneAt(k);
+
+function milestoneName(k: number) {
+  const last = MILESTONE_NAMES.length - 1;
+  return k <= last ? MILESTONE_NAMES[k] : `${MILESTONE_NAMES[last]} ${ROMAN[k - last] ?? k - last + 1}`;
+}
 
 const CLICK_UPGS: [string, string, number, number][] = [
   // name, icon, floor required, cost
@@ -315,14 +357,16 @@ const CLEAVES: [string, number, number, number][] = [
 function buildUpgrades(): UpgDef[] {
   const out: UpgDef[] = [];
   COMPS.forEach((comp, i) => {
-    TIER_AT.forEach((n, k) => {
+    for (let k = 0; k < MILESTONE_TIERS; k++) {
+      const cost = comp.cost * milestoneCost(k);
+      if (!Number.isFinite(cost)) break;
       out.push({
-        id: `c${i}t${k}`, name: `${TIER_NAMES[k]} ${comp.name}`,
-        desc: `${comp.name} deals twice as much damage.`,
-        cost: comp.cost * TIER_COST[k], icon: { sprite: comp.sprite, tier: k },
-        effect: { t: 'comp', comp: i, mult: 2 }, req: { t: 'owned', comp: i, n },
+        id: `m${i}_${k}`, name: `${milestoneName(k)} ${comp.name}`,
+        desc: `${comp.name} deals ×${milestoneMult(i, k)} damage.`,
+        cost, icon: { sprite: comp.sprite, tier: Math.min(k, ROMAN.length - 1) },
+        effect: { t: 'comp', comp: i, mult: milestoneMult(i, k) }, req: { t: 'owned', comp: i, n: milestoneAt(k) },
       });
-    });
+    }
   });
   CLICK_UPGS.forEach(([name, sprite, floor, cost], k) => {
     out.push({ id: `clk${k}`, name, desc: 'Your clicks deal twice as much damage.', cost, icon: { sprite }, effect: { t: 'click', mult: 2 }, req: { t: 'floor', n: floor } });
@@ -354,7 +398,7 @@ function buildUpgrades(): UpgDef[] {
   SYNERGIES.forEach(([a, b, name], k) => {
     out.push({
       id: `syn${k}`, name,
-      desc: `${COMPS[a].name} +5% damage per ${COMPS[b].name} level. ${COMPS[b].name} +1% per ${COMPS[a].name} level.`,
+      desc: `${COMPS[a].name} and ${COMPS[b].name} each deal twice as much damage.`,
       cost: Math.max(COMPS[a].cost, COMPS[b].cost) * 500, icon: { sprite: COMPS[a].sprite, sub: COMPS[b].sprite },
       effect: { t: 'syn', a, b }, req: { t: 'owned2', a, b, n: 25 },
     });
@@ -376,7 +420,7 @@ function buildUpgrades(): UpgDef[] {
   const fever: [string, string, number, number, Effect][] = [
     ['Battle Fury', 'Rampage fills 25% faster.', 1, 2_000, { t: 'fever', fill: 1.25 }],
     ['Blood Frenzy', 'Rampage lasts 50% longer.', 5, 5e7, { t: 'fever', dur: 1.5 }],
-    ['Unstoppable', 'Rampage makes your party half as strong again.', 15, 5e12, { t: 'fever', power: 1.5 }],
+    ['Unstoppable', "Rampage boosts your party's damage 50% more (×2 → ×3).", 15, 5e12, { t: 'fever', power: 1.5 }],
   ];
   fever.forEach(([name, desc, n, cost, effect], k) => out.push({ id: `fev${k}`, name, desc, cost, icon: { sprite: 'flask_big_red', tier: k }, effect, req: { t: 'fevers', n } }));
   return out;
@@ -393,25 +437,26 @@ export interface AbyssDef {
   desc: string;
   cost: number;
   icon: string;
-  needs?: string[];
 }
 
 export const ABYSS: AbyssDef[] = [
   { id: 'pulse', name: 'Restless Dead', desc: 'Offline progress 25% → 50%.', cost: 5, icon: 'skull' },
   { id: 'twin', name: 'Twin Blades', desc: 'Clicks deal twice as much damage.', cost: 10, icon: 'weapon_duel_sword' },
-  { id: 'heirloom', name: 'Old Friends', desc: 'Start each descent with Squire and Ranger at level 10.', cost: 15, icon: 'knight_m', needs: ['pulse'] },
-  { id: 'hands', name: 'Phantom Fury', desc: 'Your Phantom Blade attacks once more a second.', cost: 25, icon: 'weapon_knife', needs: ['twin'] },
-  { id: 'lure', name: 'Scent of Gold', desc: 'Treasure goblins show up 25% more often.', cost: 40, icon: 'coin', needs: ['twin'] },
-  { id: 'bargain', name: 'Dark Bargain', desc: 'Upgrades cost 10% less.', cost: 60, icon: 'flask_big_red', needs: ['heirloom'] },
-  { id: 'tithe', name: 'Mercenary Guild', desc: 'Companions cost 10% less.', cost: 100, icon: 'coin', needs: ['heirloom'] },
-  { id: 'dreams', name: 'Endless Rage', desc: 'Rampage fills 50% faster and lasts 50% longer.', cost: 150, icon: 'flask_big_yellow', needs: ['hands'] },
-  { id: 'skip', name: 'Deep Stairs', desc: 'Start each descent on floor 10.', cost: 200, icon: 'floor_stairs', needs: ['heirloom'] },
-  { id: 'night', name: 'Endless Night', desc: 'Offline progress 50% → 100%.', cost: 250, icon: 'flask_big_blue', needs: ['pulse', 'bargain'] },
-  { id: 'mimic', name: 'Mimic Chests', desc: 'Treasure can hold a Soul Storm: damage ×666 for 6 seconds.', cost: 400, icon: 'chest_mimic_open', needs: ['lure'] },
-  { id: 'patience', name: 'Patient Hunter', desc: 'Bosses give you 45 seconds instead of 30.', cost: 500, icon: 'ogre', needs: ['skip'] },
-  { id: 'roots', name: 'Deep Roots', desc: 'Each soul gives +3% damage instead of +2%.', cost: 700, icon: 'flask_big_green', needs: ['tithe', 'night'] },
-  { id: 'hands2', name: 'Blade Storm', desc: 'Your Phantom Blade attacks 3 more times a second.', cost: 1500, icon: 'weapon_golden_sword', needs: ['dreams', 'roots'] },
-  { id: 'crown', name: 'Crown of the Deep', desc: 'Each soul gives +4% damage instead of +3%.', cost: 5000, icon: 'weapon_red_gem_sword', needs: ['hands2', 'mimic', 'patience'] },
+  { id: 'heirloom', name: 'Old Friends', desc: 'Start each descent with Squire and Ranger at level 10.', cost: 15, icon: 'knight_m' },
+  { id: 'hands', name: 'Phantom Fury', desc: 'Your Phantom Blade attacks once more a second.', cost: 25, icon: 'weapon_knife' },
+  { id: 'lure', name: 'Scent of Gold', desc: 'Treasure goblins show up 25% more often.', cost: 40, icon: 'coin' },
+  { id: 'bargain', name: 'Dark Bargain', desc: 'Upgrades cost 10% less.', cost: 60, icon: 'flask_big_red' },
+  { id: 'tithe', name: 'Mercenary Guild', desc: 'Companions cost 10% less.', cost: 100, icon: 'coin' },
+  { id: 'purser', name: 'Purser', desc: 'Adds a Buy all button for upgrades.', cost: 120, icon: 'chest_full_open' },
+  { id: 'dreams', name: 'Endless Rage', desc: 'Rampage fills 50% faster and lasts 50% longer.', cost: 150, icon: 'flask_big_yellow' },
+  { id: 'skip', name: 'Deep Stairs', desc: 'Start each descent on floor 10.', cost: 200, icon: 'floor_stairs' },
+  { id: 'quartermaster', name: 'Quartermaster', desc: "Upgrades you've bought before buy themselves again as soon as you can afford them.", cost: 250, icon: 'chest_full_open' },
+  { id: 'night', name: 'Endless Night', desc: 'Offline progress 50% → 100%.', cost: 250, icon: 'flask_big_blue' },
+  { id: 'mimic', name: 'Mimic Chests', desc: 'Treasure can hold a Soul Storm: damage ×666 for 6 seconds.', cost: 400, icon: 'chest_mimic_open' },
+  { id: 'patience', name: 'Patient Hunter', desc: 'Bosses give you 45 seconds instead of 30.', cost: 500, icon: 'ogre' },
+  { id: 'roots', name: 'Deep Roots', desc: 'Each soul gives +3% damage instead of +2%.', cost: 700, icon: 'flask_big_green' },
+  { id: 'hands2', name: 'Blade Storm', desc: 'Your Phantom Blade attacks 3 more times a second.', cost: 1500, icon: 'weapon_golden_sword' },
+  { id: 'crown', name: 'Crown of the Deep', desc: 'Each soul gives +4% damage instead of +3%.', cost: 5000, icon: 'weapon_red_gem_sword' },
 ];
 export const ABYSS_BY_ID = new Map(ABYSS.map((a) => [a.id, a]));
 
@@ -514,7 +559,7 @@ export function relicText(def: RelicDef, lv: number): string {
     case 'rot': return `Regenerating bosses heal ${fmtN(3 * 0.7 ** L)}% a second instead of 3%.`;
     case 'rampage': return `Rampage makes your party ×${fmtN(1 + 0.25 * L)} stronger.`;
     case 'goblin': return `Treasure goblins show up ${30 * L}% more often.`;
-    case 'souls': return `Descending earns ${15 * L}% more souls.`;
+    case 'souls': return `Ascending earns ${15 * L}% more souls.`;
     case 'phantom': return `Your Phantom Blade attacks ${fmtN(0.5 * L)} more time${0.5 * L === 1 ? '' : 's'} a second.`;
     case 'cleave': return `Clicks also hit every other monster for ${20 * L}% damage.`;
     case 'all': return `All damage ×${1 + L}.`;
@@ -543,7 +588,7 @@ export interface HeartDef {
 
 export const HEART: HeartDef[] = [
   { id: 'fury', name: 'Heart of Fury', icon: 'ui_heart_full', max: Infinity, cost: (l) => 2 ** l, desc: (l) => `All damage ×10 per level (now ×${fmtBig(10 ** l)}).` },
-  { id: 'siphon', name: 'Soul Siphon', icon: 'skull', max: Infinity, cost: (l) => Math.ceil(3 * 1.6 ** l), desc: (l) => `Descending earns +100% souls per level (now +${l * 100}%).` },
+  { id: 'siphon', name: 'Soul Siphon', icon: 'skull', max: Infinity, cost: (l) => Math.ceil(3 * 1.6 ** l), desc: (l) => `Ascending earns +100% souls per level (now +${l * 100}%).` },
   { id: 'hoard', name: 'Relic Hoard', icon: 'chest_full_open', max: 2, cost: (l) => [5, 25][l], desc: (l) => `One more relic slot (${3 + l} now).` },
   { id: 'hunter', name: 'Relic Hunter', icon: 'weapon_bow_2', max: 4, cost: (l) => [3, 8, 20, 50][l], desc: (l) => `Bosses drop relics 50% more often per level (now +${l * 50}%).` },
   { id: 'bane', name: 'Warden\'s Bane', icon: 'weapon_red_gem_sword', max: 3, cost: (l) => [4, 15, 60][l], desc: (l) => `Boss modifiers are 25% weaker per level (now ${l * 25}%).` },
@@ -679,7 +724,7 @@ function buildTrophies(): TrophyDef[] {
   [1, 100, 1_000, 10_000].forEach((n, k) => out.push({ id: `crit${k}`, name: ['Critical!', 'Sharp Eye', 'Surgeon', 'Every Hit Counts'][k], desc: `Land ${n.toLocaleString('en-US')} critical hit${n > 1 ? 's' : ''}.`, icon: { sprite: 'weapon_katana', tier: k }, req: { t: 'crits', n } }));
   [1, 7, 27, 77, 277, 777].forEach((n, k) => out.push({ id: `raid${k}`, name: ['Finders Keepers', 'Goblin Catcher', 'Head Hunter', 'Goblin Bane', 'No One Escapes', 'Treasure Lord'][k], desc: `Catch ${n} treasure goblin${n > 1 ? 's' : ''}.`, icon: { sprite: 'goblin', tier: k }, req: { t: 'raids', n } }));
   [1, 10, 50, 200].forEach((n, k) => out.push({ id: `fev${k}`, name: ['Rampage!', 'Hot Blooded', 'Berserker', 'Endless Fury'][k], desc: `Go on a Rampage ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'flask_big_red', tier: k }, req: { t: 'fevers', n } }));
-  [1, 3, 10, 25, 50].forEach((n, k) => out.push({ id: `desc${k}`, name: ['Going Down', 'Deeper Still', 'Bottomless', 'Where Light Ends', 'The Deep'][k], desc: `Descend ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'floor_ladder', tier: k }, req: { t: 'descents', n } }));
+  [1, 3, 10, 25, 50].forEach((n, k) => out.push({ id: `desc${k}`, name: ['Up for Air', 'It Lets You Go', 'Return Ticket', 'The Deep Knows You', 'Always Back Down'][k], desc: `Ascend ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'floor_ladder', tier: k }, req: { t: 'descents', n } }));
   [10, 50, 100, 150].forEach((n, k) => out.push({ id: `upg${k}`, name: ['Tinkerer', 'Improver', 'Perfectionist', 'Nothing Left to Buy'][k], desc: `Own ${n} upgrades at once.`, icon: { sprite: 'flask_big_yellow', tier: k }, req: { t: 'upgrades', n } }));
   const missed: [number, string, string][] = [
     [1, 'Butterfingers', 'Let a treasure goblin get away.'],

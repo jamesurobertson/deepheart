@@ -42,12 +42,12 @@ export function charFit(name: string, height: number, maxW = height * 1.2, cls =
   return cell(r, Math.min(height / r.h, maxW / r.w), cls);
 }
 
-/** A card's monster, tinted as it looks in the dungeon, at the largest integer scale that fits `box` (never below 1). */
-export function cardArt(card: CardDef, box: number, cls = ''): string {
+/** A card's monster, tinted as it looks in the dungeon (on that lap), at the largest integer scale that fits `box` (never below 1). */
+export function cardArt(card: CardDef, box: number, cls = '', lap = 0): string {
   if (!atlas) return '';
-  const p = portrait(atlas, card);
+  const p = portrait(atlas, card, lap);
   const k = Math.max(1, Math.floor(box / Math.max(p.width, p.height)));
-  return `<img class="px ${cls}" src="${portraitUrl(atlas, card)}" width="${p.width * k}" height="${p.height * k}" alt="">`;
+  return `<img class="px ${cls}" src="${portraitUrl(atlas, card, lap)}" width="${p.width * k}" height="${p.height * k}" alt="">`;
 }
 
 /** Small hand-made pixel glyphs (drawn as SVG rects so they stay crisp). */
@@ -58,7 +58,7 @@ const r = (x: number, y: number, w = 1, h = 1) => `<rect x="${x}" y="${y}" width
 
 export const G = {
   close: () => glyph(7, 7, r(0, 0) + r(6, 0) + r(1, 1) + r(5, 1) + r(2, 2) + r(4, 2) + r(3, 3) + r(2, 4) + r(4, 4) + r(1, 5) + r(5, 5) + r(0, 6) + r(6, 6)),
-  menu: () => glyph(7, 7, r(0, 1, 7) + r(0, 3, 7) + r(0, 5, 7)),
+  menu: (scale = 2) => glyph(7, 7, r(0, 1, 7) + r(0, 3, 7) + r(0, 5, 7), '', scale),
   sound: () => glyph(9, 7, r(0, 2, 2, 3) + r(2, 1, 1, 5) + r(3, 0, 1, 7) + r(5, 2, 1, 3) + r(7, 1, 1, 5)),
   mute: () => glyph(9, 7, r(0, 2, 2, 3) + r(2, 1, 1, 5) + r(3, 0, 1, 7) + r(5, 1) + r(8, 1) + r(6, 2) + r(7, 2) + r(6, 4) + r(7, 4) + r(5, 5) + r(8, 5) + r(6, 3, 2)),
   lock: () => glyph(7, 7, r(2, 0, 3) + r(1, 1) + r(5, 1) + r(1, 2) + r(5, 2) + r(0, 3, 7, 4)),
@@ -69,9 +69,8 @@ export const G = {
   /** The essence drop: a little heart. */
   heart: (scale = 2) => glyph(7, 6, r(1, 0, 2) + r(4, 0, 2) + r(0, 1, 7, 2) + r(1, 3, 5) + r(2, 4, 3) + r(3, 5), 'g-heart', scale),
   soul: (scale = 2) => glyph(7, 8, r(3, 0) + r(2, 1, 3) + r(1, 2, 5, 3) + r(2, 5, 3) + r(1, 6) + r(3, 6) + r(5, 6) + r(0, 7) + r(2, 7) + r(4, 7) + r(6, 7), 'g-soul', scale),
-  trophy: () => glyph(7, 7, r(0, 0, 7) + r(0, 1) + r(6, 1) + r(1, 1, 5, 2) + r(2, 3, 3) + r(3, 4) + r(2, 5, 3) + r(1, 6, 5)),
-  stats: () => glyph(7, 7, r(0, 4, 2, 3) + r(3, 2, 2, 5) + r(5, 0, 2, 7)),
+  trophy: (scale = 2) => glyph(7, 7, r(0, 0, 7) + r(0, 1) + r(6, 1) + r(1, 1, 5, 2) + r(2, 3, 3) + r(3, 4) + r(2, 5, 3) + r(1, 6, 5), '', scale),
+  stats: (scale = 2) => glyph(8, 7, r(0, 4, 2, 3) + r(3, 2, 2, 5) + r(6, 0, 2, 7), '', scale),
   /** A cut gem, for relics. */
   relic: (scale = 2) => glyph(7, 6, r(2, 0, 3) + r(1, 1, 5) + r(0, 2, 7) + r(1, 3, 5) + r(2, 4, 3) + r(3, 5), 'g-relic', scale),
-  abyss: () => glyph(7, 7, r(0, 0, 7) + r(1, 1, 5) + r(2, 2, 3) + r(3, 3) + r(0, 5, 7) + r(1, 6, 5)),
 };
