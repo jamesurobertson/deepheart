@@ -105,7 +105,7 @@ const reach = (s: number | null, hi: number) => s === null && sim.t < hi;
 const ms: Milestone[] = [
   { name: 'First wall (a boss you fail)', window: '10m–25m', result: t(firstWall), status: within(firstWall, 10 * 60, 25 * 60) },
   { name: 'Deepest floor at 1h', window: '40–60', result: String(floorAt1h), status: floorAt1h >= 40 && floorAt1h <= 60 ? 'PASS' : 'FAIL' },
-  { name: 'First ascent', window: '1h–3h', result: t(firstAscent), status: within(firstAscent, H, 3 * H) },
+  { name: 'First ascent', window: '15m–1h', result: t(firstAscent), status: within(firstAscent, 15 * 60, H) },
   { name: 'All 12 first-run companions met', window: '4h–8h', result: t(firstRunMet), status: within(firstRunMet, 4 * H, 8 * H) },
   { name: 'First awakening', window: '15h–40h', result: t(firstAwaken), status: reach(firstAwaken, 40 * H) ? 'REPORT' : within(firstAwaken, 15 * H, 40 * H) },
   { name: 'Abyss powers all at level 10', window: '40h–100h', result: t(abyssDone), status: reach(abyssDone, 100 * H) ? 'REPORT' : within(abyssDone, 40 * H, 100 * H) },

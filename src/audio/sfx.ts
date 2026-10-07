@@ -71,12 +71,62 @@ export class Sfx {
       }
     };
     for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(ev, unlock, { passive: true });
-    // Go quiet while the tab is in the background; pick the music back up on return.
+    // Go quiet while the tab is in the background; pick the music back up on return. The desktop app only mutes:
+    // stopping and restarting the Mac's audio output is one of the ways it gets stuck on a buzz.
+    const desktop = !!(window as Window & { deepheart?: unknown }).deepheart;
     document.addEventListener('visibilitychange', () => {
       if (!this.ctx) return;
+      this.applyGains();
+      if (desktop) return;
       if (document.hidden) this.ctx.suspend().catch(() => {});
       else this.ctx.resume().catch(() => {});
     });
+    // A new output device (headphones, a monitor) can leave the old audio stream stuck: start a fresh one.
+    navigator.mediaDevices?.addEventListener?.('devicechange', () => this.rebuild());
+    // The audio clock should keep moving while we're playing; if it freezes (the stuck-buzz case), start over.
+    setInterval(() => this.watch(), 1000);
+  }
+
+  private lastTime = -1;
+  private stalls = 0;
+  /** When the context was last rebuilt (ms): at most one every half minute, so a machine with no audio output at all
+   *  (where the clock never moves) doesn't rebuild in a loop. */
+  private rebuiltAt = -Infinity;
+
+  private watch() {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running' || document.hidden) {
+      this.stalls = 0;
+      return;
+    }
+    this.stalls = ctx.currentTime === this.lastTime ? this.stalls + 1 : 0;
+    this.lastTime = ctx.currentTime;
+    if (this.stalls >= 2 && performance.now() - this.rebuiltAt > 30_000) this.rebuild();
+  }
+
+  /** Throw the audio context away and make a new one (what a reload does): sounds re-decode, the music picks up again. */
+  private rebuild() {
+    const old = this.ctx;
+    if (!old) return;
+    this.rebuiltAt = performance.now();
+    this.ctx = null;
+    this.master = null;
+    this.musicGain = null;
+    this.current = null;
+    this.buffers.clear();
+    this.musicBuf.clear();
+    this.stalls = 0;
+    this.lastTime = -1;
+    old.close().catch(() => {});
+    // (Decoding the wanted track again starts it, see decodeTrack.)
+    this.start();
+  }
+
+  /** Master and music volumes, silenced while muted or (desktop) while the window is hidden. */
+  private applyGains() {
+    const quiet = this._muted || document.hidden;
+    if (this.master) this.master.gain.value = quiet ? 0 : this.sfxVol;
+    this.applyMusicGain();
   }
 
   get muted() {
@@ -85,15 +135,13 @@ export class Sfx {
 
   set muted(m: boolean) {
     this._muted = m;
-    if (this.master) this.master.gain.value = m ? 0 : this.sfxVol;
-    this.applyMusicGain();
+    this.applyGains();
   }
 
   setVolumes(sfx: number, music: number) {
     this.sfxVol = sfx;
     this.musicVol = music;
-    if (this.master) this.master.gain.value = this._muted ? 0 : sfx;
-    this.applyMusicGain();
+    this.applyGains();
   }
 
   get musicOn() {
@@ -107,7 +155,7 @@ export class Sfx {
 
   private applyMusicGain() {
     if (!this.musicGain || !this.ctx) return;
-    this.musicGain.gain.setTargetAtTime(this._muted || !this._musicOn ? 0 : this.musicVol, this.ctx.currentTime, 0.15);
+    this.musicGain.gain.setTargetAtTime(this._muted || !this._musicOn || document.hidden ? 0 : this.musicVol, this.ctx.currentTime, 0.15);
   }
 
   /** Download a track the first time it's asked for. */
@@ -163,7 +211,7 @@ export class Sfx {
     if (nav.audioSession) nav.audioSession.type = 'playback';
     this.ctx = new AudioContext();
     this.master = this.ctx.createGain();
-    this.master.gain.value = this._muted ? 0 : this.sfxVol;
+    this.master.gain.value = this._muted || document.hidden ? 0 : this.sfxVol;
     // Gentle limiter so a big multi-hit doesn't clip.
     const comp = this.ctx.createDynamicsCompressor();
     comp.threshold.value = -10;
@@ -171,7 +219,7 @@ export class Sfx {
     comp.connect(this.ctx.destination);
     this.master.connect(comp);
     this.musicGain = this.ctx.createGain();
-    this.musicGain.gain.value = this._muted || !this._musicOn ? 0 : this.musicVol;
+    this.musicGain.gain.value = this._muted || !this._musicOn || document.hidden ? 0 : this.musicVol;
     this.musicGain.connect(comp);
     for (const n of this.raw.keys()) this.decode(n);
     for (const t of this.musicRaw.keys()) this.decodeTrack(t);

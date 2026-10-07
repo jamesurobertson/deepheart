@@ -66,6 +66,8 @@ export class Sim {
   awakens = 0;
   private clickAcc = 0;
   private chestAcc = 0;
+  /** Damage when last pushed back from a floor (auto went off), to know when to try again. */
+  private failDps: Decimal | null = null;
   private activeUntil: number;
   private lastMax = 0;
   private lastProgress = 0;
@@ -89,6 +91,8 @@ export class Sim {
   /** A session starts: the player attacks by hand and uses abilities for this many seconds. */
   startSession(activeSeconds: number) {
     this.activeUntil = this.t + activeSeconds;
+    // Back at the keyboard: have another go at whatever pushed you back.
+    if (!this.game.s.auto) this.game.setAuto(true);
   }
 
   /** The player is away: the game pays it out the way it does for a real player (gold on the floor is banked first). */
@@ -188,7 +192,15 @@ export class Sim {
       this.equipRelics();
     }
     // Hooks see everything this step did, the bot's own purchases and prestiges included.
-    for (const ev of game.events) this.hooks.event?.(ev, this);
+    for (const ev of game.events) {
+      this.hooks.event?.(ev, this);
+      if (ev.t === 'bossFail' || ev.t === 'retreat') this.failDps = game.baseDps();
+    }
+    // Pushed back (auto goes off): like a player, turn it on again once clearly stronger.
+    if (!game.s.auto && this.failDps && game.baseDps().gte(this.failDps.times(1.5).plus(1))) {
+      this.failDps = null;
+      game.setAuto(true);
+    }
     this.hooks.tick?.(this);
     game.events.length = 0;
     this.ticks++;

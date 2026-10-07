@@ -420,7 +420,9 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 .gen:hover { border-image-source: var(--f-btn-hi); }
 .gen:active:not(:has(.trait:active)) { transform: translateY(2px); }
 .trait:active { transform: translateY(1px); }
-.gen:not(.can) { filter: brightness(0.7) saturate(0.7); }
+.gen:not(.can)::after { content: ''; position: absolute; inset: -6px; background: rgba(12, 7, 9, 0.38); pointer-events: none; }
+/* An upgrade you can afford stays lit even when the row's levels are out of reach. */
+.gen:not(.can) .trait.buy { position: relative; z-index: 1; }
 .gen.can .gen-name { color: #fff; }
 .gen-ico { width: 48px; height: 48px; display: grid; place-items: center; flex: none; }
 .gen-ico .px { max-height: 52px; }

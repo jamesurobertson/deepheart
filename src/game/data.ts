@@ -685,7 +685,7 @@ const fmtN = (n: number) => (Math.round(n * 100) / 100).toString();
 // ---------- the heart (second prestige) ----------
 
 /** Awakening needs this deepest floor. */
-export const AWAKEN_FLOOR = 165;
+export const AWAKEN_FLOOR = 170;
 /** A boss beaten with this many seconds or fewer left is a clutch kill. */
 export const CLUTCH_SECONDS = 3;
 

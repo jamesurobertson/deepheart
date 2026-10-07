@@ -111,19 +111,18 @@ export const DESCEND_FLOOR = 30;
 /**
  * Pacing knobs, in one place (the balance tools override them to search for good values).
  * - Souls (Part III of the idle-maths series, "lifetime" style): all the souls you've earned since your last awakening
- *   come to (gold earned since then / `soulGold`)^`soulExp` (a cube root), times the soul-gain bonuses. An ascent pays what's new, so 8× the
- *   gold doubles your souls, and going deeper always pays, the same depth again only a little.
+ *   come to (gold earned since then / `soulGold`)^`soulExp` (a little gentler than a cube root), times the soul-gain
+ *   bonuses. An ascent pays what's new, so about 12× the gold doubles your souls, and going deeper always pays, the same
+ *   depth again only a little. Tuned so the first wall (the floor-30 boss) is worth ascending at.
  * - Heartstones the same way, a level up: (every soul ever earned / `stoneSouls`)^`stoneExp` in all; an awakening pays what's new.
  * - Heart of Fury multiplies all damage by `fury` per level. Zone bosses have `zoneBoss`× the health of mid-bosses.
  * - Up to floor 140 each floor has about `hpBase`× the health of the last, past it `deepHp`×; a monster is worth
  *   1/`goldDiv` of its health in gold. Each soul gives +`soulPower` damage. `abyssGrowth` steepens every Abyss power's
  *   cost curve (1 = as listed in data.ts).
- * - Each ascent after the first needs a boss at least `ascendStep` floors past where the last one ended, so short runs
- *   can't be farmed for ascend milestones.
  * - Each awakening needs `awakenStep` more floors than the last; `heartGrowth` steepens Heart power costs like
  *   `abyssGrowth` does Abyss ones.
  */
-export const TUNE = { hpBase: 1.55, goldDiv: 15, soulGold: 1e8, soulExp: 1 / 3, soulPower: SOUL_POWER, abyssGrowth: 3.5, stoneSouls: 8, stoneExp: 0.37, fury: FURY, deepHp: 1.55, zoneBoss: 2, ascendStep: 10, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
+export const TUNE = { hpBase: 1.55, goldDiv: 15, soulGold: 120, soulExp: 0.28, soulPower: SOUL_POWER, abyssGrowth: 4, stoneSouls: 8, stoneExp: 0.37, fury: FURY, deepHp: 1.55, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
 
 export interface Buff {
   id: RaidReward | 'fever' | AbilityId;
@@ -210,7 +209,6 @@ export interface SaveState {
   /** Move on as soon as a floor is cleared. */
   auto: boolean;
   /** Damage when a boss last beat you: auto retries once you're 50% stronger. */
-  failDps: Decimal;
   revealed: number;
   bestDps: Decimal;
   playTime: number;
@@ -247,7 +245,8 @@ export interface SaveState {
   slain: Record<string, number>;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
   cycleBest: number;
-  /** Deepest floor of the run you last ascended from (0 after an awakening): the next ascent has to go further. */
+  /** The deepest floor you've already gathered souls from this cycle (0 after an awakening): gold earned at or above it
+   *  gives no more souls, so a run pays souls only once it goes deeper. */
   lastAscent: number;
   settings: Settings;
 }
@@ -257,7 +256,7 @@ export function newSave(): SaveState {
     v: SAVE_VERSION, gold: new Decimal(0), runGold: new Decimal(0), totalGold: new Decimal(0), kills: 0, bosses: 0, clicks: 0, crits: 0,
     owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], abyssLv: {}, cycleGold: new Decimal(0), soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
-    floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, auto: true, failDps: new Decimal(0), revealed: 0,
+    floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
     relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
@@ -534,7 +533,7 @@ export class Game {
     }
     delete legacy.runSouls;
     // Saved as plain numbers (older saves) or strings (Decimal's JSON form).
-    for (const k of ['gold', 'runGold', 'totalGold', 'failDps', 'bestDps', 'cycleGold'] as const) s[k] = new Decimal(s[k] ?? 0);
+    for (const k of ['gold', 'runGold', 'totalGold', 'bestDps', 'cycleGold'] as const) s[k] = new Decimal(s[k] ?? 0);
     while (s.owned.length < COMPS.length) s.owned.push(0);
     this.owned = new Set(s.upgrades);
     this.known = new Set(s.upgradesKnown);
@@ -1527,11 +1526,10 @@ export class Game {
     return Math.max(0, this.soulTarget() - this.s.souls);
   }
 
-  /** The boss floor this run has to reach before the way up opens. */
+  /** The boss floor a run has to reach before the way up opens. (After that, an ascent needs new souls, which only
+   *  come from floors deeper than you've gathered from before.) */
   ascendFloor() {
-    // A cursed run can always be left (at the first gate): it's shallower than the run before it.
-    if (this.s.curse) return DESCEND_FLOOR;
-    return Math.max(DESCEND_FLOOR, Math.ceil((this.s.lastAscent + TUNE.ascendStep) / 10) * 10);
+    return DESCEND_FLOOR;
   }
 
   descendOpen() {
@@ -1548,7 +1546,7 @@ export class Game {
     const gained = this.pendingSouls();
     this.s.souls += gained;
     this.s.descents++;
-    if (!this.s.curse) this.s.lastAscent = this.s.maxFloor;
+    this.s.lastAscent = Math.max(this.s.lastAscent, this.s.maxFloor);
     this.s.curse = curse && this.cursesOpen().some((c) => c.id === curse) ? curse : null;
     this.resetRun();
     this.events.push({ t: 'descend', souls: gained });
@@ -1572,7 +1570,6 @@ export class Game {
     this.rampageTier = 0;
     s.revealed = 0;
     s.runTime = 0;
-    s.failDps = new Decimal(0);
     s.auto = true;
     this.owned.clear();
     this.raid = null;
@@ -1879,7 +1876,8 @@ export class Game {
   }
 
   private earn(n: Decimal) {
-    this.s.cycleGold = this.s.cycleGold.plus(n);
+    // Souls come only from new depths: floors already gathered from (this cycle) add none.
+    if (this.s.floor > this.s.lastAscent) this.s.cycleGold = this.s.cycleGold.plus(n);
     this.s.gold = this.s.gold.plus(n);
     this.s.runGold = this.s.runGold.plus(n);
     this.s.totalGold = this.s.totalGold.plus(n);
@@ -1927,7 +1925,6 @@ export class Game {
     if (!vault && !this.bossFloor() && this.stuckT > 20 && s.floor > 1) {
       this.stuckT = 0;
       s.auto = false;
-      s.failDps = this.dps();
       this.events.push({ t: 'retreat', floor: s.floor });
       this.enterFloor(s.floor - 1);
     }
@@ -1936,11 +1933,6 @@ export class Game {
     if (!vault && this.bossFloor() && this.bossTime > 0) {
       this.bossTime -= dt;
       if (this.bossTime <= 0) this.bossFailed();
-    }
-    // Retry a boss on your own once you're clearly stronger.
-    if (!s.auto && s.failDps.gt(0) && this.dps().gte(s.failDps.times(1.5).plus(1))) {
-      s.failDps = new Decimal(0);
-      this.setAuto(true);
     }
 
     // Buffs.
@@ -2053,7 +2045,6 @@ export class Game {
   private bossFailed() {
     const f = this.s.floor;
     this.s.auto = false;
-    this.s.failDps = this.dps();
     this.events.push({ t: 'bossFail', floor: f });
     this.enterFloor(Math.max(1, f - 1));
   }
