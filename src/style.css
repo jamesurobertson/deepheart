@@ -681,8 +681,11 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .aby.locked { opacity: 0.4; }
 .aby.avail { opacity: 0.8; }
 
-.stats { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; margin: 0; }
-.stats dt { color: var(--dim); }
+.stats { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.stats div { display: flex; align-items: baseline; }
+.stats dt { display: flex; flex: 1; align-items: baseline; color: var(--dim); }
+/* Square pixel dots (a dotted border renders round) leading from each label to its value. */
+.stats dt::after { content: ''; flex: 1; min-width: 16px; height: 2px; margin: 0 10px; background: linear-gradient(to right, var(--faint) 2px, transparent 2px) 0 0 / 6px 2px repeat-x; }
 .stats dd { margin: 0; font: 400 22px/1 'Jersey 10'; text-align: right; }
 
 .set { display: flex; flex-direction: column; gap: 12px; }
@@ -909,7 +912,8 @@ body.compact .tro-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1
 body.compact .tro { width: auto; height: auto; aspect-ratio: 1; }
 body.compact .aby-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 body.compact .aby b { font-size: 13px; }
-body.compact .stats { gap: 4px 12px; font-size: 14px; }
+body.compact .stats { gap: 4px; font-size: 14px; }
+body.compact .stats dt::after { margin: 0 6px; }
 body.compact .stats dd { font-size: 18px; }
 body.compact .set label { flex-wrap: wrap; font-size: 14px; }
 body.compact .set input[type=range] { width: 100%; }
