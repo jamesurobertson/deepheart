@@ -183,7 +183,7 @@ function fence(ctx: Ctx, x: number, y: number, n: number) {
 
 /** The brothers' game on the rug, between them: each one's deck, the card each has laid out, and the pile they play
  *  onto (top-left corners of 5×7 cards). */
-export const BROS_GAME = { danielDeck: [78, 84], victorDeck: [93, 84], danielLaid: [79, 94], victorLaid: [92, 94], pile: [85, 87] };
+export const BROS_GAME = { danDeck: [78, 84], victorDeck: [93, 84], danLaid: [79, 94], victorLaid: [92, 94], pile: [85, 87] };
 
 /** The playset in the corner by the toy chest: cardboard-box walls around a felt floor. `floor` is where the dungeon
  *  view shrinks to. */
@@ -278,7 +278,7 @@ const bedroom: MapDef = {
   warps: [{ x: 9, y: 7, to: 'house', tx: 8, ty: 2, dir: 'left' }],
   // The older brothers, on the rug, facing each other over a game of cards.
   npcs: [
-    { id: 'daniel', name: 'Daniel', sprite: 'ef_elf_m', x: 4, y: 5, dir: 'right' },
+    { id: 'dan', name: 'Dan', sprite: 'ef_elf_m', x: 4, y: 5, dir: 'right' },
     { id: 'victor', name: 'Victor', sprite: 'victor', x: 6, y: 5, dir: 'left' },
   ],
   draw(ctx) {
