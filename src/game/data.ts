@@ -199,6 +199,21 @@ export function bandFor(floor: number): MonsterDef[] {
   return lapOf(floor) ? [...z.lap, ...z.band.slice(0, 2)] : z.band;
 }
 
+/** The monster an ordinary floor is known for (its face on the floor map): the first half of a zone shows off the
+ *  crowd's first four, the second half the rest. */
+export function featuredFor(floor: number): MonsterDef {
+  const band = bandFor(floor);
+  const k = (floor - 1) % 10;
+  return band[(k < 5 ? k : k - 1) % band.length];
+}
+
+/** Half of an ordinary floor's crowd is its featured monster; the rest is anyone from the zone. */
+export function pickMonster(floor: number): MonsterDef {
+  if (Math.random() < 0.5) return featuredFor(floor);
+  const band = bandFor(floor);
+  return band[Math.floor(Math.random() * band.length)];
+}
+
 /** Each lap builds the zones from a different tileset, so a repeat zone is a new place, not a recolour. */
 const THEMES: Tiles[] = ['halls', 'crypt', 'jungle', 'tomb', 'sewer'];
 /** How far each lap shifts the tileset: the first repeat jumps furthest (dungeon stone ↔ jungle and desert). */

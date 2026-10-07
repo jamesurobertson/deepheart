@@ -1,6 +1,6 @@
 import Decimal from 'break_infinity.js';
 import {
-  ABYSS, ABYSS_BY_ID, CARD_BY_ID, ASCEND_MILESTONES, COST_GROWTH, FURY, SOUL_POWER, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor,
+  ABYSS, ABYSS_BY_ID, CARD_BY_ID, ASCEND_MILESTONES, COST_GROWTH, FURY, SOUL_POWER, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor, pickMonster,
   CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
   type AbilityId, type MilestoneId,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
@@ -951,8 +951,7 @@ export class Game {
   }
 
   private spawn() {
-    const band = bandFor(this.s.floor);
-    const def = band[Math.floor(Math.random() * band.length)];
+    const def = pickMonster(this.s.floor);
     const champ = Math.random() < CHAMP_CHANCE;
     const hp = floorHp(this.s.floor).times(def.hp * TRASH * (champ ? CHAMP_HP : 1));
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.7, mods: [], champ, ...this.spot(false) };
@@ -1215,8 +1214,7 @@ export class Game {
     }
     if (s.floor !== floor || s.floorKills >= FLOOR_KILLS) return;
     const left = FLOOR_KILLS - s.floorKills;
-    const band = bandFor(floor);
-    for (let k = 0; k < left; k++) this.rollCard(this.slay(band[Math.floor(Math.random() * band.length)]), false, 'sweep');
+    for (let k = 0; k < left; k++) this.rollCard(this.slay(pickMonster(floor)), false, 'sweep');
     const gold = Decimal.max(1, floorGold(floor).times(TRASH)).times(this.goldMult()).ceil().times(left);
     this.earn(gold);
     s.kills += left;
@@ -2066,9 +2064,8 @@ export class Game {
     this.earn(gold);
     this.s.kills += kills;
     // Every kill counts toward its monster's card, and rolls for it, as it would have at the keyboard.
-    const band = bandFor(f);
     const before = this.events.length;
-    for (let k = 0; k < kills; k++) this.rollCard(this.slay(band[Math.floor(Math.random() * band.length)]), false, 'sweep');
+    for (let k = 0; k < kills; k++) this.rollCard(this.slay(pickMonster(f)), false, 'sweep');
     const cards = this.events.slice(before).filter((e): e is Extract<GameEvent, { t: 'card' }> => e.t === 'card');
     this.s.playTime += secs;
     this.s.runTime += secs;

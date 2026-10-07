@@ -181,6 +181,70 @@ body.compact .rate .short { display: inline; }
 .floor-name .floor-sub { overflow: hidden; text-overflow: ellipsis; }
 .floor-n { font: 700 18px/1 var(--f-text); color: var(--gold-hi); text-shadow: var(--shadow); }
 .floor-sub { font: 400 11px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; letter-spacing: 1px; }
+/* A minimap of five rooms on a winding corridor. Each room wears its monster's face (a silhouette until reached);
+   the room you're on glows and carries your hero's pin. */
+.floor-map { --room: 28px; --lair: 34px; position: relative; width: 236px; height: 92px; }
+.floor-map > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.floor-map polyline { fill: none; stroke: var(--ink); stroke-width: 9; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.floor-map line { stroke: #5a454d; stroke-width: 2; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.floor-map line.lit { stroke: #e0b85a; stroke-width: 3; stroke-dasharray: none; }
+.fm {
+  --edge: #5a454d;
+  position: absolute; left: var(--x); top: var(--y); translate: -50% -50%; width: var(--room); height: var(--room); padding: 0; border: 0;
+  background: #2a1f24; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--edge), inset 0 -4px 0 rgba(0, 0, 0, 0.3);
+  cursor: pointer; display: grid; place-items: center; transition: transform 0.12s, filter 0.12s;
+}
+.fm > * { position: relative; }
+.fm .mon { max-width: calc(var(--room) - 8px); max-height: calc(var(--room) - 8px); width: auto; height: auto; }
+.fm.boss, .fm.zone { width: var(--lair); height: var(--lair); }
+.fm.boss .mon, .fm.zone .mon { max-width: calc(var(--lair) - 7px); max-height: calc(var(--lair) - 7px); }
+.fm.reached { --edge: #c89a48; background: radial-gradient(circle at 50% 65%, #a87a34, #5a3c18 80%); }
+.fm.locked { --edge: #2e2228; background: #1b1216; cursor: default; }
+.fm.locked .mon { filter: brightness(0) invert(0.3); opacity: 0.8; }
+.fm.boss { --edge: #d0505e; }
+.fm.zone { --edge: #e0b04a; }
+.fm.locked.boss, .fm.locked.zone { background: #160e12; }
+.fm.now { --edge: var(--gold-hi); z-index: 1; background: radial-gradient(circle at 50% 65%, #4a3520, #241812 80%); }
+.fm.now::before { content: ''; position: absolute; inset: -2px; box-shadow: 0 0 12px 1px rgba(255, 224, 138, 0.65); animation: roompulse 1.6s ease-in-out infinite; pointer-events: none; }
+@keyframes roompulse { 50% { opacity: 0.35; } }
+.fm:not(.locked):hover { transform: translateY(-2px); filter: brightness(1.2); }
+.fm:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 3px; }
+/* Skull for a mid-boss, crown for the zone boss, pinned to the lair's corner. */
+.fm .pxi { position: absolute; top: -8px; right: -8px; width: calc(var(--w) * 2px); fill: #f07a86; filter: drop-shadow(1px 0 0 var(--ink)) drop-shadow(-1px 0 0 var(--ink)) drop-shadow(0 1px 0 var(--ink)) drop-shadow(0 -1px 0 var(--ink)); }
+.fm.zone .pxi { fill: var(--gold-hi); }
+.fm.locked .pxi { opacity: 0.55; }
+/* Every room's floor number on a plate across its bottom edge. */
+.fm .num { position: absolute; top: 100%; left: 50%; translate: -50% -45%; min-width: 20px; padding: 1px 3px 0; background: var(--ink); color: var(--dim); font: 400 14px/1 'Jersey 10'; text-align: center; pointer-events: none; }
+.fm.reached .num { color: var(--gold); }
+.fm.now .num { background: var(--gold-hi); color: var(--ink); }
+.fm.locked .num { color: #8a7880; }
+/* You are here: your hero on a little pin over the room. */
+.fm .pin { position: absolute; bottom: calc(100% + 5px); left: 50%; translate: -50% 0; display: grid; place-items: center; width: 20px; height: 20px; background: #2a1d22; box-shadow: 0 0 0 2px var(--gold-hi), 0 0 0 4px var(--ink); animation: pinbob 1s ease-in-out infinite; pointer-events: none; }
+.fm .pin::after { content: ''; position: absolute; top: calc(100% + 2px); left: 50%; translate: -50% 0; border: 4px solid transparent; border-top-color: var(--gold-hi); border-bottom: 0; }
+@keyframes pinbob { 50% { transform: translateY(-3px); } }
+/* A room that just opened lights up; paging slides the rooms in. */
+.fm.fresh { animation: roomopen 0.9s ease-out; }
+.fm.fresh .mon { animation: monreveal 0.9s ease-out; }
+@keyframes roomopen { 0% { transform: scale(0.7); filter: brightness(3); } 45% { transform: scale(1.18); filter: brightness(1.8); } }
+@keyframes monreveal { 0%, 30% { filter: brightness(0) invert(0.3); } 55% { filter: brightness(2.5); } }
+.floor-map[data-slide=next] .fm { animation: slidenext 0.25s ease-out backwards; }
+.floor-map[data-slide=prev] .fm { animation: slideprev 0.25s ease-out backwards; }
+@keyframes slidenext { from { transform: translateX(18px); opacity: 0; } }
+@keyframes slideprev { from { transform: translateX(-18px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .fm.now::before, .fm .pin, .fm.fresh, .fm.fresh .mon, .floor-map[data-slide] .fm { animation: none; } }
+.zone-map { position: absolute; top: 14px; left: 14px; display: flex; align-items: center; gap: 6px; padding: 10px 8px 4px; pointer-events: auto; }
+.zone-map .btn.icon.sm { width: 30px; height: 30px; min-height: 0; }
+.zone-map .btn.home { filter: drop-shadow(0 0 5px rgba(255, 224, 138, 0.8)); }
+/* Narrow screens: the same map inside the floor box, smaller, with your hero standing in the room instead of a pin. */
+.floor-mid .floor-map { --room: 22px; --lair: 27px; display: none; width: auto; height: 60px; margin: 0 6px; }
+.floor-mid .fm .num { min-width: 16px; font-size: 12px; }
+.floor-mid .fm .pxi { top: -6px; right: -6px; width: calc(var(--w) * 1.5px); }
+.floor-mid .fm .pin { position: static; translate: none; width: auto; height: auto; background: none; box-shadow: none; animation: none; }
+.floor-mid .fm .pin::after { display: none; }
+.floor-mid .fm .pin .px { zoom: 0.95; }
+.floor-mid .fm.now .mon { display: none; }
+body.map-in-bar .floor-mid .floor-map { display: block; }
+body.map-in-bar .zone-map, body.in-vault .zone-map { display: none; }
 .floor-bar { position: relative; height: 14px; background: #120a0c; box-shadow: 0 0 0 2px var(--ink), inset 0 2px 0 #000; }
 .floor-bar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(#ffe08a, #d0902f 60%, #8a5a1a); transition: width 0.15s linear; }
 .floor-bar span { position: absolute; inset: 0; font: 400 16px/14px 'Jersey 10'; color: #fff; text-shadow: var(--outline); }

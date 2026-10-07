@@ -1,4 +1,4 @@
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, ASCEND_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, TRAITS, isTraitId, milestoneAt, type AbilityId, ABYSS, CARDS, CARD_BY_ID, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, ASCEND_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, TRAITS, isTraitId, milestoneAt, type AbilityId, ABYSS, CARDS, CARD_BY_ID, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { DESCEND_FLOOR, FLOOR_KILLS, isBossFloor, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -76,6 +76,23 @@ function buffText(b: Buff) {
   return `×${b.gold} gold`;
 }
 
+const MAP_ROOMS = 5;
+
+/** A tiny pixel-art icon from rows of '#' (filled) and '.' (empty), drawn in the current text colour. */
+function pixelIcon(rows: string[]) {
+  const cells = rows.flatMap((row, y) => [...row].map((c, x) => (c === '#' ? `<rect x="${x}" y="${y}" width="1" height="1"/>` : '')));
+  return `<svg class="pxi" viewBox="0 0 ${rows[0].length} ${rows.length}" style="--w:${rows[0].length}" shape-rendering="crispEdges">${cells.join('')}</svg>`;
+}
+const SKULL = pixelIcon(['.#####.', '#######', '#..#..#', '#######', '.##.##.', '.#.#.#.']);
+const CROWN = pixelIcon(['#..#..#', '##.#.##', '#######', '#######']);
+
+/** The face of a floor on the map (its boss, or the monster it's known for), tinted as it looks on that lap. */
+function floorArt(floor: number, box: number) {
+  const def = floor % 5 === 0 ? bossFor(floor) : featuredFor(floor);
+  const card = CARD_BY_ID.get(cardId(def.name));
+  return card ? cardArt(card, box, 'mon', lapOf(floor)) : charFit(def.sprite, box, box, 'mon');
+}
+
 /**
  * All the DOM: counters, floor tracker, shop, numbers, health bars, toasts and panels.
  * Per-frame bits (numbers, bars, counter) update in `frame`; the shop ~10×/s in `update`.
@@ -86,6 +103,7 @@ export class Ui {
   private scene: Scene;
   private hooks: UiHooks;
   private el: Record<string, HTMLElement> = {};
+  private floorMaps: HTMLElement[] = [];
   private rows: HTMLElement[] = [];
   private rowCache: string[] = [];
   private upgKey = '';
@@ -127,6 +145,12 @@ export class Ui {
   private bannerQueued = 0;
   private bannerAt = 0;
   private floorKey = '';
+  /** The five floors the map is paged to (null: the ones you're on). */
+  private mapPage: number | null = null;
+  private mapFloor = 0;
+  /** Deepest floor the map last showed, so a newly opened room can light up. */
+  private mapMax = 0;
+  private mapSlide: 'prev' | 'next' | '' = '';
   private bladeSprite = '';
   /** Touch screens: long-press shows a tooltip instead of hover. */
   private touch = matchMedia('(pointer: coarse)').matches;
@@ -164,6 +188,7 @@ export class Ui {
           <button class="btn icon sm" data-act="floorDown" aria-label="Previous floor">${G.left()}</button>
           <div class="floor-mid">
             <div class="floor-name" data-tip="floor"><b class="floor-n">Floor 1</b><span class="floor-sub"></span></div>
+            <div class="floor-map"></div>
             <div class="floor-bar"><i></i><span></span></div>
           </div>
           <button class="btn icon sm" data-act="floorUp" aria-label="Next floor">${G.right()}</button>
@@ -172,6 +197,7 @@ export class Ui {
         <div class="fever on" hidden><i></i><span></span><b class="fever-face">${charFit(COMPS[ABILITY_BY_ID.get('rampage')!.comp].sprite, 26)}</b></div>
         <div class="buffs"></div>
       </div>
+      <div class="zone-map pnl"><button class="btn icon sm" data-act="zonePrev" aria-label="Earlier floors">${G.left()}</button><div class="floor-map"></div><button class="btn icon sm" data-act="zoneNext" aria-label="Later floors">${G.right()}</button></div>
       <div class="bars"></div>
       <div class="hint" hidden></div>
       <button class="btn vault-leave" data-act="leaveVault" hidden>Leave the vault</button>
@@ -215,10 +241,11 @@ export class Ui {
       <div class="blade" hidden><div class="blade-in"></div></div>
     `;
     const q = (sel: string) => root.querySelector(sel) as HTMLElement;
+    this.floorMaps = [...root.querySelectorAll<HTMLElement>('.floor-map')];
     this.el = {
       bank: q('.bank-v'), bankIco: q('.bank-ico'), dps: q('.dps-v'), click: q('.click-v'), rate: q('.rate'),
       floorN: q('.floor-n'), floorSub: q('.floor-sub'), floorBar: q('.floor-bar i'), floorBarT: q('.floor-bar span'), floorBox: q('.floor'),
-      down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
+      zonePrev: q('[data-act=zonePrev]'), zoneNext: q('[data-act=zoneNext]'), down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
       fever: q('.fever'), feverBar: q('.fever > i'), feverLabel: q('.fever > span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), vaultPick: q('.vault-pick'), vaultLeave: q('.vault-leave'), vaultFaces: q('.vp-faces'), heroMark: q('.hero-mark'), raid: q('.raid-mark'), exitMark: q('.exit-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
       upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), autoUpg: q('.auto-upg'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
@@ -287,6 +314,8 @@ export class Ui {
     const freeH = sheet ? shop.top : h;
     this.field = { w: freeW, h: freeH };
     this.root.style.setProperty('--free-w', `${freeW}px`);
+    // The floor map sits in the top-left corner only when the gold counter, centred over the fight, can't reach it.
+    body.toggle('map-in-bar', compact || freeW < 980);
     this.root.style.setProperty('--free-h', `${freeH}px`);
     // The news ticker starts where the dock ends (the dock grows as features are added).
     const dock = this.root.querySelector('.dock')!.getBoundingClientRect();
@@ -603,6 +632,13 @@ export class Ui {
         this.renderModal();
         return;
       }
+      const go = t.closest<HTMLElement>('[data-goto]');
+      if (go) {
+        // Going back to an earlier floor stays there to farm it (Auto off), like the back arrow.
+        const f = Number(go.dataset.goto);
+        if (this.game.goFloor(f) && f < this.game.s.maxFloor) this.game.s.auto = false;
+        return;
+      }
       const act = t.closest<HTMLElement>('[data-act]');
       if (act) this.action(act.dataset.act!, act);
     });
@@ -684,6 +720,12 @@ export class Ui {
         if (g.goFloor(g.s.floor - 1)) g.s.auto = false;
         break;
       case 'floorUp': g.goFloor(g.s.floor + 1); break;
+      case 'zonePrev':
+      case 'zoneNext':
+        this.mapPage = Math.max(0, (this.mapPage ?? Math.floor((g.s.floor - 1) / MAP_ROOMS)) + (act === 'zonePrev' ? -1 : 1));
+        this.mapSlide = act === 'zonePrev' ? 'prev' : 'next';
+        this.renderFloor();
+        break;
       case 'auto':
         g.setAuto(!g.s.auto);
         this.hooks.sound('toggle', { vol: 0.5 });
@@ -1243,7 +1285,13 @@ export class Ui {
     const g = this.game;
     const s = g.s;
     const boss = g.bossFloor();
-    const key = `${s.floor}|${s.maxFloor}|${s.auto}|${boss}`;
+    if (s.floor !== this.mapFloor) {
+      this.mapFloor = s.floor;
+      this.mapPage = null;
+    }
+    const page = this.mapPage ?? Math.floor((s.floor - 1) / MAP_ROOMS);
+    const owned = g.heroIndex() >= 0 ? g.heroIndex() : Math.max(0, s.owned.findIndex((n) => n > 0));
+    const key = `${s.floor}|${s.maxFloor}|${s.auto}|${boss}|${page}|${owned}`;
     if (key !== this.floorKey) {
       this.floorKey = key;
       this.el.floorN.textContent = `Floor ${s.floor}`;
@@ -1255,6 +1303,37 @@ export class Ui {
       (this.el.up as HTMLButtonElement).disabled = s.floor >= s.maxFloor;
       this.el.auto.classList.toggle('on', s.auto);
       this.el.auto.textContent = s.auto ? 'Auto: on' : 'Auto: off';
+      // Five rooms on a winding corridor, each page ending on a boss. Drawn twice: an island in the corner on wide
+      // screens, inside the floor box on narrow ones (CSS picks).
+      const first = page * MAP_ROOMS + 1;
+      const fresh = this.mapMax && s.maxFloor > this.mapMax ? s.maxFloor : 0;
+      this.mapMax = s.maxFloor;
+      const spots = Array.from({ length: MAP_ROOMS }, (_, k) => [10 + k * 20, k % 2 ? 72 : 42]);
+      const rooms = spots.map(([x, y], k) => {
+        const f = first + k;
+        const state = f === s.floor ? 'now' : f <= s.maxFloor ? 'reached' : 'locked';
+        const kind = f % 10 === 0 ? ' zone' : f % 5 === 0 ? ' boss' : '';
+        const badge = kind ? (f % 10 === 0 ? CROWN : SKULL) : '';
+        const pin = state === 'now' ? `<b class="pin">${charFit(COMPS[owned].sprite, 14)}</b>` : '';
+        return `<button class="fm ${state}${kind}${f === fresh ? ' fresh' : ''}" style="--x:${x}%;--y:${y}%" data-goto="${f}" data-tip="fm:${f}"${state === 'locked' ? ' disabled' : ''}>${floorArt(f, kind ? 26 : 20)}${badge}<span class="num">${f}</span>${pin}</button>`;
+      }).join('');
+      // The corridor runs in from the page before and on to the next; stretches you've walked are lit.
+      const path = [[0, 57], ...spots, [100, 57]];
+      const steps = path.slice(1).map(([x, y], k) => {
+        const lit = first + k > 1 && first + k <= s.maxFloor;
+        return `<line class="${lit ? 'lit' : ''}" x1="${path[k][0]}" y1="${path[k][1]}" x2="${x}" y2="${y}"/>`;
+      }).join('');
+      const html = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="${path.join(' ')}"/>${steps}</svg>${rooms}`;
+      for (const map of this.floorMaps) {
+        map.dataset.slide = this.mapSlide;
+        map.innerHTML = html;
+      }
+      this.mapSlide = '';
+      const home = Math.floor((s.floor - 1) / MAP_ROOMS);
+      (this.el.zonePrev as HTMLButtonElement).disabled = page <= 0;
+      (this.el.zoneNext as HTMLButtonElement).disabled = first + MAP_ROOMS > s.maxFloor;
+      this.el.zonePrev.classList.toggle('home', home < page);
+      this.el.zoneNext.classList.toggle('home', home > page);
     }
     if (boss && g.inVault()) {
       // The boss steps aside for the vault; its clock is frozen.
@@ -1818,6 +1897,14 @@ export class Ui {
       const i = Number(id);
       const now = g.heroIndex() === i;
       return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach. Click the ★ again to have no hero.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p>`;
+    }
+    if (kind === 'fm') {
+      const f = Number(id);
+      const reached = f <= g.s.maxFloor;
+      const what = f % 10 === 0 ? 'Zone boss' : f % 5 === 0 ? 'Boss' : zoneName(f).replace(/^The /, '');
+      const face = f % 5 === 0 ? bossFor(f) : featuredFor(f);
+      const where = f === g.s.floor ? 'You are here' : reached ? 'Click to go there' : 'Not reached yet';
+      return `<div class="tt-h">${reached ? floorArt(f, 30) : ''}<b>Floor ${f}</b><span class="tt-own">${what}</span></div><p class="tt-d">${reached ? esc(face.name) : '???'}</p><p class="tt-f">${where}</p>`;
     }
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it.'}</p>`;
     if (kind === 'dock') {
