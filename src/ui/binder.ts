@@ -36,7 +36,7 @@ export interface BinderCard {
   /** The first color it can come in (the later laps' newcomers have no plain copy), and whether it comes in gold. */
   fromLap: number;
   canGold: boolean;
-  /** How you got your first one, and your first gold one: "First found on kill #1,930" or "Traded from Daniel". */
+  /** How you got your first one, and your first gold one: "First found on kill #1,930" or "Traded from Dan". */
   first: { plain: string; gold: string };
 }
 
@@ -206,7 +206,8 @@ export class Binder {
       const pockets = Array.from({ length: PER_PAGE }, (_, k) => {
         const i = start + k;
         const c = this.cards[i];
-        if (!c || !this.exists(i)) return '<i class="bnd-pocket none"></i>';
+        if (!c) return '<i class="bnd-pocket none"></i>';
+        if (!this.exists(i)) return this.elsewhere(c);
         if (!this.has(i)) return `<i class="bnd-pocket"><small>${no(i)}</small></i>`;
         const key = this.key(i);
         const fresh = this.isFresh(i);
@@ -228,6 +229,13 @@ export class Binder {
         <button data-bd="next" ${this.spread < last ? '' : 'disabled'} aria-label="Next pages">▶</button>
       </div>
       <button class="bnd-x" data-bd="close" aria-label="Close the binder">✕</button>`;
+  }
+
+  /** A slot for a card that doesn't come in this binder's color: says where it does (without naming colors you haven't reached). */
+  private elsewhere(c: BinderCard) {
+    if (this.gold && !c.canGold) return '<i class="bnd-pocket none"><small>No gold</small></i>';
+    const from = this.colors[c.fromLap];
+    return from ? `<i class="bnd-pocket none" style="--lc:${from.tint}"><i></i><small>From ${esc(from.name)}</small></i>` : '<i class="bnd-pocket none"><small>Found deeper</small></i>';
   }
 
   /** A card in the binder on view: the same card lands separately in each color's binder. */

@@ -1,22 +1,22 @@
 import type { SfxName } from '../audio/sfx.ts';
 import { CARD_BY_ID, ZONES, type CardDef } from '../game/data.ts';
-import { DANIEL_GIVES, VICTOR_GIVES, type Game } from '../game/game.ts';
+import { DAN_GIVES, VICTOR_GIVES, type Game } from '../game/game.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import { G, cardArt, charFit } from './px.ts';
 
 /**
  * Trading with the brothers, on the bedroom rug: your spares go down on your side, his card waits face down on his,
- * and you shake on it. Daniel takes five for one card from the sets you gave him (more of a set, better its odds);
+ * and you shake on it. Dan takes five for one card from the sets you gave him (more of a set, better its odds);
  * Victor takes ten for a gold card.
  */
 
-export type Brother = 'daniel' | 'victor';
+export type Brother = 'dan' | 'victor';
 
 const TYPE_MS = 22;
 
 /** What the brothers say. `{set}` and `{card}` fill in. */
 const LINES: Record<Brother, Record<'hello' | 'first' | 'ready' | 'new' | 'dupe' | 'short', string[]>> = {
-  daniel: {
+  dan: {
     hello: ["Five doubles, any sets. I'll pay you back from the same ones.", "Got doubles? I'm trying to finish a page.", "Mix 'em up if you like. I sort them anyway."],
     first: ['Ooh, {set}. Okay.', '{set}? I can work with that.'],
     ready: ['Five. Shake on it?', "That's five. Deal?"],
@@ -61,11 +61,11 @@ export class TradeMat {
     this.el.addEventListener('pointerup', (e) => e.stopPropagation());
     this.el.addEventListener('click', this.onClick);
     addEventListener('keydown', this.onKey, true);
-    const name = o.who === 'daniel' ? 'Daniel' : 'Victor';
+    const name = o.who === 'dan' ? 'Dan' : 'Victor';
     this.el.innerHTML = `
       <div class="tm">
         <button class="tm-x" data-tm="close" aria-label="Close">✕</button>
-        <header class="tm-top"><span class="tm-face">${charFit(o.who === 'daniel' ? 'ef_elf_m' : 'victor', 52)}</span><div class="tm-bubble"><b>${name}</b><p class="tm-say"></p></div></header>
+        <header class="tm-top"><span class="tm-face">${charFit(o.who === 'dan' ? 'ef_elf_m' : 'victor', 52)}</span><div class="tm-bubble"><b>${name}</b><p class="tm-say"></p></div></header>
         <div class="tm-body"></div>
       </div>`;
     o.host.appendChild(this.el);
@@ -75,7 +75,7 @@ export class TradeMat {
   }
 
   private get need() {
-    return this.o.who === 'daniel' ? DANIEL_GIVES : VICTOR_GIVES;
+    return this.o.who === 'dan' ? DAN_GIVES : VICTOR_GIVES;
   }
 
   /** Your spares, less what's already on the rug, by set then by how many you have. */
@@ -87,7 +87,7 @@ export class TradeMat {
       .sort((a, b) => a.c.zone - b.c.zone || b.n - a.n);
   }
 
-  /** What his card could be: Victor's from every gold card; Daniel's from the sets on your side, each as likely as
+  /** What his card could be: Victor's from every gold card; Dan's from the sets on your side, each as likely as
    *  its share of them. `fresh` is the chance it's one you don't have. */
   private odds() {
     const g = this.o.game;
@@ -137,7 +137,7 @@ export class TradeMat {
   private deal() {
     const g = this.o.game;
     if (this.side.length !== this.need) return;
-    const got = this.o.who === 'daniel' ? g.tradeWithDaniel(this.side) : g.tradeWithVictor(this.side);
+    const got = this.o.who === 'dan' ? g.tradeWithDan(this.side) : g.tradeWithVictor(this.side);
     if (!got) return;
     this.result = got;
     this.side = [];
@@ -213,7 +213,7 @@ export class TradeMat {
   /** Redraw the rug, your spares and the buttons (the brother's bubble stays, so his line keeps typing). */
   private render() {
     const who = this.o.who;
-    const name = who === 'daniel' ? 'Daniel' : 'Victor';
+    const name = who === 'dan' ? 'Dan' : 'Victor';
     const need = this.need;
     const slots = Array.from({ length: need }, (_, k) => {
       const id = this.side[k];
@@ -224,14 +224,14 @@ export class TradeMat {
     const his = r
       ? `<div class="tm-flip${r.gold ? ' gold' : ''}"><div class="tm-big" style="--fc:${r.gold ? CARD_FRAME.gold : CARD_FRAME[CARD_BY_ID.get(r.id)!.kind]}">${cardArt(CARD_BY_ID.get(r.id)!, 64)}<b>${esc(CARD_BY_ID.get(r.id)!.name)}</b></div>${r.first ? '<em class="tm-stamp">NEW!</em>' : ''}</div>`
       : `<div class="tm-back">${G.heart(3)}<span>DEEPHEART</span></div>`;
-    // Where his card comes from: the sets on your side and their shares (Daniel), or any gold card (Victor).
+    // Where his card comes from: the sets on your side and their shares (Dan), or any gold card (Victor).
     const pct = (v: number) => `${Math.round(v * 100)}%`;
     const from = who === 'victor'
       ? '<div class="tm-target"><span>A gold card</span></div>'
       : odds.split.length
         ? `<ul class="tm-split">${odds.split.map(({ zone, share }) => `<li><b>${pct(share)}</b> ${esc(setName(zone))}</li>`).join('')}</ul>`
         : '<p class="tm-odds">From the sets you give</p>';
-    const oddsLine = r || (who === 'daniel' && !odds.split.length) ? '' : `<p class="tm-odds">${odds.fresh ? `${pct(odds.fresh)} chance it's new` : 'You have them all'}</p>`;
+    const oddsLine = r || (who === 'dan' && !odds.split.length) ? '' : `<p class="tm-odds">${odds.fresh ? `${pct(odds.fresh)} chance it's new` : 'You have them all'}</p>`;
     const hand = this.hand();
     const cards = hand.length
       ? hand.map((h) => this.mini(h.c, `data-tm="put" data-id="${h.c.id}"${this.canPlace() ? '' : ' disabled'}`, `<i class="tm-n">×${h.n}</i>`)).join('')

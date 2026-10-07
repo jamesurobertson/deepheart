@@ -1937,7 +1937,7 @@ export class Ui {
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
         abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls.` : g.descendOpen() ? (g.s.maxFloor <= g.s.lastAscent ? `Souls lie deeper than floor ${g.s.lastAscent}.` : 'Earn more gold for your next soul.') : `The way up opens at the floor ${g.ascendFloor()} boss.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
         stats: 'Your numbers, and where every bonus comes from.',
-        room: 'Your room: the binder, and Daniel and Victor to trade with.',
+        room: 'Your room: the binder, and Dan and Victor to trade with.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
         blade: `Phantom Blade: attacks the front monster for you ${perSec(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades, Abyss powers and the Phantom Hilt make it faster.`,
@@ -2506,7 +2506,7 @@ export class Ui {
     this.hideTip();
     this.hooks.dreaming(true);
     playDream({
-      first, visit, found: g.cardsFound(), fresh: freshCount, sound: this.hooks.sound,
+      first, visit, awakening: visit ? 0 : g.s.awakens + 1, found: g.cardsFound(), fresh: freshCount, sound: this.hooks.sound,
       hero: COMPS[Math.max(0, g.heroIndex())],
       figures: this.figures(),
       binder: () => {

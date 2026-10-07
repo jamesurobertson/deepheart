@@ -11,8 +11,8 @@ import { BINDER_MARK, STASHES, BROS_GAME, FOE_SPOTS, KID_START, PARTY_SPOTS, SHE
 const W = 160;
 const H = 144;
 const TYPE_MS = 28;
-/** How long the dungeon takes to shrink into the playset (the first time is the big reveal), and to zoom back in. */
-const PULL_MS = { first: 2600, again: 1100, back: 1100 };
+/** How long the dungeon takes to shrink into the playset on a visit, and to zoom back in. */
+const PULL_MS = { again: 1100, back: 1100 };
 const STEP_S = 0.2;
 const NPC_STEP_S = 0.36;
 const KID = 'cr_beanie_kid';
@@ -24,6 +24,8 @@ export interface DreamOpts {
   first: boolean;
   /** Just popping into the room from the dungeon: no awakening, and only a word if new cards came in. */
   visit?: boolean;
+  /** Waking up for real: the awakening's number, on the black screen that fades into the bedroom. */
+  awakening?: number;
   found: number;
   /** The binder as it is right now (trades add cards while you're awake). */
   binder: () => { cards: BinderCard[]; colors: BinderColor[] };
@@ -39,7 +41,7 @@ export interface DreamOpts {
   figures: { party: string[]; foes: string[]; shelf: string[] };
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
   /** Talking to a brother opens his trade window over the screen. */
-  trade: (who: 'daniel' | 'victor', host: HTMLElement, closed: () => void) => void;
+  trade: (who: 'dan' | 'victor', host: HTMLElement, closed: () => void) => void;
   /** Search a hiding spot: the name of the card in it, or null once it's been taken. */
   stash: (spot: string) => string | null;
   /** Runs as the view pulls back out of the dungeon. */
@@ -67,7 +69,7 @@ function linesFor(id: string, o: DreamOpts): string[] {
     mailbox: ['Nothing today.'],
     sign: ['BRAMBLEFORD'],
     pond: ['Something glints at the bottom. Probably a coin.'],
-    brosGame: ["Daniel and Victor's game. Victor is winning. Obviously."],
+    brosGame: ["Dan and Victor's game. Victor is winning. Obviously."],
     bed: ['Not tired yet.'],
   };
   return lines[id] ?? [];
@@ -170,7 +172,8 @@ class Dream {
     this.raf = requestAnimationFrame(this.loop);
     await this.wait(40);
     this.o.cover?.();
-    await this.pullBack(this.o.first ? PULL_MS.first : PULL_MS.again);
+    if (this.o.awakening) await this.curtain(this.o.awakening);
+    else await this.pullBack(PULL_MS.again);
     const n = this.o.fresh;
     const line = this.o.first ? `...and the ${this.o.hero.name} saves the day!` : n ? `Playtime break. ${n} new card${n === 1 ? '' : 's'}.` : this.o.visit ? '' : 'Playtime break.';
     if (line) await this.say(line);
@@ -189,6 +192,21 @@ class Dream {
     const s = c.width / W;
     const f = PLAYSET.floor;
     return { x: c.left + f.x * s, y: c.top + f.y * s, w: f.w * s, h: f.h * s };
+  }
+
+  /** The Awakening screen fades in over the dungeon, then away to the kid in his room. */
+  private async curtain(n: number) {
+    const c = document.createElement('div');
+    c.className = 'curtain in heart';
+    c.innerHTML = `<b>Awakening ${n}</b><span>The Heart beats. Everything starts again, stronger.</span>`;
+    this.el.classList.add('waking');
+    this.el.appendChild(c);
+    await this.wait(1100);
+    this.el.classList.remove('waking');
+    await this.wait(1500);
+    c.className = 'curtain out heart';
+    await this.wait(1000);
+    c.remove();
   }
 
   /** The live dungeon view, scaled and cropped down to the playset's floor (and its full-screen self). */
@@ -356,7 +374,7 @@ class Dream {
       n.dir = this.kid.x < n.x ? 'left' : this.kid.x > n.x ? 'right' : this.kid.y < n.y ? 'up' : 'down';
       if (n.dir === 'left' || n.dir === 'right') n.left = n.dir === 'left';
       n.nextAt = performance.now() / 1000 + 4;
-      if (n.def.id === 'daniel' || n.def.id === 'victor') {
+      if (n.def.id === 'dan' || n.def.id === 'victor') {
         this.busy = true;
         this.trading = true;
         return this.o.trade(n.def.id, this.el, () => {
@@ -428,7 +446,7 @@ class Dream {
 
   private targetAt(x: number, y: number): Target | null {
     const npc = this.npcs.find((n) => n.x === x && n.y === y);
-    if (npc) return { kind: 'npc', npc, label: npc.def.id === 'daniel' || npc.def.id === 'victor' ? `Trade with ${npc.def.name}` : `Talk to ${npc.def.name}` };
+    if (npc) return { kind: 'npc', npc, label: npc.def.id === 'dan' || npc.def.id === 'victor' ? `Trade with ${npc.def.name}` : `Talk to ${npc.def.name}` };
     const p = propAt(this.map, x, y);
     if (p?.use) return { kind: 'prop', id: p.use.id, label: p.use.label, x: p.x, y: p.y, w: p.w ?? 1, h: p.h ?? 1 };
     return null;
@@ -742,11 +760,11 @@ class Dream {
       }
     };
     const g = BROS_GAME;
-    for (const [x, y] of [g.danielDeck, g.victorDeck]) {
+    for (const [x, y] of [g.danDeck, g.victorDeck]) {
       card(x + 1, y + 1, null);
       card(x, y, null);
     }
-    card(g.danielLaid[0], g.danielLaid[1], CARD_INKS[1]);
+    card(g.danLaid[0], g.danLaid[1], CARD_INKS[1]);
     card(g.victorLaid[0], g.victorLaid[1], CARD_INKS[4]);
     card(g.pile[0] + 1, g.pile[1] + 1, CARD_INKS[2]);
     card(g.pile[0], g.pile[1], CARD_INKS[0]);

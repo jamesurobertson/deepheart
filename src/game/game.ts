@@ -77,7 +77,7 @@ const CHAMP_BOSS_GOLD = 10;
 /** Card drops: 1 in this many kills (or catches). A 12-hour absence is ~170k kills, so ordinary cards sit at 0.001%;
  *  rainbow goblins are rare enough on their own to keep 1%, the best odds anything gets. */
 /** How many spares each brother wants for one card. */
-export const DANIEL_GIVES = 5;
+export const DAN_GIVES = 5;
 export const VICTOR_GIVES = 10;
 const CARD_ODDS = { monster: 100_000, boss: 25_000, champ: 10_000, champBoss: 1_000, goblin: 1_000, rainbow: 100 };
 /** Party damage is shown as numbers in batches this many seconds apart. */
@@ -536,8 +536,6 @@ export class Game {
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
-    // Unseen cards used to be bare ids (plain, first color).
-    s.dreamCards = s.dreamCards.map((k) => (k.includes(':') ? k : `${k}:${Math.min(lapOf(CARD_BY_ID.get(k)?.floor ?? 1), CORRUPTION.length - 1)}:0`));
     // Abyss powers became levelled: every soul spent on the old one-off powers comes back to spend again.
     const legacy = s as unknown as { abyss?: string[]; runSouls?: number };
     if (legacy.abyss) {
@@ -1678,7 +1676,7 @@ export class Game {
   // ---------- the heart ----------
 
   canAwaken() {
-    return this.s.cycleBest >= this.awakenFloor() && this.pendingStones() >= 1;
+    return this.s.cycleBest >= this.awakenFloor();
   }
 
   /** The depth this cycle has to reach before the Heart can be awakened: deeper each time (`awakenStep` more floors). */
@@ -1697,10 +1695,11 @@ export class Game {
     return this.s.stones + spent;
   }
 
-  /** Heartstones an awakening would pay: the cube root of every soul ever earned, less what's already been paid. */
+  /** Heartstones an awakening would pay: the cube root of every soul ever earned, less what's already been paid, and
+   *  never less than one, so reaching the depth is always enough to awaken. */
   pendingStones() {
     const total = Math.floor(((this.s.soulsLifetime + this.s.souls) / TUNE.stoneSouls) ** TUNE.stoneExp);
-    return Math.max(0, total - this.stonesEarned());
+    return Math.max(1, total - this.stonesEarned());
   }
 
   awaken() {
@@ -1832,15 +1831,15 @@ export class Game {
     return CARDS.filter((c) => c.kind !== 'goblin' && c.floor <= this.s.bestFloor && (zone === undefined || c.zone === zone));
   }
 
-  /** Daniel: five spares from any sets for a random card from those same sets, each set as likely as its share of
+  /** Dan: five spares from any sets for a random card from those same sets, each set as likely as its share of
    *  what you gave (three Upper Halls and two Bone Crypts: 60% Upper Halls, 40% Bone Crypts). */
-  tradeWithDaniel(give: string[]) {
-    if (give.length !== DANIEL_GIVES || give.some((id) => (CARD_BY_ID.get(id)?.zone ?? -1) < 0)) return null;
+  tradeWithDan(give: string[]) {
+    if (give.length !== DAN_GIVES || give.some((id) => (CARD_BY_ID.get(id)?.zone ?? -1) < 0)) return null;
     const zone = CARD_BY_ID.get(give[Math.floor(Math.random() * give.length)])!.zone;
     const pool = this.tradeable(zone);
     if (!pool.length || !this.takeSpares(give)) return null;
     this.s.trades++;
-    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, 'Daniel');
+    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, 'Dan');
   }
 
   /** Victor: ten spares from anywhere for a random gold card. */

@@ -20,7 +20,7 @@ export function cardCanvas(card: CardDef, lap = 0): HTMLCanvasElement | null {
   return atlas ? portrait(atlas, card, lap) : null;
 }
 
-/** Characters made by recoloring another sprite: Victor is Daniel's sprite with brown hair and a blue shirt. */
+/** Characters made by recoloring another sprite: Victor is Dan's sprite with brown hair and a blue shirt. */
 const VARIANTS: Record<string, { base: string; swap: Record<string, string> }> = {
   victor: { base: 'ef_elf_m', swap: { '#facb3e': '#9a6a3a', '#ee8e2e': '#6a4024', '#c56025': '#3f6aa8', '#62232f': '#263a66' } },
 };
