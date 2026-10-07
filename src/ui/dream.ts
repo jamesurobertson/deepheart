@@ -26,6 +26,10 @@ export interface DreamOpts {
   visit?: boolean;
   /** Waking up for real: the awakening's number, on the black screen that fades into the bedroom. */
   awakening?: number;
+  /** Back after a reload: the kid's where he was standing, with no pull-back or hello. */
+  at?: { map: MapId; x: number; y: number; dir: Dir };
+  /** The kid stopped on a tile or came through a door. */
+  moved: (map: MapId, x: number, y: number, dir: Dir) => void;
   found: number;
   /** The binder as it is right now (trades add cards while you're awake). */
   binder: () => { cards: BinderCard[]; colors: BinderColor[] };
@@ -150,7 +154,12 @@ class Dream {
     this.fade = this.el.querySelector('.dr-fade')!;
     this.frame.width = W;
     this.frame.height = H;
-    this.enterMap('bedroom');
+    const at = o.at && MAPS[o.at.map] ? o.at : null;
+    this.enterMap(at?.map ?? 'bedroom');
+    if (at) {
+      this.kid = { x: at.x, y: at.y, dir: at.dir, left: at.dir === 'left', move: null };
+      this.holding = false;
+    }
     if (import.meta.env.DEV) Object.assign(window, { dream: this });
   }
 
@@ -172,11 +181,13 @@ class Dream {
     this.raf = requestAnimationFrame(this.loop);
     await this.wait(40);
     this.o.cover?.();
-    if (this.o.awakening) await this.curtain(this.o.awakening);
-    else await this.pullBack(PULL_MS.again);
-    const n = this.o.fresh;
-    const line = this.o.first ? `...and the ${this.o.hero.name} saves the day!` : n ? `Playtime break. ${n} new card${n === 1 ? '' : 's'}.` : this.o.visit ? '' : 'Playtime break.';
-    if (line) await this.say(line);
+    if (!this.o.at) {
+      if (this.o.awakening) await this.curtain(this.o.awakening);
+      else await this.pullBack(PULL_MS.again);
+      const n = this.o.fresh;
+      const line = this.o.first ? `...and the ${this.o.hero.name} saves the day!` : n ? `Playtime break. ${n} new card${n === 1 ? '' : 's'}.` : this.o.visit ? '' : 'Playtime break.';
+      if (line) await this.say(line);
+    }
     this.box.hidden = true;
     this.holding = false;
     this.roaming = true;
@@ -534,6 +545,7 @@ class Dream {
   private arrive() {
     const w = this.warpAt(this.kid.x, this.kid.y);
     if (w) return void this.warp(w.to, w.tx, w.ty, w.dir);
+    this.o.moved(this.map.id, this.kid.x, this.kid.y, this.kid.dir);
     if ((this.kid.x + this.kid.y) % 2 === 0) this.o.sound(`step${(this.kid.x * 3 + this.kid.y) % 5}` as SfxName, { vol: 0.08, rate: 1.3 });
     this.walkOn();
   }
@@ -563,6 +575,7 @@ class Dream {
     await this.wait(220);
     this.enterMap(to);
     this.kid = { x, y, dir, left: dir === 'left', move: null };
+    this.o.moved(to, x, y, dir);
     this.fade.classList.remove('on');
     await this.wait(160);
     this.busy = false;

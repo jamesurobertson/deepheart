@@ -9,7 +9,7 @@ import { G, cardArt, charFit, sprite, spriteFit } from './px.ts';
 import type { BinderCard, BinderColor } from './binder.ts';
 import { TradeMat, type Brother } from './trade.ts';
 import { playDream } from './dream.ts';
-import { STASHES } from './world.ts';
+import { KID_START, STASHES, type Dir, type MapId } from './world.ts';
 
 export interface UiHooks {
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
@@ -18,9 +18,9 @@ export interface UiHooks {
   exportSave: () => string;
   importSave: (text: string) => boolean;
   reset: () => void;
-  /** You're in the kid's room (or back out of it): the dungeon waits. `awayCounts` settles the time spent like time
-   *  away (not after an awakening, which starts the run over). */
-  dreaming: (on: boolean, awayCounts?: boolean) => void;
+  /** Back in the dungeon from the kid's room: `away` seconds to settle like time away (0 after an awakening, which
+   *  starts the run over). */
+  leftRoom: (away: number) => void;
 }
 
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
@@ -2443,12 +2443,12 @@ export class Ui {
       </div>`;
   }
 
-  private doAwaken() {
+  private doAwaken(resumed = false) {
     const g = this.game;
     this.descending = true;
     this.modal = null;
     this.el.modalWrap.hidden = true;
-    this.hooks.sound('awaken', { vol: 0.9 });
+    if (!resumed) this.hooks.sound('awaken', { vol: 0.9 });
     // Going back to sleep is the awakening itself: the run resets once the kid's back in bed.
     this.playDream(!g.s.dreamSeen, () => {
       g.awaken();
@@ -2503,10 +2503,13 @@ export class Ui {
   playDream(first: boolean, sleep?: () => void, done?: () => void, visit = false) {
     const g = this.game;
     const freshCount = g.s.dreamCards.length;
+    const resumed = g.s.room;
+    const room = (g.s.room ??= { since: Date.now(), awakening: !!sleep, map: 'bedroom', ...KID_START });
     this.hideTip();
-    this.hooks.dreaming(true);
     playDream({
       first, visit, awakening: visit ? 0 : g.s.awakens + 1, found: g.cardsFound(), fresh: freshCount, sound: this.hooks.sound,
+      at: resumed ? { map: resumed.map as MapId, x: resumed.x, y: resumed.y, dir: resumed.dir as Dir } : undefined,
+      moved: (map, x, y, dir) => Object.assign(room, { map, x, y, dir }),
       hero: COMPS[Math.max(0, g.heroIndex())],
       figures: this.figures(),
       binder: () => {
@@ -2535,13 +2538,20 @@ export class Ui {
       },
       sleep: () => {
         sleep?.();
+        g.s.room = null;
         this.hooks.save();
       },
       done: () => {
-        this.hooks.dreaming(false, !sleep);
+        this.hooks.leftRoom(sleep ? 0 : (Date.now() - room.since) / 1000);
         done?.();
       },
     });
+  }
+
+  /** A reload in the kid's room lands back in it, still mid-awakening if that's how you got there. */
+  resumeRoom() {
+    if (this.game.s.room?.awakening) this.doAwaken(true);
+    else this.playDream(false, undefined, undefined, true);
   }
 
   /** The action figures in the kid's room: the party you've hired (your hero's in his hand) and the zone's monsters. */

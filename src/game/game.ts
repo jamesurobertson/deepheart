@@ -233,6 +233,9 @@ export interface SaveState {
   dreamSeen: boolean;
   /** Cards you've got (found, traded or dug up) but not yet seen in the binder, as `id:lap:gold`; they slam in when you look. */
   dreamCards: string[];
+  /** In the waking world (null: down in the dungeon): since when, mid-awakening or just visiting, and where the kid's standing.
+   *  The dungeon waits the whole time and settles it like time away when you go back in, even across reloads. */
+  room: { since: number; awakening: boolean; map: string; x: number; y: number; dir: string } | null;
   /** Trades made with the brothers. */
   trades: number;
   /** The hidden cards (in your room and around town) you've found. */
@@ -270,7 +273,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], room: null, trades: 0, stashes: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }

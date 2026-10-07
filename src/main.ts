@@ -69,20 +69,13 @@ async function boot() {
     } catch { /* storage unavailable: play continues unsaved */ }
   };
 
-  /** When you went into the kid's room (0: you're in the dungeon). */
-  let inRoomSince = 0;
   const ui = new Ui(document.getElementById('ui')!, game, scene, {
     sound: (n, o) => sfx.play(n, o),
     save,
-    dreaming: (on, awayCounts) => {
+    leftRoom: (away) => {
       // Time in the kid's room counts as time away: the dungeon waits, then catches up when you come back.
-      if (on) inRoomSince = Date.now();
-      else {
-        const away = (Date.now() - inRoomSince) / 1000;
-        inRoomSince = 0;
-        lastTick = Date.now();
-        if (awayCounts) catchUp(away);
-      }
+      lastTick = Date.now();
+      if (away) catchUp(away);
     },
     settings: () => {
       applySettings();
@@ -190,7 +183,8 @@ async function boot() {
   // Waking up: ?dream=first plays the whole reveal, ?dream=wake the short one (dev only). Saves that awakened before
   // the reveal existed see it at their next awakening.
   const dream = import.meta.env.DEV ? params.get('dream') : null;
-  if (dream) ui.playDream(dream === 'first');
+  if (game.s.room) ui.resumeRoom();
+  else if (dream) ui.playDream(dream === 'first');
 
   /** Time away: short breaks play out at full speed; longer ones pay the offline rate and say so. */
   const catchUp = (seconds: number) => {
@@ -204,7 +198,8 @@ async function boot() {
     if (o.gold.gt(0)) ui.showOffline(o);
     save();
   };
-  if (saved) {
+  // Closed in the kid's room: that time is settled on the way back into the dungeon.
+  if (saved && !game.s.room) {
     const gone = (Date.now() - saved.lastSave) / 1000;
     if (gone > 5) catchUp(gone);
   }
@@ -220,7 +215,7 @@ async function boot() {
     const gap = (now - lastTick) / 1000;
     lastTick = now;
     // Hidden tabs (and the dungeon while you're in the room) are paused; the time is settled when you come back.
-    if (document.hidden || inRoomSince) return;
+    if (document.hidden || game.s.room) return;
     // A long gap while visible means the computer slept.
     if (gap > OFFLINE_AFTER) return catchUp(gap);
     // The zone interlude pauses the fight (nothing is lost; it just waits).
@@ -240,7 +235,7 @@ async function boot() {
       save();
     } else if (hiddenAt) {
       // Hidden while in the room: leaving the room settles that time.
-      if (!inRoomSince) catchUp((Date.now() - hiddenAt) / 1000);
+      if (!game.s.room) catchUp((Date.now() - hiddenAt) / 1000);
       hiddenAt = 0;
       lastTick = Date.now();
     }
@@ -285,7 +280,7 @@ async function boot() {
       ui.update();
     }
     // The kid's room has its own tune.
-    sfx.music(inRoomSince ? 'room' : trackFor(game));
+    sfx.music(game.s.room ? 'room' : trackFor(game));
   };
   ui.update();
   requestAnimationFrame(frame);
