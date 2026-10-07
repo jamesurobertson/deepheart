@@ -7,6 +7,7 @@ import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, cardCanvas, charFit, sprite, spriteFit } from './px.ts';
 import type { BinderCard } from './binder.ts';
+import { TradeMat, type Brother } from './trade.ts';
 import { playDream } from './dream.ts';
 
 export interface UiHooks {
@@ -1989,6 +1990,7 @@ export class Ui {
       html = head('Trophies', `${n} / ${TROPHIES.length} · +${n}% damage`) + this.troTabs('trophies') + `<div class="tro-grid">${TROPHIES.map((t) => `<span class="tro ${g.hasTrophy(t.id) ? 'got' : ''}" data-tip="tro:${t.id}">${icon(t.icon, 28)}</span>`).join('')}</div>`;
     } else if (name === 'cards') {
       html = head('Cards') + this.troTabs('cards') + this.cardsHtml();
+
     } else if (name === 'abyss') {
       html = head('The Abyss', `${G.soul()} ${fmt(g.s.souls)} souls · +${fmt(Math.round(g.s.souls * g.soulPower() * 100))}% damage`) + this.tabs('abyss') + this.abyssHtml();
     } else if (name === 'heart') {
@@ -2099,6 +2101,14 @@ export class Ui {
   private troTabs(on: 'trophies' | 'cards') {
     const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
     return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${this.newCards ? ` <em class="tab-new">+${this.newCards}</em>` : ''}`)}</nav>`;
+  }
+
+  /** Cards that are new in the binder: found while you slept, or traded for since you last looked. */
+  private freshCards = new Set<string>();
+
+  /** A brother's trade window, opened by talking to him in the waking world. */
+  openTrade(who: Brother, host: HTMLElement, closed: () => void) {
+    new TradeMat({ who, game: this.game, host, sound: this.hooks.sound, save: this.hooks.save, closed, gained: (id) => this.freshCards.add(id) });
   }
 
   /** Every monster's card, zone by zone: a dark silhouette until the card turns up. A zone's row
@@ -2476,12 +2486,16 @@ export class Ui {
    *  back down (the awakening itself). */
   playDream(first: boolean, sleep?: () => void, done?: () => void) {
     const g = this.game;
-    const fresh = new Set(g.s.dreamCards);
+    this.freshCards = new Set(g.s.dreamCards);
     const freshCount = g.s.dreamCards.length;
     this.hideTip();
     this.hooks.dreaming(true);
     playDream({
-      first, found: g.cardsFound(), cards: CARDS.map((c) => this.binderCard(c, fresh.has(c.id))), fresh: freshCount, sound: this.hooks.sound,
+      first, found: g.cardsFound(), fresh: freshCount, sound: this.hooks.sound,
+      binder: () => ({ cards: CARDS.map((c) => this.binderCard(c, this.freshCards.has(c.id))), found: g.cardsFound() }),
+      seen: () => this.freshCards.clear(),
+      hasNew: () => this.freshCards.size > 0,
+      trade: (who, host, closed) => this.openTrade(who, host, closed),
       cover: () => {
         g.wake();
         this.hooks.save();

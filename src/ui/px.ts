@@ -20,9 +20,51 @@ export function cardCanvas(card: CardDef, lap = 0): HTMLCanvasElement | null {
   return atlas ? portrait(atlas, card, lap) : null;
 }
 
+/** Characters made by recolouring another sprite: Victor is Daniel's sprite with brown hair and a blue shirt. */
+const VARIANTS: Record<string, { base: string; swap: Record<string, string> }> = {
+  victor: { base: 'ef_elf_m', swap: { '#facb3e': '#9a6a3a', '#ee8e2e': '#6a4024', '#c56025': '#3f6aa8', '#62232f': '#263a66' } },
+};
+const variants = new Map<string, { img: HTMLCanvasElement; frames: Rect[] }>();
+
+/** A variant's frames (`victor`, or `victor_run` for walking), recoloured onto their own little sheet. */
+function variantFrames(name: string) {
+  const run = name.endsWith('_run');
+  const v = VARIANTS[run ? name.slice(0, -4) : name];
+  if (!v || !atlas) return null;
+  const hit = variants.get(name);
+  if (hit) return hit;
+  const src = spriteFrames(run ? `${v.base}_run` : v.base);
+  if (!src) return null;
+  const img = document.createElement('canvas');
+  img.width = src.frames.reduce((w, f) => w + f.w, 0);
+  img.height = Math.max(...src.frames.map((f) => f.h));
+  const g = img.getContext('2d')!;
+  let x = 0;
+  const frames = src.frames.map((f) => {
+    g.drawImage(src.img, f.x, f.y, f.w, f.h, x, 0, f.w, f.h);
+    const r = { x, y: 0, w: f.w, h: f.h };
+    x += f.w;
+    return r;
+  });
+  const swap = new Map(Object.entries(v.swap).map(([from, to]) => [parseInt(from.slice(1), 16), parseInt(to.slice(1), 16)]));
+  const data = g.getImageData(0, 0, img.width, img.height);
+  for (let i = 0; i < data.data.length; i += 4) {
+    const to = swap.get((data.data[i] << 16) | (data.data[i + 1] << 8) | data.data[i + 2]);
+    if (to === undefined) continue;
+    data.data[i] = to >> 16;
+    data.data[i + 1] = (to >> 8) & 255;
+    data.data[i + 2] = to & 255;
+  }
+  g.putImageData(data, 0, 0);
+  const out = { img, frames };
+  variants.set(name, out);
+  return out;
+}
+
 /** A sprite's animation frames and the sprite sheet they're cut from, for drawing onto a canvas. */
 export function spriteFrames(name: string): { img: CanvasImageSource; frames: Rect[] } | null {
   if (!atlas) return null;
+  if (VARIANTS[name.replace(/_run$/, '')]) return variantFrames(name);
   for (const n of [`${name}_idle`, name]) {
     if (atlas.has(n)) return { img: atlas.texture.image as CanvasImageSource, frames: atlas.anim(n) };
   }
@@ -50,6 +92,17 @@ export function spriteFit(name: string, box: number, cls = ''): string {
 
 /** A character at a fixed on-screen height (fractional scale), so a roster of differently sized sprites lines up. */
 export function charFit(name: string, height: number, maxW = height * 1.2, cls = ''): string {
+  const v = VARIANTS[name] && variantFrames(name);
+  if (v) {
+    // A recoloured character lives on its own canvas: show its first frame as an image.
+    const f = v.frames[0];
+    const one = document.createElement('canvas');
+    one.width = f.w;
+    one.height = f.h;
+    one.getContext('2d')!.drawImage(v.img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+    const k = Math.min(height / f.h, maxW / f.w);
+    return `<img class="px ${cls}" src="${one.toDataURL()}" width="${Math.round(f.w * k)}" height="${Math.round(f.h * k)}" alt="">`;
+  }
   const full = rectFor(name);
   if (!full) return '';
   const r = atlas!.trimmed(full);

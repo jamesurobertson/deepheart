@@ -76,6 +76,9 @@ const CHAMP_BOSS_HP = 3;
 const CHAMP_BOSS_GOLD = 10;
 /** Card drops: 1 in this many kills (or catches). A 12-hour absence is ~170k kills, so ordinary cards sit at 0.001%;
  *  rainbow goblins are rare enough on their own to keep 1%, the best odds anything gets. */
+/** How many spares each brother wants for one card. */
+export const DANIEL_GIVES = 5;
+export const VICTOR_GIVES = 10;
 const CARD_ODDS = { monster: 100_000, boss: 25_000, champ: 10_000, champBoss: 1_000, goblin: 1_000, rainbow: 100 };
 /** Party damage is shown as numbers in batches this many seconds apart. */
 const DPS_SHOWN_EVERY = 0.35;
@@ -230,6 +233,8 @@ export interface SaveState {
   dreamSeen: boolean;
   /** Cards found since you last woke up, shown arriving in the binder next time. */
   dreamCards: string[];
+  /** Trades made with the brothers. */
+  trades: number;
   /** Bosses beaten in the last seconds, champions slain, Rainbow Vaults opened, highest Rampage tier reached. */
   clutches: number;
   champions: number;
@@ -262,7 +267,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
@@ -1800,6 +1805,61 @@ export class Game {
 
   cardsFound() {
     return CARDS.filter((c) => this.cardCount(c.id) > 0).length;
+  }
+
+  // ---------- trading with the brothers ----------
+
+  /** Plain copies beyond the first: the ones you can trade away (gold copies are never traded). */
+  spareCards(id: string) {
+    const c = this.s.cards[id];
+    return c ? Math.max(0, c.n.reduce((a, b) => a + b, 0) - 1) : 0;
+  }
+
+  /** The cards a trade can hand over: ones from zones you've reached (and their later-lap newcomers once you've been that deep). */
+  tradeable(zone?: number) {
+    return CARDS.filter((c) => c.kind !== 'goblin' && c.floor <= this.s.bestFloor && (zone === undefined || c.zone === zone));
+  }
+
+  /** Daniel: five spares from any sets for a random card from those same sets, each set as likely as its share of
+   *  what you gave (three Upper Halls and two Bone Crypts: 60% Upper Halls, 40% Bone Crypts). */
+  tradeWithDaniel(give: string[]) {
+    if (give.length !== DANIEL_GIVES || give.some((id) => (CARD_BY_ID.get(id)?.zone ?? -1) < 0)) return null;
+    const zone = CARD_BY_ID.get(give[Math.floor(Math.random() * give.length)])!.zone;
+    const pool = this.tradeable(zone);
+    if (!pool.length || !this.takeSpares(give)) return null;
+    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false);
+  }
+
+  /** Victor: ten spares from anywhere for a random gold card. */
+  tradeWithVictor(give: string[]) {
+    if (give.length !== VICTOR_GIVES || give.some((id) => CARD_BY_ID.get(id)?.kind === 'goblin')) return null;
+    const pool = this.tradeable().filter((c) => c.gold);
+    if (!pool.length || !this.takeSpares(give)) return null;
+    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, true);
+  }
+
+  /** Hand over these copies (an id twice means two copies), taken from whichever lap you have most of. */
+  private takeSpares(give: string[]) {
+    const want = new Map<string, number>();
+    for (const id of give) want.set(id, (want.get(id) ?? 0) + 1);
+    for (const [id, n] of want) if (this.spareCards(id) < n) return false;
+    for (const [id, n] of want) {
+      const c = this.s.cards[id];
+      for (let k = 0; k < n; k++) {
+        const lap = c.n.indexOf(Math.max(...c.n));
+        c.n[lap]--;
+      }
+    }
+    return true;
+  }
+
+  private receive(id: string, gold: boolean) {
+    const c = (this.s.cards[id] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
+    const first = gold ? !this.hasGoldCard(id) : !this.cardCount(id);
+    (gold ? c.gold : c.n)[0]++;
+    this.s.trades++;
+    this.checkTrophies();
+    return { id, gold, first };
   }
 
   goldCardsFound() {

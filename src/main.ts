@@ -1,8 +1,4 @@
 // Fonts ship with the game (no Google Fonts request), so it also works offline and in the desktop build.
-import '@fontsource/pixelify-sans/400.css';
-import '@fontsource/pixelify-sans/500.css';
-import '@fontsource/pixelify-sans/600.css';
-import '@fontsource/pixelify-sans/700.css';
 import '@fontsource/silkscreen/400.css';
 import '@fontsource/silkscreen/700.css';
 import '@fontsource/jersey-10/400.css';

@@ -6,6 +6,13 @@ import { spriteFrames } from './px.ts';
  */
 
 const PER_PAGE = 9;
+/** When new cards start landing after a spread opens, and how far apart. */
+const SLAM_FROM_MS = 420;
+const SLAM_GAP_MS = 260;
+/** The moment in the slam where the card hits the pocket. */
+const SLAM_HIT_MS = 250;
+
+type BinderSound = 'open' | 'close' | 'click' | 'card' | 'drop2';
 const PER_SPREAD = PER_PAGE * 2;
 
 export interface BinderCard {
@@ -40,13 +47,16 @@ export class Binder {
   private detail: number | null = null;
   private cards: BinderCard[];
   private onClose: () => void;
-  private sound: (name: 'open' | 'close' | 'click' | 'card') => void;
+  private sound: (name: BinderSound) => void;
+  /** New cards that have already slammed into their pockets (they keep their NEW tag until the binder closes). */
+  private landed = new Set<number>();
+  private timers: number[] = [];
 
-  constructor(host: HTMLElement, cards: BinderCard[], sound: (name: 'open' | 'close' | 'click' | 'card') => void, onClose: () => void) {
+  constructor(host: HTMLElement, cards: BinderCard[], sound: (name: BinderSound) => void, onClose: () => void) {
     this.cards = cards;
     this.sound = sound;
     this.onClose = onClose;
-    this.el.className = 'bd';
+    this.el.className = 'bnd';
     // Open on the first new card's spread, if any came in.
     const fresh = cards.findIndex((c) => c.fresh);
     this.spread = fresh >= 0 ? Math.floor(fresh / PER_SPREAD) : 0;
@@ -61,6 +71,7 @@ export class Binder {
   }
 
   close() {
+    for (const t of this.timers) clearTimeout(t);
     removeEventListener('keydown', this.onKey, true);
     this.el.remove();
     this.onClose();
@@ -127,21 +138,49 @@ export class Binder {
       const pockets = Array.from({ length: PER_PAGE }, (_, k) => {
         const i = start + k;
         const c = this.cards[i];
-        if (!c) return '<i class="bd-pocket none"></i>';
-        if (!c.got) return `<i class="bd-pocket"><small>${no(i)}</small></i>`;
-        return `<button class="bd-pocket got${c.gold ? ' gold' : ''}${c.fresh ? ' fresh' : ''}" data-bd="card" data-i="${i}" style="--fc:${c.color};--d:${k}" aria-label="${esc(c.name)}">${c.thumb}</button>`;
+        if (!c) return '<i class="bnd-pocket none"></i>';
+        if (!c.got) return `<i class="bnd-pocket"><small>${no(i)}</small></i>`;
+        const slam = c.fresh && !this.landed.has(i);
+        const cls = `bnd-pocket got${c.gold ? ' gold' : ''}${c.fresh ? ' fresh' : ''}${slam ? ' slam' : ''}`;
+        const style = `--fc:${c.color}${slam ? `;--wait:${this.slamAt(i)}ms` : ''}`;
+        return `<button class="${cls}" style="${style}" data-bd="card" data-i="${i}" aria-label="${esc(c.name)}">${c.thumb}${c.fresh ? '<em class="bnd-new">NEW</em>' : ''}</button>`;
       });
-      return `<div class="bd-page">${pockets.join('')}</div>`;
+      return `<div class="bnd-page">${pockets.join('')}</div>`;
     };
     const last = this.spreads - 1;
+    this.landNew(from);
     this.el.innerHTML = `
-      <div class="bd-spread">${page(from)}<div class="bd-rings"><i></i><i></i><i></i></div>${page(from + PER_PAGE)}</div>
-      <div class="bd-nav">
+      <div class="bnd-spread">${page(from)}<div class="bnd-rings"><i></i><i></i><i></i></div>${page(from + PER_PAGE)}</div>
+      <div class="bnd-nav">
         <button data-bd="prev" ${this.spread ? '' : 'disabled'} aria-label="Previous pages">◀</button>
         <span>${this.spread * 2 + 1}–${this.spread * 2 + 2} / ${last * 2 + 2}</span>
         <button data-bd="next" ${this.spread < last ? '' : 'disabled'} aria-label="Next pages">▶</button>
       </div>
-      <button class="bd-x" data-bd="close" aria-label="Close the binder">✕</button>`;
+      <button class="bnd-x" data-bd="close" aria-label="Close the binder">✕</button>`;
+  }
+
+  /** Where in the line of new cards on this spread a card lands. */
+  private slamAt(i: number) {
+    const from = this.spread * PER_SPREAD;
+    const queue = this.cards.slice(from, from + PER_SPREAD).map((c, k) => (c.fresh && !this.landed.has(from + k) ? from + k : -1)).filter((k) => k >= 0);
+    return SLAM_FROM_MS + queue.indexOf(i) * SLAM_GAP_MS;
+  }
+
+  /** New cards on this spread slam into their pockets one by one: a thud and a jolt of the page as each lands. */
+  private landNew(from: number) {
+    for (const t of this.timers) clearTimeout(t);
+    this.timers = [];
+    const queue = this.cards.slice(from, from + PER_SPREAD).map((c, k) => (c.fresh && !this.landed.has(from + k) ? from + k : -1)).filter((k) => k >= 0);
+    queue.forEach((i, n) => {
+      this.timers.push(window.setTimeout(() => {
+        this.landed.add(i);
+        this.sound('drop2');
+        const spread = this.el.querySelector<HTMLElement>('.bnd-spread');
+        spread?.classList.remove('thud');
+        void spread?.offsetWidth;
+        spread?.classList.add('thud');
+      }, SLAM_FROM_MS + n * SLAM_GAP_MS + SLAM_HIT_MS));
+    });
   }
 
   private renderCard(i: number) {
@@ -149,22 +188,22 @@ export class Binder {
     const laps = c.laps.map((l) => `<i class="${l.got ? 'on' : ''}" style="--lc:${l.color}"></i>`).join('');
     const where = c.where.length ? c.where.map((w) => `<li>${esc(w)}</li>`).join('') : '<li>Turns up anywhere</li>';
     this.el.innerHTML = `
-      <div class="bd-detail">
-        <div class="bd-card${c.gold ? ' gold' : ''}" style="--fc:${c.color}">
-          <b class="bd-name">${esc(c.name)}</b>
-          <canvas class="bd-art" width="64" height="48"></canvas>
-          <span class="bd-type">${esc(c.kind)}<em>${no(i)}</em></span>
+      <div class="bnd-detail">
+        <div class="bnd-card${c.gold ? ' gold' : ''}" style="--fc:${c.color}">
+          <b class="bnd-name">${esc(c.name)}</b>
+          <canvas class="bnd-art" width="64" height="48"></canvas>
+          <span class="bnd-type">${esc(c.kind)}<em>${no(i)}</em></span>
         </div>
-        <div class="bd-info">
-          <div><small>You have</small><p class="bd-count">×${c.copies}${c.goldCopies ? ` <span>· ${c.goldCopies} gold</span>` : ''}</p></div>
-          <div><small>Colours ${c.laps.filter((l) => l.got).length}/${c.laps.length}</small><div class="bd-laps">${laps}</div></div>
+        <div class="bnd-info">
+          <div><small>You have</small><p class="bnd-count">×${c.copies}${c.goldCopies ? ` <span>· ${c.goldCopies} gold</span>` : ''}</p></div>
+          <div><small>Colours ${c.laps.filter((l) => l.got).length}/${c.laps.length}</small><div class="bnd-laps">${laps}</div></div>
           <div><small>Lives in</small><ul>${where}</ul></div>
-          ${c.firstKill ? `<p class="bd-first">First found on kill #${c.firstKill.toLocaleString()}</p>` : ''}
+          ${c.firstKill ? `<p class="bnd-first">First found on kill #${c.firstKill.toLocaleString()}</p>` : ''}
         </div>
       </div>
-      <div class="bd-nav">
+      <div class="bnd-nav">
         <button data-bd="cprev" aria-label="Previous card">◀</button>
-        <button data-bd="back" class="bd-back">Back to binder</button>
+        <button data-bd="back" class="bnd-back">Back to binder</button>
         <button data-bd="cnext" aria-label="Next card">▶</button>
       </div>`;
     this.paint(this.el.querySelector('canvas')!, c);

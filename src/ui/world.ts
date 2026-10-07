@@ -188,6 +188,10 @@ export function blanket(ctx: Ctx) {
   px(ctx, 17, 46, 1, 32, C.ink);
   px(ctx, 46, 46, 1, 32, C.ink);
 }
+/** The brothers' game on the rug, between them: each one's deck, the card each has laid out, and the pile they play
+ *  onto (top-left corners of 5×7 cards). */
+export const BROS_GAME = { danielDeck: [78, 84], victorDeck: [93, 84], danielLaid: [79, 94], victorLaid: [92, 94], pile: [85, 87] };
+
 /** Where the kid sits up in bed (feet hidden by the blanket), and where cards land on it. */
 export const BED_KID = { cx: 32, bottom: 54 };
 export const CARD_SPOTS = [[20, 54], [27, 52], [34, 55], [40, 53], [22, 62], [29, 60], [37, 63], [20, 69], [27, 67], [35, 70], [41, 66], [30, 72]];
@@ -202,9 +206,14 @@ const bedroom: MapDef = {
     { x: 3, y: 1, w: 2, use: { id: 'window', label: 'Window' } },
     { x: 0, y: 7, use: { id: 'toys', label: 'Toy box' } },
     { x: 9, y: 5 },
+    { x: 5, y: 5, use: { id: 'brosGame', label: 'Their game' } },
   ],
   warps: [{ x: 9, y: 7, to: 'house', tx: 8, ty: 2, dir: 'left' }],
-  npcs: [],
+  // The older brothers, on the rug, facing each other over a game of cards.
+  npcs: [
+    { id: 'daniel', name: 'Daniel', sprite: 'ef_elf_m', x: 4, y: 5, dir: 'right' },
+    { id: 'victor', name: 'Victor', sprite: 'victor', x: 6, y: 5, dir: 'left' },
+  ],
   draw(ctx) {
     wallpaper(ctx, 10, 2);
     boards(ctx, 10, 9, 32);

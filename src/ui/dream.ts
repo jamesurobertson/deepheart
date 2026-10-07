@@ -1,7 +1,7 @@
 import type { SfxName } from '../audio/sfx.ts';
 import { Binder, type BinderCard } from './binder.ts';
 import { G, spriteFrames } from './px.ts';
-import { BED_KID, CARD_SPOTS, MAPS, STEP, T, blanket, blocked, drawSprite, propAt, px, type Dir, type MapDef, type MapId, type NpcDef } from './world.ts';
+import { BED_KID, BROS_GAME, CARD_SPOTS, MAPS, STEP, T, blanket, blocked, drawSprite, propAt, px, type Dir, type MapDef, type MapId, type NpcDef } from './world.ts';
 
 /**
  * Waking up: the dungeon was the kid's dream, and the cards are real. A handheld-sized world (160×144) you can walk
@@ -28,10 +28,17 @@ export interface DreamOpts {
   /** The whole reveal (first awakening) or a short wake-up. */
   first: boolean;
   found: number;
-  cards: BinderCard[];
+  /** The binder as it is right now (trades add cards while you're awake). */
+  binder: () => { cards: BinderCard[]; found: number };
+  /** You've looked through the binder: nothing's new any more. */
+  seen: () => void;
+  /** Are there cards in the binder you haven't looked at yet? */
+  hasNew: () => boolean;
   /** Cards found since the last time you woke. */
   fresh: number;
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
+  /** Talking to a brother opens his trade window over the screen. */
+  trade: (who: 'daniel' | 'victor', host: HTMLElement, closed: () => void) => void;
   /** Runs once the screen is black on the way in. */
   cover?: () => void;
   /** Runs once the screen is black on the way back down: the awakening itself. */
@@ -58,6 +65,7 @@ function linesFor(id: string, o: DreamOpts): string[] {
     mailbox: ['Nothing today.'],
     sign: ['BRAMBLEFORD'],
     pond: ['Something glints at the bottom. Probably a coin.'],
+    brosGame: ["Daniel and Victor's game. Victor is winning. Obviously."],
   };
   return lines[id] ?? [];
 }
@@ -116,6 +124,9 @@ class Dream {
   private typing: number | null = null;
   private squireData: ImageData | null = null;
   private binder: Binder | null = null;
+  /** Awake but still in bed, waiting for you to get up. */
+  private lazing = false;
+  private trading = false;
   private finished = false;
 
   constructor(o: DreamOpts) {
@@ -157,6 +168,7 @@ class Dream {
     this.canvas.addEventListener('pointerleave', () => (this.hover = null));
     this.prompt.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (this.lazing) return this.getUp();
       const t = this.promptTarget();
       if (t) this.goUse(t);
     });
@@ -172,8 +184,9 @@ class Dream {
     if (this.o.first) await this.reveal();
     else await this.wake();
     if (this.finished) return;
-    await this.openBinder();
-    this.getUp();
+    // The kid stays in bed until you move (a key, a click or a tap gets them up).
+    this.box.hidden = true;
+    this.lazing = true;
   }
 
   // ---------- the story ----------
@@ -204,6 +217,7 @@ class Dream {
 
   private getUp() {
     if (this.finished) return;
+    this.lazing = false;
     this.inBed = false;
     this.kid = { x: GET_UP.x, y: GET_UP.y, dir: GET_UP.dir, left: false, move: null };
     this.box.hidden = true;
@@ -215,15 +229,14 @@ class Dream {
   private openBinder() {
     this.busy = true;
     this.o.sound('open', { vol: 0.6 });
-    if (this.o.cards.some((c) => c.fresh)) setTimeout(() => this.o.sound('card', { vol: 0.5 }), 500);
-    void this.say(`Your binder has ${this.o.cards.length} slots. You've filled ${this.o.found}.`, true);
+    const { cards, found } = this.o.binder();
+    void this.say(`Your binder has ${cards.length} slots. You've filled ${found}.`, true);
     return new Promise<void>((resolve) => {
-      this.binder = new Binder(this.screen, this.o.cards, (n) => this.o.sound(n, { vol: n === 'click' ? 0.3 : 0.5 }), () => {
+      this.binder = new Binder(this.screen, cards, (n) => this.o.sound(n, { vol: n === 'click' ? 0.3 : n === 'drop2' ? 0.7 : 0.5 }), () => {
         this.binder = null;
         this.box.hidden = true;
         this.o.sound('close', { vol: 0.5 });
-        // Pages you've seen aren't new any more.
-        for (const c of this.o.cards) c.fresh = false;
+        this.o.seen();
         this.busy = !this.roaming;
         resolve();
       });
@@ -355,7 +368,17 @@ class Dream {
       n.dir = this.kid.x < n.x ? 'left' : this.kid.x > n.x ? 'right' : this.kid.y < n.y ? 'up' : 'down';
       if (n.dir === 'left' || n.dir === 'right') n.left = n.dir === 'left';
       n.nextAt = performance.now() / 1000 + 4;
-      return this.talk(linesFor(n.def.id, this.o));
+      if (n.def.id === 'daniel' || n.def.id === 'victor') {
+        this.busy = true;
+        this.trading = true;
+        return this.o.trade(n.def.id, this.el, () => {
+          this.trading = false;
+          this.busy = false;
+          this.faceBack(n);
+        });
+      }
+      await this.talk(linesFor(n.def.id, this.o));
+      return this.faceBack(n);
     }
     if (t.id === 'bed') {
       this.busy = true;
@@ -367,6 +390,13 @@ class Dream {
     if (t.id === 'binder') return void this.openBinder();
     this.o.sound('click', { vol: 0.25 });
     return this.talk(linesFor(t.id, this.o));
+  }
+
+  /** Back to what they were doing (the brothers to their game) once you're done with them. */
+  private faceBack(n: Npc) {
+    if (n.def.roam) return;
+    n.dir = n.def.dir;
+    n.left = n.def.dir === 'left';
   }
 
   /** Walk up to something (if you're not next to it already), face it and use it. */
@@ -398,7 +428,7 @@ class Dream {
 
   private targetAt(x: number, y: number): Target | null {
     const npc = this.npcs.find((n) => n.x === x && n.y === y);
-    if (npc) return { kind: 'npc', npc, label: `Talk to ${npc.def.name}` };
+    if (npc) return { kind: 'npc', npc, label: npc.def.id === 'daniel' || npc.def.id === 'victor' ? `Trade with ${npc.def.name}` : `Talk to ${npc.def.name}` };
     const p = propAt(this.map, x, y);
     if (p?.use) return { kind: 'prop', id: p.use.id, label: p.use.label, x: p.x, y: p.y, w: p.w ?? 1, h: p.h ?? 1 };
     return null;
@@ -574,12 +604,14 @@ class Dream {
   };
 
   private onTap = (e: PointerEvent) => {
-    if ((e.target as HTMLElement).closest('button, .bd, .dr-menu')) return;
+    if ((e.target as HTMLElement).closest('button, .bnd, .dr-menu, .tm-wrap')) return;
     if (this.advance) {
       const go = this.advance;
       this.advance = null;
       return go();
     }
+    // The first click gets the kid out of bed (and on to wherever you clicked).
+    if (this.lazing) this.getUp();
     if (!this.roaming || this.busy || e.target !== this.canvas) return;
     const [x, y] = this.tileAt(e);
     const t = this.targetAt(x, y);
@@ -592,7 +624,7 @@ class Dream {
   };
 
   private onKey = (e: KeyboardEvent) => {
-    if (this.binder) return;
+    if (this.binder || this.trading) return;
     const dir = KEY_DIRS[e.key.toLowerCase()];
     const ok = e.key === ' ' || e.key === 'Enter' || e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 'z';
     if (!dir && !ok) return;
@@ -602,6 +634,7 @@ class Dream {
       else if (dir === 'up' || dir === 'down') this.choose(dir === 'up' ? -1 : 1);
       return;
     }
+    if (this.lazing) this.getUp();
     if (dir) {
       if (!this.held.includes(dir)) this.held.push(dir);
       return;
@@ -672,6 +705,7 @@ class Dream {
     ctx.save();
     ctx.translate(-cam.x, -cam.y);
     if (this.map.id === 'bedroom') {
+      this.drawBrosGame(ctx);
       if (this.inBed) drawSprite(ctx, KID, t, BED_KID.cx, BED_KID.bottom);
       blanket(ctx);
       for (let k = 0; k < this.cardsShown; k++) {
@@ -679,6 +713,14 @@ class Dream {
         px(ctx, x, y, 5, 7, '#241a2a');
         px(ctx, x + 1, y + 1, 3, 5, '#fff');
         px(ctx, x + 1, y + 2, 3, 2, CARD_INKS[k % CARD_INKS.length]);
+      }
+      // A "!" over the binder on the desk while it has cards you haven't seen.
+      if (this.roaming && this.o.hasNew()) {
+        const bob = Math.floor(t * 3) % 2;
+        px(ctx, 88, 7 - bob, 7, 10, '#241a2a');
+        px(ctx, 89, 8 - bob, 5, 8, '#ff5a7e');
+        px(ctx, 91, 9 - bob, 1, 4, '#fff');
+        px(ctx, 91, 14 - bob, 1, 1, '#fff');
       }
       // Z z: the bed's waiting for you.
       if (!this.inBed && this.roaming) {
@@ -706,8 +748,38 @@ class Dream {
     ctx.restore();
   }
 
+  /** The brothers' card game on the rug: a deck by each of them, a card each laid out, and the pile between. */
+  private drawBrosGame(ctx: CanvasRenderingContext2D) {
+    const card = (x: number, y: number, face: string | null) => {
+      px(ctx, x, y, 5, 7, '#241a2a');
+      if (face) {
+        px(ctx, x + 1, y + 1, 3, 5, '#fff');
+        px(ctx, x + 1, y + 2, 3, 2, face);
+      } else {
+        px(ctx, x + 1, y + 1, 3, 5, '#3a2850');
+        px(ctx, x + 2, y + 3, 1, 1, '#ff5a7e');
+      }
+    };
+    const g = BROS_GAME;
+    for (const [x, y] of [g.danielDeck, g.victorDeck]) {
+      card(x + 1, y + 1, null);
+      card(x, y, null);
+    }
+    card(g.danielLaid[0], g.danielLaid[1], CARD_INKS[1]);
+    card(g.victorLaid[0], g.victorLaid[1], CARD_INKS[4]);
+    card(g.pile[0] + 1, g.pile[1] + 1, CARD_INKS[2]);
+    card(g.pile[0], g.pile[1], CARD_INKS[0]);
+  }
+
   /** The "▶ Go back to sleep" bubble over whatever you could use. */
   private placePrompt() {
+    if (this.lazing) {
+      this.prompt.hidden = false;
+      if (this.prompt.textContent !== '▶ Get up') this.prompt.textContent = '▶ Get up';
+      this.prompt.style.setProperty('--px', `${BED_KID.cx}`);
+      this.prompt.style.setProperty('--py', '26');
+      return;
+    }
     const t = this.promptTarget();
     if (!t) {
       this.prompt.hidden = true;
