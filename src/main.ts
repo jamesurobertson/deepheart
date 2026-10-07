@@ -343,7 +343,7 @@ function playSound(sfx: Sfx, ev: GameEvent) {
       break;
     case 'raidEscape': sfx.play('close', { vol: 0.5, rate: 0.8 }); break;
     case 'fever': if (ev.on) sfx.play('awaken', { vol: 0.8 }); break;
-    case 'abyss': sfx.play('awaken', { vol: 0.6 }); break;
+    case 'offer': sfx.play('awaken', { vol: 0.6 }); break;
     case 'heart': sfx.play('awaken', { vol: 0.6, rate: 0.8 }); break;
     case 'split': sfx.play('bosskill', { vol: 0.6, rate: 1.3 }); break;
   }

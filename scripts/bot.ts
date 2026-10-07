@@ -13,7 +13,7 @@ export interface Profile {
   activeMin: number;
   /** Descend once stalled if the souls on offer are at least this share of the souls already held. */
   descendRatio: number;
-  /** Or, when set: descend once stalled if it adds at least this much damage (what the descend panel shows). */
+  /** Or, when set: descend once stalled if it grows the souls held by at least this share (1 soul counts from zero). */
   descendGain?: number;
   /** Awaken once stalled if the heartstones on offer are at least this share of all heartstones earned. */
   awakenRatio: number;
@@ -55,6 +55,9 @@ const DAMAGE_EFFECTS = new Set(['comp', 'global', 'syn', 'click', 'clickDps', 't
 const SHOP_RECHECK = 10;
 
 /** A player's rough relic preference: raw power first, then the answers to boss modifiers. */
+/** A player's rough offer preference: damage first, then whatever speeds a run up. */
+const OFFER_PICK = ['heart', 'warcry', 'banner', 'slayer', 'veterans', 'purse', 'whet', 'oath', 'tithe', 'skip', 'glass', 'bane', 'bargain', 'hands', 'rage', 'pulse', 'champ', 'lure', 'snare', 'mimic'];
+
 const RELIC_PICK = ['shard', 'oath', 'banner', 'slayer', 'whet', 'glass', 'hilt', 'pick', 'rot', 'drum', 'razor', 'hawk', 'cleaver', 'cage', 'purse', 'bait'];
 
 export class Sim {
@@ -105,11 +108,10 @@ export class Sim {
     this.shop();
   }
 
-  /** Damage a descent right now would add, as a fraction. */
+  /** How much a descent right now would grow the souls held, as a fraction. */
   descentGain() {
     const { game } = this;
-    const power = game.soulPower();
-    return (power * game.pendingSouls()) / (1 + power * game.s.souls);
+    return game.pendingSouls() / Math.max(1, game.s.souls);
   }
 
   get stalled() {
@@ -174,12 +176,9 @@ export class Sim {
       this.hooks.descend?.(souls, this);
       game.descend(this.pickCurse());
       this.afterReset();
-      for (;;) {
-        const a = game.abyssList().filter((x) => game.abyssAvailable(x.id)).sort((x, y) => game.abyssCost(x.id) - game.abyssCost(y.id))[0];
-        if (!a || !game.buyAbyss(a.id)) break;
-      }
+      this.buyOffers();
     }
-    if (stalled && game.canAwaken() && game.pendingStones() >= Math.max(3, this.totalStones() * profile.awakenRatio)) {
+    if (stalled && game.canAwaken() && game.pendingStones() >= Math.max(1, this.totalStones() * profile.awakenRatio)) {
       const stones = game.pendingStones();
       this.awakens++;
       this.hooks.awaken?.(stones, this);
@@ -304,6 +303,20 @@ export class Sim {
         bought = game.buyComp(i, n) || game.buyComp(i, 1) || bought;
       }
       if (!bought) return;
+    }
+  }
+
+  /** Buy from the hand, best first by a player's rough preference, until nothing affordable is left. Never redraws. */
+  private buyOffers() {
+    const { game } = this;
+    const rank = (id: string) => {
+      const k = OFFER_PICK.indexOf(id);
+      return k < 0 ? OFFER_PICK.length : k;
+    };
+    for (;;) {
+      const slots = game.s.hand.map((id, slot) => ({ id, slot })).filter(({ id }) => game.soulsFree() >= game.offerCost(id));
+      slots.sort((a, b) => rank(a.id) - rank(b.id));
+      if (!slots.length || !game.buyOffer(slots[0].slot)) break;
     }
   }
 

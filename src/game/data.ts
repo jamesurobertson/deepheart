@@ -1,6 +1,6 @@
 /**
  * Everything the game is made of: companions (who fight for you), the monster roster,
- * upgrades, trophies, abyss (prestige) powers and flavor text. Pure data plus builders.
+ * upgrades, trophies, offers (prestige) and flavor text. Pure data plus builders.
  */
 
 /** A picture for the UI: a sprite from the dungeon sheet, optionally with a badge. */
@@ -520,46 +520,67 @@ export const isTraitId = (id: string) => {
 };
 export const UPG_BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));
 
-// ---------- abyss (prestige) ----------
+// ---------- offers (prestige) ----------
 
-/** An Abyss power: bought with souls, again and again (up to `max`), each level dearer than the last. */
-export interface AbyssDef {
+/** An offer: dealt into your hand after ascending and bought with souls. Bought levels last until you awaken. */
+export interface OfferDef {
   id: string;
   name: string;
   icon: string;
+  /** Souls per level. */
+  cost: number;
   max: number;
-  cost: (lv: number) => number;
+  /** How often it's dealt, against the others. */
+  weight: number;
   /** What it does at this many levels. */
   desc: (lv: number) => string;
 }
 
-const grow = (base: number, rate: number) => (lv: number) => Math.ceil(base * rate ** lv);
+const COMMON = 10;
+const UNCOMMON = 5;
+const RARE = 2;
 
-export const ABYSS: AbyssDef[] = [
-  { id: 'pulse', name: 'Restless Dead', icon: 'skull', max: 5, cost: grow(5, 2), desc: (l) => `While you're away your party fights at ${25 + 15 * l}% speed.` },
-  { id: 'twin', name: 'Twin Blades', icon: 'weapon_duel_sword', max: Infinity, cost: grow(10, 1.8), desc: (l) => `Your clicks deal ×${1 + l} damage.` },
-  { id: 'hands', name: 'Phantom Fury', icon: 'weapon_knife', max: Infinity, cost: grow(25, 1.8), desc: (l) => `Your Phantom Blade attacks ${l} more time${l === 1 ? '' : 's'} a second.` },
-  { id: 'lure', name: 'Scent of Gold', icon: 'coin', max: 10, cost: grow(40, 1.6), desc: (l) => `Treasure goblins show up ${10 * l}% more often.` },
-  { id: 'bargain', name: 'Dark Bargain', icon: 'flask_big_red', max: 10, cost: grow(60, 1.8), desc: (l) => `Upgrades cost ${Math.round((1 - 0.95 ** l) * 100)}% less.` },
-  { id: 'tithe', name: 'Mercenary Guild', icon: 'coin', max: 10, cost: grow(100, 1.8), desc: (l) => `Companions cost ${Math.round((1 - 0.97 ** l) * 100)}% less.` },
-  { id: 'dreams', name: 'Endless Rage', icon: 'flask_big_yellow', max: 10, cost: grow(150, 1.7), desc: (l) => `Rampage fills and lasts ${15 * l}% longer.` },
-  { id: 'skip', name: 'Deep Stairs', icon: 'floor_stairs', max: 10, cost: grow(200, 2), desc: (l) => `Start each descent on floor ${1 + 5 * l}.` },
-  { id: 'mimic', name: 'Mimic Chests', icon: 'chest_mimic_open', max: 1, cost: () => 400, desc: () => 'Treasure can hold a Soul Storm: damage ×666 for 6 seconds.' },
-  { id: 'patience', name: 'Patient Hunter', icon: 'ogre', max: 10, cost: grow(500, 1.7), desc: (l) => `Bosses give you ${3 * l} more seconds.` },
-  { id: 'roots', name: 'Deep Roots', icon: 'flask_big_green', max: 10, cost: grow(700, 1.9), desc: (l) => `Each soul gives +${(SOUL_POWER * 100 + 0.2 * l).toFixed(1)}% damage.` },
+/** Cards dealt into the hand, and what a redraw costs. */
+export const HAND_SIZE = 4;
+export const REDRAW_COST = 1;
+
+const o = (id: string, name: string, icon: string, cost: number, max: number, weight: number, desc: (lv: number) => string): OfferDef =>
+  ({ id, name, icon, cost, max, weight, desc });
+
+/** About ×2 damage a soul for the damage offers, so a hand that mixes in the others still averages near the pacing
+ *  model's ×1.5 a soul (awakening around floor 100 after ~6 ascents). */
+export const OFFERS: OfferDef[] = [
+  o('banner', 'War Banner', 'wall_banner_red', 1, Infinity, 2 * COMMON, (l) => `Companions deal ×${fmtBig(1.6 ** l)} damage.`),
+  o('whet', 'Whetstone', 'weapon_knife', 1, Infinity, COMMON, (l) => `Clicks deal ×${fmtBig(5 ** l)} damage.`),
+  o('slayer', 'Giantslayer', 'weapon_spear', 1, Infinity, COMMON, (l) => `×${fmtBig(2.5 ** l)} damage to bosses.`),
+  o('purse', 'Fat Purses', 'coin', 1, Infinity, COMMON, (l) => `Monsters drop ×${fmtBig(2 ** l)} gold.`),
+  o('hands', 'Phantom Fury', 'weapon_katana', 1, 10, COMMON, (l) => `Phantom Blade attacks +${l}/s.`),
+  o('glass', 'Sandglass', 'flask_yellow', 1, 4, COMMON, (l) => `Bosses give you ${5 * l} more seconds.`),
+  o('warcry', 'War Cry', 'weapon_red_gem_sword', 2, Infinity, UNCOMMON, (l) => `Companions deal ×${fmtBig(4 ** l)} damage.`),
+  o('oath', 'Oathkeeper', 'weapon_golden_sword', 1, 5, UNCOMMON, (l) => `Clicks also deal ${10 * l}% of your party's damage.`),
+  o('tithe', 'Mercenary Guild', 'flask_big_blue', 1, 5, UNCOMMON, (l) => `Companions cost ${Math.round((1 - 0.8 ** l) * 100)}% less.`),
+  o('bargain', 'Dark Bargain', 'flask_big_red', 1, 3, UNCOMMON, (l) => `Upgrades cost ${Math.round((1 - 0.6 ** l) * 100)}% less.`),
+  o('skip', 'Deep Stairs', 'floor_stairs', 1, 6, UNCOMMON, (l) => `Start each descent on floor ${1 + 5 * l}.`),
+  o('veterans', 'Veterans', 'knight_m', 1, 1, UNCOMMON, () => 'Squire, Ranger and Dwarf Brawler start each descent at level 25.'),
+  o('bane', "Warden's Bane", 'weapon_big_hammer', 1, 3, UNCOMMON, (l) => `Boss modifiers are ${25 * l}% weaker.`),
+  o('rage', 'Endless Rage', 'flask_big_yellow', 1, 3, UNCOMMON, (l) => `Rampage fills and lasts ${30 * l}% longer.`),
+  o('pulse', 'Restless Dead', 'skull', 1, 3, UNCOMMON, (l) => `While you're away your party fights at ${25 + 25 * l}% speed.`),
+  o('lure', 'Golden Bait', 'chest_full_open', 1, 3, UNCOMMON, (l) => `Treasure goblins show up ${50 * l}% more often.`),
+  o('snare', 'Goblin Snare', 'chest_mimic_open', 1, 1, UNCOMMON, () => 'Treasure goblins sometimes get caught without you.'),
+  o('heart', 'Beating Heart', 'ui_heart_full', 3, Infinity, RARE, (l) => `All damage ×${fmtBig(8 ** l)}.`),
+  o('mimic', 'Mimic Chests', 'chest_mimic_open', 1, 1, RARE, () => 'Treasure can hold a Soul Storm: damage ×666 for 6 seconds.'),
+  o('champ', "Champion's Bounty", 'weapon_bow_2', 1, 3, RARE, (l) => `Champions show up ×${1 + l} as often.`),
 ];
-export const ABYSS_BY_ID = new Map(ABYSS.map((a) => [a.id, a]));
+export const OFFER_BY_ID = new Map(OFFERS.map((x) => [x.id, x]));
+/** Every hand holds at least one of these, so a run can always get stronger. */
+export const DAMAGE_OFFERS = new Set(['banner', 'warcry', 'heart', 'slayer']);
 
-// ---------- ascend milestones ----------
-
-/** Rewards for how many times you've ascended (never lost: the count only goes up). */
-export const ASCEND_MILESTONES = [
-  { at: 3, id: 'veterans', name: 'Veterans', desc: 'The Squire, Ranger and Dwarf Brawler start every descent at level 25.' },
-  { at: 5, id: 'buyall', name: 'Buy all', desc: 'A button that buys every upgrade you can afford.' },
-  { at: 10, id: 'quartermaster', name: 'Quartermaster', desc: "Upgrades you've bought before buy themselves again as soon as you can afford them." },
-  { at: 20, id: 'snare', name: 'Goblin snare', desc: 'Treasure goblins sometimes get caught without you.' },
+/** Rewards for awakening: the first layer, automated. */
+export const AWAKEN_MILESTONES = [
+  { at: 1, id: 'buyall', name: 'Buy all', desc: 'A button that buys every upgrade you can afford.' },
+  { at: 2, id: 'quartermaster', name: 'Quartermaster', desc: "Upgrades you've bought before buy themselves again as soon as you can afford them." },
 ] as const;
-export type MilestoneId = (typeof ASCEND_MILESTONES)[number]['id'];
+export type MilestoneId = (typeof AWAKEN_MILESTONES)[number]['id'];
 
 // ---------- cursed descents ----------
 
@@ -700,7 +721,7 @@ const fmtN = (n: number) => (Math.round(n * 100) / 100).toString();
 // ---------- the heart (second prestige) ----------
 
 /** Awakening needs this deepest floor. */
-export const AWAKEN_FLOOR = 170;
+export const AWAKEN_FLOOR = 100;
 /** A boss beaten with this many seconds or fewer left is a clutch kill. */
 export const CLUTCH_SECONDS = 3;
 
@@ -714,19 +735,12 @@ export interface HeartDef {
   desc: (lv: number) => string;
 }
 
-/** Damage each soul adds (Deep Roots adds 0.2% a level). */
-export const SOUL_POWER = 0.01;
-
 /** Heart of Fury's damage multiplier per level. */
 export const FURY = 1.5;
 
 export const HEART: HeartDef[] = [
   { id: 'fury', name: 'Heart of Fury', icon: 'ui_heart_full', max: Infinity, cost: (l) => 2 ** l, desc: (l) => `All damage ×${FURY} per level (now ×${fmtBig(FURY ** l)}).` },
   { id: 'siphon', name: 'Soul Siphon', icon: 'skull', max: Infinity, cost: (l) => Math.ceil(3 * 1.6 ** l), desc: (l) => `Ascending earns +100% souls per level (now +${l * 100}%).` },
-  { id: 'hoard', name: 'Relic Hoard', icon: 'chest_full_open', max: 2, cost: (l) => [5, 25][l], desc: (l) => `One more relic slot (${3 + l} now).` },
-  { id: 'hunter', name: 'Relic Hunter', icon: 'weapon_bow_2', max: 4, cost: (l) => [3, 8, 20, 50][l], desc: (l) => `Bosses drop relics 50% more often per level (now +${l * 50}%).` },
-  { id: 'bane', name: 'Warden\'s Bane', icon: 'weapon_red_gem_sword', max: 3, cost: (l) => [4, 15, 60][l], desc: (l) => `Boss modifiers are 25% weaker per level (now ${l * 25}%).` },
-  { id: 'echo', name: 'Echoing Abyss', icon: 'flask_big_blue', max: 1, cost: () => 6, desc: () => 'Keep the first level of every Abyss power when you awaken.' },
 ];
 export const HEART_BY_ID = new Map(HEART.map((h) => [h.id, h]));
 

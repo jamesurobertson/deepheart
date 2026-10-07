@@ -1,6 +1,6 @@
 import Decimal from 'break_infinity.js';
 import {
-  ABYSS, ABYSS_BY_ID, CARD_BY_ID, ASCEND_MILESTONES, COST_GROWTH, FURY, SOUL_POWER, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor, pickMonster,
+  OFFERS, OFFER_BY_ID, DAMAGE_OFFERS, HAND_SIZE, REDRAW_COST, CARD_BY_ID, AWAKEN_MILESTONES, COST_GROWTH, FURY, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor, pickMonster,
   CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
   type AbilityId, type MilestoneId,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
@@ -109,23 +109,23 @@ const VAULT_RAINBOW_GOBLIN_CHESTS = 6;
 const BASE_CRIT = 0.03;
 const BASE_CRIT_MULT = 2;
 const OFFLINE_CAP = 72 * 3600;
+/** Relics and cursed descents are set aside while the prestige layers are reworked (their code stays). */
+export const RELICS_ON = false;
+export const CURSES_ON = false;
 /** The way up first opens at this floor's boss. */
 export const DESCEND_FLOOR = 30;
 /**
  * Pacing knobs, in one place (the balance tools override them to search for good values).
- * - Souls (Part III of the idle-maths series, "lifetime" style): all the souls you've earned since your last awakening
- *   come to (gold earned since then / `soulGold`)^`soulExp` (a little gentler than a cube root), times the soul-gain
- *   bonuses. An ascent pays what's new, so about 12× the gold doubles your souls, and going deeper always pays, the same
- *   depth again only a little. Tuned so the first wall (the floor-30 boss) is worth ascending at.
+ * - Souls: all the souls you've earned since your last awakening come to the digits of the gold earned since then, less
+ *   `soulDigits` (a log, since gold grows exponentially with depth: about one soul per five floors), times the
+ *   soul-gain bonuses. An ascent pays what's new; the same depth again pays only a trickle.
  * - Heartstones the same way, a level up: (every soul ever earned / `stoneSouls`)^`stoneExp` in all; an awakening pays what's new.
  * - Heart of Fury multiplies all damage by `fury` per level. Zone bosses have `zoneBoss`× the health of mid-bosses.
  * - Up to floor 140 each floor has about `hpBase`× the health of the last, past it `deepHp`×; a monster is worth
- *   1/`goldDiv` of its health in gold. Each soul gives +`soulPower` damage. `abyssGrowth` steepens every Abyss power's
- *   cost curve (1 = as listed in data.ts).
- * - Each awakening needs `awakenStep` more floors than the last; `heartGrowth` steepens Heart power costs like
- *   `abyssGrowth` does Abyss ones.
+ *   1/`goldDiv` of its health in gold.
+ * - Each awakening needs `awakenStep` more floors than the last; `heartGrowth` steepens Heart power costs.
  */
-export const TUNE = { hpBase: 1.55, goldDiv: 15, soulGold: 120, soulExp: 0.28, soulPower: SOUL_POWER, abyssGrowth: 4, stoneSouls: 8, stoneExp: 0.37, fury: FURY, deepHp: 1.55, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
+export const TUNE = { hpBase: 1.55, goldDiv: 15, soulDigits: 5.5, stoneSouls: 1, stoneExp: 0.37, fury: FURY, deepHp: 1.55, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
 
 export interface Buff {
   id: RaidReward | 'fever' | AbilityId;
@@ -180,9 +180,11 @@ export interface SaveState {
   cooldowns: Record<string, number>;
   /** Abilities ever unlocked (they stay if ABILITIES_KEEP). */
   abilitiesFound: string[];
-  /** Levels of each Abyss power. */
-  abyssLv: Record<string, number>;
-  /** Gold earned since the last awakening: souls are its cube root. */
+  /** Levels of each offer bought (until the next awakening). */
+  offers: Record<string, number>;
+  /** Offer ids dealt and waiting to be bought. */
+  hand: string[];
+  /** Gold earned since the last awakening: souls come from its digits. */
   cycleGold: Decimal;
   /** Souls earned in earlier awakening cycles: heartstones are the cube root of all souls ever. */
   soulsLifetime: number;
@@ -266,7 +268,7 @@ export interface SaveState {
 export function newSave(): SaveState {
   return {
     v: SAVE_VERSION, gold: new Decimal(0), runGold: new Decimal(0), totalGold: new Decimal(0), kills: 0, bosses: 0, clicks: 0, crits: 0,
-    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], abyssLv: {}, cycleGold: new Decimal(0), soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
+    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], offers: {}, hand: [], cycleGold: new Decimal(0), soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
@@ -336,7 +338,7 @@ export type GameEvent =
   | { t: 'raidEscape'; id: number }
   | { t: 'fever'; on: boolean }
   | { t: 'descend'; souls: number }
-  | { t: 'abyss'; id: string; lv: number }
+  | { t: 'offer'; id: string; lv: number }
   | { t: 'curse'; id: string; tier: number }
   | { t: 'relic'; id: string; lv: number; floor: number; equipped: boolean; star: number }
   | { t: 'split'; id: number; into: [number, number] }
@@ -356,9 +358,11 @@ export interface Parts {
   blades: number;
   upgrades: number;
   trophies: number;
-  souls: number;
+  /** Offers: Beating Heart (all damage), War Banner and War Cry (companions), Fat Purses (gold). */
+  heart: number;
   shard: number;
   fury: Decimal;
+  party: number;
   banner: number;
   clickDps: number;
   clickDpsUpg: number;
@@ -373,6 +377,7 @@ export interface Parts {
   cleaveRelic: number;
   goldUpg: number;
   goldRelic: number;
+  purse: number;
 }
 
 interface Computed {
@@ -536,21 +541,22 @@ export class Game {
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
-    // Abyss powers became levelled: every soul spent on the old one-off powers comes back to spend again.
-    const legacy = s as unknown as { abyss?: string[]; runSouls?: number };
-    if (legacy.abyss) {
-      s.spentSouls = 0;
-      s.abyssLv = {};
-      delete legacy.abyss;
-    }
+    // The Abyss became offers: souls are recounted by the new formula, all of them unspent.
+    const legacy = s as unknown as { abyss?: string[]; abyssLv?: Record<string, number>; runSouls?: number };
+    const fromAbyss = !!(legacy.abyss || legacy.abyssLv);
+    delete legacy.abyss;
+    delete legacy.abyssLv;
     delete legacy.runSouls;
     // Saved as plain numbers (older saves) or strings (Decimal's JSON form).
     for (const k of ['gold', 'runGold', 'totalGold', 'bestDps', 'cycleGold'] as const) s[k] = new Decimal(s[k] ?? 0);
     while (s.owned.length < COMPS.length) s.owned.push(0);
     this.owned = new Set(s.upgrades);
     this.known = new Set(s.upgradesKnown);
-    // Saves from before the soul formula: pick up where their souls already are (nothing owed, nothing lost).
-    if (s.cycleGold.eq(0) && s.souls > 0) s.cycleGold = new Decimal(TUNE.soulGold).times(Decimal.pow(s.souls / this.soulGainMult(), 1 / TUNE.soulExp));
+    if (fromAbyss) {
+      s.souls = this.soulTarget();
+      s.spentSouls = 0;
+    }
+    if (s.descents > 0) this.deal();
     if (!s.soulsLifetime && this.stonesEarned() > 0) s.soulsLifetime = Math.max(0, TUNE.stoneSouls * this.stonesEarned() ** (1 / TUNE.stoneExp) - s.souls);
     this.trophySet = new Set(s.trophies);
     // A vault doesn't survive a reload (its chests aren't saved): you're back on the floor.
@@ -597,31 +603,33 @@ export class Game {
 
   /** Share of full speed the party fights at while you're away. */
   offlineSpeed() {
-    return Math.min(1, 0.25 + 0.15 * this.abyssLv('pulse'));
+    return Math.min(1, 0.25 + 0.25 * this.offerLv('pulse'));
   }
 
-  abyssLv(id: string) {
-    return this.s.abyssLv[id] ?? 0;
+  offerLv(id: string) {
+    return this.s.offers[id] ?? 0;
   }
 
-  hasAbyss(id: string) {
-    return this.abyssLv(id) > 0;
+  hasOffer(id: string) {
+    return this.offerLv(id) > 0;
   }
 
-  /** A reward for how many times you've ascended. */
+  /** A reward for how many times you've awakened. */
   milestone(id: MilestoneId) {
-    return this.s.descents >= ASCEND_MILESTONES.find((m) => m.id === id)!.at;
+    return this.s.awakens >= AWAKEN_MILESTONES.find((m) => m.id === id)!.at;
   }
 
   // ---------- cursed descents ----------
 
   /** This curse's rule is in force (Two Curses brings Iron Wardens and Mending Dark). */
   curseActive(id: string) {
+    if (!CURSES_ON) return false;
     const c = this.s.curse;
     return c === id || (c === 'two' && (id === 'iron' || id === 'mending'));
   }
 
   curseTier(id: string) {
+    if (!CURSES_ON) return 0;
     return this.s.curseTiers[id] ?? 0;
   }
 
@@ -629,7 +637,7 @@ export class Game {
    *  other curse has been beaten at least once. */
   cursesOpen() {
     const d = this.s.descents;
-    if (d < CURSES_FROM) return [];
+    if (!CURSES_ON || d < CURSES_FROM) return [];
     const plain = CURSES.filter((c) => c.id !== 'two');
     const open = plain.slice(0, Math.min(plain.length, 2 + Math.floor((d - CURSES_FROM) / 5)));
     if (plain.every((c) => this.curseTier(c.id) > 0)) open.push(CURSE_BY_ID.get('two')!);
@@ -679,6 +687,7 @@ export class Game {
 
   /** Level of the equipped relic with this effect (0 if none is slotted). */
   relic(e: RelicEffect) {
+    if (!RELICS_ON) return 0;
     let lv = 0;
     for (const id of this.s.equipped) {
       const d = RELIC_BY_ID.get(id);
@@ -689,15 +698,7 @@ export class Game {
 
   /** How much of a boss modifier's bite is left after Warden's Bane (1 → 0.25). */
   modBite() {
-    return 1 - 0.25 * this.heartLv('bane');
-  }
-
-  soulPower() {
-    return TUNE.soulPower + 0.002 * this.abyssLv('roots');
-  }
-
-  soulMult() {
-    return 1 + this.s.souls * this.soulPower();
+    return 1 - 0.25 * this.offerLv('bane');
   }
 
   trophyMult() {
@@ -712,7 +713,7 @@ export class Game {
     const effects = this.effects();
     const tier = COMPS.map(() => 1);
     const syn = COMPS.map(() => 1);
-    const twin = 1 + this.abyssLv('twin');
+    const twin = 5 ** this.offerLv('whet');
     const whet = 1 + this.relic('click');
     let blades = 1;
     let clickDpsUpg = 0;
@@ -742,20 +743,21 @@ export class Game {
       tier, syn, twin, whet, blades,
       upgrades: 1 + global,
       trophies: this.trophyMult(),
-      souls: this.soulMult(),
+      heart: 8 ** this.offerLv('heart'),
       shard: 1 + this.relic('all'),
       fury: Decimal.pow(TUNE.fury, this.heartLv('fury')),
+      party: 1.6 ** this.offerLv('banner') * 4 ** this.offerLv('warcry'),
       banner: 1 + 0.5 * this.relic('party'),
-      clickDps: CLICK_DPS + clickDpsUpg + 0.1 * this.relic('oath'),
-      clickDpsUpg, oath: 0.1 * this.relic('oath'),
+      clickDps: CLICK_DPS + clickDpsUpg + 0.1 * this.offerLv('oath') + 0.1 * this.relic('oath'),
+      clickDpsUpg, oath: 0.1 * this.offerLv('oath') + 0.1 * this.relic('oath'),
       critBase: BASE_CRIT, critUpg, critRelic: Math.min(0.3, 0.02 * this.relic('critChance')),
       critMultBase: BASE_CRIT_MULT, critMultUpg, critMultRelic: 1 + 0.5 * this.relic('critMult'),
       cleaveUpg, cleaveRelic: 0.2 * this.relic('cleave'),
-      goldUpg: 1 + gold, goldRelic: 1 + 0.5 * this.relic('gold'),
+      goldUpg: 1 + gold, goldRelic: 1 + 0.5 * this.relic('gold'), purse: 2 ** this.offerLv('purse'),
     };
-    const all = parts.fury.times(parts.upgrades * parts.trophies * parts.souls * parts.shard);
+    const all = parts.fury.times(parts.upgrades * parts.trophies * parts.heart * parts.shard);
     const baseComp = COMPS.map((c, i) => c.dps * s.owned[i] * tier[i] * syn[i]);
-    const perComp = baseComp.map((b) => all.times(b * parts.banner));
+    const perComp = baseComp.map((b) => all.times(b * parts.party * parts.banner));
     const dps = perComp.reduce((a, b) => a.plus(b), new Decimal(0));
     const click = all.times(twin * whet * blades).plus(dps.times(parts.clickDps));
     this.cache = {
@@ -763,8 +765,8 @@ export class Game {
       crit: this.abilityUnlocked('crit') ? parts.critBase + parts.critUpg + parts.critRelic : 0,
       critMult: (parts.critMultBase + parts.critMultUpg) * parts.critMultRelic,
       cleave: this.abilityUnlocked('cleave') && this.s.buffs.some((b) => b.id === 'cleave') ? (CLEAVE_BASE + parts.cleaveRelic) * parts.cleaveUpg : 0,
-      gold: parts.goldUpg * parts.goldRelic,
-      autoBase: AUTO_BASE + this.abyssLv('hands') + [0, 0.5, 1, 2][this.curseTier('silent')] + 0.5 * this.relic('phantom') + effects.reduce((sum, e) => sum + (e.t === 'auto' ? e.add : 0), 0),
+      gold: parts.goldUpg * parts.goldRelic * parts.purse,
+      autoBase: AUTO_BASE + this.offerLv('hands') + [0, 0.5, 1, 2][this.curseTier('silent')] + 0.5 * this.relic('phantom') + effects.reduce((sum, e) => sum + (e.t === 'auto' ? e.add : 0), 0),
     };
     return this.cache;
   }
@@ -876,7 +878,7 @@ export class Game {
   // ---------- costs ----------
 
   private compBase(i: number) {
-    return COMPS[i].cost * 0.97 ** this.abyssLv('tithe');
+    return COMPS[i].cost * 0.8 ** this.offerLv('tithe');
   }
 
   compCost(i: number, n = 1) {
@@ -901,7 +903,7 @@ export class Game {
   upgCost(u: UpgDef) {
     // Traits get cheaper by beating A Small Party, everything else by beating Lean Purse.
     const curse = isTraitId(u.id) ? 1 - 0.1 * this.curseTier('small') : 1 - 0.1 * this.curseTier('lean');
-    return u.cost * 0.95 ** this.abyssLv('bargain') * curse;
+    return u.cost * 0.6 ** this.offerLv('bargain') * curse;
   }
 
   compUnlocked(i: number) {
@@ -964,7 +966,7 @@ export class Game {
 
   private spawn() {
     const def = pickMonster(this.s.floor);
-    const champ = Math.random() < CHAMP_CHANCE;
+    const champ = Math.random() < CHAMP_CHANCE * (1 + this.offerLv('champ'));
     const hp = floorHp(this.s.floor).times(def.hp * TRASH * (champ ? CHAMP_HP : 1));
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: false, arrive: 0.7, mods: [], champ, ...this.spot(false) };
     this.monsters.push(m);
@@ -1103,7 +1105,7 @@ export class Game {
     const hp = floorHp(this.s.floor).times(8 * zone * first * (giant ? 1 + 2 * bite : 1) * (champ ? CHAMP_BOSS_HP : 1));
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, champ, ...this.spot(true) };
     this.monsters.push(m);
-    let time = BOSS_TIME + 3 * this.abyssLv('patience') + 5 * this.curseTier('fuse') + Math.min(30, 3 * this.relic('time'));
+    let time = BOSS_TIME + 5 * this.offerLv('glass') + 5 * this.curseTier('fuse') + Math.min(30, 3 * this.relic('time'));
     if (this.curseActive('fuse')) time *= 0.5;
     if (mods.includes('enraged')) time *= 1 - 0.5 * bite;
     if (giant || champ) time *= 1.5;
@@ -1129,7 +1131,7 @@ export class Game {
   /** Damage a monster; returns overflow past its death. */
   private damage(m: Monster, amount: Decimal, kind: HitKind, x?: number, y?: number): Decimal {
     if (m.boss) {
-      amount = amount.times(1 + this.relic('boss'));
+      amount = amount.times((1 + this.relic('boss')) * 2.5 ** this.offerLv('slayer'));
       if (kind === 'dps' && m.mods.includes('armored')) {
         // Overkill passed on from a dead monster keeps its full value; only the boss's share is cut.
         amount = amount.times(1 - this.armor());
@@ -1281,7 +1283,7 @@ export class Game {
       else if (this.rampageUnlocked() && !this.curseActive('norampage')) {
         let fill = 1 / FEVER_CLICKS;
         for (const e of this.effects()) if (e.t === 'fever' && e.fill) fill *= e.fill;
-        fill *= (1 + 0.15 * this.abyssLv('dreams')) * (1 + 0.2 * this.curseTier('norampage'));
+        fill *= (1 + 0.3 * this.offerLv('rage')) * (1 + 0.2 * this.curseTier('norampage'));
         this.s.fervor = Math.min(1, this.s.fervor + fill);
       }
     }
@@ -1351,7 +1353,7 @@ export class Game {
   rampageDuration() {
     let dur = FEVER_TIME;
     for (const e of this.effects()) if (e.t === 'fever' && e.dur) dur *= e.dur;
-    return dur * (1 + 0.15 * this.abyssLv('dreams'));
+    return dur * (1 + 0.3 * this.offerLv('rage'));
   }
 
   private startFever() {
@@ -1483,7 +1485,7 @@ export class Game {
   }
 
   private rollReward(): RaidReward {
-    if (this.hasAbyss('mimic') && Math.random() < 0.06) return 'soulstorm';
+    if (this.hasOffer('mimic') && Math.random() < 0.06) return 'soulstorm';
     const r = Math.random();
     if (r < 0.4) return 'plunder';
     if (r < 0.65) return 'bloodlust';
@@ -1502,7 +1504,7 @@ export class Game {
   }
 
   private scheduleRaid() {
-    let f = (1 + 0.1 * this.abyssLv('lure')) * (1 + 0.3 * this.relic('goblin'));
+    let f = (1 + 0.5 * this.offerLv('lure')) * (1 + 0.3 * this.relic('goblin'));
     for (const e of this.effects()) if (e.t === 'raid' && e.freq) f *= e.freq;
     this.s.raidTimer = this.debugRainbow ? 5 : (RAID_MIN + Math.random() * (RAID_MAX - RAID_MIN)) / f;
   }
@@ -1525,10 +1527,10 @@ export class Game {
     return (1 + 0.15 * this.relic('souls')) * (1 + this.heartLv('siphon')) * [1, 1.25, 1.5, 2][this.curseTier('two')];
   }
 
-  /** All the souls this awakening cycle has earned so far: the cube root of its gold (see TUNE). */
+  /** All the souls this awakening cycle has earned so far: the digits of its gold (see TUNE). */
   soulTarget() {
-    const roots = this.s.cycleGold.div(TUNE.soulGold).pow(TUNE.soulExp).toNumber();
-    return Math.floor(roots * this.soulGainMult());
+    const digits = this.s.cycleGold.max(1).log10() - TUNE.soulDigits;
+    return Math.max(0, Math.floor(digits * this.soulGainMult()));
   }
 
   /** Souls a descent would pay right now: everything banked from bosses this descent. */
@@ -1558,6 +1560,7 @@ export class Game {
     this.s.descents++;
     this.s.lastAscent = Math.max(this.s.lastAscent, this.s.maxFloor);
     this.s.curse = curse && this.cursesOpen().some((c) => c.id === curse) ? curse : null;
+    this.deal();
     this.resetRun();
     this.events.push({ t: 'descend', souls: gained });
     return true;
@@ -1584,7 +1587,7 @@ export class Game {
     this.owned.clear();
     this.raid = null;
     this.scheduleRaid();
-    const start = 1 + 5 * this.abyssLv('skip');
+    const start = 1 + 5 * this.offerLv('skip');
     s.maxFloor = start;
     this.applyStartingParty();
     this.invalidate();
@@ -1592,7 +1595,7 @@ export class Game {
   }
 
   private applyStartingParty() {
-    if (!this.milestone('veterans')) return;
+    if (!this.hasOffer('veterans')) return;
     for (const i of [0, 1, 2]) this.s.owned[i] = Math.max(this.s.owned[i], 25);
   }
 
@@ -1600,24 +1603,55 @@ export class Game {
     return this.s.souls - this.s.spentSouls;
   }
 
-  /** Another level of this Abyss power is on offer (it isn't maxed). */
-  abyssAvailable(id: string) {
-    const a = ABYSS_BY_ID.get(id);
-    return !!a && this.abyssLv(id) < a.max;
+  /** Another level of this offer can be bought (it isn't maxed). */
+  offerAvailable(id: string) {
+    const def = OFFER_BY_ID.get(id);
+    return !!def && this.offerLv(id) < def.max;
   }
 
-  abyssCost(id: string) {
-    const a = ABYSS_BY_ID.get(id)!;
-    const base = a.cost(0);
-    return Math.ceil(base * (a.cost(this.abyssLv(id)) / base) ** TUNE.abyssGrowth);
+  offerCost(id: string) {
+    return OFFER_BY_ID.get(id)!.cost;
   }
 
-  buyAbyss(id: string) {
-    if (!this.abyssAvailable(id) || this.soulsFree() < this.abyssCost(id)) return false;
-    this.s.spentSouls += this.abyssCost(id);
-    this.s.abyssLv[id] = this.abyssLv(id) + 1;
+  /** Fill the hand's empty places with offers not already in it, weighted by how common each is; the last place goes
+   *  to a damage offer if the hand has none. */
+  private deal() {
+    const hand = this.s.hand.filter((id) => this.offerAvailable(id));
+    while (hand.length < HAND_SIZE) {
+      const needDamage = hand.length === HAND_SIZE - 1 && !hand.some((id) => DAMAGE_OFFERS.has(id));
+      let pool = OFFERS.filter((x) => !hand.includes(x.id) && this.offerAvailable(x.id));
+      if (needDamage && pool.some((x) => DAMAGE_OFFERS.has(x.id))) pool = pool.filter((x) => DAMAGE_OFFERS.has(x.id));
+      if (!pool.length) break;
+      let roll = Math.random() * pool.reduce((sum, x) => sum + x.weight, 0);
+      const pick = pool.find((x) => (roll -= x.weight) < 0) ?? pool[pool.length - 1];
+      hand.push(pick.id);
+    }
+    this.s.hand = hand;
+  }
+
+  /** Buy the offer in this place in the hand; a new one is dealt into its place. */
+  buyOffer(slot: number) {
+    const id = this.s.hand[slot];
+    if (!id || !this.offerAvailable(id) || this.soulsFree() < this.offerCost(id)) return false;
+    this.s.spentSouls += this.offerCost(id);
+    this.s.offers[id] = this.offerLv(id) + 1;
+    this.s.hand.splice(slot, 1);
+    this.deal();
     this.invalidate();
-    this.events.push({ t: 'abyss', id, lv: this.s.abyssLv[id] });
+    this.events.push({ t: 'offer', id, lv: this.s.offers[id] });
+    return true;
+  }
+
+  canRedraw() {
+    return this.s.hand.length > 0 && this.soulsFree() >= REDRAW_COST;
+  }
+
+  /** Pay to throw the whole hand back and deal a fresh one (the same offers can come back). */
+  redraw() {
+    if (!this.canRedraw()) return false;
+    this.s.spentSouls += REDRAW_COST;
+    this.s.hand = [];
+    this.deal();
     return true;
   }
 
@@ -1631,6 +1665,7 @@ export class Game {
   }
 
   private rollRelic(floor: number) {
+    if (!RELICS_ON && !this.debugRelics) return;
     const chance = this.relicChance(floor);
     this.s.bossBest = Math.max(this.s.bossBest, floor);
     if (Math.random() >= chance) return;
@@ -1706,6 +1741,8 @@ export class Game {
     if (!this.canAwaken()) return false;
     const gained = this.pendingStones();
     const s = this.s;
+    // Gold still on the floor belongs to this cycle, not the next one's souls.
+    this.bankAllDrops();
     s.stones += gained;
     s.awakens++;
     s.cycleBest = 0;
@@ -1715,9 +1752,8 @@ export class Game {
     s.spentSouls = 0;
     s.cycleGold = new Decimal(0);
     s.curse = null;
-    // Echoing Abyss keeps the first level of every power, free.
-    const keep = this.heartLv('echo') > 0;
-    s.abyssLv = keep ? Object.fromEntries(Object.entries(s.abyssLv).map(([id, lv]) => [id, Math.min(lv, 1)])) : {};
+    s.offers = {};
+    s.hand = [];
     this.resetRun();
     this.events.push({ t: 'awaken', stones: gained });
     return true;
@@ -2089,7 +2125,7 @@ export class Game {
     if (this.raid) {
       this.raid.t += dt / this.raid.stay;
       // The goblin snare (an ascent milestone) gets one try at each goblin, halfway across.
-      if (this.milestone('snare') && !this.raid.snareTried && this.raid.t > 0.5) {
+      if (this.hasOffer('snare') && !this.raid.snareTried && this.raid.t > 0.5) {
         this.raid.snareTried = true;
         if (Math.random() < SNARE_CHANCE) this.catchRaid();
       }
@@ -2174,7 +2210,4 @@ export class Game {
     return { seconds: secs, gold, kills, pct, cards };
   }
 
-  abyssList() {
-    return ABYSS;
-  }
 }

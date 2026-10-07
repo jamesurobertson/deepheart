@@ -1702,7 +1702,7 @@ export class Scene {
         break;
       case 'buyComp':
       // Old Friends hands you the Squire and Ranger the moment you buy it.
-      case 'abyss':
+      case 'offer':
         this.syncParty(game);
         break;
       case 'raidSpawn':

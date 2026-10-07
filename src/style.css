@@ -680,6 +680,9 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .aby.can small { color: #eadcff; }
 .aby.locked { opacity: 0.4; }
 .aby.avail { opacity: 0.8; }
+.modal h3:has(.redraw) { justify-content: flex-start; align-items: center; gap: 10px; }
+.modal h3 .redraw { margin-left: auto; padding: 4px 10px; font: 400 18px/1 'Jersey 10'; display: inline-flex; gap: 4px; align-items: center; }
+.aby.owned small { font-size: 16px; line-height: 1.05; }
 
 .stats { display: flex; flex-direction: column; gap: 6px; margin: 0; }
 .stats div { display: flex; align-items: baseline; }
