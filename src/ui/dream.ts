@@ -1,47 +1,50 @@
 import type { SfxName } from '../audio/sfx.ts';
-import { Binder, type BinderCard } from './binder.ts';
-import { G, spriteFrames } from './px.ts';
-import { BED_KID, BROS_GAME, CARD_SPOTS, MAPS, STEP, T, blanket, blocked, drawSprite, propAt, px, type Dir, type MapDef, type MapId, type NpcDef } from './world.ts';
+import { Binder, type BinderCard, type BinderColor } from './binder.ts';
+import { BINDER_MARK, STASHES, BROS_GAME, FOE_SPOTS, KID_START, PARTY_SPOTS, SHELF_SPOTS, MAPS, PLAYSET, HERO_SPOT, STEP, T, blocked, drawSprite, propAt, px, type Dir, type MapDef, type MapId, type NpcDef } from './world.ts';
 
 /**
- * Waking up: the dungeon was the kid's dream, and the cards are real. A handheld-sized world (160×144) you can walk
- * around: the bedroom, downstairs, the town outside. The first time plays the whole reveal; later awakenings just
- * wake, add the new cards to the binder and let you wander. Getting back into bed is how you go back down.
+ * The real world behind the dungeon: it was a kid playing with his figures on the bedroom floor. The live dungeon
+ * view pulls back and shrinks into the cardboard playset on the rug, and you're in a handheld-sized world (160×144)
+ * you can walk around: the bedroom, downstairs, the town outside. Keep playing at the playset to go back in.
  */
 
 const W = 160;
 const H = 144;
 const TYPE_MS = 28;
-const DISSOLVE_MS = 1500;
-const CARD_GAP_MS = 140;
+/** How long the dungeon takes to shrink into the playset (the first time is the big reveal), and to zoom back in. */
+const PULL_MS = { first: 2600, again: 1100, back: 1100 };
 const STEP_S = 0.2;
 const NPC_STEP_S = 0.36;
 const KID = 'cr_beanie_kid';
-/** Where the kid stands after getting up: beside the bed, facing the room. */
-const GET_UP = { x: 3, y: 4, dir: 'down' as Dir };
 const CARD_INKS = ['#c8423f', '#4a78c8', '#5aa050', '#f2c14e', '#8a5ac8', '#e08a3a'];
-/** A 4×4 ordered-dither threshold map: the dissolve fills in 2×2 blocks in this order, like an old handheld. */
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 const KEY_DIRS: Record<string, Dir> = { arrowup: 'up', w: 'up', arrowdown: 'down', s: 'down', arrowleft: 'left', a: 'left', arrowright: 'right', d: 'right' };
 
 export interface DreamOpts {
   /** The whole reveal (first awakening) or a short wake-up. */
   first: boolean;
+  /** Just popping into the room from the dungeon: no awakening, and only a word if new cards came in. */
+  visit?: boolean;
   found: number;
   /** The binder as it is right now (trades add cards while you're awake). */
-  binder: () => { cards: BinderCard[]; found: number };
+  binder: () => { cards: BinderCard[]; colors: BinderColor[] };
   /** You've looked through the binder: nothing's new any more. */
   seen: () => void;
   /** Are there cards in the binder you haven't looked at yet? */
   hasNew: () => boolean;
-  /** Cards found since the last time you woke. */
+  /** Cards you have not seen in the binder yet. */
   fresh: number;
+  /** Your hero: the figure the kid's playing with. */
+  hero: { name: string; sprite: string };
+  /** The other figures (sprite names): two more of the party and two monsters on the playset, the rest on the dresser. */
+  figures: { party: string[]; foes: string[]; shelf: string[] };
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
   /** Talking to a brother opens his trade window over the screen. */
   trade: (who: 'daniel' | 'victor', host: HTMLElement, closed: () => void) => void;
-  /** Runs once the screen is black on the way in. */
+  /** Search a hiding spot: the name of the card in it, or null once it's been taken. */
+  stash: (spot: string) => string | null;
+  /** Runs as the view pulls back out of the dungeon. */
   cover?: () => void;
-  /** Runs once the screen is black on the way back down: the awakening itself. */
+  /** Runs just before the view zooms back into the playset: the awakening itself. */
   sleep?: () => void;
   done: () => void;
 }
@@ -49,10 +52,9 @@ export interface DreamOpts {
 /** What things say when you use them (the bed and the binder do something instead). */
 function linesFor(id: string, o: DreamOpts): string[] {
   const lines: Record<string, string[]> = {
-    books: ["Monster books. You've read them all twice."],
     poster: ["Your DEEPHEART poster. The heart almost looks like it's beating."],
     window: ['A sunny morning. Somewhere a bird is very pleased with itself.'],
-    toys: ['Your old toy box. A wooden sword sits on top.'],
+    toys: ['Your figures. Every one of them has been down the dungeon.'],
     kitchen: ['Toast. Cold.'],
     table: ['A bowl of cereal. It went soggy while you slept.'],
     sofa: ['The cushions are still in the shape of a fort.'],
@@ -66,6 +68,7 @@ function linesFor(id: string, o: DreamOpts): string[] {
     sign: ['BRAMBLEFORD'],
     pond: ['Something glints at the bottom. Probably a coin.'],
     brosGame: ["Daniel and Victor's game. Victor is winning. Obviously."],
+    bed: ['Not tired yet.'],
   };
   return lines[id] ?? [];
 }
@@ -102,11 +105,11 @@ class Dream {
   private fade: HTMLElement;
   private frame = document.createElement('canvas');
   private bases = new Map<MapId, HTMLCanvasElement>();
-  private mode: 'black' | 'squire' | 'dissolve' | 'world' = 'black';
   private map: MapDef = MAPS.bedroom;
-  private kid: Walker = { x: GET_UP.x, y: GET_UP.y, dir: GET_UP.dir, left: false, move: null };
+  private kid: Walker = { x: KID_START.x, y: KID_START.y, dir: KID_START.dir, left: false, move: null };
   private npcs: Npc[] = [];
-  private inBed = true;
+  /** The kid's holding his hero's figure up, mid-adventure (until you start walking). */
+  private holding = true;
   private roaming = false;
   /** Talking, in the binder, changing rooms: the kid stands still. */
   private busy = true;
@@ -114,35 +117,28 @@ class Dream {
   private then: (() => void) | null = null;
   private held: Dir[] = [];
   private hover: Target | null = null;
-  private dissolveAt = 0;
-  private cardsShown = 0;
   private start = performance.now();
   private last = performance.now();
   private raf = 0;
   private advance: (() => void) | null = null;
   private choose: ((by: number) => void) | null = null;
   private typing: number | null = null;
-  private squireData: ImageData | null = null;
   private binder: Binder | null = null;
-  /** Awake but still in bed, waiting for you to get up. */
-  private lazing = false;
   private trading = false;
   private finished = false;
 
   constructor(o: DreamOpts) {
     this.o = o;
     this.el = document.createElement('div');
-    this.el.className = 'dream';
+    this.el.className = 'dream in';
     this.el.innerHTML = `
       <div class="dr-screen">
         <canvas width="${W}" height="${H}"></canvas>
         <button class="dr-prompt" hidden></button>
-        <div class="dr-logo" hidden></div>
         <div class="dr-fade"></div>
         <div class="dr-box" hidden><p></p><i class="dr-more">▼</i></div>
         <div class="dr-menu" hidden></div>
-      </div>
-      ${o.first ? '' : '<button class="dr-skip">Skip ▸▸</button>'}`;
+      </div>`;
     this.screen = this.el.querySelector('.dr-screen')!;
     this.canvas = this.el.querySelector('canvas')!;
     this.ctx = this.canvas.getContext('2d')!;
@@ -168,71 +164,79 @@ class Dream {
     this.canvas.addEventListener('pointerleave', () => (this.hover = null));
     this.prompt.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (this.lazing) return this.getUp();
       const t = this.promptTarget();
       if (t) this.goUse(t);
     });
-    this.el.querySelector('.dr-skip')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      void this.sleep();
-    });
     this.raf = requestAnimationFrame(this.loop);
-    await this.wait(20);
-    this.el.classList.add('in');
-    await this.wait(700);
+    await this.wait(40);
     this.o.cover?.();
-    if (this.o.first) await this.reveal();
-    else await this.wake();
-    if (this.finished) return;
-    // The kid stays in bed until you move (a key, a click or a tap gets them up).
-    this.box.hidden = true;
-    this.lazing = true;
-  }
-
-  // ---------- the story ----------
-
-  private async reveal() {
-    this.mode = 'squire';
-    await this.wait(600);
-    await this.say('You wake up.');
-    this.renderWorld(this.frame.getContext('2d')!, 0);
-    this.mode = 'dissolve';
-    this.dissolveAt = performance.now();
-    this.o.sound('awaken', { vol: 0.5, rate: 1.3 });
-    await this.say("The dungeon was a dream. The cards weren't.");
-    this.mode = 'world';
-    void this.dealCards(Math.min(this.o.found, CARD_SPOTS.length));
-    await this.say('Every monster you beat is on your blanket.');
-    await this.logo();
-  }
-
-  private async wake() {
-    this.mode = 'world';
-    this.screen.classList.add('fade-in');
-    await this.wait(500);
-    await this.dealCards(Math.min(this.o.fresh, CARD_SPOTS.length));
+    await this.pullBack(this.o.first ? PULL_MS.first : PULL_MS.again);
     const n = this.o.fresh;
-    await this.say(n ? `You wake up. ${n} new card${n === 1 ? '' : 's'}.` : 'You wake up.');
-  }
-
-  private getUp() {
-    if (this.finished) return;
-    this.lazing = false;
-    this.inBed = false;
-    this.kid = { x: GET_UP.x, y: GET_UP.y, dir: GET_UP.dir, left: false, move: null };
+    const line = this.o.first ? `...and the ${this.o.hero.name} saves the day!` : n ? `Playtime break. ${n} new card${n === 1 ? '' : 's'}.` : this.o.visit ? '' : 'Playtime break.';
+    if (line) await this.say(line);
     this.box.hidden = true;
+    this.holding = false;
     this.roaming = true;
     this.busy = false;
-    this.o.sound('step2', { vol: 0.3 });
+  }
+
+
+  // ---------- in and out of the playset ----------
+
+  /** The playset's floor on screen: where the dungeon shrinks to, and zooms back in from. */
+  private floorRect() {
+    const c = this.canvas.getBoundingClientRect();
+    const s = c.width / W;
+    const f = PLAYSET.floor;
+    return { x: c.left + f.x * s, y: c.top + f.y * s, w: f.w * s, h: f.h * s };
+  }
+
+  /** The live dungeon view, scaled and cropped down to the playset's floor (and its full-screen self). */
+  private stageFrames() {
+    const r = this.floorRect();
+    const k = Math.max(r.w / innerWidth, r.h / innerHeight);
+    const tx = r.x + (r.w - innerWidth * k) / 2;
+    const ty = r.y + (r.h - innerHeight * k) / 2;
+    const left = (r.x - tx) / k;
+    const top = (r.y - ty) / k;
+    const small = { transform: `translate(${tx}px, ${ty}px) scale(${k})`, clipPath: `inset(${top}px ${innerWidth - left - r.w / k}px ${innerHeight - top - r.h / k}px ${left}px)` };
+    const full = { transform: 'translate(0px, 0px) scale(1)', clipPath: 'inset(0px 0px 0px 0px)' };
+    return { small, full };
+  }
+
+  /** The dungeon fight shrinks into the boxes on the rug while the bedroom appears around it, then fades into the playset. */
+  private async pullBack(ms: number) {
+    const stage = document.getElementById('stage');
+    if (!stage) return;
+    const { small, full } = this.stageFrames();
+    stage.style.zIndex = '2001';
+    stage.style.transformOrigin = '0 0';
+    await stage.animate([full, small], { duration: ms, easing: 'cubic-bezier(0.65, 0, 0.25, 1)', fill: 'forwards' }).finished;
+    await stage.animate([{ ...small, opacity: 1 }, { ...small, opacity: 0 }], { duration: 400, fill: 'forwards' }).finished;
+    for (const a of stage.getAnimations()) a.cancel();
+    stage.style.zIndex = '';
+  }
+
+  /** Back into the boxes: the playset becomes the live dungeon again and grows to fill the screen. */
+  private async zoomIn(ms: number) {
+    const stage = document.getElementById('stage');
+    if (!stage) return;
+    const { small, full } = this.stageFrames();
+    stage.style.zIndex = '2001';
+    stage.style.transformOrigin = '0 0';
+    await stage.animate([{ ...small, opacity: 0 }, { ...small, opacity: 1 }], { duration: 300, fill: 'forwards' }).finished;
+    await stage.animate([small, full], { duration: ms, easing: 'cubic-bezier(0.65, 0, 0.25, 1)', fill: 'forwards' }).finished;
   }
 
   private openBinder() {
     this.busy = true;
     this.o.sound('open', { vol: 0.6 });
-    const { cards, found } = this.o.binder();
-    void this.say(`Your binder has ${cards.length} slots. You've filled ${found}.`, true);
+    const { cards, colors } = this.o.binder();
+    // A slot for every card in every color it comes in, and again in gold.
+    const slots = cards.flatMap((c) => colors.flatMap((_, l) => (l < c.fromLap ? [] : c.canGold ? [c.n[l], c.gold[l]] : [c.n[l]])));
+    void this.say(`Your binders have ${slots.length} slots. You've filled ${slots.filter((n) => n > 0).length}.`, true);
     return new Promise<void>((resolve) => {
-      this.binder = new Binder(this.screen, cards, (n) => this.o.sound(n, { vol: n === 'click' ? 0.3 : n === 'drop2' ? 0.7 : 0.5 }), () => {
+      this.binder = new Binder(this.screen, cards, colors, (n) => this.o.sound(n, { vol: n === 'click' ? 0.3 : n === 'drop2' ? 0.7 : 0.5 }), () => {
         this.binder = null;
         this.box.hidden = true;
         this.o.sound('close', { vol: 0.5 });
@@ -243,7 +247,7 @@ class Dream {
     });
   }
 
-  /** Back into bed, the screen goes dark, and down you go: the real awakening happens here. */
+  /** Keep playing: the run starts over (the awakening itself) and the view zooms back into the playset. */
   private async sleep() {
     if (this.finished) return;
     this.finished = true;
@@ -251,33 +255,24 @@ class Dream {
     this.binder?.close();
     this.prompt.hidden = true;
     this.box.hidden = true;
-    this.inBed = true;
     if (this.map.id !== 'bedroom') this.enterMap('bedroom');
-    this.o.sound('close', { vol: 0.5 });
-    this.fade.classList.add('on', 'slow');
-    await this.wait(900);
     this.o.sleep?.();
-    this.el.classList.add('out');
+    // A moment for the dungeon to rebuild at the top before it fills the screen.
+    await this.wait(250);
+    this.o.sound('descend', { vol: 0.5 });
+    await this.zoomIn(PULL_MS.back);
     removeEventListener('keydown', this.onKey);
     removeEventListener('keyup', this.onKeyUp);
     removeEventListener('resize', this.fit);
-    await this.wait(700);
     cancelAnimationFrame(this.raf);
     this.el.remove();
+    const stage = document.getElementById('stage');
+    if (stage) {
+      for (const a of stage.getAnimations()) a.cancel();
+      stage.style.zIndex = '';
+    }
     document.body.classList.remove('dreaming');
     this.o.done();
-  }
-
-  private async logo() {
-    const l = this.el.querySelector<HTMLElement>('.dr-logo')!;
-    l.innerHTML = `${G.heart(5)}<b>${[...'DEEPHEART'].map((c, i) => `<span style="--i:${i}">${c}</span>`).join('')}</b><i class="dr-more">▼</i>`;
-    l.hidden = false;
-    this.box.hidden = true;
-    this.o.sound('jackpot', { vol: 0.6 });
-    await this.wait(1600);
-    l.classList.add('ready');
-    await new Promise<void>((resolve) => (this.advance = resolve));
-    l.hidden = true;
   }
 
   // ---------- talking ----------
@@ -350,13 +345,6 @@ class Dream {
     });
   }
 
-  private async dealCards(n: number) {
-    for (let k = 0; k < n; k++) {
-      this.cardsShown = k + 1;
-      this.o.sound('card', { vol: 0.25, rate: 1.2 + k * 0.04 });
-      await this.wait(CARD_GAP_MS);
-    }
-  }
 
   // ---------- using things ----------
 
@@ -380,9 +368,9 @@ class Dream {
       await this.talk(linesFor(n.def.id, this.o));
       return this.faceBack(n);
     }
-    if (t.id === 'bed') {
+    if (t.id === 'playset') {
       this.busy = true;
-      const yes = (await this.ask('Go back to sleep?', ['Yes', 'No'])) === 0;
+      const yes = (await this.ask('Keep playing?', ['Yes', 'No'])) === 0;
       this.busy = false;
       if (yes) void this.sleep();
       return;
@@ -390,6 +378,18 @@ class Dream {
     if (t.id === 'binder') return void this.openBinder();
     this.o.sound('click', { vol: 0.25 });
     return this.talk(linesFor(t.id, this.o));
+  }
+
+  private stashHere() {
+    if (this.kid.move) return null;
+    return STASHES.find((s) => s.map === this.map.id && s.x === this.kid.x && s.y === this.kid.y) ?? null;
+  }
+
+  private async search(spot: (typeof STASHES)[number]) {
+    const name = this.o.stash(spot.id);
+    if (!name) return this.talk(['Nothing else here.']);
+    this.o.sound('jackpot', { vol: 0.35 });
+    await this.talk([spot.look, `A card! ${name}.`]);
   }
 
   /** Back to what they were doing (the brothers to their game) once you're done with them. */
@@ -610,10 +610,11 @@ class Dream {
       this.advance = null;
       return go();
     }
-    // The first click gets the kid out of bed (and on to wherever you clicked).
-    if (this.lazing) this.getUp();
     if (!this.roaming || this.busy || e.target !== this.canvas) return;
     const [x, y] = this.tileAt(e);
+    // Tapping yourself (feet or head) while standing on a hiding spot; tapping it from afar just walks there.
+    const spot = this.stashHere();
+    if (spot && x === this.kid.x && (y === this.kid.y || y === this.kid.y - 1)) return void this.search(spot);
     const t = this.targetAt(x, y);
     if (t) return this.goUse(t);
     const path = this.route((tx, ty) => tx === x && ty === y);
@@ -634,7 +635,6 @@ class Dream {
       else if (dir === 'up' || dir === 'down') this.choose(dir === 'up' ? -1 : 1);
       return;
     }
-    if (this.lazing) this.getUp();
     if (dir) {
       if (!this.held.includes(dir)) this.held.push(dir);
       return;
@@ -645,8 +645,10 @@ class Dream {
       this.advance = null;
       return go();
     }
-    const t = this.roaming && !this.busy && !this.kid.move && this.promptTarget();
+    if (!this.roaming || this.busy || this.kid.move) return;
+    const t = this.promptTarget();
     if (t) void this.use(t);
+    else if (this.stashHere()) void this.search(this.stashHere()!);
   };
 
   private onKeyUp = (e: KeyboardEvent) => {
@@ -680,21 +682,9 @@ class Dream {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     const t = (now - this.start) / 1000;
-    if (this.mode === 'world') this.update(dt, now / 1000);
-    const ctx = this.ctx;
-    if (this.mode === 'black') {
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, W, H);
-      return;
-    }
-    if (this.mode === 'squire') return this.drawSquire(t);
+    this.update(dt, now / 1000);
     this.renderWorld(this.frame.getContext('2d')!, t);
-    if (this.mode === 'dissolve') {
-      const p = Math.min(1, (now - this.dissolveAt) / DISSOLVE_MS);
-      if (p >= 1) this.mode = 'world';
-      else return this.dissolve(p);
-    }
-    ctx.drawImage(this.frame, 0, 0);
+    this.ctx.drawImage(this.frame, 0, 0);
     this.placePrompt();
   };
 
@@ -706,36 +696,26 @@ class Dream {
     ctx.translate(-cam.x, -cam.y);
     if (this.map.id === 'bedroom') {
       this.drawBrosGame(ctx);
-      if (this.inBed) drawSprite(ctx, KID, t, BED_KID.cx, BED_KID.bottom);
-      blanket(ctx);
-      for (let k = 0; k < this.cardsShown; k++) {
-        const [x, y] = CARD_SPOTS[k];
-        px(ctx, x, y, 5, 7, '#241a2a');
-        px(ctx, x + 1, y + 1, 3, 5, '#fff');
-        px(ctx, x + 1, y + 2, 3, 2, CARD_INKS[k % CARD_INKS.length]);
-      }
+      // Little figures of the real thing: the party lined up on the dresser, a fight going on in the playset.
+      const fig = (sprite: string, [x, y]: number[], left = false) => drawSprite(ctx, sprite, 0, x, y, left, false, 0.5);
+      this.o.figures.shelf.forEach((sprite, k) => SHELF_SPOTS[k] && fig(sprite, SHELF_SPOTS[k]));
+      this.o.figures.party.forEach((sprite, k) => PARTY_SPOTS[k] && fig(sprite, PARTY_SPOTS[k]));
+      this.o.figures.foes.forEach((sprite, k) => FOE_SPOTS[k] && fig(sprite, FOE_SPOTS[k], true));
+      // The hero's figure: held up in the kid's hand mid-adventure, or back on the playset.
+      if (!this.holding) fig(this.o.hero.sprite, HERO_SPOT);
       // A "!" over the binder on the desk while it has cards you haven't seen.
       if (this.roaming && this.o.hasNew()) {
         const bob = Math.floor(t * 3) % 2;
-        px(ctx, 88, 7 - bob, 7, 10, '#241a2a');
-        px(ctx, 89, 8 - bob, 5, 8, '#ff5a7e');
-        px(ctx, 91, 9 - bob, 1, 4, '#fff');
-        px(ctx, 91, 14 - bob, 1, 1, '#fff');
-      }
-      // Z z: the bed's waiting for you.
-      if (!this.inBed && this.roaming) {
-        const bob = Math.floor(t * 2) % 2;
-        for (const [zx, zy, s] of [[36, 13 - bob, 5], [44, 6 + bob, 4]]) {
-          px(ctx, zx - 1, zy - 1, s + 2, s + 2, 'rgba(36, 26, 42, 0.45)');
-          px(ctx, zx, zy, s, 1, '#fff');
-          for (let d = 1; d < s - 1; d++) px(ctx, zx + s - 1 - d, zy + d, 1, 1, '#fff');
-          px(ctx, zx, zy + s - 1, s, 1, '#fff');
-        }
+        const [mx, my] = BINDER_MARK;
+        px(ctx, mx, my - bob, 7, 10, '#241a2a');
+        px(ctx, mx + 1, my + 1 - bob, 5, 8, '#ff5a7e');
+        px(ctx, mx + 3, my + 2 - bob, 1, 4, '#fff');
+        px(ctx, mx + 3, my + 7 - bob, 1, 1, '#fff');
       }
     }
     // People, nearest the bottom drawn last.
     const walkers: { w: Walker; sprite: string }[] = this.npcs.map((n) => ({ w: n, sprite: n.def.sprite }));
-    if (!this.inBed && this.roaming) walkers.push({ w: this.kid, sprite: KID });
+    walkers.push({ w: this.kid, sprite: KID });
     walkers.sort((a, b) => a.w.y - b.w.y);
     for (const { w, sprite } of walkers) {
       const p = w.move ? Math.min(1, w.move.t) : 1;
@@ -745,6 +725,7 @@ class Dream {
       ctx.fillRect(Math.round(fx * T + 3), Math.round(fy * T + 13), 10, 3);
       drawSprite(ctx, sprite, t, fx * T + 8, fy * T + 15, w.left, !!w.move);
     }
+    if (this.holding) drawSprite(ctx, this.o.hero.sprite, 0, this.kid.x * T + 15, this.kid.y * T + 4 - (Math.floor(t * 4) % 2), false, false, 0.5);
     ctx.restore();
   }
 
@@ -771,57 +752,19 @@ class Dream {
     card(g.pile[0], g.pile[1], CARD_INKS[0]);
   }
 
-  /** The "▶ Go back to sleep" bubble over whatever you could use. */
+  /** The "▶ Keep playing" bubble over whatever you could use. */
   private placePrompt() {
-    if (this.lazing) {
-      this.prompt.hidden = false;
-      if (this.prompt.textContent !== '▶ Get up') this.prompt.textContent = '▶ Get up';
-      this.prompt.style.setProperty('--px', `${BED_KID.cx}`);
-      this.prompt.style.setProperty('--py', '26');
-      return;
-    }
     const t = this.promptTarget();
     if (!t) {
       this.prompt.hidden = true;
       return;
     }
     const cam = this.camera();
-    const [x, y, w] = t.kind === 'npc' ? [t.npc.x, t.npc.y - 1, 1] : [t.x, t.y, t.w];
+    // People are a little over a tile tall: the bubble sits just over their heads.
+    const [x, y, w] = t.kind === 'npc' ? [t.npc.x, t.npc.y - 0.15, 1] : [t.x, t.y, t.w];
     this.prompt.hidden = false;
     if (this.prompt.textContent !== `▶ ${t.label}`) this.prompt.textContent = `▶ ${t.label}`;
     this.prompt.style.setProperty('--px', `${x * T + (w * T) / 2 - cam.x}`);
     this.prompt.style.setProperty('--py', `${Math.max(10, y * T - cam.y)}`);
-  }
-
-  private drawSquire(t: number) {
-    const ctx = this.ctx;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, W, H);
-    const sq = spriteFrames('knight_m');
-    if (sq) {
-      const f = sq.frames[Math.floor(t * 6) % sq.frames.length];
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(sq.img, f.x, f.y, f.w, f.h, W / 2 - f.w, 18, f.w * 2, f.h * 2);
-    }
-    this.squireData = ctx.getImageData(0, 0, W, H);
-  }
-
-  /** The Squire on black gives way to the bedroom, 2×2 block by block. */
-  private dissolve(p: number) {
-    const from = this.squireData;
-    const to = this.frame.getContext('2d')!.getImageData(0, 0, W, H);
-    if (from) {
-      const level = p * 16;
-      for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-          if (BAYER[((y >> 1) & 3) * 4 + ((x >> 1) & 3)] < level) continue;
-          const i = (y * W + x) * 4;
-          to.data[i] = from.data[i];
-          to.data[i + 1] = from.data[i + 1];
-          to.data[i + 2] = from.data[i + 2];
-        }
-      }
-    }
-    this.ctx.putImageData(to, 0, 0);
   }
 }

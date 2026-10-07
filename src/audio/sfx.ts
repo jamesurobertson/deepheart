@@ -12,7 +12,7 @@ const NAMES = [
 ] as const;
 export type SfxName = (typeof NAMES)[number];
 
-const TRACKS = ['halls', 'crypts', 'warrens', 'tomb', 'rotting', 'grove', 'demon', 'frozen', 'boss', 'boss2', 'vault'] as const;
+const TRACKS = ['halls', 'crypts', 'warrens', 'tomb', 'rotting', 'grove', 'demon', 'frozen', 'boss', 'boss2', 'vault', 'room'] as const;
 export type Track = (typeof TRACKS)[number];
 const MUSIC_VOL = 0.45;
 const FADE = 1.2;

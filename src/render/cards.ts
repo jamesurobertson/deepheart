@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Atlas } from './atlas.ts';
 import { corruptionOf, type CardDef } from '../game/data.ts';
 
-/** Frame colours: ordinary monsters in parchment, mid-bosses blue, zone bosses purple, goblins copper, gold copies gold. */
+/** Frame colors: ordinary monsters in parchment, mid-bosses blue, zone bosses purple, goblins copper, gold copies gold. */
 export const CARD_FRAME: Record<CardDef['kind'] | 'gold', string> = {
   monster: '#c9b8a0',
   mid: '#5fa8ff',
@@ -27,7 +27,7 @@ export function portrait(atlas: Atlas, card: CardDef, lap = 0): HTMLCanvasElemen
   const base = card.tint ?? 0xffffff;
   let t = [(base >> 16) & 255, (base >> 8) & 255, base & 255];
   if (lap) {
-    // The same mix the dungeon uses on corrupted monsters (scene.ts): 70% of the way to the lap's colour.
+    // The same mix the dungeon uses on corrupted monsters (scene.ts): 70% of the way to the lap's color.
     const k = corruptionOf(lap).tint;
     const lapTint = [(k >> 16) & 255, (k >> 8) & 255, k & 255];
     t = t.map((v, i) => v + ((v * lapTint[i]) / 255 - v) * 0.7);
@@ -53,7 +53,7 @@ export function portraitUrl(atlas: Atlas, card: CardDef, lap = 0): string {
 export const CARD_W = 22;
 export const CARD_H = 30;
 
-/** The card as it lies on the floor: a dark face with the monster on it, in a frame of its colour. */
+/** The card as it lies on the floor: a dark face with the monster on it, in a frame of its color. */
 export function cardTexture(atlas: Atlas, card: CardDef, gold: boolean): THREE.CanvasTexture {
   // Drawn at 4× so a portrait that has to shrink to fit still reads as pixels.
   const S = 4;

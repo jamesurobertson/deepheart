@@ -19,7 +19,7 @@ const STAIRS = new THREE.Vector3(7.5, 0, -4);
 const LOOK = new THREE.Vector3(0, 1.1, 0.5);
 
 interface Palette { torch: number; fog: number; hemi: number; wall: [number, number, number]; floor: [number, number, number]; banner: string; goo: number }
-/** Lighting per zone, in the same order as ZONES. Tiles with their own colour (jungle, tomb, sewer) get a lighter wash. */
+/** Lighting per zone, in the same order as ZONES. Tiles with their own color (jungle, tomb, sewer) get a lighter wash. */
 const PALETTES: Palette[] = [
   { torch: 0xff9a4a, fog: 0x0a0708, hemi: 0x6a5a78, wall: [0.66, 0.58, 0.6], floor: [1.1, 1.05, 1.02], banner: 'red', goo: 0 }, // Upper Halls
   { torch: 0x5ad6c8, fog: 0x04090b, hemi: 0x4a6a78, wall: [0.46, 0.62, 0.68], floor: [0.92, 1.08, 1.18], banner: 'blue', goo: 0 }, // Bone Crypts
@@ -43,7 +43,7 @@ const TRIP_STEP_IN = 0.55;
 const TRIP_FLASH = 0.5;
 const TRIP_ARRIVE = 0.7;
 
-/** A zone's palette on a later lap: torches, light and stone pulled toward the lap's colour, the dark a shade deeper. */
+/** A zone's palette on a later lap: torches, light and stone pulled toward the lap's color, the dark a shade deeper. */
 function corrupt(p: Palette, lap: number): Palette {
   if (!lap) return p;
   const c = new THREE.Color(corruptionOf(lap).tint);
@@ -65,7 +65,7 @@ const COIN_SIZE = 1.15;
 const CLUTCH_RELEASE = 0.9;
 const CLUTCH_END = 1.9;
 
-/** A relic on the floor: its glow in the rarity's colour, how long it waits before flying to the party by itself
+/** A relic on the floor: its glow in the rarity's color, how long it waits before flying to the party by itself
  *  (shorter while the staircase is waiting on it), and how long that flight takes. */
 const LOOT_COLORS = [0xc9b8a0, 0x5fa8ff, 0xc77dff, 0xffb13d];
 const LOOT_WAIT = 6;
@@ -463,7 +463,7 @@ export class Scene {
     addEventListener('resize', () => this.resize());
   }
 
-  /** Space the UI covers on the right (desktop) or bottom (phone), so the fight centres in what's left. */
+  /** Space the UI covers on the right (desktop) or bottom (phone), so the fight centers in what's left. */
   setViewport(right: number, bottom: number, top = 0) {
     if (right === this.view.right && bottom === this.view.bottom && top === this.view.top) return;
     this.view = { right, bottom, top };
@@ -479,7 +479,7 @@ export class Scene {
     const { right, bottom, top } = this.view;
     const freeW = Math.max(160, w - right);
     const freeH = Math.max(140, h - bottom - top);
-    // Shift the frustum so its centre lands in the middle of the free area.
+    // Shift the frustum so its center lands in the middle of the free area.
     const cx = freeW / 2;
     const cy = top + freeH / 2;
     const fullW = 2 * Math.max(cx, w - cx);
@@ -542,7 +542,7 @@ export class Scene {
     });
   }
 
-  /** A rainbow: seven half-rings, outside in (centred on the group's origin, standing up). */
+  /** A rainbow: seven half-rings, outside in (centered on the group's origin, standing up). */
   private rainbowArc(radius: number, width: number, opacity: number): THREE.Group {
     const group = new THREE.Group();
     RAINBOW.forEach((color, i) => {
@@ -596,7 +596,7 @@ export class Scene {
     this.hemi.color.setHex(p.hemi);
     this.wallMat.color.setRGB(...p.wall);
     for (const l of this.torchLights) l.color.setHex(p.torch);
-    // Flames burn in the zone's colour: teal in the crypts, green in the jungle, and so on.
+    // Flames burn in the zone's color: teal in the crypts, green in the jungle, and so on.
     this.flameMat.color.setHex(p.torch).lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(1.4);
   }
 
@@ -825,7 +825,7 @@ export class Scene {
     return this.lastKillAt.clone();
   }
 
-  /** A relic or card lands, glowing in its colour (a relic's rarity, a card's frame). */
+  /** A relic or card lands, glowing in its color (a relic's rarity, a card's frame). */
   private dropLoot(ev: Drop, at: THREE.Vector3) {
     let icon: LootView['icon'];
     let color: THREE.Color;
@@ -847,7 +847,7 @@ export class Scene {
       tier = ev.gold ? 3 : ['monster', 'mid', 'boss', 'goblin'].indexOf(def.kind);
       color = new THREE.Color(ev.gold ? CARD_FRAME.gold : CARD_FRAME[def.kind]);
       const map = cardTexture(this.atlas, def, ev.gold);
-      // Lit by its own picture as well as the room, so the frame keeps its colour in the dungeon's warm gloom.
+      // Lit by its own picture as well as the room, so the frame keeps its color in the dungeon's warm gloom.
       const face = (tex: THREE.Texture) => new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.6, color: 0x999999 });
       const geo = new THREE.PlaneGeometry(CARD_W / CARD_H, 1);
       const mesh = new THREE.Mesh(geo, face(map));
@@ -934,7 +934,7 @@ export class Scene {
     l.ring.visible = false;
   }
 
-  /** Picked up: a burst in its colour, and the UI shows its card. */
+  /** Picked up: a burst in its color, and the UI shows its card. */
   private collectLoot(i: number) {
     const [l] = this.loot.splice(i, 1);
     const { color } = l;
@@ -1299,7 +1299,7 @@ export class Scene {
     if (m.mods.includes('armored')) tint.multiply(new THREE.Color(0xb4c4dc));
     if (m.mods.includes('enraged')) tint.multiply(new THREE.Color(0xff9a88));
     if (m.mods.includes('regen')) tint.multiply(new THREE.Color(0xb8ffb0));
-    // Later laps: everything that climbs the stairs wears the corruption's colour.
+    // Later laps: everything that climbs the stairs wears the corruption's color.
     // (From the floor, not the room: the vault's treasure room has no lap.)
     const lap = Math.floor(zoneOf(this.lastFloor) / ZONES.length);
     if (lap) tint.lerp(tint.clone().multiply(new THREE.Color(corruptionOf(lap).tint)), 0.7);
@@ -1461,7 +1461,7 @@ export class Scene {
       r.group.position.z = 3.6 + Math.sin(t * Math.PI * 4) * 0.8;
       r.light.intensity = 9 + Math.sin(this.time * 10) * 3;
       r.sprite.update(dt);
-      // The rainbow goblin cycles through every colour, and so does its glow.
+      // The rainbow goblin cycles through every color, and so does its glow.
       const hue = (this.time * 0.9) % 1;
       if (r.rainbow) {
         r.sprite.mesh.material.color.setHSL(hue, 1, 0.7);
@@ -1882,7 +1882,7 @@ export class Scene {
     return 0.16 + 0.84 * k * k * (3 - 2 * k);
   }
 
-  /** The held breath lets go: a shockwave, gold everywhere, the colour flooding back. */
+  /** The held breath lets go: a shockwave, gold everywhere, the color flooding back. */
   private clutchRelease(at: THREE.Vector3) {
     this.fx.shockwave(at.clone().setY(0.1), 9);
     this.fx.ring(at.clone().setY(0.1), 0xffd070, 3.5, 0.6);
@@ -2252,7 +2252,7 @@ export class Scene {
 
   // ---------- goblin vault ----------
 
-  /** The vault's chests: new ones pop up one after another, shut ones glint, Rainbow Chests glow every colour. */
+  /** The vault's chests: new ones pop up one after another, shut ones glint, Rainbow Chests glow every color. */
   private updateVaultChests(dt: number, game: Game) {
     const list = game.vault?.chests ?? [];
     list.forEach((c, k) => {
@@ -2456,7 +2456,7 @@ export class Scene {
     return group;
   }
 
-  /** A portal's swirl: the doorway cycles the rainbow and breathes, throwing off coloured sparks. */
+  /** A portal's swirl: the doorway cycles the rainbow and breathes, throwing off colored sparks. */
   private animatePortal(portal: THREE.Group, dt: number) {
     const disc = portal.getObjectByName('disc') as THREE.Mesh | undefined;
     if (disc) (disc.material as THREE.MeshBasicMaterial).color.setHSL((this.time * 0.6) % 1, 0.9, 0.65);
@@ -2659,7 +2659,7 @@ export class Scene {
         this.camera.position.lerp(focus.clone().add(new THREE.Vector3(0, 3, 9)), push * 0.35);
         look.lerp(focus, push * 0.5);
       }
-      // A clutch kill: push in on the fallen boss and drain the colour, then let both go with the release.
+      // A clutch kill: push in on the fallen boss and drain the color, then let both go with the release.
       const c = this.clutch;
       if (c) {
         const inT = Math.min(1, c.t / 0.35);

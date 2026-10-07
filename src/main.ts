@@ -9,7 +9,7 @@ import { Scene } from './render/scene.ts';
 import { Ui } from './ui/ui.ts';
 import { setAtlas } from './ui/px.ts';
 import { Sfx, type Track } from './audio/sfx.ts';
-import { zoneOf } from './game/data.ts';
+import { CARDS, CORRUPTION, lapOf, zoneOf } from './game/data.ts';
 
 declare global {
   interface Window {
@@ -22,7 +22,10 @@ const params = new URLSearchParams(location.search);
 // ?slot=name keeps a separate save (handy for testing without touching your run).
 /** Where the site is served from ('./' in builds), so asset URLs work in a subfolder. */
 const BASE = import.meta.env.BASE_URL;
-const SAVE_KEY = 'deepheart-save' + (params.get('slot') ? `:${params.get('slot')}` : '');
+// ?state=awaken (dev only) plays in its own slot, so the test save never touches yours.
+const TEST_STATE = import.meta.env.DEV ? params.get('state') : null;
+const SLOT = params.get('slot') ?? (TEST_STATE ? `state-${TEST_STATE}` : null);
+const SAVE_KEY = 'deepheart-save' + (SLOT ? `:${SLOT}` : '');
 const STEP = 1 / 30;
 /** Away (tab hidden or closed) longer than this counts as offline: paid at the offline rate, with a summary. Shorter is played out at full speed. */
 const OFFLINE_AFTER = 60;
@@ -66,10 +69,21 @@ async function boot() {
     } catch { /* storage unavailable: play continues unsaved */ }
   };
 
+  /** When you went into the kid's room (0: you're in the dungeon). */
+  let inRoomSince = 0;
   const ui = new Ui(document.getElementById('ui')!, game, scene, {
     sound: (n, o) => sfx.play(n, o),
     save,
-    dreaming: (on) => (sfx.musicOn = !on && game.s.settings.music),
+    dreaming: (on, awayCounts) => {
+      // Time in the kid's room counts as time away: the dungeon waits, then catches up when you come back.
+      if (on) inRoomSince = Date.now();
+      else {
+        const away = (Date.now() - inRoomSince) / 1000;
+        inRoomSince = 0;
+        lastTick = Date.now();
+        if (awayCounts) catchUp(away);
+      }
+    },
     settings: () => {
       applySettings();
       save();
@@ -124,6 +138,36 @@ async function boot() {
       game.goFloor(deepest);
       scene.rebuild(game);
     }
+    // ?state=awaken: deep enough to Awaken for the first time, with a binder full of cards (lots of spares to trade,
+    // a few gold, a handful new since you last woke). ?state=reawaken: the same, having awakened once already.
+    // Rebuilt on every load, so you can Awaken, reload and do it again.
+    if (TEST_STATE === 'awaken' || TEST_STATE === 'reawaken') {
+      const s = game.s;
+      const again = TEST_STATE === 'reawaken';
+      Object.assign(s, { awakens: again ? 1 : 0, dreamSeen: again, stones: again ? 1 : 0, souls: again ? 2e6 : 5e4, soulsLifetime: again ? 5e5 : 0 });
+      const depth = game.awakenFloor();
+      Object.assign(s, { maxFloor: depth, bestFloor: Math.max(s.bestFloor, depth), cycleBest: depth, bestCleared: depth - 1, auto: true });
+      s.owned = s.owned.map((n) => Math.max(n, 40 + depth * 4));
+      s.cards = {};
+      let seed = 7;
+      const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      for (const c of CARDS.filter((x) => x.kind !== 'goblin' && x.floor <= depth)) {
+        if (rand() < 0.3) continue;
+        const n = CORRUPTION.map(() => 0);
+        const gold = CORRUPTION.map(() => 0);
+        // Only colors it can come in: the later laps' newcomers have no plain copy.
+        const first = lapOf(c.floor);
+        n[first] = 1 + Math.floor(rand() * 6);
+        if (first === 0 && lapOf(depth) > 0 && rand() < 0.2) n[1] = 1;
+        if (c.gold && rand() < 0.08) gold[first] = 1;
+        s.cards[c.id] = { n, gold, at: 1000 + Math.floor(rand() * 90000) };
+      }
+      s.dreamCards = Object.keys(s.cards).filter(() => rand() < 0.12).slice(0, 6).map((id) => `${id}:${s.cards[id].n.findIndex((n) => n > 0)}:0`);
+      game.invalidate();
+      game.goFloor(depth);
+      scene.rebuild(game);
+      save();
+    }
     // step(n, click) advances n frames by hand: handy when the tab is in the background.
     const step = (n: number, click = false) => {
       for (let i = 0; i < n; i++) {
@@ -176,8 +220,8 @@ async function boot() {
     const now = Date.now();
     const gap = (now - lastTick) / 1000;
     lastTick = now;
-    // Hidden tabs are paused; the time is settled when you come back.
-    if (document.hidden) return;
+    // Hidden tabs (and the dungeon while you're in the room) are paused; the time is settled when you come back.
+    if (document.hidden || inRoomSince) return;
     // A long gap while visible means the computer slept.
     if (gap > OFFLINE_AFTER) return catchUp(gap);
     // The zone interlude pauses the fight (nothing is lost; it just waits).
@@ -196,7 +240,8 @@ async function boot() {
       hiddenAt = Date.now();
       save();
     } else if (hiddenAt) {
-      catchUp((Date.now() - hiddenAt) / 1000);
+      // Hidden while in the room: leaving the room settles that time.
+      if (!inRoomSince) catchUp((Date.now() - hiddenAt) / 1000);
       hiddenAt = 0;
       lastTick = Date.now();
     }
@@ -240,7 +285,8 @@ async function boot() {
       slow = 0.1;
       ui.update();
     }
-    sfx.music(trackFor(game));
+    // The kid's room has its own tune.
+    sfx.music(inRoomSince ? 'room' : trackFor(game));
   };
   ui.update();
   requestAnimationFrame(frame);

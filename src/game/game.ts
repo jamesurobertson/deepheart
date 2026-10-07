@@ -231,10 +231,12 @@ export interface SaveState {
   awakens: number;
   /** Has the first wake-up (the dungeon was a dream) played? */
   dreamSeen: boolean;
-  /** Cards found since you last woke up, shown arriving in the binder next time. */
+  /** Cards you've got (found, traded or dug up) but not yet seen in the binder, as `id:lap:gold`; they slam in when you look. */
   dreamCards: string[];
   /** Trades made with the brothers. */
   trades: number;
+  /** The hidden cards (in your room and around town) you've found. */
+  stashes: string[];
   /** Bosses beaten in the last seconds, champions slain, Rainbow Vaults opened, highest Rampage tier reached. */
   clutches: number;
   champions: number;
@@ -249,7 +251,8 @@ export interface SaveState {
   rampage: number;
   /** Cards by id: copies per edition (normal, then each corruption; only normal is shown so far), plain and gold, and
    *  the kill (for goblins, the catch) that first dropped each. */
-  cards: Record<string, { n: number[]; gold: number[]; at?: number; goldAt?: number }>;
+  /** Copies by lap; the kill your first one (and first gold one) dropped on, or the brother you traded it from. */
+  cards: Record<string, { n: number[]; gold: number[]; at?: number; goldAt?: number; via?: string; goldVia?: string }>;
   /** Monsters slain per card id (a swept floor counts the monsters it wipes out). */
   slain: Record<string, number>;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
@@ -267,7 +270,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
@@ -533,6 +536,8 @@ export class Game {
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
+    // Unseen cards used to be bare ids (plain, first color).
+    s.dreamCards = s.dreamCards.map((k) => (k.includes(':') ? k : `${k}:${Math.min(lapOf(CARD_BY_ID.get(k)?.floor ?? 1), CORRUPTION.length - 1)}:0`));
     // Abyss powers became levelled: every soul spent on the old one-off powers comes back to spend again.
     const legacy = s as unknown as { abyss?: string[]; runSouls?: number };
     if (legacy.abyss) {
@@ -1766,17 +1771,24 @@ export class Game {
     const kill = this.cardKill(id);
     if (first && gold) c.goldAt = kill;
     else if (first) c.at = kill;
-    (gold ? c.gold : c.n)[Math.min(lapOf(this.s.floor), CORRUPTION.length - 1)]++;
-    if (this.s.dreamCards.length < 999) this.s.dreamCards.push(id);
+    const lap = Math.min(lapOf(this.s.floor), CORRUPTION.length - 1);
+    (gold ? c.gold : c.n)[lap]++;
+    this.unseen(id, lap, gold);
     this.events.push({ t: 'card', id, gold, count: this.cardCount(id), first, src, kill });
   }
 
-  /** Waking up: the cards found while you slept go into the binder. */
-  wake() {
-    const found = this.s.dreamCards;
+  private unseen(id: string, lap: number, gold: boolean) {
+    const key = `${id}:${lap}:${gold ? 1 : 0}`;
+    if (!this.s.dreamCards.includes(key) && this.s.dreamCards.length < 999) this.s.dreamCards.push(key);
+  }
+
+  /** You've looked through the binder: nothing in it is new any more. */
+  seeCards() {
     this.s.dreamCards = [];
+  }
+
+  wake() {
     this.s.dreamSeen = true;
-    return found;
   }
 
   /** Which kill of this monster it is (for the goblins, which catch). */
@@ -1827,7 +1839,8 @@ export class Game {
     const zone = CARD_BY_ID.get(give[Math.floor(Math.random() * give.length)])!.zone;
     const pool = this.tradeable(zone);
     if (!pool.length || !this.takeSpares(give)) return null;
-    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false);
+    this.s.trades++;
+    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, 'Daniel');
   }
 
   /** Victor: ten spares from anywhere for a random gold card. */
@@ -1835,7 +1848,19 @@ export class Game {
     if (give.length !== VICTOR_GIVES || give.some((id) => CARD_BY_ID.get(id)?.kind === 'goblin')) return null;
     const pool = this.tradeable().filter((c) => c.gold);
     if (!pool.length || !this.takeSpares(give)) return null;
-    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, true);
+    this.s.trades++;
+    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, true, 'Victor');
+  }
+
+  /** A hidden card: each spot gives one once ever, one you don't have yet if there's any left to find. */
+  findStash(spot: string) {
+    if (this.s.stashes.includes(spot)) return null;
+    const reached = this.tradeable();
+    const missing = reached.filter((c) => !this.cardCount(c.id));
+    const pool = missing.length ? missing : reached;
+    if (!pool.length) return null;
+    this.s.stashes.push(spot);
+    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, spot);
   }
 
   /** Hand over these copies (an id twice means two copies), taken from whichever lap you have most of. */
@@ -1853,11 +1878,15 @@ export class Game {
     return true;
   }
 
-  private receive(id: string, gold: boolean) {
+  private receive(id: string, gold: boolean, from: string) {
     const c = (this.s.cards[id] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
     const first = gold ? !this.hasGoldCard(id) : !this.cardCount(id);
-    (gold ? c.gold : c.n)[0]++;
-    this.s.trades++;
+    if (first && gold) c.goldVia = from;
+    else if (first) c.via = from;
+    // Later-lap newcomers have no plain copy: they arrive in the first color they come in.
+    const lap = Math.min(lapOf(CARD_BY_ID.get(id)!.floor), CORRUPTION.length - 1);
+    (gold ? c.gold : c.n)[lap]++;
+    this.unseen(id, lap, gold);
     this.checkTrophies();
     return { id, gold, first };
   }

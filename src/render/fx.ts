@@ -198,7 +198,7 @@ function jag(a: THREE.Vector3, b: THREE.Vector3, steps: number, spread: number):
 }
 
 /**
- * Flat ribbon of quads along a polyline (facing the camera), `w` wide. Vertex colours
+ * Flat ribbon of quads along a polyline (facing the camera), `w` wide. Vertex colors
  * fade from full at `bottom` to black `fade` units above it (invisible, since it's additive).
  */
 function ribbon(pts: THREE.Vector3[], w: number, bottom: number, fade: number): THREE.BufferGeometry {
@@ -238,7 +238,7 @@ const STAIN_LIFE = 9;
 
 /**
  * Pixel-art splat shapes, drawn once: a lumpy core, a few satellite droplets and a
- * couple of streaks, in two tones (tinted per monster by the material colour).
+ * couple of streaks, in two tones (tinted per monster by the material color).
  */
 const SPLATS: THREE.Texture[] = (() => {
   const out: THREE.Texture[] = [];
@@ -294,7 +294,7 @@ const SPLATS: THREE.Texture[] = (() => {
 })();
 const SPLAT_GEO = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 
-/** A crescent whose colour runs from dark (tail) to bright (head): additive, so the tail vanishes. */
+/** A crescent whose color runs from dark (tail) to bright (head): additive, so the tail vanishes. */
 function crescent(size: number, arc: number): THREE.BufferGeometry {
   const n = 22;
   const pos: number[] = [];
@@ -505,7 +505,7 @@ export class Fx {
 
   /**
    * Lightning striking down onto `target` from above: a pixel-jagged bolt with a white
-   * core and a coloured glow, a couple of branches, flickering between shapes, plus a
+   * core and a colored glow, a couple of branches, flickering between shapes, plus a
    * flash of light and a scorch ring where it lands.
    */
   lightning(target: THREE.Vector3, color: THREE.ColorRepresentation = 0x9fe6ff, height = 5, dur = 0.24) {
@@ -640,7 +640,7 @@ export class Fx {
     if (!pixels.length) return;
     while (this.shards.length >= MAX_SHATTERS) this.dropShard(0);
     const n = pixels.length;
-    // Unlit, so the pieces keep the monster's own colours whatever the room's light (a corrupted lap's purple, say),
+    // Unlit, so the pieces keep the monster's own colors whatever the room's light (a corrupted lap's purple, say),
     // a shade dimmed so white pixels (bones) don't blow out in the bloom.
     const mesh = new THREE.InstancedMesh(CUBE, new THREE.MeshBasicMaterial({ transparent: true }), n);
     const pos = new Float32Array(n * 3);

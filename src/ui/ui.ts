@@ -5,10 +5,11 @@ import { DESCEND_FLOOR, FLOOR_KILLS, isBossFloor, type Buff, type Game, type Gam
 import type { Drop, Scene } from '../render/scene.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
-import { G, cardArt, cardCanvas, charFit, sprite, spriteFit } from './px.ts';
-import type { BinderCard } from './binder.ts';
+import { G, cardArt, charFit, sprite, spriteFit } from './px.ts';
+import type { BinderCard, BinderColor } from './binder.ts';
 import { TradeMat, type Brother } from './trade.ts';
 import { playDream } from './dream.ts';
+import { STASHES } from './world.ts';
 
 export interface UiHooks {
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
@@ -17,8 +18,9 @@ export interface UiHooks {
   exportSave: () => string;
   importSave: (text: string) => boolean;
   reset: () => void;
-  /** The wake-up scene is playing: the dungeon's music hushes. */
-  dreaming: (on: boolean) => void;
+  /** You're in the kid's room (or back out of it): the dungeon waits. `awayCounts` settles the time spent like time
+   *  away (not after an awakening, which starts the run over). */
+  dreaming: (on: boolean, awayCounts?: boolean) => void;
 }
 
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
@@ -26,7 +28,7 @@ const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: '
 const MAX_POPS = 90;
 const RARITY_COLORS = ['#c9b8a0', '#5fa8ff', '#c77dff', '#ffb13d'];
 
-/** Little coloured labels for boss modifiers. */
+/** Little colored labels for boss modifiers. */
 const modChips = (mods: ModId[]) => mods.map((id) => `<em class="mod" style="--mc:${MOD_BY_ID.get(id)!.color}">${MOD_BY_ID.get(id)!.name}</em>`).join('');
 const MAX_COINS = 24;
 /** How often a rare ticker line (the hints that it's all a dream) is in the running. */
@@ -85,7 +87,7 @@ function buffText(b: Buff) {
 
 const MAP_ROOMS = 5;
 
-/** A tiny pixel-art icon from rows of '#' (filled) and '.' (empty), drawn in the current text colour. */
+/** A tiny pixel-art icon from rows of '#' (filled) and '.' (empty), drawn in the current text color. */
 function pixelIcon(rows: string[]) {
   const cells = rows.flatMap((row, y) => [...row].map((c, x) => (c === '#' ? `<rect x="${x}" y="${y}" width="1" height="1"/>` : '')));
   return `<svg class="pxi" viewBox="0 0 ${rows[0].length} ${rows.length}" style="--w:${rows[0].length}" shape-rendering="crispEdges">${cells.join('')}</svg>`;
@@ -220,6 +222,7 @@ export class Ui {
         <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy(3)}<span>Collection</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics">${G.relic(3)}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>Ascend</span><em class="badge" hidden></em></button>
+        <button class="btn dock-b dock-room" data-act="room" data-tip="dock:room" hidden>${charFit('cr_beanie_kid', 26)}<span>Room</span></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>Stats</span></button>
         <button class="btn dock-b dock-stat blade-rate" data-tip="dock:blade" tabindex="-1">${spriteFit('weapon_knife', 20, 'glyph')}<span>1/s</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu(3)}<span>Options</span></button>
@@ -256,7 +259,7 @@ export class Ui {
       fever: q('.fever'), feverBar: q('.fever > i'), feverLabel: q('.fever > span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), vaultPick: q('.vault-pick'), vaultLeave: q('.vault-leave'), vaultFaces: q('.vp-faces'), heroMark: q('.hero-mark'), raid: q('.raid-mark'), exitMark: q('.exit-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'), upgGrid: q('.upg-grid'),
       upgEmpty: q('.upgs-empty'), buyAll: q('.buy-all'), autoUpg: q('.auto-upg'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
-      blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'),
+      blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), roomBtn: q('[data-act=room]'),
       relicBadge: q('[data-open=relics] .badge'), cardBadge: q('[data-open=trophies] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
     };
 
@@ -295,6 +298,8 @@ export class Ui {
     this.syncMute();
     this.layout();
     addEventListener('resize', () => this.layout());
+    // The dock grows as buttons unlock (the Room one appears after the first awakening): keep the ticker clear of it.
+    new ResizeObserver(() => this.layout()).observe(this.root.querySelector('.dock')!);
     setNotation(game.s.settings.notation);
     this.nextNews();
   }
@@ -321,7 +326,7 @@ export class Ui {
     const freeH = sheet ? shop.top : h;
     this.field = { w: freeW, h: freeH };
     this.root.style.setProperty('--free-w', `${freeW}px`);
-    // The floor map sits in the top-left corner only when the gold counter, centred over the fight, can't reach it.
+    // The floor map sits in the top-left corner only when the gold counter, centered over the fight, can't reach it.
     body.toggle('map-in-bar', compact || freeW < 980);
     this.root.style.setProperty('--free-h', `${freeH}px`);
     // The news ticker starts where the dock ends (the dock grows as features are added).
@@ -785,6 +790,7 @@ export class Ui {
         break;
       case 'descend': this.renderDescendConfirm(); break;
       case 'awaken': this.renderAwakenConfirm(); break;
+      case 'room': if (this.game.s.dreamSeen && !document.body.classList.contains('dreaming')) this.playDream(false, undefined, undefined, true); break;
       case 'awakenGo': this.doAwaken(); break;
       case 'heartBack': this.modal = 'heart'; this.renderModal(); break;
       case 'descendGo': this.doDescend(); break;
@@ -1276,6 +1282,8 @@ export class Ui {
     }
     const rb = this.el.relicBadge;
     rb.hidden = this.newRelics < 1;
+    // After the reveal, the kid's room is always a button away.
+    this.el.roomBtn.hidden = !g.s.dreamSeen;
     rb.textContent = `+${this.newRelics}`;
     const cb = this.el.cardBadge;
     cb.hidden = this.newCards < 1;
@@ -1861,12 +1869,20 @@ export class Ui {
       // Until you've killed one, only where to find it: not its name.
       if (!n && !g.cardMet(id)) return `<div class="tt-h"><b>???</b></div><p class="tt-d">Not met yet.</p><ul class="tt-l">${lines}</ul>`;
       const what = { monster: 'monster card', mid: 'mid-boss card', boss: 'boss card', goblin: 'goblin card' }[c.kind];
-      const head = `<div class="tt-h"><b style="color:${gilded ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${esc(c.name)} Card</b><span class="tt-own">${n ? `×${n}${gilded ? ' · gold' : ''}` : what}</span></div>`;
       const own = g.s.cards[id];
+      // In the Cards panel you're looking at one color (a lap's tint, plain or gold): count only that one.
+      const inPanel = this.modal === 'cards';
+      const view = Math.min(this.cardLap, lapOf(g.s.bestFloor), CORRUPTION.length - 1);
+      const here = inPanel ? ((this.cardGold ? own?.gold : own?.n)?.[view] ?? 0) : n;
+      const gilt = inPanel ? this.cardGold : gilded;
+      const head = `<div class="tt-h"><b style="color:${gilt && here ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${inPanel ? `${this.cardGold ? 'Gold ' : ''}${view ? `${CORRUPTION[view].name} ` : ''}` : ''}${esc(c.name)} Card</b><span class="tt-own">${here ? `×${here}${!inPanel && gilded ? ' · gold' : ''}` : what}</span></div>`;
       const unit = c.kind === 'goblin' ? 'catch' : 'kill';
-      const found = [own?.at ? `Got your first at ${unit} #${fmt(own.at)}` : '', own?.goldAt ? `gold at ${unit} #${fmt(own.goldAt)}` : ''].filter(Boolean).join(' · ');
+      // When it was first found (that's the plain copy, or the first gold one), only where that's what you're looking at.
+      const got = (at?: number, via?: string, what = 'your first') => (at ? `Got ${what} at ${unit} #${fmt(at)}` : via ? this.viaLine(via, ` ${what}`) : '');
+      const first = !inPanel ? [got(own?.at, own?.via), got(own?.goldAt, own?.goldVia, 'your first gold one')].filter(Boolean).join(' · ')
+        : here && view === 0 ? (this.cardGold ? got(own?.goldAt, own?.goldVia, 'your first gold one') : got(own?.at, own?.via)) : '';
       const caught = id === 'rainbow-goblin' ? g.s.rainbows : g.s.raids - g.s.rainbows;
-      const tally = `${found ? `<p class="tt-got">${found}</p>` : ''}<p class="tt-f">${c.kind === 'goblin' ? `Caught: ${fmt(caught)}` : `Slain: ${fmt(slain)}`}</p>`;
+      const tally = `${first ? `<p class="tt-got">${first}</p>` : ''}<p class="tt-f">${c.kind === 'goblin' ? `Caught: ${fmt(caught)}` : `Slain: ${fmt(slain)}`}</p>`;
       return `${head}<ul class="tt-l">${lines}</ul>${tally}`;
     }
     if (kind === 'aby') {
@@ -1921,6 +1937,7 @@ export class Ui {
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
         abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls.` : g.descendOpen() ? (g.s.maxFloor <= g.s.lastAscent ? `Souls lie deeper than floor ${g.s.lastAscent}.` : 'Earn more gold for your next soul.') : `The way up opens at the floor ${g.ascendFloor()} boss.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
         stats: 'Your numbers, and where every bonus comes from.',
+        room: 'Your room: the binder, and Daniel and Victor to trade with.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
         blade: `Phantom Blade: attacks the front monster for you ${perSec(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades, Abyss powers and the Phantom Hilt make it faster.`,
@@ -2104,11 +2121,10 @@ export class Ui {
   }
 
   /** Cards that are new in the binder: found while you slept, or traded for since you last looked. */
-  private freshCards = new Set<string>();
 
   /** A brother's trade window, opened by talking to him in the waking world. */
   openTrade(who: Brother, host: HTMLElement, closed: () => void) {
-    new TradeMat({ who, game: this.game, host, sound: this.hooks.sound, save: this.hooks.save, closed, gained: (id) => this.freshCards.add(id) });
+    new TradeMat({ who, game: this.game, host, sound: this.hooks.sound, save: this.hooks.save, closed });
   }
 
   /** Every monster's card, zone by zone: a dark silhouette until the card turns up. A zone's row
@@ -2484,18 +2500,35 @@ export class Ui {
 
   /** Waking up: the whole reveal the first time, a short wake-up after. `sleep` runs once the screen is black on the way
    *  back down (the awakening itself). */
-  playDream(first: boolean, sleep?: () => void, done?: () => void) {
+  playDream(first: boolean, sleep?: () => void, done?: () => void, visit = false) {
     const g = this.game;
-    this.freshCards = new Set(g.s.dreamCards);
     const freshCount = g.s.dreamCards.length;
     this.hideTip();
     this.hooks.dreaming(true);
     playDream({
-      first, found: g.cardsFound(), fresh: freshCount, sound: this.hooks.sound,
-      binder: () => ({ cards: CARDS.map((c) => this.binderCard(c, this.freshCards.has(c.id))), found: g.cardsFound() }),
-      seen: () => this.freshCards.clear(),
-      hasNew: () => this.freshCards.size > 0,
+      first, visit, found: g.cardsFound(), fresh: freshCount, sound: this.hooks.sound,
+      hero: COMPS[Math.max(0, g.heroIndex())],
+      figures: this.figures(),
+      binder: () => {
+        const fresh = new Map<string, string[]>();
+        for (const key of g.s.dreamCards) {
+          const [id, ...view] = key.split(':');
+          fresh.set(id, [...(fresh.get(id) ?? []), view.join(':')]);
+        }
+        return { cards: CARDS.map((c) => this.binderCard(c, fresh.get(c.id) ?? [])), colors: this.binderColors() };
+      },
+      seen: () => {
+        g.seeCards();
+        this.hooks.save();
+      },
+      hasNew: () => g.s.dreamCards.length > 0,
       trade: (who, host, closed) => this.openTrade(who, host, closed),
+      stash: (spot) => {
+        const got = g.findStash(spot);
+        if (!got) return null;
+        this.hooks.save();
+        return CARD_BY_ID.get(got.id)!.name;
+      },
       cover: () => {
         g.wake();
         this.hooks.save();
@@ -2505,28 +2538,50 @@ export class Ui {
         this.hooks.save();
       },
       done: () => {
-        this.hooks.dreaming(false);
+        this.hooks.dreaming(false, !sleep);
         done?.();
       },
     });
   }
 
+  /** The action figures in the kid's room: the party you've hired (your hero's in his hand) and the zone's monsters. */
+  private figures() {
+    const g = this.game;
+    const hero = Math.max(0, g.heroIndex());
+    const party = COMPS.filter((_, i) => i !== hero && g.s.owned[i] > 0).map((c) => c.sprite);
+    const foes = [...new Set(bandFor(g.s.floor).map((d) => d.sprite))].slice(0, 2);
+    return { party: party.slice(0, 2), foes, shelf: party.slice(2, 8) };
+  }
+
   /** A card as the binder shows it: its pocket, and everything on the back. */
-  private binderCard(c: (typeof CARDS)[number], fresh: boolean): BinderCard {
+  private binderCard(c: (typeof CARDS)[number], fresh: string[]): BinderCard {
     const g = this.game;
     const own = g.s.cards[c.id];
-    const got = g.cardCount(c.id) > 0;
-    const gold = g.hasGoldCard(c.id);
     const tiles = c.zone < 0 ? 'halls' : tilesFor(c.zone);
     return {
-      id: c.id, name: c.name, kind: { monster: 'Monster', mid: 'Boss', boss: 'Zone boss', goblin: 'Goblin' }[c.kind], color: gold ? CARD_FRAME.gold : CARD_FRAME[c.kind],
-      got, gold, fresh, thumb: got ? cardArt(c, 64, c.id === 'rainbow-goblin' ? 'rainbow' : '') : '', art: got ? cardCanvas(c) : null,
+      def: c, kind: { monster: 'Monster', mid: 'Boss', boss: 'Zone boss', goblin: 'Goblin' }[c.kind], fresh,
       floor: tiles === 'halls' ? 'floor_1' : `${tiles}_floor_1`,
       where: c.where.filter((w) => w.floor <= g.s.bestFloor).map((w) => w.text),
-      copies: own ? own.n.reduce((a, b) => a + b, 0) : 0, goldCopies: own ? own.gold.reduce((a, b) => a + b, 0) : 0,
-      laps: CORRUPTION.map((cr, i) => ({ color: `#${cr.tint.toString(16).padStart(6, '0')}`, got: !!own && own.n[i] + own.gold[i] > 0 })),
-      firstKill: own?.at ?? own?.goldAt ?? null,
+      n: own ? own.n : CORRUPTION.map(() => 0), gold: own ? own.gold : CORRUPTION.map(() => 0),
+      fromLap: lapOf(c.floor), canGold: c.gold,
+      first: { plain: this.firstLine(own?.at, own?.via, c.kind === 'goblin'), gold: this.firstLine(own?.goldAt, own?.goldVia, false) },
     };
+  }
+
+  /** How you got your first copy: the kill it dropped on, or the brother you traded it from. */
+  private firstLine(at: number | undefined, via: string | undefined, goblin: boolean) {
+    return at ? `First found on ${goblin ? 'catch' : 'kill'} #${fmt(at)}` : via ? this.viaLine(via) : '';
+  }
+
+  private viaLine(via: string, what = '') {
+    const spot = STASHES.find((s) => s.id === via);
+    return spot ? `Found${what} ${spot.found}` : `Traded${what} from ${via}`;
+  }
+
+  /** The binders you have: plain, plus each lap's color once you've been that deep. */
+  private binderColors(): BinderColor[] {
+    const laps = Math.min(lapOf(this.game.s.bestFloor), CORRUPTION.length - 1);
+    return CORRUPTION.slice(0, laps + 1).map((c, l) => ({ name: l ? c.name : 'Plain', tint: `#${(l ? c.tint : 0xc9b8a0).toString(16).padStart(6, '0')}` }));
   }
 
   private renderDescendConfirm() {

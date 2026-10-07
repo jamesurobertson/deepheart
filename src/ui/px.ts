@@ -20,13 +20,13 @@ export function cardCanvas(card: CardDef, lap = 0): HTMLCanvasElement | null {
   return atlas ? portrait(atlas, card, lap) : null;
 }
 
-/** Characters made by recolouring another sprite: Victor is Daniel's sprite with brown hair and a blue shirt. */
+/** Characters made by recoloring another sprite: Victor is Daniel's sprite with brown hair and a blue shirt. */
 const VARIANTS: Record<string, { base: string; swap: Record<string, string> }> = {
   victor: { base: 'ef_elf_m', swap: { '#facb3e': '#9a6a3a', '#ee8e2e': '#6a4024', '#c56025': '#3f6aa8', '#62232f': '#263a66' } },
 };
 const variants = new Map<string, { img: HTMLCanvasElement; frames: Rect[] }>();
 
-/** A variant's frames (`victor`, or `victor_run` for walking), recoloured onto their own little sheet. */
+/** A variant's frames (`victor`, or `victor_run` for walking), recolored onto their own little sheet. */
 function variantFrames(name: string) {
   const run = name.endsWith('_run');
   const v = VARIANTS[run ? name.slice(0, -4) : name];
@@ -94,7 +94,7 @@ export function spriteFit(name: string, box: number, cls = ''): string {
 export function charFit(name: string, height: number, maxW = height * 1.2, cls = ''): string {
   const v = VARIANTS[name] && variantFrames(name);
   if (v) {
-    // A recoloured character lives on its own canvas: show its first frame as an image.
+    // A recolored character lives on its own canvas: show its first frame as an image.
     const f = v.frames[0];
     const one = document.createElement('canvas');
     one.width = f.w;

@@ -109,7 +109,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 ::-webkit-scrollbar-thumb:hover { background: #704f37; box-shadow: inset 2px 2px 0 #b3845a, inset -2px -2px 0 #3a2619; }
 ::-webkit-scrollbar-thumb:active { background: #d0902f; box-shadow: inset 2px 2px 0 #ffe08a, inset -2px -2px 0 #855415; }
 ::-webkit-scrollbar-button, ::-webkit-scrollbar-corner { display: none; background: transparent; }
-/* Firefox can't draw the bevel; give it the same colours. (Only there: setting this in Chrome turns off the styles above.) */
+/* Firefox can't draw the bevel; give it the same colors. (Only there: setting this in Chrome turns off the styles above.) */
 @supports (-moz-appearance: none) {
   * { scrollbar-color: #704f37 #0d0809; }
 }
@@ -931,7 +931,7 @@ body.compact .cur { width: auto; height: auto; aspect-ratio: 1; }
 .m-head span .g-heart, .aby .g-heart, .heart-box .glyph, .heart-confirm .g-heart { color: var(--ess); }
 .badge.new { background: #10283a; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #7fd8ff, 0 0 12px rgba(127, 216, 255, 0.6); color: #e6f7ff; animation: hintbob 0.8s ease-in-out infinite; }
 
-/* Modifier chips: small, coloured, readable over the dungeon. */
+/* Modifier chips: small, colored, readable over the dungeon. */
 .mod {
   display: inline-block; font: 400 10px/1 'Silkscreen'; font-style: normal; text-transform: uppercase; letter-spacing: 1px;
   color: var(--mc); padding: 2px 4px 3px; background: rgba(10, 5, 8, 0.85); box-shadow: 0 0 0 1px var(--ink), inset 0 0 0 1px color-mix(in srgb, var(--mc) 55%, transparent);
@@ -1160,8 +1160,6 @@ body.compact .cr-logo { font-size: 15px; }
 .dream.in { opacity: 1; }
 .dream.out { opacity: 0; }
 .dr-screen { position: relative; width: calc(160px * var(--s)); height: calc(144px * var(--s)); box-shadow: 0 0 0 calc(var(--s) * 2px) #0d0a10, 0 0 60px rgba(255, 220, 160, 0.08); }
-.dr-screen.fade-in { animation: drfade 0.8s ease-out; }
-@keyframes drfade { from { filter: brightness(0); } }
 .dr-screen canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .dr-box {
   position: absolute; left: calc(var(--s) * 3px); right: calc(var(--s) * 3px); bottom: calc(var(--s) * 3px); height: calc(var(--s) * 38px);
@@ -1172,21 +1170,11 @@ body.compact .cr-logo { font-size: 15px; }
 }
 .dr-box p { margin: 0; }
 .dr-more { position: absolute; right: calc(var(--s) * 6px); bottom: calc(var(--s) * 3px); font-size: calc(var(--s) * 6px); font-style: normal; opacity: 0; }
-.dr-box.done:not(.last) .dr-more, .dr-logo.ready .dr-more { opacity: 1; animation: drblink 0.8s steps(1) infinite; }
+.dr-box.done:not(.last) .dr-more { opacity: 1; animation: drblink 0.8s steps(1) infinite; }
 @keyframes drblink { 50% { opacity: 0; } }
 @keyframes drpop { from { transform: scale(0.85); opacity: 0; } }
-.dr-skip { position: fixed; top: calc(12px + var(--safe-t, 0px)); right: 14px; padding: 6px 10px; background: none; border: 0; color: rgba(255, 255, 255, 0.55); font: 400 18px/1 'Jersey 10'; letter-spacing: 1px; cursor: pointer; }
-.dr-skip:hover { color: #fff; }
 
-/* The title card: DEEPHEART drops in letter by letter over the dimmed room. */
-.dr-logo { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--s) * 4px); background: rgba(10, 6, 14, 0.72); animation: drfadein 0.5s ease-out; }
 @keyframes drfadein { from { opacity: 0; } }
-.dr-logo .g-heart { zoom: calc(var(--s) / 1.6); filter: drop-shadow(0 0 8px rgba(255, 90, 126, 0.8)); animation: drbeat 1.2s ease-in-out infinite; }
-@keyframes drbeat { 12% { transform: scale(1.12); } 24% { transform: scale(1); } 36% { transform: scale(1.08); } 50% { transform: scale(1); } }
-.dr-logo b { display: flex; font: 400 calc(var(--s) * 22px)/1 'Jersey 10'; color: var(--gold-hi); letter-spacing: calc(var(--s) * 1px); text-shadow: 0 calc(var(--s) * 1.5px) 0 #7a4a18, 0 0 calc(var(--s) * 8px) rgba(255, 200, 90, 0.5); }
-.dr-logo b span { animation: drletter 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) backwards; animation-delay: calc(var(--i) * 90ms + 200ms); }
-@keyframes drletter { from { transform: translateY(calc(var(--s) * -14px)); opacity: 0; } }
-.dr-logo .dr-more { position: static; color: var(--paper); font-size: calc(var(--s) * 6px); }
 
 /* The prompt over whatever you could use, the black between rooms, and the little answer menu. */
 .dr-prompt {
@@ -1248,25 +1236,44 @@ body.compact .cr-logo { font-size: 15px; }
 .bnd-x { position: absolute; top: calc(var(--s) * -3px); right: calc(var(--s) * -3px); width: calc(var(--s) * 10px); height: calc(var(--s) * 10px); padding: 0; border: 0; border-radius: 50%; background: var(--paper); box-shadow: 0 0 0 calc(var(--s) * 1px) var(--ink-gb); font-size: calc(var(--s) * 6px) !important; }
 
 /* One card, taken out of its pocket. */
-.bnd-detail { flex: 1; display: flex; gap: calc(var(--s) * 5px); min-height: 0; padding: calc(var(--s) * 3px); background: #f4ead2; }
+.bnd-detail { position: relative; flex: 1; display: flex; gap: calc(var(--s) * 5px); min-height: 0; padding: calc(var(--s) * 3px); background: #f4ead2; }
 .bnd-card { flex: none; width: calc(var(--s) * 58px); display: flex; flex-direction: column; gap: calc(var(--s) * 2px); padding: calc(var(--s) * 3px); background: var(--fc); border-radius: calc(var(--s) * 2px); box-shadow: 0 0 0 calc(var(--s) * 1px) var(--ink-gb), inset 0 0 0 calc(var(--s) * 1px) rgba(255, 255, 255, 0.4), 0 calc(var(--s) * 2px) calc(var(--s) * 4px) rgba(0, 0, 0, 0.3); animation: bdcard 0.3s cubic-bezier(0.2, 1.4, 0.4, 1); }
 .bnd-card.gold { animation: bdcard 0.3s cubic-bezier(0.2, 1.4, 0.4, 1), gilded 1.4s ease-in-out infinite alternate; }
 @keyframes bdcard { from { transform: rotate(-8deg) scale(0.7); opacity: 0; } }
-.bnd-name { font: 400 calc(var(--s) * 7.5px)/1 'Jersey 10', monospace; text-align: center; color: var(--ink-gb); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bnd-name { font: 400 calc(var(--s) * 6.5px)/1 'Jersey 10', monospace; text-align: center; color: var(--ink-gb); text-wrap: balance; overflow-wrap: anywhere; }
 .bnd-art { width: 100%; height: auto; image-rendering: pixelated; box-shadow: 0 0 0 calc(var(--s) * 0.5px) var(--ink-gb); }
 .bnd-type { display: flex; justify-content: space-between; font-size: calc(var(--s) * 5px); }
 .bnd-type em { font-style: normal; opacity: 0.7; }
-.bnd-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: calc(var(--s) * 2.5px); overflow: auto; }
+.bnd-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: calc(var(--s) * 2.5px); overflow: auto; padding: calc(var(--s) * 1.5px); margin: calc(var(--s) * -1.5px); }
 .bnd-info small { display: block; margin-bottom: calc(var(--s) * 1px); font: 400 calc(var(--s) * 4.5px)/1 'Silkscreen', monospace; letter-spacing: 0.05em; text-transform: uppercase; color: #8a6a4a; }
-.bnd-count { margin: 0; font: 400 calc(var(--s) * 11px)/1 'Jersey 10', monospace; }
-.bnd-count span { font-size: calc(var(--s) * 7px); color: #a0781c; }
-.bnd-laps { display: flex; gap: calc(var(--s) * 1.5px); }
-.bnd-laps i { width: calc(var(--s) * 5px); height: calc(var(--s) * 5px); border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 calc(var(--s) * 0.5px) var(--ink-gb); opacity: 0.4; }
-.bnd-laps i.on { background: var(--lc); opacity: 1; }
+.bnd-count { margin-left: calc(var(--s) * 1px); font: 400 calc(var(--s) * 6px)/1 'Jersey 10', monospace; letter-spacing: 0; text-transform: none; color: var(--ink-gb); }
+.bnd-laps { display: flex; align-items: center; gap: calc(var(--s) * 1.5px); }
+.bnd-laps button { width: calc(var(--s) * 6px); height: calc(var(--s) * 6px); padding: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 calc(var(--s) * 0.5px) var(--ink-gb); opacity: 0.45; cursor: pointer; }
+.bnd-laps button.on { background: var(--lc); opacity: 1; }
+.bnd-laps button.at { box-shadow: inset 0 0 0 calc(var(--s) * 0.5px) var(--ink-gb), 0 0 0 calc(var(--s) * 0.6px) var(--paper), 0 0 0 calc(var(--s) * 1.1px) var(--ink-gb); opacity: 1; }
+.bnd-laps button:disabled { opacity: 0.15; cursor: default; }
+.bnd-gold { display: flex; align-items: center; gap: calc(var(--s) * 1.5px); padding: 0; background: none; border: 0; color: #8a6a4a !important; font: 400 calc(var(--s) * 5px)/1 'Jersey 10', monospace !important; cursor: pointer; }
+.bnd-gold i { position: relative; width: calc(var(--s) * 10px); height: calc(var(--s) * 5px); border-radius: calc(var(--s) * 2.5px); background: #d9cbb0; box-shadow: inset 0 0 0 calc(var(--s) * 0.5px) var(--ink-gb); transition: background 0.15s; }
+.bnd-gold i::after { content: ''; position: absolute; top: calc(var(--s) * 1px); left: calc(var(--s) * 1px); width: calc(var(--s) * 3px); height: calc(var(--s) * 3px); border-radius: 50%; background: var(--ink-gb); transition: translate 0.15s; }
+.bnd-gold.on { color: var(--ink-gb) !important; }
+.bnd-gold.on i { background: #ffd23a; }
+.bnd-gold.on i::after { translate: calc(var(--s) * 5px) 0; }
+.bnd-detail > .bnd-gold { position: absolute; top: calc(var(--s) * 3px); right: calc(var(--s) * 3px); }
+.bnd-tab.new, .bnd-gold.new { position: relative; }
+.bnd-tab.new::after, .bnd-gold.new::after { content: ''; position: absolute; top: calc(var(--s) * -1px); right: calc(var(--s) * -1px); width: calc(var(--s) * 2.5px); height: calc(var(--s) * 2.5px); border-radius: 50%; background: #ff5a7e; box-shadow: 0 0 0 calc(var(--s) * 0.4px) var(--ink-gb); }
+.bnd-tabs .bnd-gold { margin-left: auto; color: #f4ead2 !important; }
+.bnd-tabs .bnd-gold.on { color: #ffd23a !important; }
+.bnd-card.missing { filter: saturate(0.4); }
+/* The color binders: a tab for each color you've reached, and the gold toggle. */
+.bnd-tabs { display: flex; flex-wrap: wrap; gap: calc(var(--s) * 1px); padding-right: calc(var(--s) * 8px); }
+.bnd-tab { display: flex; align-items: center; gap: calc(var(--s) * 1px); padding: calc(var(--s) * 0.5px) calc(var(--s) * 2px); background: #6d2222; border: 0; border-radius: calc(var(--s) * 1px) calc(var(--s) * 1px) 0 0; color: #f4ead2 !important; font: 400 calc(var(--s) * 4.5px)/1.2 'Jersey 10', monospace !important; cursor: pointer; opacity: 0.75; }
+.bnd-tab i { width: calc(var(--s) * 3px); height: calc(var(--s) * 3px); border-radius: 50%; background: var(--lc); box-shadow: 0 0 0 calc(var(--s) * 0.4px) var(--ink-gb); }
+.bnd-tab em { font-style: normal; opacity: 0.75; }
+.bnd-tab.on { background: #f4ead2; color: var(--ink-gb) !important; opacity: 1; }
 .bnd-info ul { margin: 0; padding: 0; list-style: none; display: grid; gap: calc(var(--s) * 1px); font-size: calc(var(--s) * 5px); }
 .bnd-first { margin: 0; font-size: calc(var(--s) * 5px); color: #a0781c; }
 .bnd-back { padding-inline: calc(var(--s) * 6px) !important; }
-@media (prefers-reduced-motion: reduce) { .dr-logo b span, .bnd-pocket.fresh, .bnd-pocket.slam, .bnd-spread.thud, .dr-logo .g-heart, .bnd, .bnd-card, .dr-screen.fade-in, .dr-prompt { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .bnd-pocket.fresh, .bnd-pocket.slam, .bnd-spread.thud, .bnd, .bnd-card, .dr-prompt { animation: none; } }
 
 /* ---------- trading with the brothers: on the bedroom rug ---------- */
 
@@ -1302,7 +1309,8 @@ body.compact .cr-logo { font-size: 15px; }
   position: relative; display: grid; place-items: center; width: 42px; height: 56px; padding: 0; border: 0; border-radius: 4px; cursor: pointer;
   background: var(--fc); box-shadow: 0 0 0 2px var(--ink-gb), inset 0 0 0 2px rgba(255, 255, 255, 0.35); transition: transform 0.12s;
 }
-.tm-card .px { width: 82%; height: auto; max-height: 78%; object-fit: contain; }
+/* A fixed box: a percentage max-height doesn't hold inside the card's auto-sized grid, so tall sprites spilled out. */
+.tm-card .px { width: 34px; height: 44px; object-fit: contain; }
 .tm-card:not(:disabled):hover { transform: translateY(-3px); }
 .tm-card:disabled { opacity: 0.35; filter: grayscale(0.6); cursor: default; }
 .tm-slots .tm-card { animation: tmput 0.22s ease-out; }
@@ -1331,7 +1339,7 @@ body.compact .cr-logo { font-size: 15px; }
 
 /* Your spares, and the buttons. */
 .tm-hand { padding: 8px; background: rgba(248, 244, 234, 0.85); border: 2px solid var(--ink-gb); border-radius: 6px; }
-.tm-cards { display: flex; flex-wrap: wrap; gap: 9px; max-height: 150px; overflow: auto; padding: 2px 4px 6px; }
+.tm-cards { display: flex; flex-wrap: wrap; gap: 9px; max-height: 150px; overflow: auto; padding: 6px 7px 7px; }
 .tm-none { margin: 0; color: #6a4a2a; }
 .tm-foot { display: flex; justify-content: flex-end; gap: 8px; }
 .tm-btn { padding: 8px 16px; background: var(--paper); border: 2px solid var(--ink-gb); border-radius: 5px; box-shadow: 0 3px 0 var(--ink-gb); font-size: 16px !important; cursor: pointer; }
@@ -1345,3 +1353,5 @@ body.compact .cr-logo { font-size: 15px; }
   .tm-slot, .tm-card { width: 38px; height: 51px; }
 }
 @media (prefers-reduced-motion: reduce) { .tm, .tm-flip, .tm-stamp, .tm-slots .tm-card { animation: none; } }
+/* While the real world's up, the dungeon's interface steps aside (the dungeon view itself shrinks into the playset). */
+body.dreaming #ui { visibility: hidden; }

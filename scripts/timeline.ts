@@ -45,6 +45,7 @@ let firstWall: number | null = null;
 let floorAt1h: number | null = null;
 let firstAscent: number | null = null;
 let firstAwaken: number | null = null;
+let ascentsToAwaken: number | null = null;
 let firstRunMet: number | null = null;
 let abyssDone: number | null = null;
 let allMet: number | null = null;
@@ -66,6 +67,7 @@ const sim = new Sim(CASUAL, {
   },
   awaken(_stones, { t }) {
     firstAwaken ??= t;
+    ascentsToAwaken ??= sim.descents;
   },
   tick({ game, t, dt }) {
     novelty.tick(game, t);
@@ -107,7 +109,7 @@ const ms: Milestone[] = [
   { name: 'Deepest floor at 1h', window: '40–60', result: String(floorAt1h), status: floorAt1h >= 40 && floorAt1h <= 60 ? 'PASS' : 'FAIL' },
   { name: 'First ascent', window: '15m–1h', result: t(firstAscent), status: within(firstAscent, 15 * 60, H) },
   { name: 'All 12 first-run companions met', window: '4h–8h', result: t(firstRunMet), status: within(firstRunMet, 4 * H, 8 * H) },
-  { name: 'First awakening', window: '15h–40h', result: t(firstAwaken), status: reach(firstAwaken, 40 * H) ? 'REPORT' : within(firstAwaken, 15 * H, 40 * H) },
+  { name: 'First awakening', window: '15h–40h', result: firstAwaken === null ? t(firstAwaken) : `${t(firstAwaken)} (${ascentsToAwaken} ascents)`, status: reach(firstAwaken, 40 * H) ? 'REPORT' : within(firstAwaken, 15 * H, 40 * H) },
   { name: 'Abyss powers all at level 10', window: '40h–100h', result: t(abyssDone), status: reach(abyssDone, 100 * H) ? 'REPORT' : within(abyssDone, 40 * H, 100 * H) },
   { name: 'All 24 companions met', window: '80h–150h', result: t(allMet), status: reach(allMet, 150 * H) ? 'REPORT' : within(allMet, 80 * H, 150 * H) },
   { name: 'Third layer opens', window: '100h–150h', result: 'not built yet', status: 'REPORT' },

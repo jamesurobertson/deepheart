@@ -1,6 +1,6 @@
 /**
  * Everything the game is made of: companions (who fight for you), the monster roster,
- * upgrades, trophies, abyss (prestige) powers and flavour text. Pure data plus builders.
+ * upgrades, trophies, abyss (prestige) powers and flavor text. Pure data plus builders.
  */
 
 /** A picture for the UI: a sprite from the dungeon sheet, optionally with a badge. */
@@ -8,7 +8,7 @@ export interface Icon {
   sprite: string;
   /** Small second sprite in the corner (synergies). */
   sub?: string;
-  /** Roman-numeral tier badge colour index. */
+  /** Roman-numeral tier badge color index. */
   tier?: number;
 }
 
@@ -81,7 +81,7 @@ export interface MonsterDef {
   /** Health multiplier. */
   hp: number;
   big?: boolean;
-  /** Colour wash for variants (frost trolls and the like), as 0xRRGGBB. */
+  /** Color wash for variants (frost trolls and the like), as 0xRRGGBB. */
   tint?: number;
   /** Arrives differently: bursts up through a floor grate, or flies in above the floor. */
   move?: 'emerge' | 'fly';
@@ -166,7 +166,7 @@ export const zoneOf = (floor: number) => Math.floor((floor - 1) / 10);
 export const zoneFor = (floor: number) => ZONES[zoneOf(floor) % ZONES.length];
 
 /** "The Sunken Tomb", then "The Corrupted Sunken Tomb" once the zones come round again. */
-/** Every lap through the eight zones comes back darker, washed in its own colour. */
+/** Every lap through the eight zones comes back darker, washed in its own color. */
 export const CORRUPTION: { name: string; tint: number }[] = [
   { name: '', tint: 0xffffff },
   { name: 'Corrupted', tint: 0xc89cff },
@@ -214,7 +214,7 @@ export function pickMonster(floor: number): MonsterDef {
   return band[Math.floor(Math.random() * band.length)];
 }
 
-/** Each lap builds the zones from a different tileset, so a repeat zone is a new place, not a recolour. */
+/** Each lap builds the zones from a different tileset, so a repeat zone is a new place, not a recolor. */
 const THEMES: Tiles[] = ['halls', 'crypt', 'jungle', 'tomb', 'sewer'];
 /** How far each lap shifts the tileset: the first repeat jumps furthest (dungeon stone ↔ jungle and desert). */
 const THEME_SHIFT = [0, 2, 4, 1, 3];
@@ -314,7 +314,7 @@ export function nextMilestone(level: number): number | null {
   return MILESTONES.find((m) => m > level) ?? null;
 }
 
-/** A line of flavour under each of those upgrades. */
+/** A line of flavor under each of those upgrades. */
 const MILESTONE_FLAVOR: Record<string, string[]> = {
   squire: ['He practises on everything. Mostly monsters.', 'Up before dawn. Swinging before breakfast.', "The training wheels are off. He's never been faster.", 'Small squire. Big swing.', 'Extra credit, paid in monsters.'],
   ranger: ['Closer than last time. That counts.', 'Eight out of ten monsters agree.', 'She hit something two floors down. Probably a monster.', 'Sharp arrows. Sharper comebacks.', "It's the thought that counts. The arrow helps."],

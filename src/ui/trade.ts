@@ -45,8 +45,6 @@ export interface TradeOpts {
   sound: (name: SfxName, o?: { vol?: number; rate?: number }) => void;
   save: () => void;
   closed: () => void;
-  /** A card you didn't have: it'll be new in the binder. */
-  gained: (id: string) => void;
 }
 
 export class TradeMat {
@@ -117,6 +115,8 @@ export class TradeMat {
   private place(id: string) {
     const c = CARD_BY_ID.get(id)!;
     if (!this.canPlace()) return;
+    // Putting a card down after a trade starts the next one.
+    this.result = null;
     const firstDown = !this.side.length;
     this.side.push(id);
     this.o.sound('card', { vol: 0.35, rate: 1.1 + this.side.length * 0.03 });
@@ -140,7 +140,6 @@ export class TradeMat {
     const got = this.o.who === 'daniel' ? g.tradeWithDaniel(this.side) : g.tradeWithVictor(this.side);
     if (!got) return;
     this.result = got;
-    if (got.first) this.o.gained(got.id);
     this.side = [];
     this.o.save();
     this.o.sound('drop3', { vol: 0.6 });

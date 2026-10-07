@@ -70,27 +70,29 @@ const C = {
   flowerR: '#ff6a7e', flowerY: '#ffe060', flowerW: '#ffffff', counter: '#b9c4cc', counterD: '#8a98a4', stove: '#5a5a66',
   sofa: '#5a86d0', sofaD: '#3f66ae', table: '#a8714a', tableD: '#7a4d33', bowl: '#f4efe2',
 };
-const BOOKS = ['#4a78c8', '#c8423f', '#5aa050', '#f2c14e', '#8a5ac8', '#e08a3a'];
 
 export function px(ctx: Ctx, x: number, y: number, w: number, h: number, color: string) {
   ctx.fillStyle = color;
   ctx.fillRect(x, y, w, h);
 }
 
-/** Draw a sprite standing with its feet at (cx, bottom), optionally facing left and on its walking frames. */
-export function drawSprite(ctx: Ctx, name: string, t: number, cx: number, bottom: number, left = false, walking = false) {
+/** Draw a sprite standing with its feet at (cx, bottom), optionally facing left, on its walking frames, or shrunk
+ *  (`scale` 0.5 makes a companion into a little action figure). */
+export function drawSprite(ctx: Ctx, name: string, t: number, cx: number, bottom: number, left = false, walking = false, scale = 1) {
   const anim = (walking && spriteFrames(`${name}_run`)) || spriteFrames(name);
   if (!anim) return;
   const f = anim.frames[Math.floor(t * (walking ? 10 : 4)) % anim.frames.length];
-  const x = Math.round(cx - f.w / 2);
-  const y = Math.round(bottom - f.h);
+  const w = Math.round(f.w * scale);
+  const h = Math.round(f.h * scale);
+  const x = Math.round(cx - w / 2);
+  const y = Math.round(bottom - h);
   if (left) {
     ctx.save();
-    ctx.translate(x + f.w, y);
+    ctx.translate(x + w, y);
     ctx.scale(-1, 1);
-    ctx.drawImage(anim.img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+    ctx.drawImage(anim.img, f.x, f.y, f.w, f.h, 0, 0, w, h);
     ctx.restore();
-  } else ctx.drawImage(anim.img, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
+  } else ctx.drawImage(anim.img, f.x, f.y, f.w, f.h, x, y, w, h);
 }
 
 const pixels = (ctx: Ctx, rows: string[], x: number, y: number, color: string) =>
@@ -179,33 +181,98 @@ function fence(ctx: Ctx, x: number, y: number, n: number) {
 
 // ---------- the bedroom ----------
 
-/** The bed's blanket (drawn over the kid when they're in it, and over the cards on top of it). */
-export function blanket(ctx: Ctx) {
-  px(ctx, 18, 46, 28, 32, C.blanket);
-  for (let y = 52, row = 0; y < 78; y += 6, row++) for (let x = 20 + (row % 2) * 3; x < 44; x += 6) px(ctx, x, y, 2, 2, C.blanketD);
-  px(ctx, 18, 46, 28, 3, C.blanketL);
-  px(ctx, 18, 49, 28, 1, C.blanketD);
-  px(ctx, 17, 46, 1, 32, C.ink);
-  px(ctx, 46, 46, 1, 32, C.ink);
-}
 /** The brothers' game on the rug, between them: each one's deck, the card each has laid out, and the pile they play
  *  onto (top-left corners of 5×7 cards). */
 export const BROS_GAME = { danielDeck: [78, 84], victorDeck: [93, 84], danielLaid: [79, 94], victorLaid: [92, 94], pile: [85, 87] };
 
-/** Where the kid sits up in bed (feet hidden by the blanket), and where cards land on it. */
-export const BED_KID = { cx: 32, bottom: 54 };
-export const CARD_SPOTS = [[20, 54], [27, 52], [34, 55], [40, 53], [22, 62], [29, 60], [37, 63], [20, 69], [27, 67], [35, 70], [41, 66], [30, 72]];
+/** The playset in the corner by the toy chest: cardboard-box walls around a felt floor. `floor` is where the dungeon
+ *  view shrinks to. */
+export const PLAYSET = { floor: { x: 104, y: 57, w: 48, h: 21 } };
+/** Where the kid kneels beside the playset, and where his hero's figure stands on it (feet) when he's not holding it. */
+export const KID_START = { x: 5, y: 4, dir: 'right' as Dir };
+export const HERO_SPOT = [112, 76];
+/** Real little figures on the playset (feet): two more of the party beside the hero, two monsters facing them. */
+export const PARTY_SPOTS = [[121, 73], [129, 77]];
+export const FOE_SPOTS = [[142, 74], [150, 77]];
+/** Figures lined up along the top of the dresser (feet). */
+export const SHELF_SPOTS = [[96, 24], [106, 24], [116, 24], [126, 24], [136, 24], [146, 24]];
+/** Where the "!" hangs when the binder on the desk has cards you haven't seen. */
+export const BINDER_MARK = [72, 4];
+/** Cards hidden around the place: stand on the spot and press (or tap yourself) to find one. Each turns up once. */
+export const STASHES: { id: string; map: MapId; x: number; y: number; look: string; found: string }[] = [
+  { id: 'floorboard', map: 'bedroom', x: 0, y: 8, look: 'This board is loose...', found: 'under a floorboard' },
+  { id: 'backyard', map: 'town', x: 1, y: 1, look: 'Something is wedged behind the house...', found: 'behind a house' },
+  { id: 'tallgrass', map: 'town', x: 18, y: 1, look: 'Something in the tall grass...', found: 'in the tall grass' },
+  { id: 'roots', map: 'town', x: 7, y: 2, look: 'Something in the roots...', found: 'in the roots of a tree' },
+  { id: 'flowers', map: 'town', x: 2, y: 7, look: 'Something among the flowers...', found: 'among the flowers' },
+  { id: 'pond', map: 'town', x: 6, y: 11, look: 'Something at the water\'s edge...', found: 'by the pond' },
+  { id: 'burrow', map: 'town', x: 1, y: 16, look: 'A rabbit hole...', found: 'down a rabbit hole' },
+  { id: 'fence', map: 'town', x: 17, y: 11, look: 'Something behind the fence...', found: 'behind the fence' },
+  { id: 'shop', map: 'town', x: 13, y: 11, look: 'Something beside the shop...', found: 'beside the card shop' },
+  { id: 'paving', map: 'town', x: 15, y: 8, look: 'This stone wobbles...', found: 'under a paving stone' },
+  { id: 'hollow', map: 'town', x: 11, y: 14, look: 'The tree is hollow...', found: 'in a hollow tree' },
+];
+
+/** The kid's playset: boxes for walls and a felt floor (the figures on it are drawn live). */
+function playset(ctx: Ctx) {
+  const box = (x: number, y: number, w: number, h: number) => {
+    px(ctx, x, y, w, h, C.ink);
+    px(ctx, x + 1, y + 1, w - 2, h - 2, '#c9a26a');
+    px(ctx, x + 1, y + h - 3, w - 2, 2, '#a07c48');
+    px(ctx, x + Math.floor(w / 2) - 1, y + 1, 2, h - 4, '#e8d2a0');
+  };
+  const { x, y, w, h } = PLAYSET.floor;
+  px(ctx, x, y, w, h, '#4a5a4a');
+  for (let gx = x + 6; gx < x + w; gx += 6) px(ctx, gx, y, 1, h, '#3e4c3e');
+  for (let gy = y + 5; gy < y + h; gy += 5) px(ctx, x, gy, w, 1, '#3e4c3e');
+  for (let bx = x - 4; bx < x + w; bx += 13) box(bx, y - 11, 13, 12);
+  box(x - 8, y - 3, 9, h + 3);
+  box(x + w - 1, y - 3, 9, h + 3);
+  // Toy blocks on the corners.
+  for (const [bx, by, c] of [[x - 6, y - 7, '#c8423f'], [x + w + 1, y - 7, '#4a78c8'], [x + w - 1, y + h - 2, C.gold]] as const) {
+    px(ctx, bx, by, 5, 5, C.ink);
+    px(ctx, bx + 1, by + 1, 3, 3, c);
+  }
+}
+
+/** One long dresser along the wall: the binder on one end, the figures lined up along the top (drawn live). */
+function dresser(ctx: Ctx) {
+  px(ctx, 64, 22, 96, 26, C.ink);
+  px(ctx, 65, 23, 94, 4, C.desk);
+  px(ctx, 65, 27, 94, 20, C.deskD);
+  for (const x of [67, 99, 131]) {
+    px(ctx, x, 29, 28, 7, C.desk);
+    px(ctx, x, 38, 28, 7, C.desk);
+    px(ctx, x + 12, 31, 4, 2, C.gold);
+    px(ctx, x + 12, 40, 4, 2, C.gold);
+  }
+  // The binder.
+  px(ctx, 68, 15, 14, 9, C.ink);
+  px(ctx, 69, 16, 12, 7, C.binder);
+  px(ctx, 69, 22, 12, 1, C.binderD);
+  for (const x of [71, 74, 77]) px(ctx, x, 15, 1, 2, C.gold);
+}
+
+/** The bed's blanket. */
+function blanket(ctx: Ctx) {
+  px(ctx, 2, 46, 28, 32, C.blanket);
+  for (let y = 52, row = 0; y < 78; y += 6, row++) for (let x = 4 + (row % 2) * 3; x < 28; x += 6) px(ctx, x, y, 2, 2, C.blanketD);
+  px(ctx, 2, 46, 28, 3, C.blanketL);
+  px(ctx, 2, 49, 28, 1, C.blanketD);
+  px(ctx, 1, 46, 1, 32, C.ink);
+  px(ctx, 30, 46, 1, 32, C.ink);
+}
 
 const bedroom: MapDef = {
   id: 'bedroom', w: 10, h: 9, wallRows: 2,
   props: [
-    { x: 1, y: 2, w: 2, h: 3, use: { id: 'bed', label: 'Go back to sleep' } },
-    { x: 5, y: 2, w: 2, use: { id: 'binder', label: 'Binder' } },
-    { x: 8, y: 2, w: 2, use: { id: 'books', label: 'Bookshelf' } },
-    { x: 6, y: 1, use: { id: 'poster', label: 'Poster' } },
-    { x: 3, y: 1, w: 2, use: { id: 'window', label: 'Window' } },
-    { x: 0, y: 7, use: { id: 'toys', label: 'Toy box' } },
-    { x: 9, y: 5 },
+    { x: 0, y: 2, w: 2, h: 3, use: { id: 'bed', label: 'Bed' } },
+    { x: 6, y: 3, w: 4, h: 2, use: { id: 'playset', label: 'Keep playing' } },
+    { x: 4, y: 2, w: 2, use: { id: 'binder', label: 'Binder' } },
+    { x: 6, y: 2, w: 4, use: { id: 'toys', label: 'Figures' } },
+    { x: 0, y: 1, use: { id: 'poster', label: 'Poster' } },
+    { x: 2, y: 1, w: 2, use: { id: 'window', label: 'Window' } },
+    { x: 0, y: 7 },
     { x: 5, y: 5, use: { id: 'brosGame', label: 'Their game' } },
   ],
   warps: [{ x: 9, y: 7, to: 'house', tx: 8, ty: 2, dir: 'left' }],
@@ -218,58 +285,38 @@ const bedroom: MapDef = {
     wallpaper(ctx, 10, 2);
     boards(ctx, 10, 9, 32);
     // Morning sun from the window across the boards.
-    for (let y = 32; y < 112; y++) px(ctx, 46 + Math.floor((y - 32) * 0.45), y, 34, 1, C.sun);
+    for (let y = 32; y < 112; y++) px(ctx, 30 + Math.floor((y - 32) * 0.45), y, 34, 1, C.sun);
     for (let y = 39; y < 112; y += 8) px(ctx, 0, y, 160, 1, C.floorD);
-    windowPane(ctx, 48, 4);
-    px(ctx, 46, 28, 36, 3, C.trim);
-    // The DEEPHEART poster.
-    px(ctx, 98, 4, 18, 24, C.ink);
-    px(ctx, 99, 5, 16, 22, C.poster);
-    pixels(ctx, ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'], 103, 8, C.heart);
-    px(ctx, 101, 18, 12, 1, C.gold);
-    px(ctx, 102, 21, 10, 1, C.gold);
-    px(ctx, 103, 24, 8, 1, C.gold);
-    // Bookshelf.
-    px(ctx, 128, 4, 32, 44, C.ink);
-    px(ctx, 129, 5, 30, 42, C.bed);
-    for (const sy of [6, 20, 34]) {
-      px(ctx, 130, sy + 11, 28, 2, C.trimD);
-      for (let x = 131, k = sy; x < 157; x += 3, k++) px(ctx, x, sy + 2 + (k % 3), 2, 9 - (k % 3), BOOKS[k % BOOKS.length]);
-    }
-    // Bed against the wall.
-    px(ctx, 16, 24, 32, 56, C.ink);
-    px(ctx, 17, 25, 30, 8, C.bed);
-    px(ctx, 18, 33, 28, 45, C.sheet);
-    px(ctx, 21, 35, 22, 9, C.ink);
-    px(ctx, 22, 36, 20, 7, C.pillow);
-    px(ctx, 17, 78, 30, 2, C.bed);
-    // Rug.
+    windowPane(ctx, 32, 4);
+    px(ctx, 30, 28, 36, 3, C.trim);
+    // The DEEPHEART poster, over the bed.
+    px(ctx, 7, 2, 18, 22, C.ink);
+    px(ctx, 8, 3, 16, 20, C.poster);
+    pixels(ctx, ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'], 12, 5, C.heart);
+    px(ctx, 10, 14, 12, 1, C.gold);
+    px(ctx, 11, 17, 10, 1, C.gold);
+    px(ctx, 12, 20, 8, 1, C.gold);
+    // Bed against the wall, in the corner.
+    px(ctx, 0, 24, 32, 56, C.ink);
+    px(ctx, 1, 25, 30, 8, C.bed);
+    px(ctx, 2, 33, 28, 45, C.sheet);
+    px(ctx, 5, 35, 22, 9, C.ink);
+    px(ctx, 6, 36, 20, 7, C.pillow);
+    px(ctx, 1, 78, 30, 2, C.bed);
+    blanket(ctx);
+    // Rug, where the brothers play.
     px(ctx, 52, 82, 56, 30, C.rugB);
     px(ctx, 54, 84, 52, 26, C.rug);
     for (let x = 57; x < 104; x += 6) px(ctx, x, 86, 3, 22, C.rugD);
-    // Desk with the binder and a lamp.
-    px(ctx, 80, 26, 32, 22, C.ink);
-    px(ctx, 81, 27, 30, 6, C.desk);
-    px(ctx, 81, 33, 30, 14, C.deskD);
-    px(ctx, 84, 37, 10, 2, C.desk);
-    px(ctx, 98, 37, 10, 2, C.desk);
-    px(ctx, 84, 20, 14, 8, C.ink);
-    px(ctx, 85, 21, 12, 6, C.binder);
-    px(ctx, 85, 26, 12, 1, C.binderD);
-    for (const x of [87, 90, 93]) px(ctx, x, 20, 1, 2, C.gold);
-    px(ctx, 103, 16, 6, 4, C.lamp);
-    px(ctx, 105, 20, 2, 7, C.ink);
-    // Plant, toy box (a wooden sword on top) and the stairs down.
-    px(ctx, 147, 86, 10, 9, C.pot);
-    px(ctx, 146, 85, 12, 2, C.trimD);
-    px(ctx, 149, 76, 6, 10, C.leaf);
-    px(ctx, 145, 79, 5, 6, C.leafD);
-    px(ctx, 154, 78, 5, 6, C.leafD);
-    px(ctx, 0, 114, 16, 14, C.ink);
-    px(ctx, 1, 115, 14, 12, C.trim);
-    px(ctx, 1, 119, 14, 1, C.trimD);
-    px(ctx, 3, 111, 10, 2, '#d8b070');
-    px(ctx, 12, 110, 2, 4, C.trimD);
+    // The dresser along the wall, and the playset on the floor in front of it.
+    dresser(ctx);
+    playset(ctx);
+    // A plant in the far corner, and the stairs down.
+    px(ctx, 3, 118, 10, 9, C.pot);
+    px(ctx, 2, 117, 12, 2, C.trimD);
+    px(ctx, 5, 108, 6, 10, C.leaf);
+    px(ctx, 1, 111, 5, 6, C.leafD);
+    px(ctx, 10, 110, 5, 6, C.leafD);
     stairs(ctx, 144, 112, true);
   },
 };
