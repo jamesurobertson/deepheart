@@ -73,6 +73,7 @@ async function boot() {
   const ui = new Ui(document.getElementById('ui')!, game, scene, {
     sound: (n, o) => sfx.play(n, o),
     save,
+    dreaming: (on) => (sfx.musicOn = !on && game.s.settings.music),
     settings: () => {
       applySettings();
       save();
@@ -146,6 +147,11 @@ async function boot() {
     };
     Object.assign(window, { game, scene, ui, sfx, step });
   }
+  // Waking up: ?dream=first plays the whole reveal, ?dream=wake the short one (dev only). Saves that awakened before
+  // the reveal existed see it once.
+  const dream = import.meta.env.DEV ? params.get('dream') : null;
+  if (dream) ui.playDream(dream === 'first');
+  else if (game.s.awakens > 0 && !game.s.dreamSeen) ui.playDream(true);
 
   /** Time away: short breaks play out at full speed; longer ones pay the offline rate and say so. */
   const catchUp = (seconds: number) => {

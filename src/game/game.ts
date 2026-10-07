@@ -226,6 +226,10 @@ export interface SaveState {
   /** Unspent heartstones. */
   stones: number;
   awakens: number;
+  /** Has the first wake-up (the dungeon was a dream) played? */
+  dreamSeen: boolean;
+  /** Cards found since you last woke up, shown arriving in the binder next time. */
+  dreamCards: string[];
   /** Bosses beaten in the last seconds, champions slain, Rainbow Vaults opened, highest Rampage tier reached. */
   clutches: number;
   champions: number;
@@ -258,7 +262,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
@@ -1758,7 +1762,16 @@ export class Game {
     if (first && gold) c.goldAt = kill;
     else if (first) c.at = kill;
     (gold ? c.gold : c.n)[Math.min(lapOf(this.s.floor), CORRUPTION.length - 1)]++;
+    if (this.s.dreamCards.length < 999) this.s.dreamCards.push(id);
     this.events.push({ t: 'card', id, gold, count: this.cardCount(id), first, src, kill });
+  }
+
+  /** Waking up: the cards found while you slept go into the binder. */
+  wake() {
+    const found = this.s.dreamCards;
+    this.s.dreamCards = [];
+    this.s.dreamSeen = true;
+    return found;
   }
 
   /** Which kill of this monster it is (for the goblins, which catch). */

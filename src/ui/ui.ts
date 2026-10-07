@@ -1,11 +1,13 @@
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, ASCEND_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, TRAITS, isTraitId, milestoneAt, type AbilityId, ABYSS, CARDS, CARD_BY_ID, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, ASCEND_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, TRAITS, isTraitId, milestoneAt, type AbilityId, ABYSS, CARDS, CARD_BY_ID, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { DESCEND_FLOOR, FLOOR_KILLS, isBossFloor, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
-import { G, cardArt, charFit, sprite, spriteFit } from './px.ts';
+import { G, cardArt, cardCanvas, charFit, sprite, spriteFit } from './px.ts';
+import type { BinderCard } from './binder.ts';
+import { playDream } from './dream.ts';
 
 export interface UiHooks {
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
@@ -14,6 +16,8 @@ export interface UiHooks {
   exportSave: () => string;
   importSave: (text: string) => boolean;
   reset: () => void;
+  /** The wake-up scene is playing: the dungeon's music hushes. */
+  dreaming: (on: boolean) => void;
 }
 
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
@@ -24,6 +28,8 @@ const RARITY_COLORS = ['#c9b8a0', '#5fa8ff', '#c77dff', '#ffb13d'];
 /** Little coloured labels for boss modifiers. */
 const modChips = (mods: ModId[]) => mods.map((id) => `<em class="mod" style="--mc:${MOD_BY_ID.get(id)!.color}">${MOD_BY_ID.get(id)!.name}</em>`).join('');
 const MAX_COINS = 24;
+/** How often a rare ticker line (the hints that it's all a dream) is in the running. */
+const RARE_NEWS = 0.15;
 /** How close your hero or the cursor has to come to a coin to pick it up (px). */
 const COIN_REACH = 52;
 /** Coins start leaning toward whoever's collecting from this far out (px). */
@@ -469,7 +475,7 @@ export class Ui {
     });
     addEventListener('keydown', (e) => {
       this.inputAt = performance.now();
-      if ((e.target as HTMLElement).closest('input, textarea')) return;
+      if ((e.target as HTMLElement).closest('input, textarea') || document.body.classList.contains('dreaming')) return;
       if (e.key === 'Escape' && this.modal) this.closeModal();
       // U buys the next upgrade: the first (cheapest) one in the Upgrades grid.
       if (e.key.toLowerCase() === 'u' && !e.repeat && !this.modal) {
@@ -508,7 +514,7 @@ export class Ui {
     const dirOf = (e: KeyboardEvent) => ({ w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down', a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right' } as const)[e.key.toLowerCase() as 'w'];
     addEventListener('keydown', (e) => {
       const dir = dirOf(e);
-      if (!dir || this.modal || (e.target as HTMLElement).closest('input, textarea')) return;
+      if (!dir || this.modal || document.body.classList.contains('dreaming') || (e.target as HTMLElement).closest('input, textarea')) return;
       this.keys.add(dir);
       this.mouseStale = true;
       if (e.key.startsWith('Arrow')) e.preventDefault();
@@ -526,6 +532,7 @@ export class Ui {
         return;
       }
       const t = e.target as HTMLElement;
+      if (t.closest('.floor-n')) return this.jumpFloor();
       const hero = t.closest<HTMLElement>('[data-hero]');
       if (hero) {
         if (this.game.setHero(Number(hero.dataset.hero))) {
@@ -1884,7 +1891,7 @@ export class Ui {
     }
     if (kind === 'floor') {
       const mods = g.bossFloor() ? g.bossMods() : [];
-      if (!mods.length) return `<div class="tt-h"><b>Floor ${g.s.floor}</b><span class="tt-own">${esc(zoneName(g.s.floor))}</span></div><p class="tt-d">${g.bossFloor() ? `Beat the boss before the clock runs out.` : `Kill ${FLOOR_KILLS} monsters to clear the floor.`}</p>${g.s.floor < 30 ? '<p class="tt-f">From floor 30, bosses start showing up with modifiers.</p>' : ''}`;
+      if (!mods.length) return `<div class="tt-h"><b>Floor ${g.s.floor}</b><span class="tt-own">${esc(zoneName(g.s.floor))}</span></div><p class="tt-d">${g.bossFloor() ? `Beat the boss before the clock runs out.` : `Kill ${FLOOR_KILLS} monsters to clear the floor.`}</p>${g.s.floor < 30 ? '<p class="tt-f">From floor 30, bosses start showing up with modifiers.</p>' : ''}<p class="tt-f">Click the floor number to jump to a floor.</p>`;
       return `<div class="tt-h"><b>Floor ${g.s.floor} boss</b></div><ul class="tt-l">${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
     }
     if (kind === 'cur') {
@@ -1935,8 +1942,8 @@ export class Ui {
 
   private nextNews() {
     const g = this.game;
-    const s = { floor: g.s.maxFloor, owned: g.s.owned, depth: g.s.descents, raids: g.s.raids, kills: g.s.kills };
-    const pool = NEWS.map((n, i) => [n, i] as const).filter(([n, i]) => i !== this.newsIdx && (!n.when || n.when(s)));
+    const s = { floor: g.s.maxFloor, owned: g.s.owned, depth: g.s.descents, raids: g.s.raids, kills: g.s.kills, awakens: g.s.awakens };
+    const pool = NEWS.map((n, i) => [n, i] as const).filter(([n, i]) => i !== this.newsIdx && (!n.when || n.when(s)) && (!n.rare || Math.random() < RARE_NEWS));
     const specific = pool.filter(([n]) => n.when);
     const from = specific.length && Math.random() < 0.75 ? specific : pool;
     const pick = from[Math.floor(Math.random() * from.length)];
@@ -2372,7 +2379,7 @@ export class Ui {
     const head = ev.gold ? (ev.first ? 'New gold card!' : 'Gold card!') : ev.first ? 'New card!' : 'Card';
     const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
-      <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.heart(7)}</div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96)}</div></div></div>
+      <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96)}</div></div></div>
       <div class="cr-text"><small>${head}</small><b>${esc(d.name)} Card</b>${line}</div>`;
     this.el.loot.parentElement!.appendChild(el);
     // The sound lands with the flip.
@@ -2415,28 +2422,97 @@ export class Ui {
     this.descending = true;
     this.modal = null;
     this.el.modalWrap.hidden = true;
-    const c = this.el.curtain;
-    c.hidden = false;
-    c.className = 'curtain in heart';
-    c.querySelector('b')!.textContent = `Awakening ${g.s.awakens + 1}`;
-    c.querySelector('span')!.textContent = 'The Heart beats. Everything starts again, stronger.';
     this.hooks.sound('awaken', { vol: 0.9 });
-    setTimeout(() => {
+    // Going back to sleep is the awakening itself: the run resets once the kid's back in bed.
+    this.playDream(!g.s.dreamSeen, () => {
       g.awaken();
       this.shown = new Decimal(0);
       this.rowCache.fill('');
       this.upgKey = '';
       this.floorKey = '';
-      this.hooks.save();
-    }, 1100);
-    setTimeout(() => {
-      c.className = 'curtain out heart';
+    }, () => {
       this.descending = false;
       this.hooks.sound('drop4', { vol: 0.7 });
       // Straight to the shop for the new heartstones.
       this.openModal('heart');
-    }, 2600);
-    setTimeout(() => (c.hidden = true), 3600);
+    });
+  }
+
+  /** The floor number turns into a box: type any floor you've reached and go there (going back turns Auto off). */
+  private jumpFloor() {
+    const g = this.game;
+    const label = this.el.floorN;
+    if (label.hidden) return;
+    const input = document.createElement('input');
+    Object.assign(input, { type: 'number', inputMode: 'numeric', min: '1', max: String(g.s.maxFloor), value: String(g.s.floor), className: 'floor-jump' });
+    input.setAttribute('aria-label', `Go to floor (1 to ${g.s.maxFloor})`);
+    label.hidden = true;
+    label.after(input);
+    this.hideTip();
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (go: boolean) => {
+      if (done) return;
+      done = true;
+      const f = Math.round(Number(input.value));
+      input.remove();
+      label.hidden = false;
+      if (go && f >= 1) {
+        const to = Math.min(f, g.s.maxFloor);
+        if (g.goFloor(to) && to < g.s.maxFloor) g.s.auto = false;
+      }
+      this.floorKey = '';
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') finish(true);
+      if (e.key === 'Escape') finish(false);
+    });
+    input.addEventListener('blur', () => finish(false));
+  }
+
+  /** Waking up: the whole reveal the first time, a short wake-up after. `sleep` runs once the screen is black on the way
+   *  back down (the awakening itself). */
+  playDream(first: boolean, sleep?: () => void, done?: () => void) {
+    const g = this.game;
+    const fresh = new Set(g.s.dreamCards);
+    const freshCount = g.s.dreamCards.length;
+    this.hideTip();
+    this.hooks.dreaming(true);
+    playDream({
+      first, found: g.cardsFound(), cards: CARDS.map((c) => this.binderCard(c, fresh.has(c.id))), fresh: freshCount, sound: this.hooks.sound,
+      cover: () => {
+        g.wake();
+        this.hooks.save();
+      },
+      sleep: () => {
+        sleep?.();
+        this.hooks.save();
+      },
+      done: () => {
+        this.hooks.dreaming(false);
+        done?.();
+      },
+    });
+  }
+
+  /** A card as the binder shows it: its pocket, and everything on the back. */
+  private binderCard(c: (typeof CARDS)[number], fresh: boolean): BinderCard {
+    const g = this.game;
+    const own = g.s.cards[c.id];
+    const got = g.cardCount(c.id) > 0;
+    const gold = g.hasGoldCard(c.id);
+    const tiles = c.zone < 0 ? 'halls' : tilesFor(c.zone);
+    return {
+      id: c.id, name: c.name, kind: { monster: 'Monster', mid: 'Boss', boss: 'Zone boss', goblin: 'Goblin' }[c.kind], color: gold ? CARD_FRAME.gold : CARD_FRAME[c.kind],
+      got, gold, fresh, thumb: got ? cardArt(c, 64, c.id === 'rainbow-goblin' ? 'rainbow' : '') : '', art: got ? cardCanvas(c) : null,
+      floor: tiles === 'halls' ? 'floor_1' : `${tiles}_floor_1`,
+      where: c.where.filter((w) => w.floor <= g.s.bestFloor).map((w) => w.text),
+      copies: own ? own.n.reduce((a, b) => a + b, 0) : 0, goldCopies: own ? own.gold.reduce((a, b) => a + b, 0) : 0,
+      laps: CORRUPTION.map((cr, i) => ({ color: `#${cr.tint.toString(16).padStart(6, '0')}`, got: !!own && own.n[i] + own.gold[i] > 0 })),
+      firstKill: own?.at ?? own?.goldAt ?? null,
+    };
   }
 
   private renderDescendConfirm() {

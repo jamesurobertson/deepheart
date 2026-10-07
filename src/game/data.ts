@@ -767,6 +767,13 @@ export function cardId(name: string): string {
 export const GOBLIN_CARD = 'treasure-goblin';
 export const RAINBOW_CARD = 'rainbow-goblin';
 
+/** " · most on floors 2 and 7": the floors in a zone (from its first) where this monster is the one the floor is known for. */
+function mostOn(d: MonsterDef, first: number) {
+  const floors = Array.from({ length: 9 }, (_, k) => first + k).filter((f) => f % 5 && featuredFor(f).name === d.name);
+  if (!floors.length) return '';
+  return ` · most on floor${floors.length > 1 ? 's' : ''} ${floors.length > 1 ? `${floors.slice(0, -1).join(', ')} and ${floors.at(-1)}` : floors[0]}`;
+}
+
 function buildCards(): CardDef[] {
   const out = new Map<string, CardDef>();
   const add = (d: MonsterDef, kind: CardKind, zone: number, text: string, floor: number) => {
@@ -778,8 +785,8 @@ function buildCards(): CardDef[] {
   ZONES.forEach((z, i) => {
     const a = i * 10;
     const name = z.name.replace(/^The /, '');
-    z.band.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 1}–${a + 9}`, a + 1));
-    z.lap.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 81}–${a + 89}`, a + 81));
+    z.band.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 1}–${a + 9}${mostOn(d, a + 1)}`, a + 1));
+    z.lap.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 81}–${a + 89}${mostOn(d, a + 81)}`, a + 81));
     add(z.mid, 'mid', i, `Floor ${a + 5} boss`, a + 1);
     add(z.boss, 'boss', i, `Floor ${a + 10} boss`, a + 1);
   });
@@ -927,10 +934,16 @@ export const CURSORS: CursorDef[] = [
 
 export interface News {
   text: string;
-  when?: (s: { floor: number; owned: number[]; depth: number; raids: number; kills: number }) => boolean;
+  when?: (s: { floor: number; owned: number[]; depth: number; raids: number; kills: number; awakens: number }) => boolean;
+  /** Only now and then in the running. */
+  rare?: boolean;
 }
 
 export const NEWS: News[] = [
+  // Hints, before the first awakening, that the dungeon is a dream.
+  { text: 'Somewhere far above, someone turns over in their sleep.', when: (s) => !s.awakens, rare: true },
+  { text: 'The Squire swears he heard his mum calling him for breakfast.', when: (s) => !s.awakens && s.owned[compIndex('squire')] > 0, rare: true },
+  { text: 'Every monster down here has a card. Nobody remembers printing them.', when: (s) => !s.awakens, rare: true },
   { text: 'The stairs go down. They always go down.', when: (s) => s.floor < 5 },
   { text: 'Somewhere far below, something is beating like a drum.', when: (s) => s.floor < 20 },
   { text: 'Your Squire asks if the dungeon has a bottom. You do not answer.', when: (s) => s.owned[compIndex('squire')] > 0 },

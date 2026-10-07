@@ -15,6 +15,20 @@ function rectFor(name: string): Rect | null {
   return null;
 }
 
+/** A card's monster as a canvas (trimmed, tinted for its lap), for drawing bigger art. */
+export function cardCanvas(card: CardDef, lap = 0): HTMLCanvasElement | null {
+  return atlas ? portrait(atlas, card, lap) : null;
+}
+
+/** A sprite's animation frames and the sprite sheet they're cut from, for drawing onto a canvas. */
+export function spriteFrames(name: string): { img: CanvasImageSource; frames: Rect[] } | null {
+  if (!atlas) return null;
+  for (const n of [`${name}_idle`, name]) {
+    if (atlas.has(n)) return { img: atlas.texture.image as CanvasImageSource, frames: atlas.anim(n) };
+  }
+  return null;
+}
+
 function cell(r: Rect, scale: number, cls = '', style = '') {
   const a = atlas!;
   return `<i class="px ${cls}" style="width:${r.w * scale}px;height:${r.h * scale}px;background:url(${a.url}) -${r.x * scale}px -${r.y * scale}px/${a.size.w * scale}px ${a.size.h * scale}px no-repeat;${style}"></i>`;
