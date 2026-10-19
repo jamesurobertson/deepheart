@@ -498,9 +498,11 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 .gen-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 /* The star picks your hero: shown on your hero's row, and on the others when you hover them. */
 .gen { position: relative; }
-.gen-hero { position: absolute; left: 2px; top: 1px; display: none; padding: 1px 4px; font: 400 14px/1 var(--f-text); color: var(--faint); text-shadow: var(--outline); cursor: pointer; }
+.gen-hero { position: absolute; left: 3px; top: 3px; display: none; padding: 2px; line-height: 0; color: var(--faint); cursor: pointer;
+  filter: drop-shadow(1px 0 0 var(--ink)) drop-shadow(-1px 0 0 var(--ink)) drop-shadow(0 1px 0 var(--ink)) drop-shadow(0 -1px 0 var(--ink)); }
 .gen.owned:hover .gen-hero, body.touch .gen.owned .gen-hero, .shop.show-stars .gen.owned .gen-hero { display: block; }
-.gen.is-hero .gen-hero { display: block; color: var(--gold-hi); text-shadow: var(--outline), 0 0 6px rgba(255, 210, 100, 0.8); }
+.gen.is-hero .gen-hero { display: block; color: var(--gold-hi);
+  filter: drop-shadow(1px 0 0 var(--ink)) drop-shadow(-1px 0 0 var(--ink)) drop-shadow(0 1px 0 var(--ink)) drop-shadow(0 -1px 0 var(--ink)) drop-shadow(0 0 4px rgba(255, 210, 100, 0.8)); }
 .gen-hero:hover { color: var(--gold-hi); }
 /* A companion's traits (levels 10–100), bought right here: owned, ready to buy, reached but too dear, still to come. */
 .traits { display: flex; gap: 3px; margin-top: 2px; }
