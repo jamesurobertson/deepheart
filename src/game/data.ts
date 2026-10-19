@@ -1,6 +1,6 @@
 /**
  * Everything the game is made of: companions (who fight for you), the monster roster,
- * upgrades, trophies, offers (prestige) and flavor text. Pure data plus builders.
+ * upgrades, trophies and flavor text. Pure data plus builders.
  */
 
 /** A picture for the UI: a sprite from the dungeon sheet, optionally with a badge. */
@@ -32,38 +32,38 @@ export interface CompDef {
 const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, depth = 0, big = false, heart = 0): CompDef =>
   ({ id, name, sprite, cost, dps, attack, flavor, depth, big, heart });
 
-/** Each companion costs more than the last and arrives a few floors deeper: one every 3–5 floors early on, every 6–8
- *  from the Shieldmaiden. Damage grows slower than price (about cost^0.5 between them), so each arrival helps without
- *  carrying the run on its own. */
+/** All 24 are there from the start, spaced by price: each costs about ×7 the last (one every 4–5 floors against ×1.55
+ *  health a floor), the last four steeper. Damage grows a little slower than price (about cost^0.85), so each arrival
+ *  is a clear jump without carrying the run alone. The first six get more per gold (Squire about 5 gold a point,
+ *  falling to about 300 by the Shadow Thief) so the opening floors move; past them the climb is about hires and traits. */
 export const COMPS: CompDef[] = [
-  // Plain adventurers first; the strange and the enormous come later, the Heart's recruits last of all.
+  // Plain adventurers first; the strange and the enormous come later.
   // The first four are cheap and hit hard, so the party carries the opening and clicking is a bonus.
-  c('squire', 'Squire', 'knight_m', 5, 2, 'slash', 'Wants to be a knight so badly. Practises on everything, monsters included.'),
-  c('ranger', 'Ranger', 'elf_f', 30, 10, 'arrow', 'Never misses. Well, rarely. Well, sometimes.'),
-  c('brawler', 'Dwarf Brawler', 'dwarf_m', 150, 44, 'slash', 'Came for the gold. Stayed for the punching.'),
-  c('apprentice', 'Apprentice', 'wizzard_m', 750, 148, 'bolt', 'Knows exactly one spell. It is lightning. It is enough.'),
-  c('hunter', 'Lizard Hunter', 'lizard_m', 7_000, 245, 'arrow', 'Can smell a monster through three floors of stone.'),
-  c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 130_000, 2_140, 'slash', 'Her shield has killed more monsters than her sword.'),
-  c('thief', 'Shadow Thief', 'cr_green_thief', 4e6, 23_900, 'arrow', 'Throws knives. Takes them back. Takes your purse too, then gives it back.'),
-  c('dancer', 'Blade Dancer', 'elf_m', 3e8, 333_000, 'slash', 'Fights like it is a performance. The monsters do not clap.'),
-  c('corsair', 'Corsair Captain', 'cr_pirate_captain', 2.2e11, 2.58e7, 'arrow', 'Sailed the underground sea. There is an underground sea. Do not ask.'),
-  c('runesmith', 'Runesmith', 'dwarf_f', 3.5e12, 1.72e8, 'rune', 'Carves runes into the floor. The floor explodes.'),
-  c('paladin', 'Paladin', 'cr_gold_knight', 3.7e14, 3.53e9, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
-  c('stormcaller', 'Stormcaller', 'wizzard_f', 1.2e15, 9.48e9, 'storm', 'Brought her own weather. Down here, of all places.'),
-  c('venomblade', 'Venomblade', 'lizard_f', 7e16, 1.38e11, 'dark', 'Every blade is poisoned. Every single one. She has a lot.', 1),
-  c('doctor', 'Plague Doctor', 'doc', 1e18, 7.77e11, 'dark', 'Treats monsters with a strict regimen of dying.', 2),
-  c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.4e19, 6.73e12, 'storm', 'Followed you home from the Frozen Vault. Will not leave. Brings its own blizzard.', 3),
-  c('hollow', 'Hollow Knight', 'pumpkin_dude', 2e20, 5.65e13, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.', 4),
-  // The Heart's recruits: one more answers every time you awaken it. A gentler curve (×2 damage for ×4 cost),
-  // since every awakening already multiplies your power; steeper and the late game snowballs.
-  c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 8e20, 1.13e14, 'dark', 'Broke every vow but one: never stop swinging.', 4, false, 1),
-  c('archmage', 'Archmage', 'cr_wizard', 3.2e21, 2.26e14, 'bolt', 'Older than the dungeon. Insists the dungeon was smaller back then.', 4, false, 2),
-  c('wraith', 'Bound Wraith', 'cr_crimson_wraith', 1.28e22, 4.52e14, 'dark', 'The Heart sent it. It hums a song nobody taught it.', 4, false, 3),
-  c('necro', 'Turncoat Necromancer', 'necromancer', 5.07e22, 9.04e14, 'dark', 'Used to raise these monsters. Now it lowers them.', 4, false, 4),
-  c('king', 'Exiled King', 'cr_king', 2e23, 1.81e15, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 4, false, 5),
-  c('angel', 'Fallen Angel', 'angel', 8.13e23, 3.58e15, 'fire', 'Fell from somewhere bright. Landed swinging.', 4, false, 6),
-  c('ogre', 'Tamed Ogre', 'ogre', 3.33e24, 7.16e15, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 4, true, 7),
-  c('demon', 'Bound Demon', 'big_demon', 1.31e25, 1.45e16, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 4, true, 8),
+  c('squire', 'Squire', 'knight_m', 5, 1, 'slash', 'Wants to be a knight so badly. Practices on everything, monsters included.'),
+  c('ranger', 'Ranger', 'elf_f', 40, 4, 'arrow', 'Never misses. Well, rarely. Well, sometimes.'),
+  c('brawler', 'Dwarf Brawler', 'dwarf_m', 250, 12, 'slash', 'Came for the gold. Stayed for the punching.'),
+  c('apprentice', 'Apprentice', 'wizzard_m', 2000, 50, 'bolt', 'Knows exactly one spell. It is lightning. It is enough.'),
+  c('hunter', 'Lizard Hunter', 'lizard_m', 12_000, 150, 'arrow', 'Can smell a monster through three floors of stone.'),
+  c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 80_000, 500, 'slash', 'Her shield has killed more monsters than her sword.'),
+  c('thief', 'Shadow Thief', 'cr_green_thief', 6e5, 2000, 'arrow', 'Throws knives. Takes them back. Takes your purse too, then gives it back.'),
+  c('dancer', 'Blade Dancer', 'elf_m', 4e6, 10_000, 'slash', 'Fights like it is a performance. The monsters do not clap.'),
+  c('corsair', 'Corsair Captain', 'cr_pirate_captain', 3e7, 60_000, 'arrow', 'Sailed the underground sea. There is an underground sea. Do not ask.'),
+  c('runesmith', 'Runesmith', 'dwarf_f', 2e8, 3e5, 'rune', 'Carves runes into the floor. The floor explodes.'),
+  c('paladin', 'Paladin', 'cr_gold_knight', 1.5e9, 1.5e6, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
+  c('stormcaller', 'Stormcaller', 'wizzard_f', 1e10, 7e6, 'storm', 'Brought her own weather. Down here, of all places.'),
+  c('venomblade', 'Venomblade', 'lizard_f', 7e10, 4e7, 'dark', 'Every blade is poisoned. Every single one. She has a lot.'),
+  c('doctor', 'Plague Doctor', 'doc', 5e11, 2.5e8, 'dark', 'Treats monsters with a strict regimen of dying.'),
+  c('frostimp', 'Frost Imp', 'cr_frost_imp', 4e12, 1.2e9, 'storm', 'Followed you home from the Frozen Vault. Will not leave. Brings its own blizzard.'),
+  c('hollow', 'Hollow Knight', 'pumpkin_dude', 2.5e13, 6e9, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.'),
+  c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 2e14, 4e10, 'dark', 'Broke every vow but one: never stop swinging.'),
+  c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2e11, 'bolt', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
+  c('wraith', 'Bound Wraith', 'cr_crimson_wraith', 8e15, 1e12, 'dark', 'The Heart sent it. It hums a song nobody taught it.'),
+  c('necro', 'Turncoat Necromancer', 'necromancer', 6e16, 5e12, 'dark', 'Used to raise these monsters. Now it lowers them.'),
+  // Most of the party arrives in the first climb; these last four wait deeper down.
+  c('king', 'Exiled King', 'cr_king', 7e17, 4e13, 'fire', 'Lost his crown, his kingdom and his temper, in that order.'),
+  c('angel', 'Fallen Angel', 'angel', 8e18, 3e14, 'fire', 'Fell from somewhere bright. Landed swinging.'),
+  c('ogre', 'Tamed Ogre', 'ogre', 1e20, 2.5e15, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 0, true),
+  c('demon', 'Bound Demon', 'big_demon', 1.2e21, 2e16, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 0, true),
 ];
 
 /** A companion's place in the roster, by id (so lists below don't break if the order changes). */
@@ -239,6 +239,12 @@ export type Effect =
   | { t: 'clickDps'; pct: number }
   | { t: 'auto'; add: number }
   | { t: 'global'; pct: number }
+  /** Every companion deals this many times the damage (multiplies with other party traits). */
+  | { t: 'party'; mult: number }
+  /** Damage to bosses, added up across upgrades. */
+  | { t: 'boss'; pct: number }
+  /** A trait whose whole effect is the skill it unlocks. */
+  | { t: 'skill' }
   | { t: 'gold'; pct: number }
   | { t: 'crit'; chance?: number; add?: number }
   | { t: 'cleave'; pct: number }
@@ -271,75 +277,115 @@ export type Req =
   | { t: 'trophies'; n: number }
   | { t: 'fevers'; n: number };
 
-/** Companion levels that unlock a ×2 damage upgrade (its traits, bought on its row). There are none past level 100. */
-const MILESTONES = [10, 25, 50, 75, 100];
-/** Each companion level costs this much more than the last (about 3.9 levels a floor against ×1.55 health). */
-export const COST_GROWTH = 1.12;
-/** Upgrade cost as a multiple of the companion's hire price. */
-const MILESTONE_COST = [16, 190, 5_000, 1.5e5, 5e6];
+/** Companion levels a trait can open at (a companion has 4–7 of them), and each trait's price as a multiple of the
+ *  companion's hire price. */
+const TRAIT_LEVELS = [10, 25, 50, 75, 100, 125, 150];
+const TRAIT_COST = [12, 30, 150, 1_000, 1e4, 6e4, 3e5];
+/** From level `from`, every `every` levels multiply a companion's damage by `mult`, on their own: old companions stay
+ *  worth leveling. (An object so the pacing tools can try other values.) */
+export const LEVEL_BONUS = { from: 200, every: 25, mult: 3 };
+export const levelMult = (level: number) =>
+  level < LEVEL_BONUS.from ? 1 : LEVEL_BONUS.mult ** (Math.floor((level - LEVEL_BONUS.from) / LEVEL_BONUS.every) + 1);
+
+/** Each companion level costs this much more than the last (about 6 levels a floor against ×1.55 health). */
+export const COST_GROWTH = 1.075;
+/** What each companion's traits do, in order: own (×2 to them), party (+25% to every companion), click (+5% of party
+ *  damage per click), gold (+50%), boss (+50% to bosses), blade (Phantom Blade +1/s), crit2 (+2% crit chance), critx1
+ *  (+1× crit damage), or skill (unlocks the ability listed in ABILITIES at that trait). */
+const TRAIT_PLAN: Record<string, string[]> = {
+  squire: ['skill', 'skill', 'own', 'click', 'blade', 'own', 'own'],
+  ranger: ['own', 'skill', 'crit2', 'crit3', 'party', 'crit3'],
+  brawler: ['own', 'own', 'skill', 'click', 'own', 'party'],
+  apprentice: ['own', 'own', 'party', 'own'],
+  hunter: ['own', 'critx1', 'own', 'critx1', 'party'],
+  shieldmaiden: ['own', 'boss', 'skill', 'own', 'boss', 'party'],
+  thief: ['own', 'crit2', 'gold', 'crit3', 'gold'],
+  dancer: ['own', 'critx1', 'click', 'critx1', 'party'],
+  corsair: ['own', 'gold', 'own', 'skill', 'gold', 'party'],
+  runesmith: ['own', 'own', 'party', 'skill', 'own', 'boss'],
+  paladin: ['own', 'boss', 'party', 'own', 'boss'],
+  stormcaller: ['own', 'own', 'click', 'own', 'skill', 'blade', 'party'],
+  venomblade: ['own', 'crit3', 'own', 'critx2', 'crit3', 'party'],
+  doctor: ['own', 'own', 'party', 'boss'],
+  frostimp: ['own', 'party', 'own', 'click'],
+  hollow: ['own', 'boss', 'own', 'party', 'boss'],
+  oathbreaker: ['own', 'click', 'party', 'own', 'click'],
+  archmage: ['own', 'own', 'party', 'own', 'own', 'party'],
+  wraith: ['own', 'blade', 'own', 'party'],
+  necro: ['own', 'party', 'own', 'own', 'party'],
+  king: ['own', 'gold', 'own', 'party', 'gold', 'own'],
+  angel: ['own', 'own', 'party', 'own', 'party'],
+  ogre: ['own', 'boss', 'own', 'boss', 'party'],
+  demon: ['own', 'own', 'party', 'own', 'own', 'own', 'party'],
+};
+/** A companion's trait levels (as many as it has traits). */
+export const traitLevels = (comp: number) => TRAIT_LEVELS.slice(0, TRAIT_PLAN[COMPS[comp].id].length);
 /** Each companion's milestone upgrades, one per milestone. */
 const MILESTONE_NAMES: Record<string, string[]> = {
-  squire: ['Practice Swing', 'Eager Beaver', 'Training Wheels', 'Squire Power', 'Overachiever'],
-  ranger: ['Near Miss', 'Mostly Accurate', 'Long Shot', 'Quiver Wit', 'Bullseye-ish'],
-  brawler: ['Knuckle Down', 'Short Fuse', 'Punch Line', 'Gold Digger', 'Beard Punch'],
+  squire: ['Practice Swing', 'Eager Beaver', 'Training Wheels', 'Squire Power', 'Overachiever', 'Knighthood Pending', 'Sir Squire'],
+  ranger: ['Near Miss', 'Mostly Accurate', 'Long Shot', 'Quiver Wit', 'Bullseye-ish', 'Dead Eye'],
+  brawler: ['Knuckle Down', 'Short Fuse', 'Punch Line', 'Gold Digger', 'Beard Punch', 'Round Two'],
   apprentice: ['One Trick', 'Spark of Genius', 'Shock Value', 'Fast Learner', 'Bolt from the Blue'],
   hunter: ['Cold Blooded', 'Keen Nose', 'Scent Trail', 'Tail Gate', 'Scale Up'],
-  shieldmaiden: ['Shield Bash', 'Board Meeting', 'Living Wall', 'Best Defense', 'Bash Course'],
+  shieldmaiden: ['Shield Bash', 'Board Meeting', 'Living Wall', 'Best Defense', 'Bash Course', 'Hold the Line'],
   thief: ['Light Fingers', 'Sticky Fingers', 'Pickpocket', 'Knife to Meet You', 'Steal of a Deal'],
   dancer: ['First Position', 'Pirouette', 'Dance Off', 'Cutting a Rug', 'Sword Dance'],
-  corsair: ['Sea Legs', 'Plunder Ground', 'Shiver Me Timbers', 'Sunken Treasure', 'Below Deck'],
-  runesmith: ['Chisel In', 'Floor Plan', 'Rune for Cover', 'Set in Stone', 'Groundbreaking'],
+  corsair: ['Sea Legs', 'Plunder Ground', 'Shiver Me Timbers', 'Sunken Treasure', 'Below Deck', 'Full Sail'],
+  runesmith: ['Chisel In', 'Floor Plan', 'Rune for Cover', 'Set in Stone', 'Groundbreaking', 'Rock Bottom'],
   paladin: ['Holy Moly', 'Purge Party', 'Smite Club', 'Light Work', 'Holy Order'],
-  stormcaller: ['Brainstorm', 'Under the Weather', 'Cloud Cover', 'Storm Front', 'Eye of the Storm'],
-  venomblade: ['Toxic Trait', 'Bad Blood', 'Bite Back', 'Poison Pen', 'Forked Tongue'],
+  stormcaller: ['Brainstorm', 'Under the Weather', 'Cloud Cover', 'Storm Front', 'Eye of the Storm', 'Lightning Rod', 'Perfect Storm'],
+  venomblade: ['Toxic Trait', 'Bad Blood', 'Bite Back', 'Poison Pen', 'Forked Tongue', 'Snake Oil'],
   doctor: ['Second Opinion', 'Bedside Manner', 'House Call', "Doctor's Orders", 'Bad Prognosis'],
   frostimp: ['Cold Snap', 'Chill Out', 'Ice Breaker', 'Frostbite', 'Cold Shoulder'],
   hollow: ['Gourd Duty', 'Pumpkin Spice', 'Carved Up', 'Patch Work', 'Squash Them'],
   oathbreaker: ['Promise Ring', 'Broken Vow', 'Fine Print', 'Word Breaker', 'No Take-Backs'],
-  archmage: ['Old School', 'Back in My Day', 'Spell Check', 'Arch Rival', 'Senior Moment'],
+  archmage: ['Old School', 'Back in My Day', 'Spell Check', 'Arch Rival', 'Senior Moment', 'Old Magic'],
   wraith: ['Ghost Note', 'Haunting Melody', 'Spirited', 'Dead Ringer', 'Soul Music'],
   necro: ['Change of Heart', 'Grave Mistake', 'Dead Serious', 'Bone to Pick', 'Raise the Stakes'],
-  king: ['Royal Pain', 'Throne Away', 'Heavy Is the Head', "King's Ransom", 'Royal Decree'],
+  king: ['Royal Pain', 'Throne Away', 'Heavy Is the Head', "King's Ransom", 'Royal Decree', 'Crown Jewels'],
   angel: ['Fall Guy', 'Grounded', 'Fallen Grace', 'Wing It', 'Halo Effect'],
   ogre: ['Good Boy', 'Pebble Dash', 'Rock Solid', 'Big Softie', 'Boulder Dash'],
-  demon: ['Terms and Conditions', 'Blood Pact', 'Hell to Pay', "Devil's Advocate", 'Hellfire'],
+  demon: ['Terms and Conditions', 'Blood Pact', 'Hell to Pay', "Devil's Advocate", 'Hellfire', 'Soul Contract', 'Fire Sale'],
 };
 export const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
 
-/** The level of a companion's k-th milestone (k from 0). */
-export const milestoneAt = (k: number) => MILESTONES[k];
+/** The level of a companion's k-th trait (k from 0). */
+export const milestoneAt = (k: number) => TRAIT_LEVELS[k];
 
-/** The first milestone above this level (null past the last). */
-export function nextMilestone(level: number): number | null {
-  return MILESTONES.find((m) => m > level) ?? null;
+/** The next level above this one that brings this companion something: a trait, or past its last trait the ×4 every
+ *  25 levels from 200. */
+export function nextMilestone(comp: number, level: number): number {
+  const trait = traitLevels(comp).find((m) => m > level);
+  const { from, every } = LEVEL_BONUS;
+  return trait ?? (level < from ? from : from + every * (Math.floor((level - from) / every) + 1));
 }
 
 /** A line of flavor under each of those upgrades. */
 const MILESTONE_FLAVOR: Record<string, string[]> = {
-  squire: ['He practises on everything. Mostly monsters.', 'Up before dawn. Swinging before breakfast.', "The training wheels are off. He's never been faster.", 'Small squire. Big swing.', 'Extra credit, paid in monsters.'],
-  ranger: ['Closer than last time. That counts.', 'Eight out of ten monsters agree.', 'She hit something two floors down. Probably a monster.', 'Sharp arrows. Sharper comebacks.', "It's the thought that counts. The arrow helps."],
-  brawler: ["He's taking this seriously now. Very seriously.", "Don't mention his height. Or anything.", 'He tells the joke. The monster gets the punch.', 'Every hole he digs has gold in it. Or a monster. Both are fine.', 'Nobody knows how. Nobody wants a demonstration.'],
+  squire: ['He practices on everything. Mostly monsters.', 'Up before dawn. Swinging before breakfast.', "The training wheels are off. He's never been faster.", 'Small squire. Big swing.', 'Extra credit, paid in monsters.', 'The paperwork is in. The knighting is any day now.', 'Not official. He says it anyway.'],
+  ranger: ['Closer than last time. That counts.', 'Eight out of ten monsters agree.', 'She hit something two floors down. Probably a monster.', 'Sharp arrows. Sharper comebacks.', "It's the thought that counts. The arrow helps.", 'Never misses now. Almost never.'],
+  brawler: ["He's taking this seriously now. Very seriously.", "Don't mention his height. Or anything.", 'He tells the joke. The monster gets the punch.', 'Every hole he digs has gold in it. Or a monster. Both are fine.', 'Nobody knows how. Nobody wants a demonstration.', 'He was only warming up. The monsters were not.'],
   apprentice: ["It's a good trick.", 'Mostly sparks. Some genius.', 'Monsters find him shocking.', "Learned a second spell. It's also lightning.", 'Also from the red, the green and the ceiling.'],
   hunter: ['Feels nothing. Hits everything.', 'Smells fear. Also lunch.', 'Follows it three floors down and back.', 'Gets too close. On purpose.', 'Grows a little every time something dies.'],
-  shieldmaiden: ['Defense is just offense, waiting.', 'The shield meets the face. Meeting adjourned.', "Walls don't usually chase you.", 'Is a good offense. Is also a good shield.', 'She teaches it. Monsters fail it.'],
+  shieldmaiden: ['Defense is just offense, waiting.', 'The shield meets the face. Meeting adjourned.', "Walls don't usually chase you.", 'Is a good offense. Is also a good shield.', 'She teaches it. Monsters fail it.', 'Everyone behind her fights braver.'],
   thief: ["Your purse feels lighter. That's normal.", 'The knives come back. So does your gold, mostly.', 'Monsters have pockets. Had.', 'He says it every time. Every knife.', "He's very proud of this price. Don't ask why."],
   dancer: ["Also the monster's last position.", 'One spin, three slices.', 'The monsters lost. Badly. Fatally.', 'And everything standing on it.', "Don't stand too close. Don't stand at all."],
-  corsair: ['Steady on any floor. Even the wet ones.', "Everything down here is treasure if you're brave enough.", 'The monsters shiver first.', 'Found it. Kept it. Hit things with it.', 'The lower the deck, the bigger the haul.'],
-  runesmith: ['Every swing leaves a mark. Some marks explode.', 'The plan: the floor explodes.', "Monsters run. Runes don't care.", "The runes are permanent. The monsters aren't.", 'Literally.'],
+  corsair: ['Steady on any floor. Even the wet ones.', "Everything down here is treasure if you're brave enough.", 'The monsters shiver first.', 'Found it. Kept it. Hit things with it.', 'The lower the deck, the bigger the haul.', 'The whole crew hits harder with the wind behind them.'],
+  runesmith: ['Every swing leaves a mark. Some marks explode.', 'The plan: the floor explodes.', "Monsters run. Runes don't care.", "The runes are permanent. The monsters aren't.", 'Literally.', 'Bosses hit the floor. The floor hits back.'],
   paladin: ['A prayer and a punch.', "Everyone's invited. Nobody leaves.", 'First rule: smite.', 'Purging is easy when you glow.', 'The order is: hit it again.'],
-  stormcaller: ['Her best ideas come with lightning.', 'The monsters are. Permanently.', 'Indoors, somehow.', "She's always at the front of it.", 'Calm in the middle. Chaos everywhere else.'],
-  venomblade: ["She poisons everything. It's a lot.", 'Theirs, mostly.', 'Monsters bite. She bites back harder.', 'She writes their names on the blades. Then delivers them.', 'Says one thing. Stabs another.'],
+  stormcaller: ['Her best ideas come with lightning.', 'The monsters are. Permanently.', 'Indoors, somehow.', "She's always at the front of it.", 'Calm in the middle. Chaos everywhere else.', 'The blade keeps getting struck. It likes it.', 'Everyone fights better in her weather.'],
+  venomblade: ["She poisons everything. It's a lot.", 'Theirs, mostly.', 'Monsters bite. She bites back harder.', 'She writes their names on the blades. Then delivers them.', 'Says one thing. Stabs another.', 'She sells it to the party. It works, somehow.'],
   doctor: ['Also: dying.', 'Terrible. Effective.', 'Comes to you. Unfortunately.', 'Rest. Permanently.', 'For them. Always for them.'],
   frostimp: ['Snaps. Things. Cold.', "It won't. Ever.", 'Breaks the ice. And the monster.', 'Bites, too.', 'Monsters get it. Then they get frozen.'],
   hollow: ['Reporting for it.', 'Seasonal. Lethal.', "The pumpkin's smile gets wider every fight.", 'Fresh from the patch. Ready to work.', 'Pun intended.'],
   oathbreaker: ["Doesn't count. Never did.", "Another one. He's keeping count.", 'He read it. Then ignored it.', 'His word means nothing. His sword means everything.', 'Swings first. Never apologises.'],
-  archmage: ['The original school. He built it.', 'Monsters were bigger. He was faster.', 'Every spell checked. Every monster checked out.', "He has one. It's the dungeon.", 'Forgot what he was casting. Cast it anyway. Worked.'],
+  archmage: ['The original school. He built it.', 'Monsters were bigger. He was faster.', 'Every spell checked. Every monster checked out.', "He has one. It's the dungeon.", 'Forgot what he was casting. Cast it anyway. Worked.', 'Older than the dungeon. Stronger, too.'],
   wraith: ['Heard but not seen. Then felt.', "Monsters can't get it out of their heads.", 'Enthusiastic, for the dead.', 'Sounds like doom. Is doom.', 'Played on monsters.'],
   necro: ['Used to raise them. Now he lowers them.', 'The monsters made it.', 'About the job. About the dead.', 'With every skeleton he ever raised.', 'And then drive them in.'],
-  king: ["A pain in every monster's neck.", "He's fine about it. Mostly.", 'Heavy is the fist, too.', "Nobody's paying it. He's taking it.", 'All monsters: begone.'],
+  king: ["A pain in every monster's neck.", "He's fine about it. Mostly.", 'Heavy is the fist, too.', "Nobody's paying it. He's taking it.", 'All monsters: begone.', 'He kept one crown. It is very heavy. He swings it.'],
   angel: ['Took the fall. Gave back worse.', 'Literally. Angrily.', 'Not so graceful now. Much more punchy.', 'No plan. Lots of wing.', 'Monsters see it. Then they see nothing.'],
   ogre: ["Yes he is. Who's a good boy? Pebble is.", 'Pebble runs. Things break.', 'Pebble is not small. Pebble is never small.', 'To you. Only to you.', 'Pebble got bigger.'],
-  demon: ['Nobody reads them. The monsters should have.', "Mostly the monsters' blood.", "And it's collecting.", 'Argues for violence. Wins.', 'Brought from home.'],
+  demon: ['Nobody reads them. The monsters should have.', "Mostly the monsters' blood.", "And it's collecting.", 'Argues for violence. Wins.', 'Brought from home.', 'Every companion signed. Nobody read it.', 'Everything must burn.'],
 };
 
 function milestoneName(comp: string, k: number) {
@@ -390,15 +436,19 @@ const SYNERGIES: [number, number, string][] = ([
   ['dancer', 'venomblade', 'Blades in the Dark'], ['doctor', 'necro', 'Plague and Grave'], ['hollow', 'angel', 'Burning Halo'], ['ogre', 'demon', 'Bound Together'],
 ] as const).map(([a, b, name]) => [compIndex(a), compIndex(b), name]);
 
-/** Crits grow through the sharp-eyed companions' milestones (by milestone index): chance in %, or extra crit damage. */
-const CRIT_BONUS: Record<string, Record<number, { chance?: number; add?: number }>> = {
-  ranger: { 2: { chance: 2 }, 3: { chance: 2 }, 4: { chance: 3 } },
-  hunter: { 2: { add: 1 }, 4: { add: 1 } },
-  thief: { 1: { chance: 2 }, 3: { chance: 3 }, 4: { add: 1 } },
-  dancer: { 2: { add: 1 }, 4: { add: 1 } },
-  venomblade: { 1: { chance: 3 }, 3: { add: 2 }, 4: { chance: 3 } },
-};
-const critText = (b: { chance?: number; add?: number }) => (b.chance ? ` Crit chance +${b.chance}%.` : ` Crit damage +${b.add}×.`);
+/** What a trait does, in words and in effect (see TRAIT_PLAN). */
+function traitEffect(kind: string, comp: number): { effect: Effect; desc: string } {
+  const num = Number(kind.replace(/\D+/g, ''));
+  if (kind === 'own') return { effect: { t: 'comp', comp, mult: 2 }, desc: `${COMPS[comp].name} deals ×2 damage.` };
+  if (kind === 'party') return { effect: { t: 'party', mult: 1.25 }, desc: 'Every companion deals +25% damage.' };
+  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.05 }, desc: "Clicks also deal +5% of your party's damage." };
+  if (kind === 'gold') return { effect: { t: 'gold', pct: 0.5 }, desc: 'Monsters drop +50% gold.' };
+  if (kind === 'boss') return { effect: { t: 'boss', pct: 0.5 }, desc: '+50% damage to bosses.' };
+  if (kind === 'blade') return { effect: { t: 'auto', add: 1 }, desc: 'Phantom Blade +1/s.' };
+  if (kind.startsWith('critx')) return { effect: { t: 'crit', add: num }, desc: `Crit damage +${num}×.` };
+  if (kind.startsWith('crit')) return { effect: { t: 'crit', chance: num / 100 }, desc: `Crit chance +${num}%.` };
+  return { effect: { t: 'skill' }, desc: '' };
+}
 
 const CLEAVES: [string, number, number, number][] = [
   ['Cleave', 12, 2e4, 0.25],
@@ -409,26 +459,23 @@ const CLEAVES: [string, number, number, number][] = [
 function buildUpgrades(): UpgDef[] {
   const out: UpgDef[] = [];
   COMPS.forEach((comp, i) => {
-    for (let k = 0; k < MILESTONES.length; k++) {
-      const cost = comp.cost * MILESTONE_COST[k];
-      const crit = CRIT_BONUS[comp.id]?.[k];
+    TRAIT_PLAN[comp.id].forEach((kind, k) => {
+      const { effect, desc } = traitEffect(kind, i);
       out.push({
-        id: `m${i}_${k}`, name: milestoneName(comp.id, k), flavor: MILESTONE_FLAVOR[comp.id][k],
-        desc: `${comp.name} deals ×2 damage.${crit ? critText(crit) : ''}`,
-        bonus: crit ? { t: 'crit', chance: (crit.chance ?? 0) / 100, add: crit.add } : undefined,
-        cost, icon: { sprite: comp.sprite, tier: Math.min(k, ROMAN.length - 1) },
-        effect: { t: 'comp', comp: i, mult: 2 }, req: { t: 'owned', comp: i, n: milestoneAt(k) },
+        id: `m${i}_${k}`, name: milestoneName(comp.id, k), flavor: MILESTONE_FLAVOR[comp.id][k], desc,
+        cost: comp.cost * TRAIT_COST[k], icon: { sprite: comp.sprite, tier: Math.min(k, ROMAN.length - 1) },
+        effect, req: { t: 'owned', comp: i, n: milestoneAt(k) },
       });
-    }
+    });
   });
   CLICK_UPGS.forEach(([name, sprite, floor, cost], k) => {
-    out.push({ id: `clk${k}`, name, desc: 'Your clicks deal twice as much damage.', cost, icon: { sprite }, effect: { t: 'click', mult: 2 }, req: { t: 'floor', n: floor } });
+    out.push({ id: `clk${k}`, name, desc: 'Base click damage ×2.', cost, icon: { sprite }, effect: { t: 'click', mult: 2 }, req: { t: 'floor', n: floor } });
   });
   DPS_CLICK.forEach(([name, sprite, floor, cost], k) => {
     out.push({ id: `cd${k}`, name, desc: 'Each click also deals +5% of your companions\' damage per second.', cost, icon: { sprite }, effect: { t: 'clickDps', pct: 0.05 }, req: { t: 'floor', n: floor } });
   });
   PHANTOM_UPGS.forEach(([name, floor, cost, add], k) => {
-    out.push({ id: `auto${k}`, name, desc: `Your Phantom Blade attacks ${add} more time${add === 1 ? '' : 's'} a second.`, cost, icon: { sprite: 'weapon_knife', tier: k + 1 }, effect: { t: 'auto', add }, req: { t: 'floor', n: floor } });
+    out.push({ id: `auto${k}`, name, desc: `Your Phantom Blade attacks ${add} more time${add === 1 ? '' : 's'} a second.`, cost, icon: { sprite: 'weapon_knife', tier: k + 1 }, effect: { t: 'auto', add }, req: { t: 'floor', n: floor }, needs: 'blade' });
   });
   // The first step of cleave is the Dwarf Brawler's ability now; ids keep their old numbers so saves line up.
   CLEAVES.forEach(([name, floor, cost, pct], k) => k > 0 && out.push({
@@ -480,7 +527,7 @@ export const UPGRADES = buildUpgrades();
 
 // ---------- abilities ----------
 
-export type AbilityId = 'flurry' | 'crit' | 'rampage' | 'cleave' | 'drums' | 'treasure' | 'legion';
+export type AbilityId = 'blade' | 'flurry' | 'crit' | 'rampage' | 'cleave' | 'drums' | 'treasure' | 'legion';
 
 export interface AbilityDef {
   id: AbilityId;
@@ -498,6 +545,7 @@ export interface AbilityDef {
 
 /** In the order you're likely to meet them. Each is unlocked by buying one companion trait, and earned again every run. */
 export const ABILITIES: AbilityDef[] = [
+  { id: 'blade', name: 'Phantom Blade', desc: 'Attacks the front monster for you, once a second.', kind: 'passive', comp: compIndex('squire'), trait: 0 },
   { id: 'flurry', name: 'Flurry', desc: 'Clicks for you, 10 times a second, for 30s.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 5 * 60 },
   { id: 'crit', name: 'Critical Hits', desc: 'Your clicks and Phantom Blade can land critical hits: a 3% chance for ×2 damage. Sharp-eyed companions raise both.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
   { id: 'rampage', name: 'Rampage', desc: 'Attacks charge it. Unleash for ×5 damage for 10s. Keep attacking for ×10.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
@@ -511,69 +559,11 @@ export const ABILITY_BY_ID = new Map(ABILITIES.map((a) => [a.id, a]));
 export const abilityUpgrade = (a: AbilityDef) => `m${a.comp}_${a.trait}`;
 /** The ability a trait upgrade unlocks, if any. */
 export const ABILITY_BY_UPGRADE = new Map(ABILITIES.map((a) => [abilityUpgrade(a), a]));
-/** Companion traits shown on the companion's own row (levels 10–100); later milestones stay in the Upgrades grid. */
-export const TRAITS = 5;
-/** A companion's first milestones (`m{comp}_{k}`, k < TRAITS) are its traits, bought on its own row. */
-export const isTraitId = (id: string) => {
-  const m = /^m\d+_(\d+)$/.exec(id);
-  return !!m && Number(m[1]) < TRAITS;
-};
+/** A companion's milestones (`m{comp}_{k}`) are its traits, bought on its own row. */
+export const isTraitId = (id: string) => /^m\d+_\d+$/.test(id);
 export const UPG_BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));
 
-// ---------- offers (prestige) ----------
-
-/** An offer: dealt into your hand after ascending and bought with souls. Bought levels last until you awaken. */
-export interface OfferDef {
-  id: string;
-  name: string;
-  icon: string;
-  /** Souls per level. */
-  cost: number;
-  max: number;
-  /** How often it's dealt, against the others. */
-  weight: number;
-  /** What it does at this many levels. */
-  desc: (lv: number) => string;
-}
-
-const COMMON = 10;
-const UNCOMMON = 5;
-const RARE = 2;
-
-/** Cards dealt into the hand, and what a redraw costs. */
-export const HAND_SIZE = 4;
-export const REDRAW_COST = 1;
-
-const o = (id: string, name: string, icon: string, cost: number, max: number, weight: number, desc: (lv: number) => string): OfferDef =>
-  ({ id, name, icon, cost, max, weight, desc });
-
-/** About ×2 damage a soul for the damage offers, so a hand that mixes in the others still averages near the pacing
- *  model's ×1.5 a soul (awakening around floor 100 after ~6 ascents). */
-export const OFFERS: OfferDef[] = [
-  o('banner', 'War Banner', 'wall_banner_red', 1, Infinity, 2 * COMMON, (l) => `Companions deal ×${fmtBig(1.6 ** l)} damage.`),
-  o('whet', 'Whetstone', 'weapon_knife', 1, Infinity, COMMON, (l) => `Clicks deal ×${fmtBig(5 ** l)} damage.`),
-  o('slayer', 'Giantslayer', 'weapon_spear', 1, Infinity, COMMON, (l) => `×${fmtBig(2.5 ** l)} damage to bosses.`),
-  o('purse', 'Fat Purses', 'coin', 1, Infinity, COMMON, (l) => `Monsters drop ×${fmtBig(2 ** l)} gold.`),
-  o('hands', 'Phantom Fury', 'weapon_katana', 1, 10, COMMON, (l) => `Phantom Blade attacks +${l}/s.`),
-  o('glass', 'Sandglass', 'flask_yellow', 1, 4, COMMON, (l) => `Bosses give you ${5 * l} more seconds.`),
-  o('warcry', 'War Cry', 'weapon_red_gem_sword', 2, Infinity, UNCOMMON, (l) => `Companions deal ×${fmtBig(4 ** l)} damage.`),
-  o('oath', 'Oathkeeper', 'weapon_golden_sword', 1, 5, UNCOMMON, (l) => `Clicks also deal ${10 * l}% of your party's damage.`),
-  o('tithe', 'Mercenary Guild', 'flask_big_blue', 1, 5, UNCOMMON, (l) => `Companions cost ${Math.round((1 - 0.8 ** l) * 100)}% less.`),
-  o('bargain', 'Dark Bargain', 'flask_big_red', 1, 3, UNCOMMON, (l) => `Upgrades cost ${Math.round((1 - 0.6 ** l) * 100)}% less.`),
-  o('skip', 'Deep Stairs', 'floor_stairs', 1, 6, UNCOMMON, (l) => `Start each descent on floor ${1 + 5 * l}.`),
-  o('veterans', 'Veterans', 'knight_m', 1, 1, UNCOMMON, () => 'Squire, Ranger and Dwarf Brawler start each descent at level 25.'),
-  o('bane', "Warden's Bane", 'weapon_big_hammer', 1, 3, UNCOMMON, (l) => `Boss modifiers are ${25 * l}% weaker.`),
-  o('rage', 'Endless Rage', 'flask_big_yellow', 1, 3, UNCOMMON, (l) => `Rampage fills and lasts ${30 * l}% longer.`),
-  o('pulse', 'Restless Dead', 'skull', 1, 3, UNCOMMON, (l) => `While you're away your party fights at ${25 + 25 * l}% speed.`),
-  o('lure', 'Golden Bait', 'chest_full_open', 1, 3, UNCOMMON, (l) => `Treasure goblins show up ${50 * l}% more often.`),
-  o('snare', 'Goblin Snare', 'chest_mimic_open', 1, 1, UNCOMMON, () => 'Treasure goblins sometimes get caught without you.'),
-  o('heart', 'Beating Heart', 'ui_heart_full', 3, Infinity, RARE, (l) => `All damage ×${fmtBig(8 ** l)}.`),
-  o('mimic', 'Mimic Chests', 'chest_mimic_open', 1, 1, RARE, () => 'Treasure can hold a Soul Storm: damage ×666 for 6 seconds.'),
-  o('champ', "Champion's Bounty", 'weapon_bow_2', 1, 3, RARE, (l) => `Champions show up ×${1 + l} as often.`),
-];
-export const OFFER_BY_ID = new Map(OFFERS.map((x) => [x.id, x]));
-/** Every hand holds at least one of these, so a run can always get stronger. */
-export const DAMAGE_OFFERS = new Set(['banner', 'warcry', 'heart', 'slayer']);
+// ---------- awakening rewards ----------
 
 /** Rewards for awakening: the first layer, automated. */
 export const AWAKEN_MILESTONES = [
@@ -697,7 +687,7 @@ export const relicPower = (lv: number) => lv + Math.floor((lv * relicStars(lv)) 
 export function relicText(def: RelicDef, lv: number): string {
   const L = Math.max(1, relicPower(lv));
   switch (def.effect) {
-    case 'click': return `Clicks deal ×${1 + L} damage.`;
+    case 'click': return `Base click damage ×${1 + L}.`;
     case 'party': return `Companions deal ×${fmtN(1 + 0.5 * L)} damage.`;
     case 'gold': return `Monsters drop ×${fmtN(1 + 0.5 * L)} gold.`;
     case 'boss': return `×${1 + L} damage to bosses.`;
@@ -721,7 +711,7 @@ const fmtN = (n: number) => (Math.round(n * 100) / 100).toString();
 // ---------- the heart (second prestige) ----------
 
 /** Awakening needs this deepest floor. */
-export const AWAKEN_FLOOR = 100;
+export const AWAKEN_FLOOR = 200;
 /** A boss beaten with this many seconds or fewer left is a clutch kill. */
 export const CLUTCH_SECONDS = 3;
 

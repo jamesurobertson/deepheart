@@ -17,7 +17,7 @@ const ACTIVE = 2 * 60;
 /** Hours away after each of the day's three sessions. */
 const AWAY = [4, 4, 15];
 
-const CASUAL: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 0.5, awakenRatio: 1, stall: 180, catchRate: 0.03, resetActive: 0, shopEvery: 5 };
+const CASUAL: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 1, ascendEager: true, ascendMin: 5, awakenRatio: 1, stall: 180, catchRate: 0.03, resetActive: 0, shopEvery: 5 };
 
 /** The longest quiet stretch allowed, by when it starts. */
 const quietLimit = (start: number) => (start < 10 * H ? 20 * 60 : start < 100 * H ? H : 3 * H);
@@ -38,7 +38,8 @@ const hours = Number(args.find((a, i) => !a.startsWith('--') && !args[i - 1]?.st
 if (process.env.TUNE) Object.assign(TUNE, JSON.parse(process.env.TUNE));
 seedRandom(flag('--seed', Number(process.env.SEED ?? 1)));
 
-const firstRun = COMPS.map((c, i) => [c, i] as const).filter(([c]) => !c.depth && !c.heart).map(([, i]) => i);
+/** The companions the first climb should bring (all but the last four). */
+const firstRun = COMPS.slice(0, 20).map((_, i) => i);
 const met = new Set<number>();
 const novelty = new Novelty();
 let firstWall: number | null = null;
@@ -102,12 +103,12 @@ const t = (s: number | null) => (s === null ? 'never' : played(s));
 const within = (s: number | null, lo: number, hi: number) => (s !== null && s >= lo && s <= hi ? 'PASS' : 'FAIL');
 const reach = (s: number | null, hi: number) => s === null && sim.t < hi;
 const ms: Milestone[] = [
-  { name: 'First wall (a boss you fail)', window: '10m–25m', result: t(firstWall), status: within(firstWall, 10 * 60, 25 * 60) },
-  { name: 'Deepest floor at 1h', window: '40–60', result: String(floorAt1h), status: floorAt1h >= 40 && floorAt1h <= 60 ? 'PASS' : 'FAIL' },
-  { name: 'First ascent', window: '15m–1h', result: t(firstAscent), status: within(firstAscent, 15 * 60, H) },
-  { name: 'All 12 first-run companions met', window: '4h–8h', result: t(firstRunMet), status: within(firstRunMet, 4 * H, 8 * H) },
+  { name: 'First wall (a boss you fail)', window: '5m–25m', result: t(firstWall), status: within(firstWall, 5 * 60, 25 * 60) },
+  { name: 'Deepest floor at 1h', window: '30–60', result: String(floorAt1h), status: floorAt1h >= 30 && floorAt1h <= 60 ? 'PASS' : 'FAIL' },
+  { name: 'First ascent', window: '1h30m–3h', result: t(firstAscent), status: within(firstAscent, 1.5 * H, 3 * H) },
+  { name: 'First 20 companions met', window: '1h30m–3h', result: t(firstRunMet), status: within(firstRunMet, 1.5 * H, 3 * H) },
   { name: 'First awakening', window: '5h–10h', result: firstAwaken === null ? t(firstAwaken) : `${t(firstAwaken)} (${ascentsToAwaken} ascents)`, status: reach(firstAwaken, 10 * H) ? 'REPORT' : within(firstAwaken, 5 * H, 10 * H) },
-  { name: 'All 24 companions met', window: '80h–150h', result: t(allMet), status: reach(allMet, 150 * H) ? 'REPORT' : within(allMet, 80 * H, 150 * H) },
+  { name: 'All 24 companions met', window: '2h–5h', result: t(allMet), status: reach(allMet, 5 * H) ? 'REPORT' : within(allMet, 2 * H, 5 * H) },
   { name: 'Third layer opens', window: '100h–150h', result: 'not built yet', status: 'REPORT' },
 ];
 

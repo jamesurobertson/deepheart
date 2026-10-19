@@ -15,6 +15,9 @@ export interface Profile {
   descendRatio: number;
   /** Or, when set: descend once stalled if it grows the souls held by at least this share (1 soul counts from zero). */
   descendGain?: number;
+  /** With descendGain: don't wait to stall (ascend as soon as it pays), and never for fewer than this many souls. */
+  ascendEager?: boolean;
+  ascendMin?: number;
   /** Awaken once stalled if the heartstones on offer are at least this share of all heartstones earned. */
   awakenRatio: number;
   /** Seconds without a new deepest floor (this descent) before the player gives up on the run. */
@@ -49,14 +52,12 @@ export function seedRandom(seed: number) {
 }
 
 /** Upgrade effects that change what everything else is worth. */
-const DAMAGE_EFFECTS = new Set(['comp', 'global', 'syn', 'click', 'clickDps', 'trophy']);
+const DAMAGE_EFFECTS = new Set(['comp', 'global', 'party', 'syn', 'click', 'clickDps', 'trophy']);
 
 /** Seconds at most between shop checks while saving up for something. */
 const SHOP_RECHECK = 10;
 
 /** A player's rough relic preference: raw power first, then the answers to boss modifiers. */
-/** A player's rough offer preference: damage first, then whatever speeds a run up. */
-const OFFER_PICK = ['heart', 'warcry', 'banner', 'slayer', 'veterans', 'purse', 'whet', 'oath', 'tithe', 'skip', 'glass', 'bane', 'bargain', 'hands', 'rage', 'pulse', 'champ', 'lure', 'snare', 'mimic'];
 
 const RELIC_PICK = ['shard', 'oath', 'banner', 'slayer', 'whet', 'glass', 'hilt', 'pick', 'rot', 'drum', 'razor', 'hawk', 'cleaver', 'cage', 'purse', 'bait'];
 
@@ -168,15 +169,14 @@ export class Sim {
       this.hooks.stall?.(this);
     }
     const worthIt = profile.descendGain !== undefined
-      ? this.descentGain() >= profile.descendGain
+      ? this.descentGain() >= profile.descendGain && game.pendingSouls() >= (profile.ascendMin ?? 1)
       : profile.descendRatio > 0 && game.pendingSouls() >= Math.max(10, game.s.souls * profile.descendRatio);
-    if (stalled && game.canDescend() && (worthIt || game.s.curse)) {
+    if ((stalled || (profile.ascendEager && worthIt)) && game.canDescend() && (worthIt || game.s.curse)) {
       const souls = game.pendingSouls();
       this.descents++;
       this.hooks.descend?.(souls, this);
       game.descend(this.pickCurse());
       this.afterReset();
-      this.buyOffers();
     }
     if (stalled && game.canAwaken() && game.pendingStones() >= Math.max(1, this.totalStones() * profile.awakenRatio)) {
       const stones = game.pendingStones();
@@ -193,7 +193,7 @@ export class Sim {
     // Hooks see everything this step did, the bot's own purchases and prestiges included.
     for (const ev of game.events) {
       this.hooks.event?.(ev, this);
-      if (ev.t === 'bossFail' || ev.t === 'retreat') this.failDps = game.baseDps();
+      if (ev.t === 'bossFail') this.failDps = game.baseDps();
     }
     // Pushed back (auto goes off): like a player, turn it on again once clearly stronger.
     if (!game.s.auto && this.failDps && game.baseDps().gte(this.failDps.times(1.5).plus(1))) {
@@ -274,6 +274,7 @@ export class Sim {
         else if (e.t === 'click') gain = game.clickDamage().times(Math.max(0.001, this.hand() + game.autoRate()));
         else if (e.t === 'auto') gain = game.clickDamage().times(e.add);
         else if (e.t === 'global') gain = p.times(e.pct);
+        else if (e.t === 'party') gain = game.baseDps().times(e.mult - 1);
         options.push({ upg: u.id, cost, score: cost.div(Decimal.max(gain, 1e-9)).log10() });
       }
       options.sort((a, b) => a.score - b.score);
@@ -303,20 +304,6 @@ export class Sim {
         bought = game.buyComp(i, n) || game.buyComp(i, 1) || bought;
       }
       if (!bought) return;
-    }
-  }
-
-  /** Buy from the hand, best first by a player's rough preference, until nothing affordable is left. Never redraws. */
-  private buyOffers() {
-    const { game } = this;
-    const rank = (id: string) => {
-      const k = OFFER_PICK.indexOf(id);
-      return k < 0 ? OFFER_PICK.length : k;
-    };
-    for (;;) {
-      const slots = game.s.hand.map((id, slot) => ({ id, slot })).filter(({ id }) => game.soulsFree() >= game.offerCost(id));
-      slots.sort((a, b) => rank(a.id) - rank(b.id));
-      if (!slots.length || !game.buyOffer(slots[0].slot)) break;
     }
   }
 

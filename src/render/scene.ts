@@ -1697,12 +1697,9 @@ export class Scene {
         break;
       }
       case 'bossFail':
-      case 'retreat':
         this.addShake(0.2);
         break;
       case 'buyComp':
-      // Old Friends hands you the Squire and Ranger the moment you buy it.
-      case 'offer':
         this.syncParty(game);
         break;
       case 'raidSpawn':

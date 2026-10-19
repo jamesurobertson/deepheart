@@ -3,13 +3,14 @@ import '@fontsource/silkscreen/400.css';
 import '@fontsource/silkscreen/700.css';
 import '@fontsource/jersey-10/400.css';
 import './style.css';
-import { Game, newSave, SAVE_VERSION, type GameEvent, type SaveState } from './game/game.ts';
+import Decimal from 'break_infinity.js';
+import { Game, floorHp, newSave, SAVE_VERSION, type GameEvent, type SaveState } from './game/game.ts';
 import { Atlas } from './render/atlas.ts';
 import { Scene } from './render/scene.ts';
 import { Ui } from './ui/ui.ts';
 import { setAtlas } from './ui/px.ts';
 import { Sfx, type Track } from './audio/sfx.ts';
-import { CARDS, CORRUPTION, lapOf, zoneOf } from './game/data.ts';
+import { CARDS, CORRUPTION, UPGRADES, lapOf, zoneOf } from './game/data.ts';
 
 declare global {
   interface Window {
@@ -138,6 +139,20 @@ async function boot() {
       s.owned = s.owned.map((n) => Math.max(n, 40 + deepest * 4));
       game.invalidate();
       game.goFloor(deepest);
+      scene.rebuild(game);
+    }
+    // ?state=lv1000: every companion at level 1000 with every trait, on the deepest floor that party clears in about 20s.
+    if (TEST_STATE === 'lv1000') {
+      const s = game.s;
+      s.owned = s.owned.map(() => 1000);
+      s.gold = new Decimal('1e300');
+      for (const u of UPGRADES) if (/^m\d+_\d+$/.test(u.id)) game.buyUpg(u.id);
+      s.gold = new Decimal(0);
+      game.invalidate();
+      let f = 1;
+      while (floorHp(f + 1).times(10).lt(game.dps().times(20))) f++;
+      Object.assign(s, { maxFloor: f, bestFloor: Math.max(s.bestFloor, f), bestCleared: Math.max(s.bestCleared, f - 1), auto: false, revealed: s.owned.length });
+      game.goFloor(f);
       scene.rebuild(game);
     }
     // ?state=awaken: deep enough to Awaken for the first time, with a binder full of cards (lots of spares to trade,
@@ -345,7 +360,6 @@ function playSound(sfx: Sfx, ev: GameEvent) {
       break;
     case 'raidEscape': sfx.play('close', { vol: 0.5, rate: 0.8 }); break;
     case 'fever': if (ev.on) sfx.play('awaken', { vol: 0.8 }); break;
-    case 'offer': sfx.play('awaken', { vol: 0.6 }); break;
     case 'heart': sfx.play('awaken', { vol: 0.6, rate: 0.8 }); break;
     case 'split': sfx.play('bosskill', { vol: 0.6, rate: 1.3 }); break;
   }

@@ -25,7 +25,6 @@ const sim = new Sim(
   {
     event(ev, { game, t }) {
       if (ev.t === 'relic' && process.env.RELICS) console.log(`${duration(t).padStart(8)}  relic ${ev.id} lv${ev.lv} (floor ${ev.floor})`);
-      if (ev.t === 'retreat' && process.env.FAILS) console.log(`${duration(t).padStart(8)}  retreat floor ${ev.floor}`);
       if (ev.t === 'bossFail' && failsLogged++ < 400 && process.env.FAILS) console.log(`${duration(t).padStart(8)}  boss fail floor ${ev.floor} [${game.bossMods(ev.floor).join(',')}]`);
     },
     descend(souls, { game, t, descents }) {
