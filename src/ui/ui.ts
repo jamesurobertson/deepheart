@@ -274,7 +274,7 @@ export class Ui {
         <span class="gen-ico">${charFit(c.sprite, 40)}</span>
         <span class="gen-mid"><b class="gen-name"></b><span class="gen-cost"></span><span class="traits"></span></span>
         <span class="gen-right"><b class="gen-lv"></b><small class="gen-dps"></small></span>
-        <span class="gen-hero" data-hero="${i}" data-tip="hero:${i}">${G.star(3)}</span>`;
+        <span class="gen-hero" data-hero="${i}" data-tip="hero:${i}">${G.star()}</span>`;
       this.el.gens.appendChild(row);
       this.rows.push(row);
       this.rowCache.push('');
@@ -1739,7 +1739,7 @@ export class Ui {
     this.el.shop.classList.toggle('show-stars', state === 'star');
     this.el.hint.innerHTML = state === 'hero'
       ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : 'they follow your mouse'}</small></b>`
-      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click their ${G.star()} to switch</small></b>`
+      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click their ${G.star(3)} to switch</small></b>`
         : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>Companions fight for you, even while you're away</small></b>`
           : state === 'level' ? `<b>Keep ${this.touch ? 'tapping' : 'clicking'} to level up<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
             : state === 'blade' ? `<b>Phantom Blade unlocked!<small>It attacks for you, once a second</small></b>`
@@ -1939,7 +1939,7 @@ export class Ui {
     if (kind === 'hero') {
       const i = Number(id);
       const now = g.heroIndex() === i;
-      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach. Click the ${G.star()} again to have no hero.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p>`;
+      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach. Click the ${G.star(3)} again to have no hero.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p>`;
     }
     if (kind === 'fm') {
       const f = Number(id);

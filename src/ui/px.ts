@@ -139,7 +139,7 @@ export const G = {
   trophy: (scale = 2) => glyph(7, 7, r(0, 0, 7) + r(0, 1) + r(6, 1) + r(1, 1, 5, 2) + r(2, 3, 3) + r(3, 4) + r(2, 5, 3) + r(1, 6, 5), '', scale),
   stats: (scale = 2) => glyph(8, 7, r(0, 4, 2, 3) + r(3, 2, 2, 5) + r(6, 0, 2, 7), '', scale),
   /** Picks your hero on a companion's row. */
-  star: (scale = 2) => glyph(7, 7, r(3, 0) + r(2, 1, 3) + r(0, 2, 7) + r(1, 3, 5) + r(2, 4, 3) + r(1, 5, 2) + r(4, 5, 2) + r(1, 6) + r(5, 6), 'g-star', scale),
+  star: (scale = 2) => glyph(5, 5, r(2, 0) + r(0, 1, 5) + r(1, 2, 3) + r(1, 3) + r(3, 3) + r(0, 4) + r(4, 4), 'g-star', scale),
   /** A cut gem, for relics. */
   relic: (scale = 2) => glyph(7, 6, r(2, 0, 3) + r(1, 1, 5) + r(0, 2, 7) + r(1, 3, 5) + r(2, 4, 3) + r(3, 5), 'g-relic', scale),
 };
