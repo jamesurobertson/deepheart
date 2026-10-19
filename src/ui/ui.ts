@@ -1,7 +1,7 @@
 import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, isTraitId, levelMult, milestoneAt, traitLevels, type AbilityId, CARDS, CARD_BY_ID, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, FLOOR_KILLS, RELICS_ON, TUNE, isBossFloor, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, FLOOR_KILLS, RELICS_ON, TUNE, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
@@ -1596,7 +1596,7 @@ export class Ui {
     this.coinFly(at.x, at.y, rainbow ? 30 : 8, gold);
   }
 
-  private bankCoins(id: number, by: 'hand' | 'time' | 'all') {
+  private bankCoins(id: number, by: BankedBy) {
     const pile = this.coinPiles.get(id);
     if (!pile) return;
     this.coinPiles.delete(id);
@@ -1607,7 +1607,7 @@ export class Ui {
       this.pickAt = now;
       this.hooks.sound('coins', { vol: 0.35, rate: 1 + this.pickCombo * 0.06 });
     }
-    if (by !== 'all') {
+    if (by === 'hand' || by === 'time') {
       const first = pile.coins[0];
       this.pop(first.x, first.y - 18, `+${fmt(pile.gold)}`, 'p-pick');
     }

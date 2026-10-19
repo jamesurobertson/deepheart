@@ -135,6 +135,10 @@ export const DESCEND_FLOOR = 100;
  */
 export const TUNE = { hpBase: 1.55, goldBase: 1, goldGrowth: 1.56, deepGold: 1.15, soulDigits: 17, soulExp: 0.35, soulPower: 1, stoneSouls: 1, stoneExp: 0.37, fury: FURY, deepHp: 1.145, deepFrom: 100, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
 
+/** How gold on the floor reached the bank: picked up, left too long, swept up leaving the floor, or flown up when
+ *  a rainbow portal opens. */
+export type BankedBy = 'hand' | 'time' | 'all' | 'sweep';
+
 export interface Buff {
   id: RaidReward | 'fever' | AbilityId;
   name: string;
@@ -329,7 +333,7 @@ export type GameEvent =
   | { t: 'ability'; id: AbilityId; unlocked?: boolean }
   /** A kill's gold lands on the floor (`from` is the monster), and later goes to the bank. */
   | { t: 'drop'; id: number; from: number; gold: Decimal; big: boolean }
-  | { t: 'bank'; id: number; by: 'hand' | 'time' | 'all' }
+  | { t: 'bank'; id: number; by: BankedBy }
   | { t: 'trophy'; id: string }
   | { t: 'raidSpawn'; id: number; from: -1 | 1; rainbow: boolean }
   | { t: 'rampage'; tier: number; click: number }
@@ -1450,6 +1454,8 @@ export class Game {
     if (this.cardRoll(r.rainbow ? CARD_ODDS.rainbow : CARD_ODDS.goblin)) this.giveCard(r.rainbow ? RAINBOW_CARD : GOBLIN_CARD, false, 'raid');
     if (r.rainbow && (this.s.vaults === 0 || this.debugRainbow || Math.random() < VAULT_CHANCE)) {
       this.events.push({ t: 'raidCatch', id: r.id, reward: 'vault' });
+      // The gold on the floor doesn't wait out the slow motion: it all flies up to the bank.
+      this.bankAllDrops('sweep');
       // Everything slows while you choose who goes in.
       if (!this.vaultPick) {
         this.vaultPick = true;
@@ -1930,7 +1936,7 @@ export class Game {
     if (this.drops.length > MAX_DROPS) this.bankDrop(0, 'time');
   }
 
-  private bankDrop(i: number, by: 'hand' | 'time' | 'all') {
+  private bankDrop(i: number, by: BankedBy) {
     const [d] = this.drops.splice(i, 1);
     this.earn(d.gold);
     this.events.push({ t: 'bank', id: d.id, by });
@@ -1949,9 +1955,10 @@ export class Game {
     return { ...this.s, gold: this.s.gold.plus(lying), runGold: this.s.runGold.plus(lying), totalGold: this.s.totalGold.plus(lying) };
   }
 
-  /** Everything on the floor goes to the bank: leaving the floor, ascending. */
-  bankAllDrops() {
-    while (this.drops.length) this.bankDrop(0, 'all');
+  /** Everything on the floor goes to the bank: leaving the floor, ascending ('all'), or a rainbow portal opening
+   *  ('sweep', where every coin is seen flying up). */
+  bankAllDrops(by: 'all' | 'sweep' = 'all') {
+    while (this.drops.length) this.bankDrop(0, by);
   }
 
   private earn(n: Decimal) {
