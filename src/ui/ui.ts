@@ -69,8 +69,8 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.ceil(s % 60) %
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
 
 /** What it takes to meet a companion who hasn't joined yet. */
-const meetText = (def: { depth: number; heart?: number }, descents: number) =>
-  descents < def.depth ? `Ascend ${def.depth}× to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
+const meetText = (def: { floor: number; heart?: number }, bestFloor: number) =>
+  bestFloor < def.floor ? `Reach floor ${def.floor} to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
 
 /** A relic's stars, as little gold glyphs after its name. */
 /** A small rate with up to two decimals (1.15, not 1.1); big ones as usual. */
@@ -1425,7 +1425,7 @@ export class Ui {
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
       row.querySelector('.gen-name')!.innerHTML = `${name}${q.n > 1 && !locked && !mystery ? ` <small>×${q.n}</small>` : ''}`;
-      row.querySelector('.gen-cost')!.innerHTML = locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.descents)}</span>` : gold(q.cost, can ? 'ok' : 'no');
+      row.querySelector('.gen-cost')!.innerHTML = locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.bestFloor)}</span>` : gold(q.cost, can ? 'ok' : 'no');
       row.querySelector('.gen-lv')!.textContent = lv ? `Lv ${lv}` : '';
       row.querySelector('.gen-dps')!.textContent = lv ? `${fmt(g.compDps(i))} dps` : '';
       // Owned traits and the next one only: the rest show up as you buy your way along. Past the last trait, the next
@@ -1829,7 +1829,7 @@ export class Ui {
     if (kind === 'comp') {
       const i = Number(id);
       const def = COMPS[i];
-      if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. ${meetText(def, g.s.descents)}.</p>`;
+      if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. ${meetText(def, g.s.bestFloor)}.</p>`;
       if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">A new companion is on their way. Earn more gold to meet them.</p>`;
       const q = g.compQuote(i);
       const next = g.compNext(i).times(q.n);

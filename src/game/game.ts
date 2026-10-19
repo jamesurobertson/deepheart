@@ -117,16 +117,23 @@ export const DESCEND_FLOOR = 100;
 /**
  * Pacing knobs, in one place (the balance tools override them to search for good values).
  * - Souls: all the souls you've earned since your last awakening come to (gold earned since then / 10^`soulDigits`)
- *   ^`soulExp`, less one, times the soul-gain bonuses: 1 at the first wall, hundreds by floor 100. An ascent pays
- *   what's new; the same depth again pays only a trickle. Each soul adds `soulPower` (+100%) to all damage.
+ *   ^`soulExp`, less one, times the soul-gain bonuses: about 5 at the first ascent. An ascent pays what's new; the same
+ *   depth again pays only a trickle. Each soul adds `soulPower` (+100%) to all damage.
+ *   `soulExp` is the balance point of the whole game: doubling souls must take about as many new floors as doubling
+ *   damage buys, or runs bloat (too low) or collapse (too high). Balanced near
+ *   (ln deepHp − α·ln deepGold) / ln deepGold, where α = (ln LEVEL_BONUS.mult / LEVEL_BONUS.every) / ln COST_GROWTH
+ *   is damage bought per gold: 0.36 today. Re-derive it after changing any of those, then re-fit `soulDigits` to
+ *   log10(gold by the first ascent, ~1e20) − log10(6) / soulExp so the first ascent still pays about 5.
  * - Heartstones the same way, a level up: (every soul ever earned / `stoneSouls`)^`stoneExp` in all; an awakening pays what's new.
  * - Heart of Fury multiplies all damage by `fury` per level. Zone bosses have `zoneBoss`× the health of mid-bosses.
- * - Up to floor 140 each floor has about `hpBase`× the health of the last, past it `deepHp`×. A floor's gold starts at
- *   `goldBase` and grows `goldGrowth`× a floor (slowly outgrowing health, so each floor buys a little more), `deepGold`×
- *   past 140. A floor's health and gold are shared across its 25 monsters.
+ * - Up to floor `deepFrom` each floor has about `hpBase`× the health of the last, past it `deepHp`×. A floor's gold
+ *   starts at `goldBase` and grows `goldGrowth`× a floor, `deepGold`× past `deepFrom`. Until then gold barely outpaces
+ *   health: it compounds (×1.6 against ×1.55 was ×80 by floor 140, and the first climb met the whole party in an hour). `deepFrom` sits at the way up (DESCEND_FLOOR) so ascents happen on the gentle curve: each buys a
+ *   dozen or more floors instead of a handful.
+ *   A floor's health and gold are shared across its 25 monsters.
  * - Each awakening needs `awakenStep` more floors than the last; `heartGrowth` steepens Heart power costs.
  */
-export const TUNE = { hpBase: 1.55, goldBase: 1, goldGrowth: 1.6, deepGold: 1.15, soulDigits: 21.5, soulExp: 0.12, soulPower: 1, stoneSouls: 1, stoneExp: 0.37, fury: FURY, deepHp: 1.145, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
+export const TUNE = { hpBase: 1.55, goldBase: 1, goldGrowth: 1.56, deepGold: 1.15, soulDigits: 17, soulExp: 0.35, soulPower: 1, stoneSouls: 1, stoneExp: 0.37, fury: FURY, deepHp: 1.145, deepFrom: 100, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
 
 export interface Buff {
   id: RaidReward | 'fever' | AbilityId;
@@ -416,14 +423,14 @@ export interface OfflineSummary {
 
 /** Health of an ordinary monster on a floor (the classic clicker curve). */
 export function floorHp(f: number): Decimal {
-  if (f <= 140) return new Decimal(10 * (f - 1 + TUNE.hpBase ** (f - 1)));
-  return floorHp(140).times(Decimal.pow(TUNE.deepHp, f - 140));
+  if (f <= TUNE.deepFrom) return new Decimal(10 * (f - 1 + TUNE.hpBase ** (f - 1)));
+  return floorHp(TUNE.deepFrom).times(Decimal.pow(TUNE.deepHp, f - TUNE.deepFrom));
 }
 
 /** Gold for one ordinary monster's worth of a floor (monsters get a share of it, like their health). */
 export function floorGold(f: number): Decimal {
-  if (f <= 140) return new Decimal(TUNE.goldBase).times(Decimal.pow(TUNE.goldGrowth, f - 1));
-  return floorGold(140).times(Decimal.pow(TUNE.deepGold, f - 140));
+  if (f <= TUNE.deepFrom) return new Decimal(TUNE.goldBase).times(Decimal.pow(TUNE.goldGrowth, f - 1));
+  return floorGold(TUNE.deepFrom).times(Decimal.pow(TUNE.deepGold, f - TUNE.deepFrom));
 }
 
 export const isBossFloor = (f: number) => f % BOSS_EVERY === 0;
@@ -896,7 +903,7 @@ export class Game {
   }
 
   compUnlocked(i: number) {
-    return this.s.descents >= COMPS[i].depth && this.s.awakens >= (COMPS[i].heart ?? 0);
+    return this.s.bestFloor >= COMPS[i].floor && this.s.awakens >= (COMPS[i].heart ?? 0);
   }
 
   // ---------- floors and monsters ----------

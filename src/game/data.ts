@@ -22,20 +22,22 @@ export interface CompDef {
   dps: number;
   attack: Attack;
   flavor: string;
-  /** Needs this many descents before it can be hired. */
-  depth: number;
+  /** Waits on this floor: hired only once your deepest floor ever has reached it. */
+  floor: number;
   big?: boolean;
   /** Needs this many awakenings of the Heart (the late recruits). */
   heart?: number;
 }
 
-const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, depth = 0, big = false, heart = 0): CompDef =>
-  ({ id, name, sprite, cost, dps, attack, flavor, depth, big, heart });
+const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, floor = 0, big = false, heart = 0): CompDef =>
+  ({ id, name, sprite, cost, dps, attack, flavor, floor, big, heart });
 
-/** All 24 are there from the start, spaced by price: each costs about ×7 the last (one every 4–5 floors against ×1.55
- *  health a floor), the last four steeper. Damage grows a little slower than price (about cost^0.85), so each arrival
- *  is a clear jump without carrying the run alone. The first six get more per gold (Squire about 5 gold a point,
- *  falling to about 300 by the Shadow Thief) so the opening floors move; past them the climb is about hires and traits. */
+/** Spaced by price: each costs about ×7 the last (one every 4–5 floors against ×1.55 health a floor), the last four
+ *  steeper. Damage grows a little slower than price (about cost^0.85), so each arrival is a clear jump without carrying
+ *  the run alone. The first six get more per gold (Squire about 5 gold a point, falling to about 300 by the Shadow
+ *  Thief) so the opening floors move; past them the climb is about hires and traits.
+ *  The first eighteen carry the first climb to the way up (floor 100); the last six wait deeper, one every 45 minutes
+ *  or so of the first eight hours, so every few ascents bring someone new. */
 export const COMPS: CompDef[] = [
   // Plain adventurers first; the strange and the enormous come later.
   // The first four are cheap and hit hard, so the party carries the opening and clicking is a bonus.
@@ -57,13 +59,12 @@ export const COMPS: CompDef[] = [
   c('hollow', 'Hollow Knight', 'pumpkin_dude', 2.5e13, 6e9, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.'),
   c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 2e14, 4e10, 'dark', 'Broke every vow but one: never stop swinging.'),
   c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2e11, 'bolt', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
-  c('wraith', 'Bound Wraith', 'cr_crimson_wraith', 8e15, 1e12, 'dark', 'The Heart sent it. It hums a song nobody taught it.'),
-  c('necro', 'Turncoat Necromancer', 'necromancer', 6e16, 5e12, 'dark', 'Used to raise these monsters. Now it lowers them.'),
-  // Most of the party arrives in the first climb; these last four wait deeper down.
-  c('king', 'Exiled King', 'cr_king', 7e17, 4e13, 'fire', 'Lost his crown, his kingdom and his temper, in that order.'),
-  c('angel', 'Fallen Angel', 'angel', 8e18, 3e14, 'fire', 'Fell from somewhere bright. Landed swinging.'),
-  c('ogre', 'Tamed Ogre', 'ogre', 1e20, 2.5e15, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 0, true),
-  c('demon', 'Bound Demon', 'big_demon', 1.2e21, 2e16, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 0, true),
+  c('wraith', 'Bound Wraith', 'cr_crimson_wraith', 8e15, 1e12, 'dark', 'The Heart sent it. It hums a song nobody taught it.', 105),
+  c('necro', 'Turncoat Necromancer', 'necromancer', 6e16, 5e12, 'dark', 'Used to raise these monsters. Now it lowers them.', 145),
+  c('king', 'Exiled King', 'cr_king', 7e17, 4e13, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 190),
+  c('angel', 'Fallen Angel', 'angel', 8e18, 3e14, 'fire', 'Fell from somewhere bright. Landed swinging.', 240),
+  c('ogre', 'Tamed Ogre', 'ogre', 1e20, 2.5e15, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 300, true),
+  c('demon', 'Bound Demon', 'big_demon', 1.2e21, 2e16, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 400, true),
 ];
 
 /** A companion's place in the roster, by id (so lists below don't break if the order changes). */
@@ -289,34 +290,36 @@ export const levelMult = (level: number) =>
 
 /** Each companion level costs this much more than the last (about 6 levels a floor against ×1.55 health). */
 export const COST_GROWTH = 1.075;
-/** What each companion's traits do, in order: own (×2 to them), party (+25% to every companion), click (+5% of party
+/** What each companion's traits do, in order: own (×2 to them), party (+50% to every companion), click (+5% of party
  *  damage per click), gold (+50%), boss (+50% to bosses), blade (Phantom Blade +1/s), crit2 (+2% crit chance), critx1
- *  (+1× crit damage), or skill (unlocks the ability listed in ABILITIES at that trait). */
+ *  (+1× crit damage), or skill (unlocks the ability listed in ABILITIES at that trait).
+ *  Party traits multiply together, so only five companions have one, each a rallying sort (×7.6 in all; one on everyone
+ *  was ×330 and most of the opening hour's explosion). */
 const TRAIT_PLAN: Record<string, string[]> = {
   squire: ['skill', 'skill', 'own', 'click', 'blade', 'own', 'own'],
-  ranger: ['own', 'skill', 'crit2', 'crit3', 'party', 'crit3'],
-  brawler: ['own', 'own', 'skill', 'click', 'own', 'party'],
-  apprentice: ['own', 'own', 'party', 'own'],
-  hunter: ['own', 'critx1', 'own', 'critx1', 'party'],
+  ranger: ['own', 'skill', 'crit2', 'crit3', 'own', 'crit3'],
+  brawler: ['own', 'own', 'skill', 'click', 'own', 'own'],
+  apprentice: ['own', 'own', 'own', 'own'],
+  hunter: ['own', 'critx1', 'own', 'critx1', 'own'],
   shieldmaiden: ['own', 'boss', 'skill', 'own', 'boss', 'party'],
   thief: ['own', 'crit2', 'gold', 'crit3', 'gold'],
-  dancer: ['own', 'critx1', 'click', 'critx1', 'party'],
+  dancer: ['own', 'critx1', 'click', 'critx1', 'own'],
   corsair: ['own', 'gold', 'own', 'skill', 'gold', 'party'],
-  runesmith: ['own', 'own', 'party', 'skill', 'own', 'boss'],
-  paladin: ['own', 'boss', 'party', 'own', 'boss'],
+  runesmith: ['own', 'own', 'own', 'skill', 'own', 'boss'],
+  paladin: ['own', 'boss', 'own', 'own', 'boss'],
   stormcaller: ['own', 'own', 'click', 'own', 'skill', 'blade', 'party'],
   venomblade: ['own', 'crit3', 'own', 'critx2', 'crit3', 'party'],
-  doctor: ['own', 'own', 'party', 'boss'],
-  frostimp: ['own', 'party', 'own', 'click'],
-  hollow: ['own', 'boss', 'own', 'party', 'boss'],
-  oathbreaker: ['own', 'click', 'party', 'own', 'click'],
-  archmage: ['own', 'own', 'party', 'own', 'own', 'party'],
-  wraith: ['own', 'blade', 'own', 'party'],
-  necro: ['own', 'party', 'own', 'own', 'party'],
-  king: ['own', 'gold', 'own', 'party', 'gold', 'own'],
-  angel: ['own', 'own', 'party', 'own', 'party'],
-  ogre: ['own', 'boss', 'own', 'boss', 'party'],
-  demon: ['own', 'own', 'party', 'own', 'own', 'own', 'party'],
+  doctor: ['own', 'own', 'own', 'boss'],
+  frostimp: ['own', 'own', 'own', 'click'],
+  hollow: ['own', 'boss', 'own', 'own', 'boss'],
+  oathbreaker: ['own', 'click', 'own', 'own', 'click'],
+  archmage: ['own', 'own', 'own', 'own', 'own', 'own'],
+  wraith: ['own', 'blade', 'own', 'own'],
+  necro: ['own', 'own', 'own', 'own', 'own'],
+  king: ['own', 'gold', 'own', 'own', 'gold', 'own'],
+  angel: ['own', 'own', 'own', 'own', 'own'],
+  ogre: ['own', 'boss', 'own', 'boss', 'own'],
+  demon: ['own', 'own', 'own', 'own', 'own', 'party', 'own'],
 };
 /** A companion's trait levels (as many as it has traits). */
 export const traitLevels = (comp: number) => TRAIT_LEVELS.slice(0, TRAIT_PLAN[COMPS[comp].id].length);
@@ -440,7 +443,7 @@ const SYNERGIES: [number, number, string][] = ([
 function traitEffect(kind: string, comp: number): { effect: Effect; desc: string } {
   const num = Number(kind.replace(/\D+/g, ''));
   if (kind === 'own') return { effect: { t: 'comp', comp, mult: 2 }, desc: `${COMPS[comp].name} deals ×2 damage.` };
-  if (kind === 'party') return { effect: { t: 'party', mult: 1.25 }, desc: 'Every companion deals +25% damage.' };
+  if (kind === 'party') return { effect: { t: 'party', mult: 1.5 }, desc: 'Every companion deals +50% damage.' };
   if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.05 }, desc: "Clicks also deal +5% of your party's damage." };
   if (kind === 'gold') return { effect: { t: 'gold', pct: 0.5 }, desc: 'Monsters drop +50% gold.' };
   if (kind === 'boss') return { effect: { t: 'boss', pct: 0.5 }, desc: '+50% damage to bosses.' };
