@@ -58,7 +58,7 @@ const FEVER_CLICKS = 60;
 /** Attacks during a Rampage that push it to its top tier, and each tier's multiplier on all your damage (the
  *  Unstoppable upgrade and the Blood Drum add to both). */
 const RAMPAGE_STEPS = [20];
-const RAMPAGE_TIERS = [5, 10];
+const RAMPAGE_TIERS = [2, 3];
 const RAMPAGE_EXTEND = 3;
 /** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
 const CLUTCH_GOLD = 1.5;
