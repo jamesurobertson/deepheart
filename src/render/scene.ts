@@ -401,7 +401,10 @@ export class Scene {
   /** `reached`: when the walker got to the doorway (trip seconds), -1 until then. */
   private trip: { into: boolean; phase: 'go' | 'arrive'; t: number; portal: THREE.Group; reached: number } | null = null;
   private sparkleT = 0;
-  private cine: { phase: 'exit' | 'stairs' | 'arrive'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[] } | null = null;
+  /** The demo stops on the stairs down into this zone: they fade to black and stay there, and `onEnd` is called. */
+  endBefore = -1;
+  onEnd: (() => void) | null = null;
+  private cine: { phase: 'exit' | 'stairs' | 'arrive' | 'end'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[] } | null = null;
   /** Black card in front of the camera for fades. */
   private fade: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   /** The floor we were last on: stepping down into a new zone plays the staircase. */
@@ -2040,7 +2043,12 @@ export class Scene {
       fog.near = dist + 1.5;
       fog.far = dist + 7;
       fade = Math.max(0, 1 - c.t / 0.35, (c.t - (dur - 0.35)) / 0.35);
-      if (c.t >= dur) this.arrive();
+      if (c.t >= dur && c.zone === this.endBefore) {
+        c.phase = 'end';
+        this.onEnd?.();
+      } else if (c.t >= dur) this.arrive();
+    } else if (c.phase === 'end') {
+      fade = 1;
     } else {
       fade = Math.max(0, 1 - c.t / 0.45);
       if (c.t >= 1) this.cine = null;

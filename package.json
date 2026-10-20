@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "dev:demo": "VITE_DEMO=1 vite --port 5200",
+    "build:demo": "tsc --noEmit && VITE_DEMO=1 vite build --outDir dist-demo",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "timeline": "node scripts/timeline.ts"

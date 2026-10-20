@@ -8,6 +8,7 @@ import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, sprite, spriteFit } from './px.ts';
 import type { BinderCard, BinderColor } from './binder.ts';
 import { TradeMat, type Brother } from './trade.ts';
+import { DEMO, DEMO_COMPANIONS, DEMO_LAST_FLOOR, STEAM_URL } from '../demo.ts';
 import { playDream } from './dream.ts';
 import { STASHES } from './world.ts';
 
@@ -73,9 +74,13 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.ceil(s % 60) %
 
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
 
+/** The companions the demo keeps for the full game. */
+const fullGameOnly = (i: number) => DEMO && i >= DEMO_COMPANIONS;
+
 /** What it takes to meet a companion who hasn't joined yet. */
 const meetText = (def: { floor: number; heart?: number }, bestFloor: number) =>
-  bestFloor < def.floor ? `Reach floor ${def.floor} to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
+  fullGameOnly(COMPS.indexOf(def as (typeof COMPS)[number])) ? 'In the full game'
+    : bestFloor < def.floor ? `Reach floor ${def.floor} to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
 
 /** A relic's stars, as little gold glyphs after its name. */
 /** A small rate with up to two decimals (1.15, not 1.1); big ones as usual. */
@@ -1892,6 +1897,7 @@ export class Ui {
     if (kind === 'comp') {
       const i = Number(id);
       const def = COMPS[i];
+      if (fullGameOnly(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">${COMPS.length - DEMO_COMPANIONS} more companions join you in the full game.</p>`;
       if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. ${meetText(def, g.s.bestFloor)}.</p>`;
       if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">A new companion is on their way. Earn more gold to meet them.</p>`;
       const q = g.compQuote(i);
@@ -2720,6 +2726,28 @@ export class Ui {
         pill.innerHTML = `<span><b>Downloading v${esc(version)}</b> Open it and replace Deepheart; your save stays.</span><button class="btn icon small" data-update="later" aria-label="Dismiss">${G.close()}</button>`;
       }
     };
+  }
+
+  /** The end of the demo: over the black the stairs faded to, what you did, what's further down, and the way to Steam. */
+  showDemoEnd() {
+    if (this.root.querySelector('.demo-end')) return;
+    const g = this.game;
+    this.hideTip();
+    if (this.modal) this.closeModal();
+    document.body.classList.add('demo-over');
+    const el = document.createElement('div');
+    el.className = 'demo-end';
+    const zonesLeft = ZONES.length - zoneOf(DEMO_LAST_FLOOR + 1);
+    const cards = Object.keys(g.s.cards).length;
+    el.innerHTML = `<div class="de-in">
+      <div class="de-heart">${G.heart(8)}</div>
+      <h1>DEEPHEART</h1>
+      <p class="de-lead">Thanks for playing the demo!</p>
+      <p class="de-run">${duration(g.s.playTime)} · ${fmt(g.s.kills)} monsters slain · ${cards} card${cards === 1 ? '' : 's'} found</p>
+      <p class="de-more">The stairs keep going: ${zonesLeft} more zones, ${COMPS.length - DEMO_COMPANIONS} more companions, and a dungeon with no bottom.</p>
+      <a class="btn primary big" href="${STEAM_URL}" target="_blank" rel="noopener">Wishlist on Steam</a>
+    </div>`;
+    this.root.appendChild(el);
   }
 
   showOffline(o: OfflineSummary) {

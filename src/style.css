@@ -1366,3 +1366,18 @@ body.compact .cr-logo { font-size: 15px; }
 @media (prefers-reduced-motion: reduce) { .tm, .tm-flip, .tm-stamp, .tm-slots .tm-card { animation: none; } }
 /* While the real world's up, the dungeon's interface steps aside (the dungeon view itself shrinks into the playset). */
 body.dreaming #ui { visibility: hidden; }
+
+/* The end of the demo, over the black the stairs fade to. */
+.demo-end { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px calc(16px + var(--safe-r)) 24px calc(16px + var(--safe-l));
+  background: radial-gradient(ellipse at 50% 45%, #1e0f14, #000 70%); }
+.de-in { animation: de-in 1.2s ease-out both; display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 560px; text-align: center; }
+.de-heart { color: #e8455f; filter: drop-shadow(0 0 18px rgba(232, 69, 95, 0.6)); animation: de-beat 1.4s ease-in-out infinite; }
+.demo-end h1 { margin: 0; font: 400 clamp(56px, 12vw, 104px)/0.9 'Jersey 10'; letter-spacing: 3px; color: var(--gold-hi);
+  text-shadow: 0 5px 0 var(--ink), 4px 0 0 var(--ink), -4px 0 0 var(--ink), 0 -4px 0 var(--ink), 0 0 36px rgba(255, 170, 80, 0.45); }
+.de-lead { margin: 0; font: 400 32px/1.1 'Jersey 10'; color: var(--text); }
+.de-run { margin: 0; font: 400 20px/1.2 'Jersey 10'; color: var(--dim); }
+.de-more { margin: 4px 0 8px; font: 400 22px/1.25 'Jersey 10'; color: var(--text); text-wrap: balance; }
+.demo-end .btn { text-decoration: none; display: inline-flex; align-items: center; }
+body.demo-over .hint, body.demo-over .tip { display: none !important; }
+@keyframes de-in { from { opacity: 0; } }
+@keyframes de-beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.12); } 30% { transform: scale(1); } }

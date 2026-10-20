@@ -11,6 +11,7 @@ import { Ui } from './ui/ui.ts';
 import { setAtlas } from './ui/px.ts';
 import { Sfx, type Track } from './audio/sfx.ts';
 import { CARDS, CORRUPTION, UPGRADES, lapOf, zoneOf } from './game/data.ts';
+import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
 
 declare global {
   interface Window {
@@ -211,9 +212,12 @@ async function boot() {
 
   /** Time away: short breaks play out at full speed; longer ones pay the offline rate and say so. */
   const catchUp = (seconds: number) => {
+    if (game.demoOver()) return;
     if (seconds <= OFFLINE_AFTER) {
-      for (let t = 0; t < seconds; t += 0.2) game.update(0.2);
+      for (let t = 0; t < seconds && !game.demoOver(); t += 0.2) game.update(0.2);
       game.events.length = 0;
+      // (The last boss fell while you were away: no stairs to watch, straight to the end.)
+      if (game.demoOver()) ui.showDemoEnd();
       return;
     }
     const o = game.applyOffline(seconds);
@@ -224,6 +228,12 @@ async function boot() {
   if (saved) {
     const gone = (Date.now() - saved.lastSave) / 1000;
     if (gone > 5) catchUp(gone);
+  }
+  // The demo ends on the stairs down from its last boss (or at once, if it was already over).
+  if (DEMO) {
+    scene.endBefore = zoneOf(DEMO_LAST_FLOOR + 1);
+    scene.onEnd = () => ui.showDemoEnd();
+    if (game.demoOver()) ui.showDemoEnd();
   }
 
   // The sim runs on a fixed-step timer; rendering on rAF.
@@ -240,8 +250,8 @@ async function boot() {
     if (document.hidden || inRoomSince) return;
     // A long gap while visible means the computer slept.
     if (gap > OFFLINE_AFTER) return catchUp(gap);
-    // The zone interlude pauses the fight (nothing is lost; it just waits).
-    if (scene.busy) return;
+    // The zone interlude pauses the fight (nothing is lost; it just waits). The end of the demo stops it for good.
+    if (scene.busy || game.demoOver()) return;
     acc += gap * SPEED * (freeze > 0 ? 0.1 : 1) * timeScale;
     while (acc >= STEP) {
       game.update(STEP);

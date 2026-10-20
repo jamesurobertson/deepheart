@@ -1,3 +1,4 @@
+import { DEMO, DEMO_COMPANIONS, DEMO_LAST_FLOOR } from '../demo.ts';
 import Decimal from 'break_infinity.js';
 import {
   CARD_BY_ID, AWAKEN_MILESTONES, COST_GROWTH, FURY, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor, pickMonster,
@@ -907,6 +908,7 @@ export class Game {
   }
 
   compUnlocked(i: number) {
+    if (DEMO && i >= DEMO_COMPANIONS) return false;
     return this.s.bestFloor >= COMPS[i].floor && this.s.awakens >= (COMPS[i].heart ?? 0);
   }
 
@@ -925,6 +927,11 @@ export class Game {
     if (bossDelay) this.spawnT = bossDelay;
     else if (isBossFloor(f) && !this.inVault()) this.spawnBoss();
     if (!quiet) this.events.push({ t: 'floor', floor: f, boss: isBossFloor(f), cleared });
+  }
+
+  /** The demo's last boss is beaten: the game stops here (the stairs play out, then the end screen). */
+  demoOver() {
+    return DEMO && this.s.bestCleared >= DEMO_LAST_FLOOR;
   }
 
   /** Go to a floor you've unlocked. */
@@ -1200,7 +1207,8 @@ export class Game {
       this.events.push({ t: 'bossWin', floor: this.s.floor, first: firstClear, clutch });
       this.rollCard(this.slay(m.def), !!m.champ, 'kill', true);
       if (firstWin || this.debugRelics) this.rollRelic(this.s.floor);
-      if (this.s.auto) this.enterFloor(this.s.floor + 1);
+      // The demo's last boss always leads down the stairs, where it ends.
+      if (this.s.auto || this.demoOver()) this.enterFloor(this.s.floor + 1);
       else this.enterFloor(this.s.floor, false, false, BOSS_RESPAWN);
     } else if (!this.bossFloor()) {
       this.s.floorKills++;
