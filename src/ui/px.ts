@@ -76,6 +76,37 @@ function cell(r: Rect, scale: number, cls = '', style = '') {
   return `<i class="px ${cls}" style="width:${r.w * scale}px;height:${r.h * scale}px;background:url(${a.url}) -${r.x * scale}px -${r.y * scale}px/${a.size.w * scale}px ${a.size.h * scale}px no-repeat;${style}"></i>`;
 }
 
+/** Icons drawn here rather than taken from the sheet (where nothing reads well that small), as rows of palette keys. */
+const DRAWN: Record<string, { rows: string[]; palette: Record<string, string> }> = {
+  // A flight of stairs going down, for the floor trophies (the sheet's floor_stairs tile is a muddy blur at icon size).
+  stairs: {
+    rows: [
+      '.ooo..........',
+      'oTtto.........',
+      'o111o.........',
+      'o111ooo.......',
+      'o222Ttto......',
+      'o222r22o......',
+      'o222r22ooo....',
+      'o333333Ttto...',
+      'o333333r33o...',
+      'o333333r33ooo.',
+      'o444444444Ttto',
+      'o444444444r44o',
+      'o444444444r44o',
+      '.oooooooooooo.',
+    ],
+    palette: { o: '#140a12', T: '#fff0d4', t: '#e6cda4', r: '#b0907a', 1: '#9a7e6c', 2: '#806758', 3: '#675146', 4: '#4f3d36' },
+  },
+};
+
+function drawn(icon: (typeof DRAWN)[string], scale: number, cls: string) {
+  const rects = icon.rows.flatMap((row, y) => [...row].map((key, x) => (icon.palette[key] ? `<rect x="${x}" y="${y}" width="1" height="1" fill="${icon.palette[key]}"/>` : '')));
+  const w = icon.rows[0].length;
+  const h = icon.rows.length;
+  return `<svg class="px ${cls}" viewBox="0 0 ${w} ${h}" width="${w * scale}" height="${h * scale}" shape-rendering="crispEdges" aria-hidden="true">${rects.join('')}</svg>`;
+}
+
 /** Any sprite from the dungeon sheet (first frame for animations) at an integer scale. */
 export function sprite(name: string, scale = 2, cls = ''): string {
   const r = rectFor(name);
@@ -84,6 +115,8 @@ export function sprite(name: string, scale = 2, cls = ''): string {
 
 /** A sprite's visible pixels at the largest integer scale that fits a `box`-pixel square, so every icon fills its box alike. */
 export function spriteFit(name: string, box: number, cls = ''): string {
+  const own = DRAWN[name];
+  if (own) return drawn(own, Math.max(1, Math.floor(box / Math.max(own.rows.length, own.rows[0].length))), cls);
   const full = rectFor(name);
   if (!full) return '';
   const r = atlas!.trimmed(full);

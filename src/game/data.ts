@@ -858,7 +858,7 @@ function bigWords(n: number): string {
 
 function buildTrophies(): TrophyDef[] {
   const out: TrophyDef[] = [];
-  FLOOR_AT.forEach((n, k) => out.push({ id: `fl${k}`, name: FLOOR_NAMES[k], desc: `Clear floor ${n}.`, icon: { sprite: 'floor_stairs', tier: Math.min(k, 10) }, req: { t: 'floor', n } }));
+  FLOOR_AT.forEach((n, k) => out.push({ id: `fl${k}`, name: FLOOR_NAMES[k], desc: `Clear floor ${n}.`, icon: { sprite: 'stairs', tier: Math.min(k, 10) }, req: { t: 'floor', n } }));
   GOLD_NAMES.forEach((name, k) => {
     const n = 10 ** (2 + k * 4);
     out.push({ id: `gold${k}`, name, desc: `Collect ${bigWords(n)} gold in total.`, icon: { sprite: 'coin', tier: Math.min(k, 10) }, req: { t: 'gold', n } });
