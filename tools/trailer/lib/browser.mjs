@@ -60,8 +60,9 @@ export async function settle(ctx, seconds) {
  */
 export async function record(ctx, { dir, seconds, rate = 0.12, actions = [], quality = 94, zoom = null }) {
   const { page, cdp } = ctx;
-  // A close-up films part of the page at a higher scale, so the output stays the same size and pixel-sharp.
-  const clip = zoom ? { ...zoom, scale: (ctx.clip.width * ctx.clip.scale) / zoom.width } : ctx.clip;
+  // A close-up films part of the page at a higher scale, so the output stays the same size and pixel-sharp. `zoom` can
+  // be a function, asked before every frame: a camera move.
+  const clipOf = (rect) => (rect ? { ...rect, scale: (ctx.clip.width * ctx.clip.scale) / rect.width } : ctx.clip);
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   const todo = [...actions].sort((a, b) => a.at - b.at);
@@ -74,7 +75,7 @@ export async function record(ctx, { dir, seconds, rate = 0.12, actions = [], qua
     while (todo.length && todo[0].at <= t) await todo.shift().run(page);
     t = (await page.evaluate(() => window.__vnow()) - t0) / 1000;
     if (t > seconds) break;
-    const { data } = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality, optimizeForSpeed: true, clip });
+    const { data } = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality, optimizeForSpeed: true, clip: clipOf(typeof zoom === 'function' ? zoom() : zoom) });
     const t1 = (await page.evaluate(() => window.__vnow()) - t0) / 1000;
     const file = `f${String(k).padStart(5, '0')}.jpg`;
     fs.writeFileSync(path.join(dir, file), Buffer.from(data, 'base64'));

@@ -2,9 +2,18 @@ import { open } from '../lib/browser.mjs';
 import { prepare, film, fight } from '../lib/stage.mjs';
 
 // A rainbow goblin, caught: into the Rainbow Vault, running the hall and bursting chests.
-export default async function vault(ctx) {
-  await open(ctx, 'slot=tr-vault&goblin=rainbow');
+export default (ctx) => shootVault(ctx, 'vault');
+
+/** The vault scene filmed as `take`, its "RAINBOW VAULT!" banner retitled `title` if given. */
+export async function shootVault(ctx, take, { title } = {}) {
+  await open(ctx, `slot=tr-${take}&goblin=rainbow`);
   await prepare(ctx.page);
+  if (title) {
+    await ctx.page.evaluate((retitled) => {
+      const banner = window.ui.banner.bind(window.ui);
+      window.ui.banner = (head, ...rest) => banner(head === 'RAINBOW VAULT!' ? retitled : head, ...rest);
+    }, title);
+  }
   await ctx.page.evaluate(() => {
     const g = window.game;
     const { floor } = window.__small();
@@ -16,7 +25,7 @@ export default async function vault(ctx) {
   await ctx.page.addStyleTag({ content: '.banner span, .buff.vault, .vault-leave { display: none !important; }' });
   await ctx.page.waitForFunction(() => window.game.raid, { timeout: 30000 });
   let stage = 'catch';
-  await film(ctx, 'vault', 12, {
+  await film(ctx, take, 12, {
     tick: async (t, cur) => {
       if (stage === 'catch') {
         const at = await ctx.page.evaluate(() => window.scene.raiderScreen());

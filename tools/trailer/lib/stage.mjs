@@ -113,9 +113,11 @@ export function cursor(page, start) {
   };
 }
 
-/** Record with a gliding cursor; `tick(t, cur)` runs every frame to steer it. The frame log rides along. */
-export async function film(ctx, name, seconds, { start = { x: 400, y: 400 }, tick = async () => {}, actions = [], zoom = null, rate = 0.12 } = {}) {
-  // A close-up would catch the edge of the dock (its buttons bounce up when something lands in them).
+/** Record with a gliding cursor; `tick(t, cur)` runs every frame to steer it. The frame log rides along. `zoom` is a
+ *  fixed close-up; `camera` a function returning the crop for each frame. */
+export async function film(ctx, name, seconds, { start = { x: 400, y: 400 }, tick = async () => {}, actions = [], zoom = null, camera = null, rate = 0.12 } = {}) {
+  // A close-up would catch the edge of the dock (its buttons bounce up when something lands in them). A camera
+  // that moves is left to keep the dock out of its close-ups itself.
   if (zoom) await ctx.page.addStyleTag({ content: '.dock { display: none !important; }' });
   const cur = cursor(ctx.page, start);
   await ctx.page.mouse.move(start.x, start.y);
@@ -124,7 +126,7 @@ export async function film(ctx, name, seconds, { start = { x: 400, y: 400 }, tic
   const frames = await record(ctx, {
     dir: `${TAKES}${name}`,
     seconds,
-    zoom,
+    zoom: camera ?? zoom,
     rate,
     actions: [...actions.map((a) => ({ at: a.at, run: () => a.run(cur) })),
       // Every frame: steer, glide, and note what's on screen.

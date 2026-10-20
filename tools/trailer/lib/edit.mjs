@@ -50,7 +50,7 @@ function clip(take, start, seconds, out) {
   fs.writeFileSync(list, lines.join('\n') + '\n');
   const first = frames.find((f, k) => frames[k + 1]?.t >= start).t;
   ffmpeg(['-f', 'concat', '-safe', '0', '-i', list,
-    '-vf', `fps=${FPS},trim=start=${(start - first).toFixed(4)}:duration=${seconds.toFixed(4)},setpts=PTS-STARTPTS`,
+    '-vf', `scale=1920:1080:flags=lanczos,fps=${FPS},trim=start=${(start - first).toFixed(4)}:duration=${seconds.toFixed(4)},setpts=PTS-STARTPTS`,
     '-c:v', 'libx264', '-crf', '10', '-preset', 'medium', '-pix_fmt', 'yuv420p', out]);
 }
 

@@ -30,6 +30,13 @@ export const card = {
   caption: { main: 'MONSTER CARDS', top: true },
 };
 
+// Full width, Frozen Vault: the camera pushes in as the card spins out of a Frost Imp, then pulls back as it flies
+// to the Collection button. Same four bars and the same moment for the reveal as the card part above.
+export const frostcard = {
+  shots: [{ take: 'frostcard', from: starts('card', -2.4), bars: 4, sounds: [{ sfx: 'cardgold', at: starts('card', 0.38), volume: 0.9 }] }],
+  caption: { main: 'MONSTER CARDS', top: true },
+};
+
 export const collection = { shots: [{ take: 'collection', from: 0.5, bars: 2 }], caption: 'COLLECT THEM ALL' };
 
 // The goblin's last few seconds across the room, the catch, then the Treasure! banner.
@@ -39,6 +46,9 @@ export const goblin = {
 };
 
 export const vault = { shots: [{ take: 'vault', from: 0.1, bars: 2, sounds: [{ sfx: 'jackpot', at: 0.24, volume: 0.6 }] }] };
+
+// The same shot with its banner in the plural: RAINBOW VAULTS!
+export const vaults = { shots: [{ take: 'vaults', from: ends('raid', -0.12), bars: 2, sounds: [{ sfx: 'jackpot', at: ends('raid'), volume: 0.6 }] }] };
 
 export const zones = { shots: ['zone0', 'zone1', 'zone2', 'zone3'].map((take) => ({ take, from: 0.5, bars: 1 })) };
 
