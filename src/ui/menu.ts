@@ -214,7 +214,7 @@ class Stairs {
 
     // The stairway: a landing on the left, then steps down to the bottom right corner.
     // (Torches and their light sit high enough to clear the tallest heroes on the landing.)
-    const run = 28;
+    const run = 36;
     const rise = 12;
     const landX = Math.round(W * (portrait ? 0.08 : 0.44));
     const landY = Math.round(H * (portrait ? 0.68 : 0.5));
@@ -266,12 +266,12 @@ class Stairs {
       }
     }
 
-    // The party on the steps, three to a step (the whole roster fits on screen), the leader lowest; each idles on its
+    // The party on the steps, four to a step (the whole roster fits on screen), the leader lowest; each idles on its
     // own beat.
     this.party.forEach((p, i) => {
       if (!p.frames) return;
-      const k = Math.floor((this.party.length - 1 - i) / 3);
-      const side = (this.party.length - 1 - i) % 3;
+      const k = Math.floor((this.party.length - 1 - i) / 4);
+      const side = (this.party.length - 1 - i) % 4;
       const f = p.frames.frames[Math.floor((this.t + p.phase) * 6) % p.frames.frames.length];
       const x = (k === 0 ? landX + 6 : stepX(k) + 1) + side * 8;
       const y = stepY(k) + 1 - f.h;
