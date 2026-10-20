@@ -59,6 +59,8 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 export class TitleMenu {
   private el: HTMLElement;
   private stairs: Stairs;
+  /** The menu is laid out for a 760 px tall window and scaled to the real one. */
+  private fit = () => this.el.style.setProperty('--mm-scale', String(Math.min(1.6, Math.max(0.85, innerHeight / 760))));
   private game: Game;
   private hasRun: boolean;
   private hooks: MenuHooks;
@@ -79,11 +81,14 @@ export class TitleMenu {
     panel.className = 'mm-panel';
     this.el.appendChild(panel);
     this.el.addEventListener('click', (e) => this.act((e.target as HTMLElement).closest<HTMLElement>('[data-mm]')?.dataset.mm));
+    this.fit();
+    addEventListener('resize', this.fit);
     this.show('main');
   }
 
   close() {
     this.stairs.stop();
+    removeEventListener('resize', this.fit);
     this.el.remove();
     document.body.classList.remove('at-menu');
   }
@@ -242,7 +247,8 @@ class Stairs {
     // Torches on the wall above the landing (the sheet's one flame is the sewers' green: warmed to torchlight).
     const flame = spriteFrames('sewer_flame');
     if (flame) {
-      for (const tx of [landX - 26, landX + 58]) {
+      // (Over the landing and the first steps: further left they'd sit behind the logo on narrower screens.)
+      for (const tx of [landX + 30, landX + 112]) {
         const f = flame.frames[Math.floor(this.t * 8 + tx) % flame.frames.length];
         const light = g.createRadialGradient(tx + 8, landY - 34, 0, tx + 8, landY - 34, 46);
         light.addColorStop(0, 'rgba(255, 170, 80, 0.35)');

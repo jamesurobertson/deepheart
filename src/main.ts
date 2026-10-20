@@ -59,7 +59,15 @@ function load(): SaveState | null {
   }
 }
 
+/** The menu waits for the pixel fonts (at most 2 s), so it never shows in a fallback face first. */
+const fontsReady = () => Promise.race([
+  Promise.all([document.fonts.load("38px 'Jersey 10'"), document.fonts.load('16px Silkscreen')]),
+  new Promise((resolve) => setTimeout(resolve, 2000)),
+]);
+
 async function boot() {
+  // Black until the menu is drawn: no flash of the room or the HUD first.
+  if (!SKIP_MENU) document.body.classList.add('at-menu');
   const atlas = await Atlas.load(`${BASE}assets/sprites/atlas.png`, `${BASE}assets/sprites/atlas.txt`);
   setAtlas(atlas);
 
@@ -267,6 +275,7 @@ async function boot() {
   let lastTick = Date.now();
   let acc = 0;
   if (atMenu) {
+    await fontsReady();
     const menu = new TitleMenu(document.body, game, !!saved && game.s.kills > 0, {
       play: () => {
         menu.close();

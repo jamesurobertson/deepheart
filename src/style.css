@@ -1391,29 +1391,30 @@ body.demo-over .hint, body.demo-over .tip { display: none !important; }
 body.at-menu #ui > :not(.modal-wrap) { visibility: hidden; }
 /* #ui is fixed (a layer of its own), so its windows only rise above the menu if it does. */
 body.at-menu #ui { z-index: 20; }
+body.at-menu #stage { visibility: hidden; }
 body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticker, body.at-menu .hero-mark { display: none !important; }
 .title-menu { background: #0d0709; }
 .mm-stairs { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
-.mm-panel { position: relative; align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 34px; width: min(560px, 100%); box-sizing: border-box;
+.mm-panel { position: relative; align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 34px; width: min(560px, 100% / var(--mm-scale, 1)); zoom: var(--mm-scale, 1); box-sizing: border-box;
   padding: 40px 40px 40px max(72px, calc(8vw + var(--safe-l))); background: linear-gradient(90deg, rgba(8, 4, 6, 0.94) 62%, rgba(8, 4, 6, 0)); }
 .mm-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
 .mm-heart { filter: drop-shadow(0 0 20px rgba(232, 69, 95, 0.7)); animation: mm-beat 1.4s ease-in-out infinite; }
 @keyframes mm-beat { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.12); } 24% { transform: scale(1); } 36% { transform: scale(1.06); } 48% { transform: scale(1); } }
-.mm-logo { position: relative; margin: 0; font: 400 clamp(64px, 9vw, 112px)/0.9 'Jersey 10'; letter-spacing: 3px; }
+.mm-logo { position: relative; margin: 0; font: 400 clamp(64px, 9vw, 112px)/0.9 'Jersey 10', monospace; letter-spacing: 3px; }
 .mm-logo .mm-ink { position: absolute; inset: 0; color: var(--ink); text-shadow: 0 5px 0 var(--ink), 5px 0 0 var(--ink), -5px 0 0 var(--ink), 0 -5px 0 var(--ink), 4px 4px 0 var(--ink), -4px 4px 0 var(--ink), 4px -4px 0 var(--ink), -4px -4px 0 var(--ink), 0 10px 0 var(--ink), 0 0 40px rgba(255, 150, 60, 0.6); }
 .mm-logo .mm-gold { position: relative; color: transparent; background: linear-gradient(180deg, #fff6c8 0%, #ffd56a 38%, #f29a2e 70%, #d8641f 100%); -webkit-background-clip: text; background-clip: text; }
-.mm-tag { margin: 4px 0 0; font: 400 16px/1 'Silkscreen', monospace; letter-spacing: 6px; color: #c9b39c; }
+.mm-tag { margin: 4px 0 0; font: 400 16px/1 'Silkscreen', monospace; letter-spacing: 6px; color: #c9b39c; white-space: nowrap; }
 .mm-stamped { position: relative; }
 .mm-stamped + .mm-tag { margin-top: 30px; }
 .mm-stamp { position: absolute; right: 2px; bottom: -30px; transform: rotate(-6deg); padding: 6px 12px 4px; background: #e8455f; color: #fff4f6; font: 400 20px/1 'Silkscreen', monospace; letter-spacing: 4px; box-shadow: 0 0 0 3px var(--ink), 0 5px 0 3px var(--ink); }
 .mm-list { display: flex; flex-direction: column; gap: 8px; }
-.mm-list button { display: flex; align-items: baseline; gap: 14px; padding: 4px 0; border: 0; background: none; cursor: pointer; text-align: left; font: 400 38px/1 'Jersey 10'; color: #a8907c; }
+.mm-list button { display: flex; align-items: baseline; gap: 14px; padding: 4px 0; border: 0; background: none; cursor: pointer; text-align: left; font: 400 38px/1 'Jersey 10', monospace; color: #a8907c; }
 .mm-list button span { width: 18px; color: transparent; }
 .mm-list button:hover, .mm-list button:focus-visible { color: var(--gold-hi); outline: none; text-shadow: 0 0 18px rgba(255, 200, 90, 0.45); }
 .mm-list button:hover span, .mm-list button:focus-visible span { color: #ff5a7e; }
 .mm-run { margin: -6px 0 8px 32px; font: 400 12px/1.2 'Silkscreen', monospace; letter-spacing: 1px; color: #8a7466; }
 .mm-btn { display: inline-flex; align-items: center; justify-content: center; width: 320px; max-width: 100%; min-height: 54px; box-sizing: border-box; padding: 6px 16px; border: 0; cursor: pointer; text-decoration: none;
-  font: 400 28px/1 'Jersey 10'; color: var(--text); background: #2a1a1c; box-shadow: inset 0 0 0 3px #6b4a33, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink); }
+  font: 400 28px/1 'Jersey 10', monospace; color: var(--text); background: #2a1a1c; box-shadow: inset 0 0 0 3px #6b4a33, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink); }
 .mm-btn:hover, .mm-btn:focus-visible { color: var(--gold-hi); outline: none; box-shadow: inset 0 0 0 3px #f2b44a, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink); }
 .mm-btn.primary { color: #2a1604; background: linear-gradient(#ffd76a, #e0a23c); box-shadow: inset 0 0 0 3px #fff0b8, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink), 0 0 30px rgba(242, 180, 74, 0.35); }
 /* Steam's own navy and blue, with its logo. */
@@ -1427,7 +1428,7 @@ body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticke
 .mm-row { display: flex; flex-wrap: wrap; gap: 16px; }
 .mm-row .mm-btn { width: auto; }
 .mm-credits { display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 80px); overflow-y: auto; padding-right: 12px; }
-.mm-credits h2 { margin: 0; font: 400 56px/1 'Jersey 10'; color: var(--gold-hi); text-shadow: 0 4px 0 var(--ink); }
+.mm-credits h2 { margin: 0; font: 400 56px/1 'Jersey 10', monospace; color: var(--gold-hi); text-shadow: 0 4px 0 var(--ink); }
 .mm-credits h3 { margin: 0 0 4px; font: 400 14px/1 'Silkscreen', monospace; letter-spacing: 4px; color: #c9b39c; text-transform: uppercase; }
 .mm-credits ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 22px; line-height: 1.15; }
 .mm-credits a { color: var(--text); text-decoration-color: rgba(255, 224, 138, 0.4); text-underline-offset: 3px; }
