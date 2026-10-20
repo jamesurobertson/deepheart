@@ -551,7 +551,7 @@ export const ABILITIES: AbilityDef[] = [
   { id: 'blade', name: 'Phantom Blade', desc: 'Attacks the front monster for you, once a second.', kind: 'passive', comp: compIndex('squire'), trait: 0 },
   { id: 'flurry', name: 'Flurry', desc: 'Clicks for you, 10 times a second, for 30s.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 5 * 60 },
   { id: 'crit', name: 'Critical Hits', desc: 'Your clicks and Phantom Blade can land critical hits: a 3% chance for ×2 damage. Sharp-eyed companions raise both.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
-  { id: 'rampage', name: 'Rampage', desc: 'Attacks charge it. Unleash for ×2 damage for 10s. Keep attacking for ×3.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
+  { id: 'rampage', name: 'Rampage', desc: 'Attacks charge it. Unleash for ×2 party damage for 10s. Keep attacking for ×3.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
   { id: 'cleave', name: 'Cleave', desc: 'Your clicks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 10 * 60 },
   { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold for 30 seconds.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 15 * 60 },
   { id: 'drums', name: 'War Drums', desc: 'Your party deals ×2 damage for 30 seconds.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 10 * 60 },

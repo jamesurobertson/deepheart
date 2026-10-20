@@ -2290,7 +2290,7 @@ export class Ui {
       row('+ Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} upgrades` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`) +
       mul('Buffs right now', b.buffClick, buffNames('click'), 'Frenzy…') +
       total('Per click', fmt(g.clickDamage())) +
-      row('During Rampage', x(g.feverMult()), 'all your damage while a Rampage runs'));
+      row('During Rampage', x(g.feverMult()), "your party's damage while a Rampage runs"));
 
     const crit = table('Critical hits',
       row('Chance', pc(g.critChance()), g.abilityUnlocked('crit') ? `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} companions` : ''}${p.critRelic ? ` + ${pc(p.critRelic)} ${relicName('hawk')}` : ''}` : `locked: unlocked by the ${COMPS[ABILITY_BY_ID.get('crit')!.comp].name}`, !g.abilityUnlocked('crit')) +

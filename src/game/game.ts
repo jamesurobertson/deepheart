@@ -807,10 +807,10 @@ export class Game {
     return this.c.click.times(this.buffMult('click'));
   }
 
-  /** One of your clicks right now, as it lands: Rampage included, plus cleave on every other monster in the room. */
+  /** One of your clicks right now, as it lands, plus cleave on every other monster in the room. (Rampage is the party's,
+   *  not your clicks'.) */
   clickTotal() {
-    const fever = this.s.buffs.some((b) => b.id === 'fever') ? this.feverMult() : 1;
-    return this.clickDamage().times(fever * (1 + this.cleave() * Math.max(0, this.monsters.length - 1)));
+    return this.clickDamage().times(1 + this.cleave() * Math.max(0, this.monsters.length - 1));
   }
 
   /** Everything that isn't your own clicking, per second: the party and the Phantom Blade (with its cleave). */
@@ -1272,8 +1272,7 @@ export class Game {
     }
     const crit = Math.random() < this.critChance();
     const fever = this.s.buffs.some((b) => b.id === 'fever');
-    let amount = this.clickDamage().times(crit ? this.critMult() : 1);
-    if (fever) amount = amount.times(this.feverMult());
+    const amount = this.clickDamage().times(crit ? this.critMult() : 1);
     const others = this.cleave() > 0 ? this.monsters.filter((m) => m !== target) : [];
     this.damage(target, amount, auto ? (crit ? 'autoCrit' : 'auto') : crit ? 'crit' : fever ? 'fever' : 'click', x, y);
     for (const m of others) if (this.monsters.includes(m)) this.damage(m, amount.times(this.cleave()), 'cleave');
