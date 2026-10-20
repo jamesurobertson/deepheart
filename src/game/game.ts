@@ -1,4 +1,4 @@
-import { DEMO, DEMO_COMPANIONS, DEMO_LAST_FLOOR } from '../demo.ts';
+import { DEMO, DEMO_COMPANIONS, DEMO_FIRST_CARD, DEMO_LAST_FLOOR } from '../demo.ts';
 import Decimal from 'break_infinity.js';
 import {
   CARD_BY_ID, AWAKEN_MILESTONES, COST_GROWTH, FURY, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor, pickMonster,
@@ -1753,8 +1753,10 @@ export class Game {
 
   /** A killed monster's chance at its card: champions roll for a gold one first. */
   private rollCard(id: string, champ: boolean, src: 'kill' | 'sweep', boss = false) {
-    // In the demo the first boss you beat always drops its card: a short session should see the card turn up.
-    if (DEMO && boss && Object.keys(this.s.cards).length === 0) {
+    // In the demo your first card is sure to turn up early (at normal odds a short session would never see one): each
+    // kill in DEMO_FIRST_CARD's stretch has a 1 in (kills left) chance, so the drop lands evenly across it.
+    const { from, by } = DEMO_FIRST_CARD;
+    if (DEMO && src === 'kill' && this.s.kills >= from && Object.keys(this.s.cards).length === 0 && Math.random() * (by - this.s.kills) < 1) {
       this.giveCard(id, false, src);
       return;
     }
