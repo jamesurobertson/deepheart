@@ -1737,6 +1737,8 @@ export class Ui {
     const firstRun = g.s.descents === 0 && g.s.awakens === 0;
     const noUpgrades = g.s.upgradesKnown.length === 0;
     const upgradeRow = noUpgrades ? this.rows.findIndex((row) => row.querySelector('.trait.buy')) : -1;
+    // The shop's first upgrade you can afford, until you've bought one there.
+    const shopUpg = g.s.upgradesKnown.some((id) => !isTrait(id)) ? null : this.el.upgGrid.querySelector<HTMLElement>('.upg.can');
     if (g.s.clicks < 6) state = 'click';
     else if (g.s.owned.every((n) => n === 0) && g.s.gold.gte(g.compCost(0))) state = firstRun ? 'hire' : 'nudge';
     else if (g.abilityUnlocked('blade') && !g.s.bladeSeen) state = 'blade';
@@ -1746,6 +1748,7 @@ export class Ui {
     // Meeting your hero: first on the field, then (once there's someone to switch to) the star that picks one.
     else if (g.s.heroTips === 0 && g.heroIndex() >= 0) state = 'hero';
     else if (upgradeRow >= 0) state = 'upgrade';
+    else if (shopUpg) state = 'shop';
     else if (firstRun && noUpgrades && g.s.owned[0] === 1 && g.s.gold.gte(g.compCost(0))) state = 'level';
     else if (g.s.fevers === 0 && g.rampageReady()) state = 'rampage';
     else if (g.s.heroTips === 1 && g.s.owned.filter((n) => n > 0).length >= 2) state = 'star';
@@ -1772,6 +1775,8 @@ export class Ui {
       this.pointAt(this.el.abilities.querySelector('[data-ability="rampage"]'));
     } else if (state === 'upgrade') {
       this.pointAt(this.rows[upgradeRow].querySelector('.trait.buy'));
+    } else if (state === 'shop') {
+      this.pointAt(shopUpg);
     }
     if (state === 'champ') {
       const champ = g.monsters.find((m) => m.champ);
@@ -1788,7 +1793,7 @@ export class Ui {
     }
     if (state === this.hintState) return;
     this.hintState = state;
-    const pointing = ['star', 'hire', 'level', 'upgrade', 'rampage', 'blade'].includes(state);
+    const pointing = ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'blade'].includes(state);
     this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ';
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero');
@@ -1801,6 +1806,7 @@ export class Ui {
             : state === 'blade' ? `<b>Phantom Blade unlocked!<small>It attacks for you, once a second</small></b>`
             : state === 'rampage' ? `<b>Rampage is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it, or save it for a boss</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
+            : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it, or press U'}</small></b>`
               : state === 'champ' ? `<b>A champion!<small>Tougher than the rest, worth 10× the gold</small></b>`
               : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
@@ -2015,7 +2021,7 @@ export class Ui {
         room: 'Your room: the binder, and Dan and Victor to trade with.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        blade: `Phantom Blade: attacks the front monster for you ${perSec(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades and the Phantom Fury offer make it faster.`,
+        blade: `Phantom Blade: attacks the front monster for you ${perSec(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades make it faster${g.abilityUnlocked('legion') ? ', and Phantom Legion makes it ten times as fast for a while' : ''}.`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }
