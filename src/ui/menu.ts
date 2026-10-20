@@ -2,7 +2,7 @@ import { COMPS, zoneName } from '../game/data.ts';
 import { duration } from '../game/format.ts';
 import type { Game } from '../game/game.ts';
 import { DEMO, STEAM_URL } from '../demo.ts';
-import { spriteFrames } from './px.ts';
+import { G, spriteFrames } from './px.ts';
 
 export interface MenuHooks {
   /** Into the game: the run there is (Continue, Play the Demo), or the fresh one a New Game made. */
@@ -110,7 +110,7 @@ export class TitleMenu {
     const logo = DEMO ? `<div class="mm-stamped">${LOGO}<span class="mm-stamp">DEMO</span></div>` : LOGO;
     const play = this.hasRun ? 'Continue' : DEMO ? 'Play the Demo' : 'New Game';
     return `<div class="mm-head">${HEART}${logo}<p class="mm-tag">A DUNGEON CLICKER</p></div>
-      ${DEMO ? `<a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">Wishlist on Steam</a>` : ''}
+      ${DEMO ? `<a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}Wishlist on Steam</a>` : ''}
       <nav class="mm-list">
         <button type="button" data-mm="${this.hasRun || DEMO ? 'play' : 'new'}"><span>▸</span>${play}</button>${run}
         ${this.hasRun ? '<button type="button" data-mm="new"><span>▸</span>New Game</button>' : ''}

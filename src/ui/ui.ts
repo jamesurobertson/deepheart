@@ -2747,7 +2747,7 @@ export class Ui {
       <div class="de-next">${silhouette(COMPS[DEMO_COMPANIONS].sprite, 96, '#2c2233')}<b>???</b></div>
       <p class="de-more">More heroes wait deeper down.</p>
       <p class="de-run">You met ${heroes} hero${heroes === 1 ? '' : 'es'} and found ${cards} card${cards === 1 ? '' : 's'}.</p>
-      <a class="btn primary big" href="${STEAM_URL}" target="_blank" rel="noopener">Wishlist on Steam</a>
+      <a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}Wishlist on Steam</a>
     </div>`;
     this.root.appendChild(el);
   }

@@ -1417,8 +1417,9 @@ body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticke
   font: 400 28px/1 'Jersey 10'; color: var(--text); background: #2a1a1c; box-shadow: inset 0 0 0 3px #6b4a33, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink); }
 .mm-btn:hover, .mm-btn:focus-visible { color: var(--gold-hi); outline: none; box-shadow: inset 0 0 0 3px #f2b44a, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink); }
 .mm-btn.primary { color: #2a1604; background: linear-gradient(#ffd76a, #e0a23c); box-shadow: inset 0 0 0 3px #fff0b8, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink), 0 0 30px rgba(242, 180, 74, 0.35); }
-.mm-btn.steam { color: #2a1604; background: linear-gradient(#ffd76a, #e0a23c); box-shadow: inset 0 0 0 3px #fff0b8, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink), 0 0 30px rgba(242, 180, 74, 0.35); }
-.mm-btn.steam:hover, .mm-btn.steam:focus-visible { color: #2a1604; filter: brightness(1.08); }
+/* Steam's own navy and blue, with its logo. */
+.mm-btn.steam { gap: 12px; color: #ffffff; background: linear-gradient(180deg, #2a475e 0%, #1b2838 100%); box-shadow: inset 0 0 0 3px #66c0f4, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink), 0 0 26px rgba(102, 192, 244, 0.35); }
+.mm-btn.steam:hover, .mm-btn.steam:focus-visible { color: #ffffff; background: linear-gradient(180deg, #34597a 0%, #213449 100%); box-shadow: inset 0 0 0 3px #a3dcff, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink), 0 0 30px rgba(102, 192, 244, 0.5); }
 .mm-head + .mm-btn { align-self: flex-start; }
 .mm-btn.danger { color: #fff0f2; background: #7a1f2c; box-shadow: inset 0 0 0 3px #e8455f, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink); }
 .mm-note { margin: 0; font: 400 13px/1 'Silkscreen', monospace; letter-spacing: 2px; color: #a8907c; }
