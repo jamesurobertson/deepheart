@@ -523,13 +523,14 @@ export class Ui {
       if ((e.key === ' ' || e.key === 'Enter') && !e.repeat && !this.modal && !(e.target as HTMLElement).closest('button')) {
         e.preventDefault();
         if (this.scene.busy) return;
-        // The sword swings where the cursor is, or at the front monster if the cursor's off the field.
+        // The sword swings at the monster under the cursor, or at the front one if the cursor's off the field.
         const at = this.pointer ?? { x: -1, y: -1 };
+        const id = this.pointer ? this.scene.pick(at.x, at.y) : null;
         if (e.key === ' ') {
           this.spaceHeld = true;
-          this.game.hold = { id: null, ...at };
+          this.game.hold = { id, ...at };
         }
-        this.game.click(null, at.x, at.y);
+        this.game.click(id, at.x, at.y);
       }
     });
     addEventListener('keyup', (e) => {
@@ -1224,6 +1225,9 @@ export class Ui {
 
   frame(dt: number) {
     const g = this.game;
+    // A held attack keeps to whatever is under the cursor, which changes as monsters move and die even when the mouse
+    // doesn't.
+    if (g.hold && g.hold.x >= 0) g.hold.id = this.scene.pick(g.hold.x, g.hold.y);
     // The marker over your hero (hero tip) moves every frame, right with them.
     const mark = this.el.heroMark;
     if (!mark.hidden) {
