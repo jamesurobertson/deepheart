@@ -123,6 +123,27 @@ export function spriteFit(name: string, box: number, cls = ''): string {
   return cell(r, Math.max(1, Math.floor(box / Math.max(r.w, r.h))), cls);
 }
 
+/** A character as a flat silhouette in `color`, at a fixed on-screen height. Cut on each pixel's opacity, so a sprite's
+ *  faint glow doesn't turn into a dark box (as a CSS brightness(0) filter would make it). */
+export function silhouette(name: string, height: number, color: string): string {
+  const src = spriteFrames(name);
+  const f = src && atlas!.trimmed(src.frames[0]);
+  if (!src || !f) return '';
+  const c = document.createElement('canvas');
+  c.width = f.w;
+  c.height = f.h;
+  const g = c.getContext('2d')!;
+  g.drawImage(src.img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+  const data = g.getImageData(0, 0, f.w, f.h);
+  for (let i = 3; i < data.data.length; i += 4) data.data[i] = data.data[i] >= 128 ? 255 : 0;
+  g.putImageData(data, 0, 0);
+  g.globalCompositeOperation = 'source-in';
+  g.fillStyle = color;
+  g.fillRect(0, 0, f.w, f.h);
+  const k = height / f.h;
+  return `<img class="px" src="${c.toDataURL()}" width="${Math.round(f.w * k)}" height="${Math.round(f.h * k)}" alt="">`;
+}
+
 /** A character at a fixed on-screen height (fractional scale), so a roster of differently sized sprites lines up. */
 export function charFit(name: string, height: number, maxW = height * 1.2, cls = ''): string {
   const v = VARIANTS[name] && variantFrames(name);

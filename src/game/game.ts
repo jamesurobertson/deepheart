@@ -1753,6 +1753,11 @@ export class Game {
 
   /** A killed monster's chance at its card: champions roll for a gold one first. */
   private rollCard(id: string, champ: boolean, src: 'kill' | 'sweep', boss = false) {
+    // In the demo the first boss you beat always drops its card: a short session should see the card turn up.
+    if (DEMO && boss && Object.keys(this.s.cards).length === 0) {
+      this.giveCard(id, false, src);
+      return;
+    }
     if (champ && this.cardRoll(boss ? CARD_ODDS.champBoss : CARD_ODDS.champ)) this.giveCard(id, true, src);
     else if (this.cardRoll(boss ? CARD_ODDS.boss : CARD_ODDS.monster)) this.giveCard(id, false, src);
   }

@@ -5,10 +5,10 @@ import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, FLOOR_KILLS, RELICS_ON, TUNE, isBo
 import type { Drop, Scene } from '../render/scene.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
-import { G, cardArt, charFit, sprite, spriteFit } from './px.ts';
+import { G, cardArt, charFit, silhouette, sprite, spriteFit } from './px.ts';
 import type { BinderCard, BinderColor } from './binder.ts';
 import { TradeMat, type Brother } from './trade.ts';
-import { DEMO, DEMO_COMPANIONS, DEMO_LAST_FLOOR, STEAM_URL } from '../demo.ts';
+import { DEMO, DEMO_COMPANIONS, STEAM_URL } from '../demo.ts';
 import { playDream } from './dream.ts';
 import { STASHES } from './world.ts';
 
@@ -2728,23 +2728,37 @@ export class Ui {
     };
   }
 
-  /** The end of the demo: over the black the stairs faded to, what you did, what's further down, and the way to Steam. */
+  /** The end of the demo, over the black the stairs faded to: the heroes still to meet, as silhouettes, how much of the
+   *  party and the card collection you've got, and the way to Steam. */
   showDemoEnd() {
     if (this.root.querySelector('.demo-end')) return;
     const g = this.game;
     this.hideTip();
     if (this.modal) this.closeModal();
     document.body.classList.add('demo-over');
+    const locked = COMPS.slice(DEMO_COMPANIONS);
+    const heroes = g.s.owned.filter((n) => n > 0).length;
+    // The whole collection: every card in each lap it turns up on, ordinary and gold.
+    let cards = 0;
+    let cardsHad = 0;
+    for (const c of CARDS) {
+      const got = g.s.cards[c.id];
+      for (let lap = lapOf(c.floor); lap < CORRUPTION.length; lap++) {
+        cards += c.gold ? 2 : 1;
+        cardsHad += ((got?.n[lap] ?? 0) > 0 ? 1 : 0) + ((got?.gold[lap] ?? 0) > 0 ? 1 : 0);
+      }
+    }
+    const meter = (label: string, have: number, of: number) =>
+      `<div class="de-meter"><span>${label}</span><i><b style="width:${Math.max(2, (have / of) * 100)}%"></b></i><em>${fmt(have)} / ${fmt(of)}</em></div>`;
     const el = document.createElement('div');
     el.className = 'demo-end';
-    const zonesLeft = ZONES.length - zoneOf(DEMO_LAST_FLOOR + 1);
-    const cards = Object.keys(g.s.cards).length;
     el.innerHTML = `<div class="de-in">
       <div class="de-heart">${G.heart(8)}</div>
       <h1>DEEPHEART</h1>
       <p class="de-lead">Thanks for playing the demo!</p>
-      <p class="de-run">${duration(g.s.playTime)} · ${fmt(g.s.kills)} monsters slain · ${cards} card${cards === 1 ? '' : 's'} found</p>
-      <p class="de-more">The stairs keep going: ${zonesLeft} more zones, ${COMPS.length - DEMO_COMPANIONS} more companions, and a dungeon with no bottom.</p>
+      <div class="de-shadows">${locked.map((c, i) => `<span style="--i:${i}">${silhouette(c.sprite, 40, '#2c2233')}</span>`).join('')}</div>
+      <p class="de-more">${locked.length} more heroes wait deeper down.</p>
+      <div class="de-meters">${meter('Heroes', heroes, COMPS.length)}${meter('Cards', cardsHad, cards)}</div>
       <a class="btn primary big" href="${STEAM_URL}" target="_blank" rel="noopener">Wishlist on Steam</a>
     </div>`;
     this.root.appendChild(el);
