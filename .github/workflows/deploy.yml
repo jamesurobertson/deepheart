@@ -24,7 +24,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # The same game, built as the demo when it's deployed from the demo-deepheart repo.
       - run: npm run build
+        env:
+          VITE_DEMO: ${{ github.event.repository.name == 'demo-deepheart' && '1' || '' }}
       # What actions/upload-pages-artifact does, done here: that action uses upload-artifact by tag internally, which
       # the repo's "actions must be pinned to a commit" rule refuses.
       - run: tar --dereference --hard-dereference --directory dist -cvf "$RUNNER_TEMP/artifact.tar" .

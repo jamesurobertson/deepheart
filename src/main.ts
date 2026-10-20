@@ -26,9 +26,10 @@ const params = new URLSearchParams(location.search);
 const BASE = import.meta.env.BASE_URL;
 // ?state=awaken (dev only) plays in its own slot, so the test save never touches yours.
 const TEST_STATE = import.meta.env.DEV ? params.get('state') : null;
-// The playtest site shares an origin with the live game (jamesurobertson.github.io), so it saves to its own slot.
+// The playtest site and the demo share an origin with the live game (jamesurobertson.github.io), so each saves to its
+// own slot.
 const PLAYTEST = location.pathname.startsWith('/dev-deepheart/');
-const SLOT = params.get('slot') ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (PLAYTEST ? 'playtest' : null);
+const SLOT = params.get('slot') ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
 const SAVE_KEY = 'deepheart-save' + (SLOT ? `:${SLOT}` : '');
 const STEP = 1 / 30;
 /** Away (tab hidden or closed) longer than this counts as offline: paid at the offline rate, with a summary. Shorter is played out at full speed. */
