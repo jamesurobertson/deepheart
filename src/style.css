@@ -1375,17 +1375,12 @@ body.dreaming #ui { visibility: hidden; }
 .demo-end h1 { margin: 0; font: 400 clamp(56px, 12vw, 104px)/0.9 'Jersey 10'; letter-spacing: 3px; color: var(--gold-hi);
   text-shadow: 0 5px 0 var(--ink), 4px 0 0 var(--ink), -4px 0 0 var(--ink), 0 -4px 0 var(--ink), 0 0 36px rgba(255, 170, 80, 0.45); }
 .de-lead { margin: 0; font: 400 32px/1.1 'Jersey 10'; color: var(--text); }
-/* Two rows of eight: the heroes still to meet. */
-.de-shadows { display: grid; grid-template-columns: repeat(8, 48px); justify-items: center; align-items: end; gap: 10px 6px; margin-top: 10px; }
-.de-shadows span { line-height: 0; animation: de-in 0.5s calc(0.6s + var(--i) * 0.06s) ease-out both; }
-.de-shadows .px { filter: drop-shadow(1px 0 0 #5a4670) drop-shadow(-1px 0 0 #5a4670) drop-shadow(0 1px 0 #5a4670) drop-shadow(0 -1px 0 #5a4670); }
-@media (max-width: 460px) { .de-shadows { grid-template-columns: repeat(4, 48px); } }
-.de-more { margin: 0 0 6px; font: 400 26px/1.2 'Jersey 10'; color: var(--text); }
-.de-meters { display: grid; gap: 8px; width: min(380px, 100%); margin-bottom: 10px; }
-.de-meter { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 10px; font: 400 20px/1 'Jersey 10'; color: var(--dim); text-align: left; }
-.de-meter i { height: 12px; background: #1d1218; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #3a2629; }
-.de-meter b { display: block; height: 100%; background: linear-gradient(#ffe08a, #e0a23c); }
-.de-meter em { font-style: normal; color: var(--text); min-width: 64px; text-align: right; }
+/* The next hero, still a mystery. */
+.de-next { position: relative; display: grid; place-items: center; margin-top: 8px; animation: de-in 0.8s 0.5s ease-out both; }
+.de-next .px { filter: drop-shadow(2px 0 0 #5a4670) drop-shadow(-2px 0 0 #5a4670) drop-shadow(0 2px 0 #5a4670) drop-shadow(0 -2px 0 #5a4670) drop-shadow(0 0 18px rgba(180, 140, 255, 0.35)); }
+.de-next b { position: absolute; font: 400 34px/1 'Jersey 10'; letter-spacing: 3px; color: #b49ad0; text-shadow: 0 3px 0 var(--ink); }
+.de-more { margin: 0; font: 400 26px/1.2 'Jersey 10'; color: var(--text); }
+.de-run { margin: 0 0 10px; font: 400 21px/1.2 'Jersey 10'; color: var(--dim); }
 .demo-end .btn { text-decoration: none; display: inline-flex; align-items: center; }
 body.demo-over .hint, body.demo-over .tip { display: none !important; }
 @keyframes de-in { from { opacity: 0; } }
