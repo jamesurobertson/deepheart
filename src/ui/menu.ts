@@ -195,7 +195,7 @@ class Stairs {
     // Drawn in sprite pixels at a whole-number scale, so the tiles stay crisp. A portrait screen (a phone) has the menu
     // on top and the stairway below it, scaled to the width.
     const portrait = h > w;
-    const S = Math.max(2, Math.round(portrait ? w / 170 : h / 210));
+    const S = Math.max(2, portrait ? Math.round(w / 170) : Math.floor(h / 270));
     const W = Math.ceil(w / S);
     const H = Math.ceil(h / S);
     const g = this.ctx;
@@ -214,10 +214,11 @@ class Stairs {
 
     // The stairway: a landing on the left, then steps down to the bottom right corner.
     // (Torches and their light sit high enough to clear the tallest heroes on the landing.)
-    const run = 36;
+    // A long flight, whatever the party: even a full roster leaves empty steps below it.
+    const run = 30;
     const rise = 12;
-    const landX = Math.round(W * (portrait ? 0.08 : 0.44));
-    const landY = Math.round(H * (portrait ? 0.68 : 0.5));
+    const landX = Math.round(W * (portrait ? 0.08 : 0.45));
+    const landY = Math.round(H * (portrait ? 0.68 : 0.42));
     const steps = Math.ceil((W - landX) / run) + 1;
     const stepX = (k: number) => landX + 36 + (k - 1) * run;
     const stepY = (k: number) => landY + k * rise;
@@ -267,17 +268,17 @@ class Stairs {
     }
 
     // The party on the steps, four to a step (the whole roster fits on screen), the leader lowest; each idles on its
-    // own beat.
-    this.party.forEach((p, i) => {
-      if (!p.frames) return;
+    // own beat. Shadows go down first (one on a step above would otherwise cross the face of someone below), then the
+    // heroes from the top step down, so the lower ones stand in front.
+    const placed = this.party.flatMap((p, i) => {
+      if (!p.frames) return [];
       const k = Math.floor((this.party.length - 1 - i) / 4);
       const side = (this.party.length - 1 - i) % 4;
       const f = p.frames.frames[Math.floor((this.t + p.phase) * 6) % p.frames.frames.length];
-      const x = (k === 0 ? landX + 6 : stepX(k) + 1) + side * 8;
-      const y = stepY(k) + 1 - f.h;
-      g.fillStyle = 'rgba(0, 0, 0, 0.35)';
-      g.fillRect(x + 2, stepY(k), f.w - 4, 2);
-      g.drawImage(p.frames.img, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
+      return [{ img: p.frames.img, f, k, x: (k === 0 ? landX + 6 : stepX(k)) + side * 6 }];
     });
+    g.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    for (const h of placed) g.fillRect(h.x + 2, stepY(h.k), h.f.w - 4, 2);
+    for (const h of [...placed].sort((a, b) => a.k - b.k)) g.drawImage(h.img, h.f.x, h.f.y, h.f.w, h.f.h, h.x, stepY(h.k) + 1 - h.f.h, h.f.w, h.f.h);
   }
 }
