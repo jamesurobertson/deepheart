@@ -12,6 +12,7 @@ import { setAtlas } from './ui/px.ts';
 import { Sfx, type Track } from './audio/sfx.ts';
 import { CARDS, CORRUPTION, UPGRADES, lapOf, zoneOf } from './game/data.ts';
 import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
+import { TitleMenu } from './ui/menu.ts';
 
 declare global {
   interface Window {
@@ -31,6 +32,11 @@ const TEST_STATE = import.meta.env.DEV ? params.get('state') : null;
 const PLAYTEST = location.pathname.startsWith('/dev-deepheart/');
 const SLOT = params.get('slot') ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
 const SAVE_KEY = 'deepheart-save' + (SLOT ? `:${SLOT}` : '');
+// The game opens on its main menu, except a test run (?slot=, ?state=), ?menu=0, or straight after the menu's own New
+// Game (which wipes the save and reloads).
+const PLAY_NOW = 'deepheart-play-now';
+const SKIP_MENU = params.get('menu') === '0' || (import.meta.env.DEV && (params.has('slot') || !!TEST_STATE)) || sessionStorage.getItem(PLAY_NOW) === '1';
+sessionStorage.removeItem(PLAY_NOW);
 const STEP = 1 / 30;
 /** Away (tab hidden or closed) longer than this counts as offline: paid at the offline rate, with a summary. Shorter is played out at full speed. */
 const OFFLINE_AFTER = 60;
@@ -66,8 +72,10 @@ async function boot() {
     scene.settings.blood = s.blood;
     scene.settings.cinematics = s.cinematics;
   };
+  /** Up while the main menu is: the fight waits, and nothing is saved (time away is settled when you play). */
+  let atMenu = !SKIP_MENU;
   const save = () => {
-    if (resetting) return;
+    if (resetting || atMenu) return;
     try {
       game.s.lastSave = Date.now();
       localStorage.setItem(SAVE_KEY, JSON.stringify(game.saveState()));
@@ -213,7 +221,7 @@ async function boot() {
 
   /** Time away: short breaks play out at full speed; longer ones pay the offline rate and say so. */
   const catchUp = (seconds: number) => {
-    if (game.demoOver()) return;
+    if (game.demoOver() || atMenu) return;
     if (seconds <= OFFLINE_AFTER) {
       for (let t = 0; t < seconds && !game.demoOver(); t += 0.2) game.update(0.2);
       game.events.length = 0;
@@ -226,16 +234,21 @@ async function boot() {
     if (o.gold.gt(0)) ui.showOffline(o);
     save();
   };
-  if (saved) {
-    const gone = (Date.now() - saved.lastSave) / 1000;
-    if (gone > 5) catchUp(gone);
-  }
-  // The demo ends on the stairs down from its last boss (or at once, if it was already over).
+  // The demo ends on the stairs down from its last boss.
   if (DEMO) {
     scene.endBefore = zoneOf(DEMO_LAST_FLOOR + 1);
     scene.onEnd = () => ui.showDemoEnd();
-    if (game.demoOver()) ui.showDemoEnd();
   }
+  /** Into the game: the time away settled, and the demo's end straight away if it's already over. */
+  const play = () => {
+    atMenu = false;
+    lastTick = Date.now();
+    if (saved) {
+      const gone = (Date.now() - saved.lastSave) / 1000;
+      if (gone > 5) catchUp(gone);
+    }
+    if (game.demoOver()) ui.showDemoEnd();
+  };
 
   // The sim runs on a fixed-step timer; rendering on rAF.
   let freeze = 0;
@@ -243,6 +256,24 @@ async function boot() {
   let timeScale = 1;
   let lastTick = Date.now();
   let acc = 0;
+  if (atMenu) {
+    const menu = new TitleMenu(document.body, game, !!saved && game.s.kills > 0, {
+      play: () => {
+        menu.close();
+        play();
+      },
+      newGame: () => {
+        resetting = true;
+        try {
+          localStorage.removeItem(SAVE_KEY);
+          sessionStorage.setItem(PLAY_NOW, '1');
+        } catch { /* ignore */ }
+        location.reload();
+      },
+      options: () => ui.openModal('settings'),
+      quit: window.deepheart ? () => window.close() : null,
+    });
+  } else play();
   setInterval(() => {
     const now = Date.now();
     const gap = (now - lastTick) / 1000;
@@ -252,7 +283,7 @@ async function boot() {
     // A long gap while visible means the computer slept.
     if (gap > OFFLINE_AFTER) return catchUp(gap);
     // The zone interlude pauses the fight (nothing is lost; it just waits). The end of the demo stops it for good.
-    if (scene.busy || game.demoOver()) return;
+    if (scene.busy || game.demoOver() || atMenu) return;
     acc += gap * SPEED * (freeze > 0 ? 0.1 : 1) * timeScale;
     while (acc >= STEP) {
       game.update(STEP);
