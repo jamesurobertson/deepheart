@@ -132,6 +132,13 @@ async function boot() {
         return false;
       }
     },
+    mainMenu: () => {
+      save();
+      try {
+        sessionStorage.removeItem(IN_GAME);
+      } catch { /* ignore */ }
+      location.reload();
+    },
     reset: () => {
       resetting = true;
       try {

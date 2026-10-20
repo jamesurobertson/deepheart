@@ -19,6 +19,8 @@ export interface UiHooks {
   exportSave: () => string;
   importSave: (text: string) => boolean;
   reset: () => void;
+  /** Back to the main menu (the run is saved first). */
+  mainMenu: () => void;
   /** You're in the kid's room (or back out of it): the dungeon waits. `awayCounts` settles the time spent like time
    *  away (not after an awakening, which starts the run over). */
   dreaming: (on: boolean, awayCounts?: boolean) => void;
@@ -788,6 +790,9 @@ export class Ui {
         if (!this.hooks.importSave(ta.value.trim())) this.toast('That save code did not work', 'close');
         break;
       }
+      case 'mainMenu':
+        this.hooks.mainMenu();
+        break;
       case 'reset':
         if (!this.resetArmed) {
           this.resetArmed = true;
@@ -2123,6 +2128,7 @@ export class Ui {
           <p class="muted">Copy your save code to move it to another browser.</p>
           <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
           <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
+          ${document.body.classList.contains('at-menu') ? '' : '<div class="set-row"><button class="btn" data-act="mainMenu">Main menu</button></div>'}
         </div>`;
     }
     if (soft && html === this.modalKey) return;
