@@ -2753,7 +2753,9 @@ export class Ui {
       <p class="de-more">More heroes wait deeper down.</p>
       <p class="de-run">You met ${heroes} hero${heroes === 1 ? '' : 'es'} and found ${cards} card${cards === 1 ? '' : 's'}.</p>
       <a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}Wishlist on Steam</a>
+      <button type="button" class="mm-btn de-menu">Main menu</button>
     </div>`;
+    el.querySelector('.de-menu')!.addEventListener('click', () => this.hooks.mainMenu());
     this.root.appendChild(el);
   }
 

@@ -1381,6 +1381,7 @@ body.dreaming #ui { visibility: hidden; }
 .de-more { margin: 0; font: 400 26px/1.2 'Jersey 10'; color: var(--text); }
 .de-run { margin: 0 0 10px; font: 400 21px/1.2 'Jersey 10'; color: var(--dim); }
 .demo-end .btn { text-decoration: none; display: inline-flex; align-items: center; }
+.demo-end .mm-btn + .mm-btn { margin-top: 4px; }
 body.demo-over .hint, body.demo-over .tip { display: none !important; }
 @keyframes de-in { from { opacity: 0; } }
 @keyframes de-beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.12); } 30% { transform: scale(1); } }
