@@ -1367,7 +1367,7 @@ body.compact .cr-logo { font-size: 15px; }
 body.dreaming #ui { visibility: hidden; }
 
 /* The end of the demo, over the black the stairs fade to. */
-.demo-end { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px calc(16px + var(--safe-r)) 24px calc(16px + var(--safe-l));
+.demo-end { pointer-events: auto; cursor: default; position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px calc(16px + var(--safe-r)) 24px calc(16px + var(--safe-l));
   background: radial-gradient(ellipse at 50% 45%, #1e0f14, #000 70%); }
 .de-in { animation: de-in 1.2s ease-out both; display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 560px; text-align: center; }
 .de-heart { color: #e8455f; filter: drop-shadow(0 0 18px rgba(232, 69, 95, 0.6)); animation: de-beat 1.4s ease-in-out infinite; }
@@ -1439,4 +1439,8 @@ body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticke
 /* Phones and narrow windows: the menu over the stairs, which dim behind it. */
 @media (max-width: 760px) {
   .mm-panel { width: 100%; padding: 32px max(24px, calc(16px + var(--safe-l))); background: rgba(8, 4, 6, 0.72); }
+}
+/* Portrait (a phone held upright): the menu along the top, the stairway below it. */
+@media (orientation: portrait) {
+  .mm-panel { width: 100%; justify-content: flex-start; padding-top: calc(28px + var(--safe-t)); background: linear-gradient(180deg, rgba(8, 4, 6, 0.95) 50%, rgba(8, 4, 6, 0) 64%); }
 }

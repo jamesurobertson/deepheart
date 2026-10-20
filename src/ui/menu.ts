@@ -59,8 +59,8 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 export class TitleMenu {
   private el: HTMLElement;
   private stairs: Stairs;
-  /** The menu is laid out for a 760 px tall window and scaled to the real one. */
-  private fit = () => this.el.style.setProperty('--mm-scale', String(Math.min(1.6, Math.max(0.85, innerHeight / 760))));
+  /** The menu is laid out for a 600 × 760 px space and scaled to fit the real window (a phone's width included). */
+  private fit = () => this.el.style.setProperty('--mm-scale', String(Math.min(1.6, Math.max(0.6, Math.min(innerHeight / 760, innerWidth / 600)))));
   private game: Game;
   private hasRun: boolean;
   private hooks: MenuHooks;
@@ -192,8 +192,10 @@ class Stairs {
     const tiles = spriteFrames('wall_mid');
     const floor = spriteFrames('floor_1');
     if (!tiles || !floor) return;
-    // Drawn in sprite pixels at a whole-number scale, so the tiles stay crisp.
-    const S = Math.max(2, Math.round(h / 210));
+    // Drawn in sprite pixels at a whole-number scale, so the tiles stay crisp. A portrait screen (a phone) has the menu
+    // on top and the stairway below it, scaled to the width.
+    const portrait = h > w;
+    const S = Math.max(2, Math.round(portrait ? w / 170 : h / 210));
     const W = Math.ceil(w / S);
     const H = Math.ceil(h / S);
     const g = this.ctx;
@@ -211,10 +213,11 @@ class Stairs {
     g.fillRect(0, 0, W, H);
 
     // The stairway: a landing on the left, then steps down to the bottom right corner.
-    const run = 22;
+    // (Torches and their light sit high enough to clear the tallest heroes on the landing.)
+    const run = 28;
     const rise = 12;
-    const landX = Math.round(W * 0.44);
-    const landY = Math.round(H * 0.5);
+    const landX = Math.round(W * (portrait ? 0.08 : 0.44));
+    const landY = Math.round(H * (portrait ? 0.68 : 0.5));
     const steps = Math.ceil((W - landX) / run) + 1;
     const stepX = (k: number) => landX + 36 + (k - 1) * run;
     const stepY = (k: number) => landY + k * rise;
@@ -250,27 +253,28 @@ class Stairs {
       // (Over the landing and the first steps: further left they'd sit behind the logo on narrower screens.)
       for (const tx of [landX + 30, landX + 112]) {
         const f = flame.frames[Math.floor(this.t * 8 + tx) % flame.frames.length];
-        const light = g.createRadialGradient(tx + 8, landY - 34, 0, tx + 8, landY - 34, 46);
+        const light = g.createRadialGradient(tx + 8, landY - 50, 0, tx + 8, landY - 50, 46);
         light.addColorStop(0, 'rgba(255, 170, 80, 0.35)');
         light.addColorStop(1, 'rgba(255, 120, 40, 0)');
         g.globalCompositeOperation = 'lighter';
         g.fillStyle = light;
-        g.fillRect(tx - 40, landY - 80, 96, 96);
+        g.fillRect(tx - 40, landY - 96, 96, 96);
         g.globalCompositeOperation = 'source-over';
         g.filter = 'grayscale(1) sepia(1) saturate(5) hue-rotate(-18deg) brightness(1.2)';
-        g.drawImage(flame.img, f.x, f.y, f.w, f.h, tx, landY - 48, f.w, f.h);
+        g.drawImage(flame.img, f.x, f.y, f.w, f.h, tx, landY - 64, f.w, f.h);
         g.filter = 'none';
       }
     }
 
-    // The party on the steps, two to a step, the leader lowest; each idles on its own beat.
+    // The party on the steps, three to a step (the whole roster fits on screen), the leader lowest; each idles on its
+    // own beat.
     this.party.forEach((p, i) => {
       if (!p.frames) return;
-      const k = Math.floor((this.party.length - 1 - i) / 2);
-      const side = (this.party.length - 1 - i) % 2;
+      const k = Math.floor((this.party.length - 1 - i) / 3);
+      const side = (this.party.length - 1 - i) % 3;
       const f = p.frames.frames[Math.floor((this.t + p.phase) * 6) % p.frames.frames.length];
-      const x = (k === 0 ? landX + 8 : stepX(k) + 2) + side * 9;
-      const y = stepY(k) + 1 - f.h + side * 0;
+      const x = (k === 0 ? landX + 6 : stepX(k) + 1) + side * 8;
+      const y = stepY(k) + 1 - f.h;
       g.fillStyle = 'rgba(0, 0, 0, 0.35)';
       g.fillRect(x + 2, stepY(k), f.w - 4, 2);
       g.drawImage(p.frames.img, f.x, f.y, f.w, f.h, x, y, f.w, f.h);
