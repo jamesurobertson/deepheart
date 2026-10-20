@@ -144,8 +144,8 @@ export class TitleMenu {
   }
 }
 
-/** The stairway beside the full game's menu: a wall of dungeon bricks, steps going down to the right into a red glow
- *  with something's eyes at the bottom, torches, and your party standing on the steps in pairs. */
+/** The stairway beside the full game's menu: a wall of dungeon bricks, steps going down to the right into a red glow,
+ *  torches, and your party standing on the steps in pairs. */
 class Stairs {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -229,7 +229,7 @@ class Stairs {
       g.fillRect(x, y + 5, 2, rise - 5);
     }
 
-    // Something waits at the bottom, in the red.
+    // Down at the bottom, the red.
     const glow = g.createRadialGradient(W, H, 0, W, H, Math.max(W, H) * 0.65);
     const pulse = 0.5 + 0.08 * Math.sin(this.t * 2.2);
     glow.addColorStop(0, `rgba(255, 70, 45, ${pulse})`);
@@ -239,18 +239,6 @@ class Stairs {
     g.fillStyle = glow;
     g.fillRect(0, 0, W, H);
     g.globalCompositeOperation = 'source-over';
-    // Its eyes, low in the dark, shut now and then.
-    const blink = this.t % 5.2 > 5.05;
-    if (!blink) {
-      const ex = W - 46;
-      const ey = H - 26;
-      g.shadowColor = 'rgba(255, 60, 40, 0.9)';
-      g.shadowBlur = 6;
-      g.fillStyle = '#ff5a3c';
-      g.fillRect(ex, ey, 3, 2);
-      g.fillRect(ex + 9, ey, 3, 2);
-      g.shadowBlur = 0;
-    }
 
     // Torches on the wall above the landing (the sheet's one flame is the sewers' green: warmed to torchlight).
     const flame = spriteFrames('sewer_flame');

@@ -32,11 +32,18 @@ const TEST_STATE = import.meta.env.DEV ? params.get('state') : null;
 const PLAYTEST = location.pathname.startsWith('/dev-deepheart/');
 const SLOT = params.get('slot') ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
 const SAVE_KEY = 'deepheart-save' + (SLOT ? `:${SLOT}` : '');
-// The game opens on its main menu, except a test run (?slot=, ?state=), ?menu=0, or straight after the menu's own New
-// Game (which wipes the save and reloads).
-const PLAY_NOW = 'deepheart-play-now';
-const SKIP_MENU = params.get('menu') === '0' || (import.meta.env.DEV && (params.has('slot') || !!TEST_STATE)) || sessionStorage.getItem(PLAY_NOW) === '1';
-sessionStorage.removeItem(PLAY_NOW);
+// The game opens on its main menu once a visit: a refresh after you've started playing (or the menu's own New Game,
+// which wipes the save and reloads) goes straight back in, as do test runs (?slot=, ?state=) and ?menu=0. Closing the
+// tab (or the desktop app) and coming back opens the menu again.
+const IN_GAME = 'deepheart-in-game';
+const inGame = () => {
+  try {
+    return sessionStorage.getItem(IN_GAME) === '1';
+  } catch {
+    return false;
+  }
+};
+const SKIP_MENU = params.get('menu') === '0' || (import.meta.env.DEV && (params.has('slot') || !!TEST_STATE)) || inGame();
 const STEP = 1 / 30;
 /** Away (tab hidden or closed) longer than this counts as offline: paid at the offline rate, with a summary. Shorter is played out at full speed. */
 const OFFLINE_AFTER = 60;
@@ -242,6 +249,9 @@ async function boot() {
   /** Into the game: the time away settled, and the demo's end straight away if it's already over. */
   const play = () => {
     atMenu = false;
+    try {
+      sessionStorage.setItem(IN_GAME, '1');
+    } catch { /* storage unavailable: the menu just shows on every load */ }
     lastTick = Date.now();
     if (saved) {
       const gone = (Date.now() - saved.lastSave) / 1000;
@@ -266,7 +276,7 @@ async function boot() {
         resetting = true;
         try {
           localStorage.removeItem(SAVE_KEY);
-          sessionStorage.setItem(PLAY_NOW, '1');
+          sessionStorage.setItem(IN_GAME, '1');
         } catch { /* ignore */ }
         location.reload();
       },
