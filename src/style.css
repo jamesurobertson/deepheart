@@ -548,13 +548,10 @@ body.phone .ab[data-gap] { margin-top: 0; margin-left: 12px; }
 .ab.ready { border-image-source: var(--f-gold); box-shadow: 0 0 6px rgba(242, 193, 78, 0.4); }
 .ab.active { border-image-source: var(--f-gold); }
 .ab.active .ab-time { color: var(--gold-hi); }
-.ab.charging .ab-fill { background: none; }
-/* Rampage charging: its border fills clockwise. */
-.ab.charging::before {
-  content: ''; position: absolute; inset: -6px; padding: 3px; pointer-events: none;
-  background: conic-gradient(#ff5470 var(--cd, 0%), transparent 0);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
-}
+/* Rampage charging: the button fills from the bottom up, inside its frame (the corners carry the key and the %). */
+.ab.charging .ab-fill { background: linear-gradient(to top, rgba(255, 84, 112, 0.45) var(--cd, 0%), transparent 0); }
+.ab.charging .px { z-index: 1; }
+.ab.charging .ab-fill::after { content: ''; position: absolute; left: 0; right: 0; bottom: var(--cd, 0%); height: 2px; background: #ff7088; }
 .ab.charging .ab-time { color: #ff9aae; }
 .ab-key { position: absolute; left: -7px; top: -7px; min-width: 15px; padding: 1px 3px 0; background: #140e18; font: 400 13px/1 'Jersey 10'; color: var(--dim); text-align: center; box-shadow: 0 0 0 2px var(--ink); pointer-events: none; }
 .ab.locked .ab-key { display: none; }
