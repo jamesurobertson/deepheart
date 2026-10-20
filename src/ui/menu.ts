@@ -109,7 +109,7 @@ export class TitleMenu {
     const run = this.hasRun ? `<p class="mm-run">Floor ${s.floor} · ${esc(zoneName(s.floor))} · ${duration(s.playTime)}</p>` : '';
     const logo = DEMO ? `<div class="mm-stamped">${LOGO}<span class="mm-stamp">DEMO</span></div>` : LOGO;
     const play = this.hasRun ? 'Continue' : DEMO ? 'Play the Demo' : 'New Game';
-    return `<div class="mm-head">${HEART}${logo}<p class="mm-tag">A DUNGEON CLICKER</p></div>
+    return `<div class="mm-head">${HEART}${logo}<p class="mm-tag">AN IDLE DUNGEON CRAWLER</p></div>
       ${DEMO ? `<a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}Wishlist on Steam</a>` : ''}
       <nav class="mm-list">
         <button type="button" data-mm="${this.hasRun || DEMO ? 'play' : 'new'}"><span>▸</span>${play}</button>${run}

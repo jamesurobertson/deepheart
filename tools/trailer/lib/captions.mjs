@@ -74,7 +74,7 @@ function title() {
   </style>
   <div class="wrap">${heart(18)}
     <div class="name"><span class="stack"><span class="ink">DEEPHEART</span><span class="gold">DEEPHEART</span></span></div>
-    <div class="tag">A DUNGEON CLICKER</div></div>`;
+    <div class="tag">AN IDLE DUNGEON CRAWLER</div></div>`;
 }
 
 /** The close: name, the pitch, and coming soon. */
