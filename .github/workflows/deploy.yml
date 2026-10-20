@@ -30,6 +30,8 @@ jobs:
       - run: npm run build
         env:
           VITE_DEMO: ${{ github.event.repository.name == 'demo-deepheart' && '1' || '' }}
+          # Link previews point at the site they're shared from.
+          VITE_SITE_URL: https://jamesurobertson.github.io/${{ github.event.repository.name }}/
       # What actions/upload-pages-artifact does, done here: that action uses upload-artifact by tag internally, which
       # the repo's "actions must be pinned to a commit" rule refuses.
       - run: tar --dereference --hard-dereference --directory dist -cvf "$RUNNER_TEMP/artifact.tar" .
