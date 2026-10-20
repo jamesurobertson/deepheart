@@ -1,0 +1,13 @@
+{
+  "name": "deepheart-trailer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "cd ../.. && npx vite --port 5199",
+    "record": "node record.mjs",
+    "cut": "node cut.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.43.1"
+  }
+}
