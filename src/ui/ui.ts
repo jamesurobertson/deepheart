@@ -2120,10 +2120,9 @@ export class Ui {
             return `<button class="cur ${open ? '' : 'locked'} ${s.cursor === c.id ? 'on' : ''}" data-cursor="${c.id}" data-tip="cur:${c.id}">${spriteFit(spr, 36)}${open ? '' : `<span class="cur-lock">${G.lock()}</span>`}</button>`;
           }).join('')}</div>
           <h3>Save</h3>
-          <p class="muted">The game saves itself every few seconds. Copy your save code to move it to another browser.</p>
+          <p class="muted">Copy your save code to move it to another browser.</p>
           <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
           <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
-          <p class="credits muted">Art: 0x72 DungeonTileset II, Superdark, Omniboy, Zoltan Kosina, Niji, AnriTool, DevWizard · Sounds: Kenney · Music: Juhani Junkala, Memoraphile, Wolfgang_, Zane Little, The Art Bros, Jonathan So (all CC0)</p>
         </div>`;
     }
     if (soft && html === this.modalKey) return;

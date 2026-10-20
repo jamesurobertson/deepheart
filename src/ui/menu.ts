@@ -138,7 +138,6 @@ export class TitleMenu {
         <h2>Credits</h2>
         <p class="mm-by">Deepheart by James Robertson. All art, sound and music are CC0: thank you to everyone who made them free.</p>
         ${sections}
-        <p class="mm-by">The Rainbow Vault theme is made by the game's own script.</p>
         <button type="button" class="mm-btn" data-mm="main">Back</button>
       </div>`;
   }
