@@ -398,6 +398,7 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 }
 .pop.p-crit { font-size: 52px; color: var(--gold-hi); animation-duration: 1.2s; z-index: 3; }
 .pop.p-crit::after { content: '!'; }
+.pop.p-arc { animation: none; }
 .pop.p-fever { color: #ff9aae; font-size: 38px; z-index: 2; }
 .pop.p-dps { font-size: 22px; color: #d8cfe6; animation-name: popdps; animation-duration: 0.8s; }
 .pop.p-cleave { font-size: 20px; color: #ffd0c8; opacity: 0.9; }

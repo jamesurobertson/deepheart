@@ -26,6 +26,10 @@ export interface UiHooks {
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
 const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', soulstorm: 'Soul Storm!', vault: 'Rainbow Vault!', rainbow: 'Rainbow Haul!' };
 const MAX_POPS = 90;
+/** Hits on one monster less than this many seconds apart are a streak; from the ARC_FROM-th hit of a streak on, its
+ *  numbers arc out of the monster away from your hero, each landing a little further out, fanning into a rainbow. */
+const STREAK_GAP = 0.25;
+const ARC_FROM = 3;
 const RARITY_COLORS = ['#c9b8a0', '#5fa8ff', '#c77dff', '#ffb13d'];
 
 /** Little colored labels for boss modifiers. */
@@ -121,6 +125,8 @@ export class Ui {
   private tipKey: string | null = null;
   private tipAnchor: HTMLElement | null = null;
   private pops: HTMLElement[] = [];
+  /** Per monster: when it was last hit and how many hits its streak has run to. */
+  private streaks = new Map<number, { at: number; n: number }>();
   private coins = 0;
   private bars = new Map<number, HTMLElement>();
   /** Gold on the counter, easing toward the real bank. */
@@ -826,7 +832,12 @@ export class Ui {
         if (!g.s.settings.numbers && ev.kind !== 'crit' && ev.kind !== 'autoCrit') break;
         const s = this.scene.screenOf(ev.id);
         if (!s) break;
-        if (ev.kind === 'dps') this.pop(s.x + (Math.random() - 0.5) * 30, s.y + s.h * 0.2, fmt(ev.amount), 'p-dps');
+        const streak = ev.kind === 'dps' ? 0 : this.streak(ev.id);
+        if (streak >= ARC_FROM) {
+          const hero = this.scene.heroScreen(g);
+          const kind = ev.kind === 'autoCrit' ? 'crit' : ev.kind === 'auto' ? 'cleave' : ev.kind;
+          this.arcPop(s.x, s.y + s.h * 0.25, fmt(ev.amount), `p-${kind}`, hero && hero.x > s.x ? -1 : 1, streak - ARC_FROM);
+        } else if (ev.kind === 'dps') this.pop(s.x + (Math.random() - 0.5) * 30, s.y + s.h * 0.2, fmt(ev.amount), 'p-dps');
         else if (ev.kind === 'cleave' || ev.kind === 'auto') this.pop(s.x + (Math.random() - 0.5) * 40, s.y + s.h * 0.3, fmt(ev.amount), 'p-cleave');
         else if (ev.kind === 'autoCrit') this.pop(s.x + (Math.random() - 0.5) * 40, s.y + s.h * 0.25, fmt(ev.amount), 'p-crit');
         // Pop classes are prefixed so they can't collide with HUD classes (the Rampage meter is .fever).
@@ -1028,8 +1039,25 @@ export class Ui {
     el.classList.add('bump');
   }
 
-  private pop(x: number, y: number, text: string, kind: string) {
+  /** Counts a hit into its monster's streak and returns the streak's length so far. */
+  private streak(id: number) {
+    const now = performance.now() / 1000;
+    const last = this.streaks.get(id);
+    const n = last && now - last.at < STREAK_GAP ? last.n + 1 : 1;
+    this.streaks.set(id, { at: now, n });
+    if (this.streaks.size > 40) for (const [k, v] of this.streaks) if (now - v.at > STREAK_GAP) this.streaks.delete(k);
+    return n;
+  }
+
+  /** A pop element, new or the oldest one recycled (stopping any arc it was flying). */
+  private takePop() {
     const el = this.pops.length >= MAX_POPS ? this.pops.shift()! : document.createElement('div');
+    el.getAnimations().forEach((a) => a.cancel());
+    return el;
+  }
+
+  private pop(x: number, y: number, text: string, kind: string) {
+    const el = this.takePop();
     el.className = `pop ${kind}`;
     el.textContent = text;
     el.style.left = `${x + (kind === 'p-dps' ? 0 : (Math.random() - 0.5) * 20)}px`;
@@ -1038,6 +1066,34 @@ export class Ui {
     this.el.pops.appendChild(el);
     this.pops.push(el);
     el.onanimationend = () => {
+      el.remove();
+      const i = this.pops.indexOf(el);
+      if (i >= 0) this.pops.splice(i, 1);
+    };
+  }
+
+  /** A number thrown out of a monster in a high arc (up, over and down past where it started), toward `dir` (±1). The
+   *  `k`-th number of a streak lands a little further out than the one before, so a fast streak fans out. */
+  private arcPop(x: number, y: number, text: string, kind: string, dir: number, k: number) {
+    const el = this.takePop();
+    el.className = `pop ${kind} p-arc`;
+    el.textContent = text;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    this.el.pops.appendChild(el);
+    this.pops.push(el);
+    const reach = dir * (46 + (k % 6) * 20 + Math.random() * 10);
+    const rise = 74 + (k % 3) * 14;
+    const fall = 46;
+    const frames = Array.from({ length: 13 }, (_, i) => {
+      const t = i / 12;
+      const scale = t < 0.1 ? 0.5 + t * 6.5 : 1.15 - Math.min(1, t) * 0.3;
+      return {
+        transform: `translate(calc(-50% + ${reach * t}px), calc(-50% + ${-4 * rise * t * (1 - t) + fall * t * t}px)) scale(${scale})`,
+        opacity: t < 0.08 ? t / 0.08 : t > 0.75 ? (1 - t) / 0.25 : 1,
+      };
+    });
+    el.animate(frames, { duration: 850, fill: 'forwards' }).onfinish = () => {
       el.remove();
       const i = this.pops.indexOf(el);
       if (i >= 0) this.pops.splice(i, 1);
