@@ -10,9 +10,11 @@ permissions:
   pages: write
   id-token: write
 
+# Deploys queue rather than cancel: a deploy cancelled part way leaves Pages thinking it's still running, and it then
+# refuses every deploy after it.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
