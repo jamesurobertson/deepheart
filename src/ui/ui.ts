@@ -44,10 +44,11 @@ const COIN_MAGNET = 110;
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-function icon(i: Icon, box = 36): string {
+/** `badge`: the tier's numeral in the corner (left off in tooltips, which sit beside the badged icon already). */
+function icon(i: Icon, box = 36, badge = true): string {
   // Two companions (a synergy): side by side, a little overlapped.
   if (i.sub) return `<span class="ico pair">${charFit(i.sprite, box * 0.8)}${charFit(i.sub, box * 0.8)}</span>`;
-  const tier = i.tier !== undefined ? `<b class="tier" style="--tc:${TIER_COLORS[i.tier]}">${ROMAN[i.tier]}</b>` : '';
+  const tier = badge && i.tier !== undefined ? `<b class="tier" style="--tc:${TIER_COLORS[i.tier]}">${ROMAN[i.tier]}</b>` : '';
   return `<span class="ico">${spriteFit(i.sprite, box)}${tier}</span>`;
 }
 
@@ -1924,7 +1925,7 @@ export class Ui {
       if (!u) return '';
       const cost = g.upgCost(u);
       const forSkill = u.needs ? `${ABILITY_BY_ID.get(u.needs)!.name} upgrade` : 'upgrade';
-      return `<div class="tt-h">${icon(u.icon, 32)}<b>${esc(u.name)}</b><span class="tt-own">${forSkill}</span></div>
+      return `<div class="tt-h">${icon(u.icon, 32, false)}<b>${esc(u.name)}</b><span class="tt-own">${forSkill}</span></div>
         <div class="tt-cost">${gold(cost, g.s.gold.gte(cost) ? 'ok' : 'no')}</div>
         ${ABILITY_BY_UPGRADE.has(u.id) ? `<p class="tt-gain">Unlocks ${esc(ABILITY_BY_UPGRADE.get(u.id)!.name)}</p>` : ''}
         <p class="tt-d">${esc(u.desc)}</p>${this.upgPreview(u)}${u.flavor ? `<p class="tt-flavor">${esc(u.flavor)}</p>` : ''}`;
@@ -1948,7 +1949,7 @@ export class Ui {
     }
     if (kind === 'tro') {
       const t = TROPHIES.find((x) => x.id === id)!;
-      return `<div class="tt-h">${icon(t.icon, 32)}<b>${esc(t.name)}</b><span class="tt-own">${g.hasTrophy(id) ? 'unlocked' : 'locked'}</span></div><p class="tt-d">${esc(t.desc)}</p>`;
+      return `<div class="tt-h">${icon(t.icon, 32, false)}<b>${esc(t.name)}</b><span class="tt-own">${g.hasTrophy(id) ? 'unlocked' : 'locked'}</span></div><p class="tt-d">${esc(t.desc)}</p>`;
     }
     if (kind === 'card') {
       const c = CARD_BY_ID.get(id)!;
