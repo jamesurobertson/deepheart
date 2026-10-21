@@ -117,10 +117,11 @@ const meetWait = Math.max(...meetTimes.slice(1).map((x, i) => x - meetTimes[i]))
 const ms: Milestone[] = [
   { name: 'First wall (a boss you fail)', window: '5m–25m', result: t(firstWall), status: within(firstWall, 5 * 60, 25 * 60) },
   { name: 'Deepest floor at 1h', window: '30–60', result: String(floorAt1h), status: floorAt1h >= 30 && floorAt1h <= 60 ? 'PASS' : 'FAIL' },
-  { name: 'First ascent', window: '1h30m–3h', result: t(firstAscent), status: within(firstAscent, 1.5 * H, 3 * H) },
+  // (Bosses became walls in October 2026, at the cost of a slower first climb: these three windows moved with it.)
+  { name: 'First ascent', window: '2h–4h30m', result: t(firstAscent), status: within(firstAscent, 2 * H, 4.5 * H) },
   { name: 'Companions met by the first ascent', window: '16–19', result: String(metAtFirstAscent ?? 'no ascent'), status: metAtFirstAscent !== null && metAtFirstAscent >= 16 && metAtFirstAscent <= 19 ? 'PASS' : 'FAIL' },
-  { name: 'All 24 companions met', window: '5h–8h', result: t(allMet), status: reach(allMet, 8 * H) ? 'REPORT' : within(allMet, 5 * H, 8 * H) },
-  { name: 'Longest wait for a new companion', window: 'under 80m', result: allMet === null ? 'party not complete' : played(meetWait), status: allMet !== null && meetWait < 80 * 60 ? 'PASS' : reach(allMet, 8 * H) ? 'REPORT' : 'FAIL' },
+  { name: 'All 24 companions met', window: '6h–10h', result: t(allMet), status: reach(allMet, 10 * H) ? 'REPORT' : within(allMet, 6 * H, 10 * H) },
+  { name: 'Longest wait for a new companion', window: 'under 2h', result: allMet === null ? 'party not complete' : played(meetWait), status: allMet !== null && meetWait < 2 * H ? 'PASS' : reach(allMet, 10 * H) ? 'REPORT' : 'FAIL' },
   { name: `Every card can drop (floor ${ALL_CARDS_FLOOR})`, window: '5h–10h', result: t(allCardsAt), status: reach(allCardsAt, 10 * H) ? 'REPORT' : within(allCardsAt, 5 * H, 10 * H) },
   { name: 'First awakening', window: '5h–10h', result: !AWAKEN_ON ? 'switched off' : firstAwaken === null ? t(firstAwaken) : `${t(firstAwaken)} (${ascentsToAwaken} ascents)`, status: !AWAKEN_ON || reach(firstAwaken, 10 * H) ? 'REPORT' : within(firstAwaken, 5 * H, 10 * H) },
   { name: 'Third layer opens', window: '100h–150h', result: 'not built yet', status: 'REPORT' },

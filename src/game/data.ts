@@ -446,7 +446,7 @@ function traitEffect(kind: string, comp: number): { effect: Effect; desc: string
   if (kind === 'party') return { effect: { t: 'party', mult: 1.5 }, desc: 'Every companion deals +50% damage.' };
   if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.05 }, desc: "Clicks also deal +5% of your party's damage." };
   if (kind === 'gold') return { effect: { t: 'gold', pct: 0.5 }, desc: 'Monsters drop +50% gold.' };
-  if (kind === 'boss') return { effect: { t: 'boss', pct: 0.5 }, desc: '+50% damage to bosses.' };
+  if (kind === 'boss') return { effect: { t: 'boss', pct: 0.25 }, desc: '+25% damage to bosses.' };
   if (kind === 'blade') return { effect: { t: 'auto', add: 1 }, desc: 'Phantom Blade +1/s.' };
   if (kind.startsWith('critx')) return { effect: { t: 'crit', add: num }, desc: `Crit damage +${num}×.` };
   if (kind.startsWith('crit')) return { effect: { t: 'crit', chance: num / 100 }, desc: `Crit chance +${num}%.` };

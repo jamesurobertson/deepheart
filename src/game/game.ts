@@ -13,7 +13,7 @@ export { COST_GROWTH };
 const costPows: Decimal[] = [];
 const costPow = (k: number) => (costPows[k] ??= Decimal.pow(COST_GROWTH, k));
 /** Kills needed to clear a normal floor. */
-export const FLOOR_KILLS = 25;
+export const FLOOR_KILLS = 20;
 /** A boss guards every Nth floor. */
 export const BOSS_EVERY = 5;
 const BOSS_TIME = 30;
@@ -135,7 +135,7 @@ export const DESCEND_FLOOR = 100;
  *   A floor's health and gold are shared across its 25 monsters.
  * - Each awakening needs `awakenStep` more floors than the last; `heartGrowth` steepens Heart power costs.
  */
-export const TUNE = { bossHp: 8, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.56, deepGold: 1.15, soulDigits: 17, soulExp: 0.35, soulPower: 1, stoneSouls: 1, stoneExp: 0.37, fury: FURY, deepHp: 1.145, deepFrom: 100, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
+export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.56, deepGold: 1.15, soulDigits: 17, soulExp: 0.35, soulPower: 1, stoneSouls: 1, stoneExp: 0.37, fury: FURY, deepHp: 1.145, deepFrom: 100, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
 
 /** How gold on the floor reached the bank: picked up, left too long, swept up leaving the floor, or flown up when
  *  a rainbow portal opens. */
@@ -1119,7 +1119,10 @@ export class Game {
     const first = this.s.floor <= 10 ? 0.5 : this.s.floor < DESCEND_FLOOR ? 0.5 : 1;
     // Only on a boss floor you've beaten before, so a champion never stands in the way of new ground.
     const champ = this.championsOn() && this.s.floor < this.s.bestFloor && Math.random() < (this.debugCards ? 0.34 : CHAMP_BOSS_CHANCE);
-    const hp = floorHp(this.s.floor).times(TUNE.bossHp * zone * first * (giant ? 1 + 2 * bite : 1) * (champ ? CHAMP_BOSS_HP : 1));
+    // Bosses toughen over the first floors (from bossHpFrom to bossHp by floor bossRamp): the opening stays gentle, and
+    // further down they're the walls you go back and grow stronger for.
+    const toughness = TUNE.bossHpFrom + (TUNE.bossHp - TUNE.bossHpFrom) * Math.min(1, (this.s.floor - 1) / TUNE.bossRamp);
+    const hp = floorHp(this.s.floor).times(toughness * zone * first * (giant ? 1 + 2 * bite : 1) * (champ ? CHAMP_BOSS_HP : 1));
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, champ, ...this.spot(true) };
     this.monsters.push(m);
     let time = BOSS_TIME + 5 * this.curseTier('fuse') + Math.min(30, 3 * this.relic('time'));
