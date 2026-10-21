@@ -435,11 +435,12 @@ class Stairs {
     }
   }
 
-  /** Your hero, free on the stairs. Each step is a ledge running off the right edge of the screen: walk along it (and off
-   *  either end), jump up through the one above and land on it, drop (↓) through to the one below. The DEMO stamp and the Wishlist button are ledges too, just in reach of a jump from the very end of the landing. Walk off
-   *  the end of a ledge (the top of the landing, or the screen's edge) and they fall into the dark, and the next in
-   *  line takes over (until nobody's left: they're back next time the menu opens). A click walks them to where you clicked,
-   *  hopping up and dropping down through the steps (and off the DEMO stamp) to the one at that height. */
+  /** Your hero, free on the stairs. Each step is a ledge running to the right edge of the screen, which is a wall: walk
+   *  along it, jump up through the one above and land on it, drop (↓) through to the one below. The DEMO stamp and the
+   *  Wishlist button are ledges too, just in reach of a jump from the very end of the landing. Walk off the top of the
+   *  landing (or a menu element) and they fall into the dark, and the next in line takes over (until nobody's left:
+   *  they're back next time the menu opens). A click walks them to where you clicked, hopping up and dropping down
+   *  through the steps (and off the DEMO stamp) to the one at that height. */
   private leader(p: (typeof this.party)[number], from: number, landX: number, stepAt: (x: number) => number, stepY: (k: number) => number) {
     if (!p.frames) return [];
     const geo = this.geo!;
@@ -497,7 +498,7 @@ class Stairs {
     if (dir) {
       this.facing = dir;
       const step = 72 * dt;
-      let nx = clicked ? h.x + dir * Math.min(Math.abs(this.toX! - h.x), step) : Math.min(geo.W + 24, Math.max(-24, h.x + dir * step));
+      let nx = clicked ? h.x + dir * Math.min(Math.abs(this.toX! - h.x), step) : Math.min(geo.W - 16, Math.max(-24, h.x + dir * step));
       if (clicked && h.on !== null) {
         const plat = h.on >= 100 ? extras[h.on - 100] : null;
         // Off a menu element, a full jump across the gap, if one lands anywhere (the Wishlist button sits too low:
@@ -551,7 +552,6 @@ class Stairs {
     if (h.y > geo.H + 40) {
       this.flare = 1;
       const colors = colorsOf(p.frames);
-      // (From where they fell, kept on screen: off the right edge, the burst comes up at the edge.)
       const at = Math.min(geo.W - 10, Math.max(10, h.x + 8));
       for (let i = 0; i < 22; i++) {
         this.embers.push({ x: at + (Math.random() - 0.5) * 10, y: geo.H - 1, vx: (Math.random() - 0.5) * 70, vy: -(70 + Math.random() * 110), life: 0.6 + Math.random() * 0.5, color: colors[Math.floor(Math.random() * colors.length)] });

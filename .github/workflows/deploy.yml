@@ -52,16 +52,31 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
         continue-on-error: true
-      # Pages refuses a deploy while it still counts an earlier one as in progress, and now and then it keeps a finished
-      # one that way for good (it reported success, then blocked every deploy after it). Cancel whatever it's holding,
-      # then try once more.
+      # Pages refuses a deploy while it still counts an earlier one as in progress: one that's really still going (two
+      # pushes a minute or two apart), or now and then one it's kept that way for good (it reported success, then
+      # blocked every deploy after it). Wait up to 3 minutes for them to finish, cancel any that haven't, then try once
+      # more.
       - if: steps.deployment.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for sha in $(gh api "repos/${{ github.repository }}/deployments?environment=github-pages&per_page=5" --jq '.[].sha' | sort -u); do
-            [ "$sha" = "${{ github.sha }}" ] || gh api -X POST "repos/${{ github.repository }}/pages/deployments/$sha/cancel" || true
+          repo="${{ github.repository }}"
+          others=$(gh api "repos/$repo/deployments?environment=github-pages&per_page=5" --jq '.[].sha' | sort -u | grep -v "${{ github.sha }}" || true)
+          busy() {
+            for sha in $others; do
+              status=$(gh api "repos/$repo/pages/deployments/$sha" --jq .status 2>/dev/null || echo unknown)
+              echo "$sha: $status" >&2
+              case "$status" in
+                succeed|deployment_failed|deployment_cancelled|deployment_content_failed|deployment_lost|deployment_attempt_error) ;;
+                *) echo "$sha" ;;
+              esac
+            done
+          }
+          for i in $(seq 18); do
+            [ -z "$(busy)" ] && exit 0
+            sleep 10
           done
+          for sha in $(busy); do gh api -X POST "repos/$repo/pages/deployments/$sha/cancel" || true; done
           sleep 20
       - id: retry
         if: steps.deployment.outcome == 'failure'
