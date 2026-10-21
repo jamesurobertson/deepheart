@@ -29,6 +29,8 @@ export interface UiHooks {
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
 const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', soulstorm: 'Soul Storm!', vault: 'Rainbow Vault!', rainbow: 'Rainbow Haul!' };
 const MAX_POPS = 90;
+/** A monster's health bar turns from green to red at this share of its health left. */
+const HP_LOW = 0.3;
 /** Hits on one monster less than this many seconds apart are a streak; from the ARC_FROM-th hit of a streak on, its
  *  numbers arc out of the monster away from your hero, each landing a little further out, fanning into a rainbow. */
 const STREAK_GAP = 0.25;
@@ -1283,7 +1285,9 @@ export class Ui {
       const half = m.boss ? 79 : 24;
       const x = Math.min(innerWidth - half, Math.max(half, s.x));
       bar.style.transform = `translate(${Math.round(x)}px, ${Math.round(Math.max(4, s.y - 8))}px)`;
-      (bar.firstChild as HTMLElement).style.width = `${Math.max(0, m.hp.div(m.max).toNumber()) * 100}%`;
+      const left = Math.max(0, m.hp.div(m.max).toNumber());
+      (bar.firstChild as HTMLElement).style.width = `${left * 100}%`;
+      bar.classList.toggle('low', left <= HP_LOW);
     }
     for (const [id, bar] of this.bars) if (!seen.has(id)) {
       bar.remove();

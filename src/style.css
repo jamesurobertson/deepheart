@@ -413,7 +413,8 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 /* Over the damage numbers, so a monster's health still reads under a flurry of hits. */
 .bars { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
 .hp { position: absolute; left: -22px; top: 0; width: 44px; height: 6px; background: #1a0c0e; box-shadow: 0 0 0 2px var(--ink); }
-.hp i { display: block; height: 100%; background: linear-gradient(#ff7a6a, #c8302a); }
+.hp i { display: block; height: 100%; background: linear-gradient(#8ee86a, #3e9c32); }
+.hp.low i { background: linear-gradient(#ff7a6a, #c8302a); }
 .hp.boss { left: -75px; width: 150px; height: 12px; box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px rgba(255, 220, 200, 0.35), 0 3px 10px rgba(0, 0, 0, 0.6); }
 
 /* ---------- dock ---------- */
