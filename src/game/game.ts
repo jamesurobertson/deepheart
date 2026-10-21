@@ -1301,6 +1301,28 @@ export class Game {
     return this.dps().times(SWEEP_SECONDS).gte(floorHp(this.s.floor).times(this.floorLeft() * toughest * TRASH));
   }
 
+  /** Dev only (the ?quick button): win this floor as if you'd fought it, the monsters left (or its boss) killed for all
+   *  they'd pay, and go on to the next. */
+  devClearFloor() {
+    const s = this.s;
+    const floor = s.floor;
+    // (Auto on just for this, so the win carries on down; it's put back after.)
+    const auto = s.auto;
+    this.downed = 0;
+    s.auto = true;
+    if (!this.bossFloor()) this.sweep();
+    else {
+      if (!this.monsters.some((m) => m.boss)) this.spawnBoss();
+      // (A splitting boss takes a few: each half has to die too.)
+      for (let k = 0; k < 8 && s.floor === floor; k++) {
+        const boss = this.monsters.find((m) => m.boss);
+        if (boss) this.kill(boss, 'dps');
+      }
+    }
+    s.auto = auto;
+    this.bankAllDrops();
+  }
+
   /** Clear the floor in one go: monsters on the field die as usual, the rest are paid out as if they had. */
   private sweep() {
     const s = this.s;

@@ -33,7 +33,10 @@ const PLAYTEST = location.pathname.startsWith('/dev-deepheart/');
 // ?sim=300 (dev only): play from where a nonstop player first reaches floor 300, in its own slot. It's built the first
 // time (the pacing bot plays it out, a few seconds); &fresh builds it again.
 const SIM_FLOOR = import.meta.env.DEV ? Number(params.get('sim')) || 0 : 0;
-const SLOT = params.get('slot') ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (SIM_FLOOR ? `sim-${SIM_FLOOR}` : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
+// ?quick (dev only): its own save, with a Next floor button (or N) that wins the floor you're on for everything it'd pay;
+// &fresh starts it over.
+const QUICK = import.meta.env.DEV && params.has('quick');
+const SLOT = params.get('slot') ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (SIM_FLOOR ? `sim-${SIM_FLOOR}` : null) ?? (QUICK ? 'quick' : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
 const SAVE_KEY = 'deepheart-save' + (SLOT ? `:${SLOT}` : '');
 // The game opens on its main menu once a visit: a refresh after you've started playing (or the menu's own New Game,
 // which wipes the save and reloads) goes straight back in, as do test runs (?slot=, ?state=) and ?menu=0. Closing the
@@ -46,7 +49,7 @@ const inGame = () => {
     return false;
   }
 };
-const SKIP_MENU = params.get('menu') === '0' || (import.meta.env.DEV && (params.has('slot') || !!TEST_STATE || !!SIM_FLOOR)) || inGame();
+const SKIP_MENU = params.get('menu') === '0' || (import.meta.env.DEV && (params.has('slot') || !!TEST_STATE || !!SIM_FLOOR || QUICK)) || inGame();
 const STEP = 1 / 30;
 /** Away (tab hidden or closed) longer than this counts as offline: paid at the offline rate, with a summary. Shorter is played out at full speed. */
 const OFFLINE_AFTER = 60;
@@ -81,6 +84,11 @@ async function boot() {
     save.lastSave = Date.now();
     localStorage.setItem(SAVE_KEY, JSON.stringify(save));
     console.info(`?sim: floor ${save.bestFloor} after ${hours.toFixed(1)} h of nonstop play, ${save.descents} ascents`);
+  }
+  if (QUICK && params.has('fresh')) {
+    localStorage.removeItem(SAVE_KEY);
+    params.delete('fresh');
+    history.replaceState(null, '', `?${params}`);
   }
   const saved = load();
   const game = new Game(saved ?? newSave());
@@ -251,6 +259,21 @@ async function boot() {
       }
     };
     Object.assign(window, { game, scene, ui, sfx, step });
+    if (QUICK) {
+      const next = (floors: number) => {
+        for (let k = 0; k < floors && !scene.busy; k++) game.devClearFloor();
+      };
+      const button = document.createElement('button');
+      button.textContent = 'Next floor ▸ (N)';
+      button.title = 'Win this floor for everything it pays. Shift: 10 floors.';
+      button.style.cssText = 'position:fixed;left:12px;top:132px;z-index:50;padding:6px 10px;font:14px Silkscreen,monospace;background:#2a1d14;color:#ffd27a;border:2px solid #7a5a2a;border-radius:4px;cursor:pointer';
+      button.addEventListener('pointerdown', (e) => e.stopPropagation());
+      button.addEventListener('click', (e) => next(e.shiftKey ? 10 : 1));
+      document.body.appendChild(button);
+      addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 'n' && !e.repeat && !(e.target as HTMLElement).closest('input, textarea')) next(e.shiftKey ? 10 : 1);
+      });
+    }
   }
   // Waking up: ?dream=first plays the whole reveal, ?dream=wake the short one (dev only). Saves that awakened before
   // the reveal existed see it at their next awakening.
