@@ -547,16 +547,17 @@ export interface AbilityDef {
   cooldown?: number;
 }
 
-/** In the order you're likely to meet them. Each is unlocked by buying one companion trait, and earned again every run. */
+/** In the order you're likely to meet them. Each is unlocked by buying one companion trait, and earned again every run.
+ *  Cooldowns are uneven (8, 12, 20, 25 and 30 minutes) so they drift apart: lining them all up costs real waiting. */
 export const ABILITIES: AbilityDef[] = [
   { id: 'blade', name: 'Phantom Blade', desc: 'Attacks the front monster for you, once a second.', kind: 'passive', comp: compIndex('squire'), trait: 0 },
-  { id: 'flurry', name: 'Flurry', desc: 'Clicks for you, 10 times a second, for 30s.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 5 * 60 },
+  { id: 'flurry', name: 'Flurry', desc: 'Clicks for you, 10 times a second, for 30s.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 8 * 60 },
   { id: 'crit', name: 'Critical Hits', desc: 'Your clicks and Phantom Blade can land critical hits: a 3% chance for ×2 damage. Sharp-eyed companions raise both.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
   { id: 'rampage', name: 'Rampage', desc: 'Attacks charge it. Unleash for ×2 party damage for 10s. Keep attacking for ×3.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
-  { id: 'cleave', name: 'Cleave', desc: 'Your clicks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 10 * 60 },
-  { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold for 30 seconds.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 15 * 60 },
-  { id: 'drums', name: 'War Drums', desc: '+50% crit chance.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 10 * 60 },
-  { id: 'legion', name: 'Phantom Legion', desc: 'A Phantom Blade for every monster.', kind: 'button', comp: compIndex('stormcaller'), trait: 4, dur: 30, cooldown: 15 * 60 },
+  { id: 'cleave', name: 'Cleave', desc: 'Your clicks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 12 * 60 },
+  { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold for 30 seconds.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 25 * 60 },
+  { id: 'drums', name: 'War Drums', desc: '+50% crit chance.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 20 * 60 },
+  { id: 'legion', name: 'Phantom Legion', desc: 'A Phantom Blade for every monster.', kind: 'button', comp: compIndex('stormcaller'), trait: 4, dur: 30, cooldown: 30 * 60 },
 ];
 export const ABILITY_BY_ID = new Map(ABILITIES.map((a) => [a.id, a]));
 /** The trait upgrade that unlocks an ability. */

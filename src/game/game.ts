@@ -54,8 +54,9 @@ const REVEAL_AT = 0.7;
 const FEVER_TIME = 10;
 /** Clicks a second the Squire's Flurry makes for you. */
 const FLURRY_RATE = 10;
-/** Attacks by hand that fill the Rampage meter (about 12 seconds of holding). */
-const FEVER_CLICKS = 60;
+/** Attacks by hand that fill the Rampage meter (about a minute of holding): a charge you save for a boss, not one
+ *  that's back before the last has worn off (at 60 it was up 60% of the time). */
+const FEVER_CLICKS = 300;
 /** Attacks during a Rampage that push it to its top tier, and each tier's multiplier on all your damage (the
  *  Unstoppable upgrade and the Blood Drum add to both). */
 const RAMPAGE_STEPS = [20];
@@ -1626,7 +1627,7 @@ export class Game {
     s.upgrades = [];
     s.buffs = [];
     s.fervor = 0;
-    s.cooldowns = {};
+    // Cooldowns keep running through a reset: ascending isn't a way to have every skill back at once.
     this.stash = [];
     this.vaultOn = false;
     this.vault = null;

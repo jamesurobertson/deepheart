@@ -40,6 +40,8 @@ const modChips = (mods: ModId[]) => mods.map((id) => `<em class="mod" style="--m
 const MAX_COINS = 24;
 /** How often a rare ticker line (the hints that it's all a dream) is in the running. */
 const RARE_NEWS = 0.15;
+/** The star tip waits until the pointer comes back onto a monster at least this long after someone to switch to is hired. */
+const STAR_WAIT_MS = 1000;
 /** How close your hero or the cursor has to come to a coin to pick it up (px). */
 const COIN_REACH = 52;
 /** Coins start leaning toward whoever's collecting from this far out (px). */
@@ -150,6 +152,10 @@ export class Ui {
   private hintState = '';
   /** When the current hint appeared (the hero tips time out). */
   private tourAt = 0;
+  /** When the pointer was last on a monster, and when switching heroes first became possible: the star tip waits
+   *  until you're back in the fight after hiring someone to switch to. */
+  private onMonsterAt = 0;
+  private starFrom = 0;
   /** When a clutch kill's slow motion ends (relic cards wait for it). */
   private cinemaUntil = 0;
   /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
@@ -434,6 +440,7 @@ export class Ui {
         this.fingerDown = true;
         this.heroAim = { x: e.clientX, y: e.clientY };
       }
+      if (this.scene.overMonster(e.clientX, e.clientY)) this.onMonsterAt = performance.now();
       // Hold to keep attacking (at most MANUAL_RATE a second, so there's nothing to gain from clicking faster).
       const id = this.scene.pick(e.clientX, e.clientY);
       this.game.hold = { id, x: e.clientX, y: e.clientY };
@@ -471,6 +478,7 @@ export class Ui {
       this.el.blade.hidden = !field;
       document.body.classList.toggle('blade-on', field);
       this.pointer = field ? { x: e.clientX, y: e.clientY } : null;
+      if (field && this.scene.overMonster(e.clientX, e.clientY)) this.onMonsterAt = performance.now();
       this.coinPointer = { x: e.clientX, y: e.clientY };
       this.inputAt = performance.now();
       this.mouseStale = false;
@@ -1757,6 +1765,8 @@ export class Ui {
     const upgradeRow = noUpgrades ? this.rows.findIndex((row) => row.querySelector('.trait.buy')) : -1;
     // The shop's first upgrade you can afford, until you've bought one there.
     const shopUpg = g.s.upgradesKnown.some((id) => !isTrait(id)) ? null : this.el.upgGrid.querySelector<HTMLElement>('.upg.can');
+    const starOpen = g.s.heroTips === 1 && g.s.owned.filter((n) => n > 0).length >= 2;
+    this.starFrom = starOpen ? this.starFrom || performance.now() : 0;
     if (g.s.clicks < 6) state = 'click';
     else if (g.s.owned.every((n) => n === 0) && g.s.gold.gte(g.compCost(0))) state = firstRun ? 'hire' : 'nudge';
     else if (g.abilityUnlocked('blade') && !g.s.bladeSeen) state = 'blade';
@@ -1769,7 +1779,7 @@ export class Ui {
     else if (shopUpg) state = 'shop';
     else if (firstRun && noUpgrades && g.s.owned[0] === 1 && g.s.gold.gte(g.compCost(0))) state = 'level';
     else if (g.s.fevers === 0 && g.rampageReady()) state = 'rampage';
-    else if (g.s.heroTips === 1 && g.s.owned.filter((n) => n > 0).length >= 2) state = 'star';
+    else if (starOpen && this.onMonsterAt > this.starFrom + STAR_WAIT_MS) state = 'star';
     // Hints point at the battlefield and shop, so they wait while a panel covers them.
     if (this.modal) state = '';
     if (state !== this.hintState) this.tourAt = performance.now();
