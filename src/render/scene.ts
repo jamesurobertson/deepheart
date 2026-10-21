@@ -69,6 +69,11 @@ const CLUTCH_END = 1.9;
  *  (shorter while the staircase is waiting on it), and how long that flight takes. */
 const LOOT_COLORS = [0xc9b8a0, 0x5fa8ff, 0xc77dff, 0xffb13d];
 const LOOT_WAIT = 6;
+/** A boss that outlasts its timer winds up and lunges into the party, flipping them all onto their backs; they lie
+ *  there a moment, scramble up and run for it (the floor above has them walk back in). Seconds for each part. */
+const FELL = { windup: 0.4, lunge: 0.12, flip: 0.55, lie: 0.8, rise: 0.35 };
+/** When the boss's lunge lands, in seconds from the timer running out. */
+export const FELL_HIT = FELL.windup + FELL.lunge;
 const LOOT_WAIT_STAIRS = 3.5;
 const LOOT_FLY = 0.5;
 /** Seconds a relic spends tumbling out of the boss and landing (it can't be walked over until then), and the angle
@@ -372,6 +377,9 @@ export class Scene {
   /** A pause (the loot card is up) before the staircase starts. */
   private hold: { zone: number; t: number } | null = null;
   private relicDropped = false;
+  /** The party beaten by a boss: seconds since its timer ran out, and each one's fall (when the lunge throws them, and
+   *  which way). */
+  private fall: { t: number; who: Map<number, { at: number; dir: number }> } | null = null;
   /** In the Rainbow Vault's treasure room, and the portal trip in or out of it (the game pauses during the run-up). */
   private inVaultRoom = false;
   /** The vault's chests on the floor. */
@@ -1076,6 +1084,88 @@ export class Scene {
     }
   }
 
+  /** The boss crouches, throws itself at the party and eases back; as it lands they're flipped over one by one and lie
+   *  there, dimmed. */
+  private updateFall(dt: number) {
+    const f = this.fall!;
+    const was = f.t;
+    f.t += dt;
+    const boss = [...this.mons.values()].find((v) => v.boss && v.dead < 0);
+    const standing = this.party.filter((c) => c.body.visible);
+    if (boss && standing.length) {
+      const partyX = standing.reduce((sum, c) => sum + c.body.position.x, 0) / standing.length;
+      const toward = partyX - boss.body.position.x;
+      const lunge = Math.sign(toward) * Math.min(3, Math.max(0, Math.abs(toward) - 1.5));
+      if (f.t < FELL.windup) {
+        boss.squash = 0.6 * (f.t / FELL.windup);
+        boss.inner.position.x = -lunge * 0.12 * (f.t / FELL.windup);
+      } else if (f.t < FELL_HIT) boss.inner.position.x = lunge * (-0.12 + 1.12 * ((f.t - FELL.windup) / FELL.lunge));
+      else boss.inner.position.x = lunge * Math.max(0, 1 - (f.t - FELL_HIT) / 0.6);
+    }
+    if (was < FELL_HIT && f.t >= FELL_HIT) {
+      this.addShake(0.45);
+      this.hitstop = Math.max(this.hitstop, 0.08);
+    }
+    for (const c of standing) {
+      const me = f.who.get(c.comp);
+      const u = me ? f.t - me.at : -1;
+      if (!me || u < 0) {
+        c.sprite.update(dt);
+        continue;
+      }
+      const landed = u - FELL.flip;
+      const up = landed - FELL.lie;
+      const run = up - FELL.rise;
+      if (landed < 0 || up < 0) {
+        // A backflip, thrown clear of the boss, that lands them flat with a little bounce; then they lie there, dimmed.
+        const k = Math.min(1, u / FELL.flip);
+        const lift = k < 1 ? 3.6 * k * (1 - k) : Math.max(0, Math.sin(landed * 14) * 0.1 * (1 - landed / 0.25));
+        this.pose(c, me.dir * 2.5 * Math.PI * (1 - (1 - k) ** 2), -me.dir * 0.7 * k, lift, k);
+        c.sprite.mesh.material.color.setScalar(1 - 0.45 * Math.min(1, Math.max(0, landed / 0.4)));
+      } else if (run < 0) {
+        const k = up / FELL.rise;
+        this.pose(c, (me.dir * Math.PI * (1 - k)) / 2, -me.dir * 0.7, Math.sin(k * Math.PI) * 0.25, 1 - k);
+        c.sprite.mesh.material.color.setScalar(0.55 + 0.45 * k);
+      } else {
+        // Up, and running for it: back the way they came in, off the left of the screen.
+        if (c.inner.rotation.z !== 0) {
+          c.body.position.x -= me.dir * 0.7;
+          c.inner.rotation.z = 0;
+          c.inner.position.set(0, 0, c.inner.position.z);
+          c.sprite.mesh.material.color.setScalar(1);
+        }
+        c.body.position.x -= 14 * Math.min(1, run * 4) * dt;
+        c.inner.position.y = Math.abs(Math.sin(this.time * 16)) * 0.1;
+        c.sprite.flip = true;
+        c.sprite.play(c.run);
+        c.sprite.update(dt * 1.4);
+      }
+    }
+    // The boss hops in triumph as the first of them scrambles up.
+    const firstUp = Math.min(...[...f.who.values()].map((me) => me.at)) + FELL.flip + FELL.lie;
+    if (boss && was < firstUp && f.t >= firstUp) boss.hopV = 5;
+  }
+
+  /** On the floor above, the party's themselves again (and walks back in from wherever it ran to). */
+  private endFall() {
+    for (const c of this.party) {
+      c.inner.rotation.z = 0;
+      c.inner.position.set(0, 0, c.inner.position.z);
+      c.sprite.mesh.material.color.setScalar(1);
+    }
+    this.fall = null;
+  }
+
+  /** Turn a companion `angle` about their middle, shifted `x` along and `y` up, from standing (`flat` 0) to lying on
+   *  the floor (1). (Lying on their side, half their sprite's width holds them up, less its empty edges.) */
+  private pose(c: CompView, angle: number, x: number, y: number, flat: number) {
+    const h = (c.sprite.rect.h / 16) * c.base;
+    const w = (c.sprite.rect.w / 16) * c.base;
+    const middle = h / 2 + (w * 0.34 - h / 2) * flat + y;
+    c.inner.rotation.z = angle;
+    c.inner.position.set(x + (Math.sin(angle) * h) / 2, middle - (Math.cos(angle) * h) / 2, c.inner.position.z);
+  }
+
   private endAct(c: CompView) {
     c.act = null;
     c.cd = 0.8 + Math.random() * 0.9;
@@ -1673,6 +1763,7 @@ export class Scene {
         this.sweptAt = this.time;
         break;
       case 'floor': {
+        if (this.fall) this.endFall();
         // Leaving a floor: any relic still lying there flies to the party (but not one the boss just dropped: the
         // next floor starts the moment a boss dies, and its relic waits on the floor to be picked up there).
         this.collectAllLoot(false, true);
@@ -1699,9 +1790,14 @@ export class Scene {
         this.relicDropped = false;
         break;
       }
-      case 'bossFail':
-        this.addShake(0.2);
+      case 'bossFail': {
+        const boss = [...this.mons.values()].find((v) => v.boss && v.dead < 0);
+        const bossX = boss?.body.position.x ?? Infinity;
+        const who = new Map(this.party.map((c) => [c.comp, { at: FELL_HIT + Math.random() * 0.15, dir: c.body.position.x < bossX ? 1 : -1 }]));
+        this.fall = { t: 0, who };
+        for (const c of this.party) c.act = null;
         break;
+      }
       case 'buyComp':
         this.syncParty(game);
         break;
@@ -2629,8 +2725,11 @@ export class Scene {
     const holding = (this.cine && this.cine.phase !== 'arrive') || this.trip?.phase === 'go';
     this.updateMonsters(dt, game);
     if (!holding) {
-      this.updateParty(dt, game);
-      this.updateHero(dt, game);
+      if (this.fall) this.updateFall(dt);
+      else {
+        this.updateParty(dt, game);
+        this.updateHero(dt, game);
+      }
     }
     this.updateShots(dt);
     this.updateRaiders(dt, game);

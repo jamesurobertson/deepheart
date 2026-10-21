@@ -6,7 +6,7 @@ import './style.css';
 import Decimal from 'break_infinity.js';
 import { Game, floorHp, newSave, SAVE_VERSION, type GameEvent, type SaveState } from './game/game.ts';
 import { Atlas } from './render/atlas.ts';
-import { Scene } from './render/scene.ts';
+import { FELL_HIT, Scene } from './render/scene.ts';
 import { Ui } from './ui/ui.ts';
 import { setAtlas } from './ui/px.ts';
 import { Sfx, type Track } from './audio/sfx.ts';
@@ -420,7 +420,8 @@ function playSound(sfx: Sfx, ev: GameEvent) {
     case 'vaultPick': sfx.play('awaken', { vol: 0.7, rate: 0.8 }); break;
     case 'vaultGoblin': sfx.play('kill', { vol: 0.5, rate: ev.rainbow ? 0.9 : 1.15 }); break;
     case 'chest': sfx.play(ev.rainbow ? 'jackpot' : 'treasure', { vol: ev.rainbow ? 0.9 : 0.6, jitter: ev.rainbow ? 0 : 0.06 }); break;
-    case 'bossFail': sfx.play('death', { vol: 0.6 }); break;
+    // (When the boss's lunge lands.)
+    case 'bossFail': setTimeout(() => sfx.play('death', { vol: 0.6 }), FELL_HIT * 1000); break;
     case 'buyComp': sfx.play('coins', { vol: 0.5, jitter: 0.08 }); break;
     case 'reveal': sfx.play('levelup', { vol: 0.5 }); break;
     case 'buyUpg': sfx.play('equip', { vol: 0.55, jitter: 0.05 }); break;

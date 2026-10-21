@@ -89,6 +89,9 @@ const CARD_ODDS = { monster: 100_000, boss: 25_000, champ: 10_000, champBoss: 1_
 const DPS_SHOWN_EVERY = 0.35;
 /** Seconds before the boss of a floor you're farming climbs back up. */
 const BOSS_RESPAWN = 2.5;
+/** Seconds from the boss timer running out (the party knocked flat, getting up, running for it) to falling back a
+ *  floor. */
+export const DOWNED_SECONDS = 3.4;
 /** Share of treasure goblins that are rainbow goblins. Catching one opens the Rainbow Vault a quarter of the time
  *  (always the first time); otherwise it drops a Rainbow Haul of RAINBOW_HAUL times a goblin's plunder. */
 const RAINBOW_CHANCE = 1 / 8;
@@ -473,6 +476,8 @@ export class Game {
   /** Seconds left to beat the boss, when one is up. */
   bossTime = 0;
   bossTimeMax = BOSS_TIME;
+  /** Seconds the party has left lying beaten by a boss (it does no damage meanwhile), then it falls back a floor. */
+  downed = 0;
   private seq = 1;
   private spawnT = 0;
   private sweepT = 0;
@@ -641,6 +646,7 @@ export class Game {
 
   /** Use a button ability: its buff for a while, then its cooldown (Rampage: unleash a full meter). */
   useAbility(id: AbilityId) {
+    if (this.downed > 0) return false;
     const a = ABILITY_BY_ID.get(id);
     if (id === 'rampage') return this.unleashRampage();
     if (!a || a.kind !== 'button' || !this.abilityUnlocked(id) || this.abilityCooldown(id) > 0) return false;
@@ -978,6 +984,7 @@ export class Game {
     this.monsters = [];
     this.spawnT = 0.3;
     this.bossTime = 0;
+    this.downed = 0;
     this.stash = [];
     // During the Rainbow Vault the boss waits until the vault closes.
     if (bossDelay) this.spawnT = bossDelay;
@@ -1199,6 +1206,7 @@ export class Game {
 
   /** Damage a monster; returns overflow past its death. */
   private damage(m: Monster, amount: Decimal, kind: HitKind, x?: number, y?: number): Decimal {
+    if (this.downed > 0) return new Decimal(0);
     if (m.boss) {
       amount = amount.times(this.c.parts.boss * (1 + this.relic('boss')));
       if (kind === 'dps' && m.mods.includes('armored')) {
@@ -1333,7 +1341,7 @@ export class Game {
   /** Click a monster (or, if it's gone, whatever's in front). `x, y` are screen coords for numbers. */
   click(id: number | null, x: number, y: number, auto = false, flurry = false) {
     const target = (id !== null ? this.monster(id) : undefined) ?? this.focus();
-    if (!target) return new Decimal(0);
+    if (!target || this.downed > 0) return new Decimal(0);
     if (!auto) {
       if (this.curseActive('silent')) return new Decimal(0);
       // Flurry's clicks are on top of your own, so they don't wait for the hand's cooldown.
@@ -2108,7 +2116,7 @@ export class Game {
     if (!vault && this.bossFloor() && this.bossTime > 0) {
       this.bossTime -= dt;
       if (this.bossTime <= 0) this.bossFailed();
-    }
+    } else if (this.downed > 0 && (this.downed -= dt) <= 0) this.enterFloor(Math.max(1, s.floor - 1));
 
     // Buffs.
     let expired = false;
@@ -2219,7 +2227,7 @@ export class Game {
     const f = this.s.floor;
     this.s.auto = false;
     this.events.push({ t: 'bossFail', floor: f });
-    this.enterFloor(Math.max(1, f - 1));
+    this.downed = DOWNED_SECONDS;
   }
 
   /**
