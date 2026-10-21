@@ -447,12 +447,18 @@ class Dream {
     this.binder?.close();
     this.prompt.hidden = true;
     this.box.hidden = true;
-    if (this.map.id !== 'bedroom') this.enterMap('bedroom');
+    const inRoom = this.map.id === 'bedroom';
     this.o.sleep?.();
     // A moment for the dungeon to rebuild at the top before it fills the screen.
     await this.wait(250);
     this.o.sound('descend', { vol: 0.5 });
-    await this.zoomIn(PULL_MS.back);
+    // From the bedroom the view zooms back into the playset; anywhere else (the menu's Keep playing) the waking world
+    // just fades away over the dungeon.
+    if (inRoom) await this.zoomIn(PULL_MS.back);
+    else {
+      this.el.classList.remove('in');
+      await this.wait(650);
+    }
     removeEventListener('keydown', this.onKey);
     removeEventListener('keyup', this.onKeyUp);
     removeEventListener('resize', this.fit);
