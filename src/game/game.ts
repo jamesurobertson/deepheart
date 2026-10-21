@@ -66,8 +66,10 @@ const RAMPAGE_EXTEND = 3;
 /** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
 const CLUTCH_GOLD = 1.5;
 /** Any monster that climbs the stairs has this chance of being a champion: tougher, glowing, and worth as much gold
- *  as ten ordinary monsters. None before the first ascent: the first run is hard enough. */
+ *  as ten ordinary monsters. */
 const CHAMP_CHANCE = 0.01;
+/** Champions start turning up once you reach this floor (and everywhere after it). */
+const CHAMP_FLOOR = 31;
 const CHAMP_HP = 6;
 const CHAMP_GOLD = 10;
 /** A boss on a floor you've beaten before is now and then a champion (so farming a boss floor has a jackpot):
@@ -1003,7 +1005,7 @@ export class Game {
   }
 
   championsOn() {
-    return this.s.descents > 0 || this.s.awakens > 0;
+    return this.s.bestFloor >= CHAMP_FLOOR || this.s.descents > 0 || this.s.awakens > 0;
   }
 
   private spawn() {
