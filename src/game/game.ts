@@ -1301,8 +1301,8 @@ export class Game {
     return this.dps().times(SWEEP_SECONDS).gte(floorHp(this.s.floor).times(this.floorLeft() * toughest * TRASH));
   }
 
-  /** Dev only (the ?quick button): win this floor as if you'd fought it, the monsters left (or its boss) killed for all
-   *  they'd pay, and go on to the next. */
+  /** Testing only (the ?quick button, local and on the playtest site): win this floor as if you'd fought it, the
+   *  monsters left (or its boss) killed for all they'd pay, and go on to the next. */
   devClearFloor() {
     const s = this.s;
     const floor = s.floor;
