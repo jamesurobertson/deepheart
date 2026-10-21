@@ -220,6 +220,9 @@ export interface SaveState {
   bestCleared: number;
   /** Souls banked this descent from zone bosses; paid out when you descend. */
   floorKills: number;
+  /** The kills on the deepest floor of this descent (maxFloor, not cleared yet), kept while you're back on an earlier
+   *  floor so they're still there when you return. */
+  peakKills: number;
   /** Move on as soon as a floor is cleared. */
   auto: boolean;
   /** Damage when a boss last beat you: auto retries once you're 50% stronger. */
@@ -281,7 +284,7 @@ export function newSave(): SaveState {
     v: SAVE_VERSION, gold: new Decimal(0), runGold: new Decimal(0), totalGold: new Decimal(0), kills: 0, bosses: 0, clicks: 0, crits: 0,
     owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], cycleGold: new Decimal(0), soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
-    floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, auto: true, revealed: 0,
+    floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
     relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
@@ -505,6 +508,7 @@ export class Game {
     // Saves from before awakening existed: the whole history counts as the first cycle.
     if (s.cycleBest === undefined) s.cycleBest = s.bestFloor ?? 1;
     if (s.bestCleared === undefined) s.bestCleared = (s.bestFloor ?? 1) - 1;
+    s.peakKills ??= 0;
     // Auto-hire (the Quartermaster Heart power) is gone; whoever bought it gets the heartstones back.
     if (s.heart?.quarter) {
       s.stones = (s.stones ?? 0) + 4;
@@ -917,8 +921,11 @@ export class Game {
   /** Move to a floor. `cleared`: because the last one was just cleared (the UI and scene make a moment of it). */
   private enterFloor(f: number, quiet = false, cleared = false, bossDelay = 0) {
     this.bankAllDrops();
-    this.s.floor = f;
-    this.s.floorKills = 0;
+    const s = this.s;
+    // Stepping off the deepest floor keeps its kills, and coming back to it picks them up again (its monsters respawn).
+    if (s.floor === s.maxFloor && !isBossFloor(s.floor)) s.peakKills = s.floorKills;
+    s.floor = f;
+    s.floorKills = f === s.maxFloor && !isBossFloor(f) ? Math.min(s.peakKills, FLOOR_KILLS) : 0;
     this.monsters = [];
     this.spawnT = 0.3;
     this.bossTime = 0;
@@ -1256,6 +1263,7 @@ export class Game {
     s.cycleBest = Math.max(s.cycleBest, s.floor + 1);
     if (s.floor + 1 > s.maxFloor) {
       s.maxFloor = s.floor + 1;
+      s.peakKills = 0;
       s.bestFloor = Math.max(s.bestFloor, s.maxFloor);
       this.checkCurse();
     }
@@ -1600,6 +1608,7 @@ export class Game {
     this.raid = null;
     this.scheduleRaid();
     s.maxFloor = 1;
+    s.peakKills = 0;
     this.invalidate();
     this.enterFloor(1, true);
   }
