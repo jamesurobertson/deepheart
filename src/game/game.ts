@@ -34,7 +34,7 @@ const MAX_DROPS = 40;
 const CLEAVE_BASE = 0.1;
 /** Abilities stay unlocked once found (true), or are earned again every run with their traits (false). */
 const ABILITIES_KEEP = false;
-/** Seconds between the Quartermaster's shopping trips. */
+/** Seconds between auto-buy's shopping trips. */
 const REBUY_GAP = 0.5;
 /** Ordinary monsters are a fraction of a floor's base health: many small kills. */
 export const TRASH = 0.4;
@@ -124,18 +124,20 @@ export const DESCEND_FLOOR = 100;
  *   `soulExp` is the balance point of the whole game: doubling souls must take about as many new floors as doubling
  *   damage buys, or runs bloat (too low) or collapse (too high). Balanced near
  *   (ln deepHp − α·ln deepGold) / ln deepGold, where α = (ln LEVEL_BONUS.mult / LEVEL_BONUS.every) / ln COST_GROWTH
- *   is damage bought per gold: 0.36 today. Re-derive it after changing any of those, then re-fit `soulDigits` to
+ *   is damage bought per gold: 0.61 today, putting the balance near 0.39. It sits a little below on purpose: each
+ *   run's souls carry the next one a little less far, so runs end at walls instead of feeding each other. Re-derive it after changing any of those, then re-fit `soulDigits` to
  *   log10(gold by the first ascent, ~1e20) − log10(6) / soulExp so the first ascent still pays about 5.
  * - Heartstones the same way, a level up: (every soul ever earned / `stoneSouls`)^`stoneExp` in all; an awakening pays what's new.
  * - Heart of Fury multiplies all damage by `fury` per level. Zone bosses have `zoneBoss`× the health of mid-bosses.
  * - Up to floor `deepFrom` each floor has about `hpBase`× the health of the last, past it `deepHp`×. A floor's gold
  *   starts at `goldBase` and grows `goldGrowth`× a floor, `deepGold`× past `deepFrom`. Until then gold barely outpaces
  *   health: it compounds (×1.6 against ×1.55 was ×80 by floor 140, and the first climb met the whole party in an hour). `deepFrom` sits at the way up (DESCEND_FLOOR) so ascents happen on the gentle curve: each buys a
- *   dozen or more floors instead of a handful.
+ *   dozen or more floors instead of a handful. Past it gold grows a little slower than health, so every floor deeper
+ *   costs more damage per gold: at ×1.15 against ×1.145 a player who rarely ascended flew 150 floors a run.
  *   A floor's health and gold are shared across its 25 monsters.
  * - Each awakening needs `awakenStep` more floors than the last; `heartGrowth` steepens Heart power costs.
  */
-export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.56, deepGold: 1.15, soulDigits: 17, soulExp: 0.35, soulPower: 1, stoneSouls: 1, stoneExp: 0.37, fury: FURY, deepHp: 1.145, deepFrom: 100, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
+export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.56, deepGold: 1.14, soulDigits: 17, soulExp: 0.35, soulPower: 1, stoneSouls: 1, stoneExp: 0.37, fury: FURY, deepHp: 1.145, deepFrom: 100, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
 
 /** How gold on the floor reached the bank: picked up, left too long, swept up leaving the floor, or flown up when
  *  a rainbow portal opens. */
@@ -172,7 +174,7 @@ export interface Settings {
   cinematics: boolean;
   /** Cursor skin id (see CURSORS). */
   cursor: string;
-  /** Quartermaster: rebuy upgrades you've bought before. */
+  /** Auto-buy: rebuy upgrades you've bought before. */
   autoUpg: boolean;
 }
 
@@ -188,7 +190,7 @@ export interface SaveState {
   crits: number;
   owned: number[];
   upgrades: string[];
-  /** Every upgrade ever bought, across ascents and awakenings (the Quartermaster rebuys these). */
+  /** Every upgrade ever bought, across ascents and awakenings (auto-buy rebuys these). */
   upgradesKnown: string[];
   /** Seconds left before each ability can be used again (cleared by an ascent, which earns the skills again). */
   cooldowns: Record<string, number>;
@@ -274,6 +276,8 @@ export interface SaveState {
   slain: Record<string, number>;
   /** Of those, the ones slain in each later color (by lap; index 0 is unused, plain kills are the rest). */
   slainLaps: Record<string, number[]>;
+  /** Hired the late six at their deep-floor prices (older saves are refunded and start them over). */
+  latePrices?: boolean;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
   cycleBest: number;
   /** The deepest floor you've already gathered souls from this cycle (0 after an awakening): gold earned at or above it
@@ -289,7 +293,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {},
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
@@ -513,6 +517,18 @@ export class Game {
     if (s.bestCleared === undefined) s.bestCleared = (s.bestFloor ?? 1) - 1;
     s.peakKills ??= 0;
     s.slainLaps ??= {};
+    // The six companions that wait on deep floors used to cost so little there that they arrived at level 150–400.
+    // Repriced to the gold at their floor (and stronger to match), they start over, with every gold piece paid back.
+    if (!s.latePrices) {
+      const OLD_COSTS: Record<string, number> = { wraith: 8e15, necro: 6e16, king: 7e17, angel: 8e18, ogre: 1e20, demon: 1.2e21 };
+      COMPS.forEach((c, i) => {
+        const level = s.owned?.[i] ?? 0;
+        if (!OLD_COSTS[c.id] || !level) return;
+        s.gold = new Decimal(s.gold).plus(costPow(level).minus(1).times(OLD_COSTS[c.id] / (COST_GROWTH - 1)));
+        s.owned[i] = 0;
+      });
+      s.latePrices = true;
+    }
     // Auto-hire (the Quartermaster Heart power) is gone; whoever bought it gets the heartstones back.
     if (s.heart?.quarter) {
       s.stones = (s.stones ?? 0) + 4;
@@ -618,6 +634,11 @@ export class Game {
   }
 
   /** A reward for how many times you've awakened. */
+  /** Auto-buy opens with your first ascent, when there's a whole shop to buy back. */
+  autoUpgOpen() {
+    return this.s.descents > 0 || this.s.awakens > 0;
+  }
+
   milestone(id: MilestoneId) {
     return this.s.awakens >= AWAKEN_MILESTONES.find((m) => m.id === id)!.at;
   }
@@ -2080,11 +2101,11 @@ export class Game {
       this.healShown.set(m.id, (this.healShown.get(m.id) ?? new Decimal(0)).plus(heal));
     }
 
-    // Quartermaster: rebuy what you've bought before (new upgrades stay yours to find).
+    // Auto-buy: rebuy what you've bought before (new upgrades stay yours to find).
     this.rebuyT -= dt;
     if (this.rebuyT <= 0) {
       this.rebuyT = REBUY_GAP;
-      if (s.settings.autoUpg && this.milestone('quartermaster')) this.buyAllUpgs(true);
+      if (s.settings.autoUpg && this.autoUpgOpen()) this.buyAllUpgs(true);
     }
 
     // Phantom Blade.

@@ -1731,7 +1731,7 @@ export class Ui {
       b.classList.toggle('can', can);
     });
     this.el.buyAll.hidden = !g.milestone('buyall') || affordable < 2;
-    const auto = g.milestone('quartermaster');
+    const auto = g.autoUpgOpen();
     this.el.autoUpg.hidden = !auto;
     if (auto) {
       const label = `Auto: ${g.s.settings.autoUpg ? 'on' : 'off'}`;
@@ -1927,7 +1927,7 @@ export class Ui {
     if (kind === 'shop') {
       const text = id === 'next'
         ? 'Hire up to each companion\'s next milestone, where a damage upgrade unlocks.'
-        : `Quartermaster: upgrades you've bought before buy themselves again. ${g.s.settings.autoUpg ? 'On.' : 'Off.'}`;
+        : `Auto-buy: upgrades you've bought before buy themselves again as soon as you can afford them. ${g.s.settings.autoUpg ? 'On.' : 'Off.'}`;
       return `<p class="tt-d">${text}</p>`;
     }
     if (kind === 'lvl') {

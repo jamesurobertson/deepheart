@@ -37,7 +37,8 @@ const c = (id: string, name: string, sprite: string, cost: number, dps: number, 
  *  the run alone. The first six get more per gold (Squire about 5 gold a point, falling to about 300 by the Shadow
  *  Thief) so the opening floors move; past them the climb is about hires and traits.
  *  The first eighteen carry the first climb to the way up (floor 100); the last six wait deeper, one every 45 minutes
- *  or so of the first eight hours, so every few ascents bring someone new. */
+ *  or so of the first eight hours, so every few ascents bring someone new. Those six are priced for the gold at their
+ *  floor, so each starts near level 1 and grows over the next few minutes (cheaper, they arrived at level 150–400). */
 export const COMPS: CompDef[] = [
   // Plain adventurers first; the strange and the enormous come later.
   // The first four are cheap and hit hard, so the party carries the opening and clicking is a bonus.
@@ -59,12 +60,12 @@ export const COMPS: CompDef[] = [
   c('hollow', 'Hollow Knight', 'pumpkin_dude', 2.5e13, 6e9, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.'),
   c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 2e14, 4e10, 'dark', 'Broke every vow but one: never stop swinging.'),
   c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2e11, 'bolt', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
-  c('wraith', 'Bound Wraith', 'cr_crimson_wraith', 8e15, 1e12, 'dark', 'The Heart sent it. It hums a song nobody taught it.', 105),
-  c('necro', 'Turncoat Necromancer', 'necromancer', 6e16, 5e12, 'dark', 'Used to raise these monsters. Now it lowers them.', 145),
-  c('king', 'Exiled King', 'cr_king', 7e17, 4e13, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 190),
-  c('angel', 'Fallen Angel', 'angel', 8e18, 3e14, 'fire', 'Fell from somewhere bright. Landed swinging.', 240),
-  c('ogre', 'Tamed Ogre', 'ogre', 1e20, 2.5e15, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 300, true),
-  c('demon', 'Bound Demon', 'big_demon', 1.2e21, 2e16, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 400, true),
+  c('wraith', 'Bound Wraith', 'cr_crimson_wraith', 2e19, 8e12, 'dark', 'The Heart sent it. It hums a song nobody taught it.', 95),
+  c('necro', 'Turncoat Necromancer', 'necromancer', 6e22, 7e14, 'dark', 'Used to raise these monsters. Now it lowers them.', 145),
+  c('king', 'Exiled King', 'cr_king', 1.5e24, 6e15, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 190),
+  c('angel', 'Fallen Angel', 'angel', 1e28, 6e17, 'fire', 'Fell from somewhere bright. Landed swinging.', 240),
+  c('ogre', 'Tamed Ogre', 'ogre', 3e29, 1.5e19, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 300, true),
+  c('demon', 'Bound Demon', 'big_demon', 1e32, 5e20, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 370, true),
 ];
 
 /** A companion's place in the roster, by id (so lists below don't break if the order changes). */
@@ -290,7 +291,7 @@ export const levelMult = (level: number) =>
 
 /** Each companion level costs this much more than the last (about 6 levels a floor against ×1.55 health). */
 export const COST_GROWTH = 1.075;
-/** What each companion's traits do, in order: own (×2 to them), party (+50% to every companion), click (+5% of party
+/** What each companion's traits do, in order: own (×2 to them), party (+50% to every companion), click (+2% of party
  *  damage per click), gold (+50%), boss (+50% to bosses), blade (Phantom Blade +1/s), crit2 (+2% crit chance), critx1
  *  (+1× crit damage), or skill (unlocks the ability listed in ABILITIES at that trait).
  *  Party traits multiply together, so only five companions have one, each a rallying sort (×7.6 in all; one on everyone
@@ -444,7 +445,7 @@ function traitEffect(kind: string, comp: number): { effect: Effect; desc: string
   const num = Number(kind.replace(/\D+/g, ''));
   if (kind === 'own') return { effect: { t: 'comp', comp, mult: 2 }, desc: `${COMPS[comp].name} deals ×2 damage.` };
   if (kind === 'party') return { effect: { t: 'party', mult: 1.5 }, desc: 'Every companion deals +50% damage.' };
-  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.05 }, desc: "Clicks also deal +5% of your party's damage." };
+  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.02 }, desc: "Clicks also deal +2% of your party's damage." };
   if (kind === 'gold') return { effect: { t: 'gold', pct: 0.5 }, desc: 'Monsters drop +50% gold.' };
   if (kind === 'boss') return { effect: { t: 'boss', pct: 0.25 }, desc: '+25% damage to bosses.' };
   if (kind === 'blade') return { effect: { t: 'auto', add: 1 }, desc: 'Phantom Blade +1/s.' };
@@ -475,7 +476,7 @@ function buildUpgrades(): UpgDef[] {
     out.push({ id: `clk${k}`, name, desc: 'Base click damage ×2.', cost, icon: { sprite }, effect: { t: 'click', mult: 2 }, req: { t: 'floor', n: floor } });
   });
   DPS_CLICK.forEach(([name, sprite, floor, cost], k) => {
-    out.push({ id: `cd${k}`, name, desc: 'Each click also deals +5% of your companions\' damage per second.', cost, icon: { sprite }, effect: { t: 'clickDps', pct: 0.05 }, req: { t: 'floor', n: floor } });
+    out.push({ id: `cd${k}`, name, desc: 'Each click also deals +3% of your companions\' damage per second.', cost, icon: { sprite }, effect: { t: 'clickDps', pct: 0.03 }, req: { t: 'floor', n: floor } });
   });
   PHANTOM_UPGS.forEach(([name, floor, cost, add], k) => {
     out.push({ id: `auto${k}`, name, desc: `Your Phantom Blade attacks ${add} more time${add === 1 ? '' : 's'} a second.`, cost, icon: { sprite: 'weapon_knife', tier: k + 1 }, effect: { t: 'auto', add }, req: { t: 'floor', n: floor }, needs: 'blade' });
@@ -571,7 +572,6 @@ export const UPG_BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));
 /** Rewards for awakening: the first layer, automated. */
 export const AWAKEN_MILESTONES = [
   { at: 1, id: 'buyall', name: 'Buy all', desc: 'A button that buys every upgrade you can afford.' },
-  { at: 2, id: 'quartermaster', name: 'Quartermaster', desc: "Upgrades you've bought before buy themselves again as soon as you can afford them." },
 ] as const;
 export type MilestoneId = (typeof AWAKEN_MILESTONES)[number]['id'];
 
