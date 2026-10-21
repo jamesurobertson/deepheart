@@ -859,7 +859,8 @@ export class Ui {
       }
       case 'kill': {
         const s = this.scene.screenOf(ev.id);
-        if (!s) break;
+        // (A splitting boss's body and first half pay nothing: the gold comes with the last half.)
+        if (!s || ev.gold.lte(0)) break;
         this.pop(s.x, s.y + s.h * 0.5, `+${fmt(ev.gold)}`, ev.boss || ev.champ ? 'p-gold p-big' : 'p-gold');
         if (ev.champ) this.pop(s.x, s.y - 10, 'CHAMPION!', 'p-champ');
         break;

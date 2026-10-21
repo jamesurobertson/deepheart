@@ -1175,8 +1175,12 @@ export class Game {
       this.events.push({ t: 'hit', id: m.id, amount: Decimal.max(shown, this.dps().times(DPS_SHOWN_EVERY)), kind: 'dps' });
       this.dpsShown.delete(m.id);
     }
-    const gold = this.monsterGold(m);
-    this.dropGold(gold, m);
+    // A splitting boss pays nothing until its last half falls, which drops the lot (what the body and both halves are
+    // worth).
+    const halvesLeft = m.half && this.monsters.some((x) => x.half);
+    const pays = !(m.boss && ((m.mods.includes('split') && !m.half) || halvesLeft));
+    const gold = pays ? this.monsterGold(m).times(m.half ? 3 : 1) : new Decimal(0);
+    if (pays) this.dropGold(gold, m);
     this.s.kills++;
     this.killAcc++;
     if (m.champ && !m.half) this.s.champions++;
@@ -1204,7 +1208,7 @@ export class Game {
       const firstClear = this.s.floor > this.s.bestCleared;
       let clutch: { left: number; gold: Decimal } | undefined;
       if (this.bossTime > 0 && this.bossTime <= CLUTCH_SECONDS) {
-        const bonus = gold.times(CLUTCH_GOLD - 1);
+        const bonus = this.monsterGold(m).times(CLUTCH_GOLD - 1);
         this.earn(bonus);
         if (firstWin) this.s.clutches++;
         clutch = { left: this.bossTime, gold: bonus };
