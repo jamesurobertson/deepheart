@@ -1,4 +1,4 @@
-import type { CardDef } from '../game/data.ts';
+import { cardName, type CardDef } from '../game/data.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import { cardArt, cardCanvas, spriteFrames } from './px.ts';
 
@@ -26,15 +26,17 @@ export interface BinderCard {
   kind: string;
   /** Floor tile it stands on in the big picture (its zone's floor). */
   floor: string;
-  where: string[];
+  /** Where it lives, in each color (by lap). */
+  where: string[][];
   /** Found since you last looked. */
   /** The versions that came in since you last looked, as `lap:gold` ("1:0" is a plain Corrupted copy). */
   fresh: string[];
   /** Copies in each color (by lap), plain and gold. */
   n: number[];
   gold: number[];
-  /** The first color it can come in (the later laps' newcomers have no plain copy), and whether it comes in gold. */
-  fromLap: number;
+  /** The colors it comes in (the later laps' newcomers have no plain copy, and not all the plain ones come back), and
+   *  whether it comes in gold. */
+  laps: number[];
   canGold: boolean;
   /** How you got your first one, and your first gold one: "First found on kill #1,930" or "Traded from Dan". */
   first: { plain: string; gold: string };
@@ -87,7 +89,7 @@ export class Binder {
   /** Can this card come in the color on view? */
   private exists(i: number, lap = this.lap, gold = this.gold) {
     const c = this.cards[i];
-    return lap >= c.fromLap && (!gold || c.canGold);
+    return c.laps.includes(lap) && (!gold || c.canGold);
   }
 
   /** How many of this card you have in the color on view. */
@@ -182,7 +184,7 @@ export class Binder {
   /** The color tabs across the top, each with how much of that binder you've filled, and the gold toggle. */
   private tabs() {
     const filled = (lap: number) => {
-      const can = this.cards.filter((c) => lap >= c.fromLap && (!this.gold || c.canGold));
+      const can = this.cards.filter((c) => c.laps.includes(lap) && (!this.gold || c.canGold));
       const got = can.filter((c) => ((this.gold ? c.gold : c.n)[lap] ?? 0) > 0);
       return `${got.length}/${can.length}`;
     };
@@ -234,7 +236,8 @@ export class Binder {
   /** A slot for a card that doesn't come in this binder's color: says where it does (without naming colors you haven't reached). */
   private elsewhere(c: BinderCard) {
     if (this.gold && !c.canGold) return '<i class="bnd-pocket none"><small>No gold</small></i>';
-    const from = this.colors[c.fromLap];
+    if (this.lap > c.laps[0]) return `<i class="bnd-pocket none"><small>${c.laps.length === 1 && !c.laps[0] ? 'Plain only' : 'Not in this color'}</small></i>`;
+    const from = this.colors[c.laps[0]];
     return from ? `<i class="bnd-pocket none" style="--lc:${from.tint}"><i></i><small>From ${esc(from.name)}</small></i>` : '<i class="bnd-pocket none"><small>Found deeper</small></i>';
   }
 
@@ -305,12 +308,12 @@ export class Binder {
     // One dot per color: filled if you have it (in gold, on the gold binder); tap one to see that version.
     const dots = this.colors.map((col, l) => {
       const owned = ((this.gold ? c.gold : c.n)[l] ?? 0) > 0;
-      const can = l >= c.fromLap && (!this.gold || c.canGold);
+      const can = c.laps.includes(l) && (!this.gold || c.canGold);
       return `<button class="${owned ? 'on' : ''}${l === this.lap ? ' at' : ''}" data-bd="lap" data-l="${l}" style="--lc:${col.tint}" ${can ? '' : 'disabled'} aria-label="${esc(col.name)}"></button>`;
     }).join('');
     const colorsFound = this.colors.filter((_, l) => ((this.gold ? c.gold : c.n)[l] ?? 0) > 0).length;
-    const where = c.where.length ? c.where.map((w) => `<li>${esc(w)}</li>`).join('') : '<li>Turns up anywhere</li>';
-    const title = `${this.gold ? 'Gold ' : ''}${this.lap ? `${this.colors[this.lap].name} ` : ''}${c.def.name}`;
+    const where = c.where[this.lap].length ? c.where[this.lap].map((w) => `<li>${esc(w)}</li>`).join('') : '<li>Turns up anywhere</li>';
+    const title = `${this.gold ? 'Gold ' : ''}${cardName(c.def.name, this.lap)}`;
     this.el.innerHTML = `
       <div class="bnd-detail">
         <div class="bnd-card${this.gold && n ? ' gold' : ''}${n ? '' : ' missing'}" style="--fc:${frame}">

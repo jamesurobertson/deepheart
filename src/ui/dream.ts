@@ -251,7 +251,7 @@ class Dream {
     this.o.sound('open', { vol: 0.6 });
     const { cards, colors } = this.o.binder();
     // A slot for every card in every color it comes in, and again in gold.
-    const slots = cards.flatMap((c) => colors.flatMap((_, l) => (l < c.fromLap ? [] : c.canGold ? [c.n[l], c.gold[l]] : [c.n[l]])));
+    const slots = cards.flatMap((c) => colors.flatMap((_, l) => (!c.laps.includes(l) ? [] : c.canGold ? [c.n[l], c.gold[l]] : [c.n[l]])));
     void this.say(`Your binders have ${slots.length} slots. You've filled ${slots.filter((n) => n > 0).length}.`, true);
     return new Promise<void>((resolve) => {
       this.binder = new Binder(this.screen, cards, colors, (n) => this.o.sound(n, { vol: n === 'click' ? 0.3 : n === 'drop2' ? 0.7 : 0.5 }), () => {

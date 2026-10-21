@@ -1,4 +1,4 @@
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, isTraitId, levelMult, milestoneAt, traitLevels, type AbilityId, CARDS, CARD_BY_ID, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, isTraitId, levelMult, milestoneAt, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, FLOOR_KILLS, RELICS_ON, TUNE, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -1972,19 +1972,22 @@ export class Ui {
     if (kind === 'card') {
       const c = CARD_BY_ID.get(id)!;
       const n = g.cardCount(id);
-      const slain = g.s.slain[id] ?? 0;
       const gilded = g.hasGoldCard(id);
-      const lines = c.where.filter((w) => w.floor <= g.s.bestFloor).map((w) => `<li>${esc(w.text)}</li>`).join('');
+      // In the Cards panel you're looking at one color (a lap's tint, plain or gold): where, how many and how many slain
+      // are that color's. Elsewhere, where it turns up on the lap you're on.
+      const inPanel = this.modal === 'cards';
+      const view = Math.min(this.cardLap, lapOf(g.s.bestFloor), CORRUPTION.length - 1);
+      const onLap = Math.min(lapOf(g.s.floor), CORRUPTION.length - 1);
+      const lap = inPanel ? view : c.laps.includes(onLap) ? onLap : c.laps[0];
+      const slain = inPanel ? g.slainOn(id, view) : g.s.slain[id] ?? 0;
+      const lines = c.where[lap].filter((w) => w.floor <= g.s.bestFloor).map((w) => `<li>${esc(w.text)}</li>`).join('');
       // Until you've killed one, only where to find it: not its name.
       if (!n && !g.cardMet(id)) return `<div class="tt-h"><b>???</b></div><p class="tt-d">Not met yet.</p><ul class="tt-l">${lines}</ul>`;
       const what = { monster: 'monster card', mid: 'mid-boss card', boss: 'boss card', goblin: 'goblin card' }[c.kind];
       const own = g.s.cards[id];
-      // In the Cards panel you're looking at one color (a lap's tint, plain or gold): count only that one.
-      const inPanel = this.modal === 'cards';
-      const view = Math.min(this.cardLap, lapOf(g.s.bestFloor), CORRUPTION.length - 1);
       const here = inPanel ? ((this.cardGold ? own?.gold : own?.n)?.[view] ?? 0) : n;
       const gilt = inPanel ? this.cardGold : gilded;
-      const head = `<div class="tt-h"><b style="color:${gilt && here ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${inPanel ? `${this.cardGold ? 'Gold ' : ''}${view ? `${CORRUPTION[view].name} ` : ''}` : ''}${esc(c.name)} Card</b><span class="tt-own">${here ? `×${here}${!inPanel && gilded ? ' · gold' : ''}` : what}</span></div>`;
+      const head = `<div class="tt-h"><b style="color:${gilt && here ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${inPanel && this.cardGold ? 'Gold ' : ''}${esc(cardName(c.name, inPanel ? view : 0))} Card</b><span class="tt-own">${here ? `×${here}${!inPanel && gilded ? ' · gold' : ''}` : what}</span></div>`;
       const unit = c.kind === 'goblin' ? 'catch' : 'kill';
       // When it was first found (that's the plain copy, or the first gold one), only where that's what you're looking at.
       const got = (at?: number, via?: string, what = 'your first') => (at ? `Got ${what} at ${unit} #${fmt(at)}` : via ? this.viaLine(via, ` ${what}`) : '');
@@ -2228,7 +2231,7 @@ export class Ui {
     const lapsReached = Math.min(lapOf(g.s.bestFloor), CORRUPTION.length - 1);
     const view = Math.min(this.cardLap, lapsReached);
     const gold = this.cardGold;
-    const inView = (c: (typeof CARDS)[number], lap = view) => seen(c) && lapOf(c.floor) <= lap && (!gold || c.gold);
+    const inView = (c: (typeof CARDS)[number], lap = view) => seen(c) && (c.laps.includes(lap) || owned(c, lap)) && (!gold || c.gold);
     const owned = (c: (typeof CARDS)[number], lap = view) => ((gold ? g.s.cards[c.id]?.gold : g.s.cards[c.id]?.n)?.[lap] ?? 0) > 0;
     // Where you are: a marker on your zone's row, and a dot on the cards that can drop on this floor.
     const floor = g.s.floor;
@@ -2664,9 +2667,9 @@ export class Ui {
     return {
       def: c, kind: { monster: 'Monster', mid: 'Boss', boss: 'Zone boss', goblin: 'Goblin' }[c.kind], fresh,
       floor: tiles === 'halls' ? 'floor_1' : `${tiles}_floor_1`,
-      where: c.where.filter((w) => w.floor <= g.s.bestFloor).map((w) => w.text),
+      where: c.where.map((places) => places.filter((w) => w.floor <= g.s.bestFloor).map((w) => w.text)),
       n: own ? own.n : CORRUPTION.map(() => 0), gold: own ? own.gold : CORRUPTION.map(() => 0),
-      fromLap: lapOf(c.floor), canGold: c.gold,
+      laps: c.laps, canGold: c.gold,
       first: { plain: this.firstLine(own?.at, own?.via, c.kind === 'goblin'), gold: this.firstLine(own?.goldAt, own?.goldVia, false) },
     };
   }

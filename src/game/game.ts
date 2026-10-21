@@ -272,6 +272,8 @@ export interface SaveState {
   cards: Record<string, { n: number[]; gold: number[]; at?: number; goldAt?: number; via?: string; goldVia?: string }>;
   /** Monsters slain per card id (a swept floor counts the monsters it wipes out). */
   slain: Record<string, number>;
+  /** Of those, the ones slain in each later color (by lap; index 0 is unused, plain kills are the rest). */
+  slainLaps: Record<string, number[]>;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
   cycleBest: number;
   /** The deepest floor you've already gathered souls from this cycle (0 after an awakening): gold earned at or above it
@@ -287,7 +289,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {},
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {},
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
@@ -510,6 +512,7 @@ export class Game {
     if (s.cycleBest === undefined) s.cycleBest = s.bestFloor ?? 1;
     if (s.bestCleared === undefined) s.bestCleared = (s.bestFloor ?? 1) - 1;
     s.peakKills ??= 0;
+    s.slainLaps ??= {};
     // Auto-hire (the Quartermaster Heart power) is gone; whoever bought it gets the heartstones back.
     if (s.heart?.quarter) {
       s.stones = (s.stones ?? 0) + 4;
@@ -1252,7 +1255,7 @@ export class Game {
     }
     if (s.floor !== floor || s.floorKills >= FLOOR_KILLS) return;
     const left = FLOOR_KILLS - s.floorKills;
-    for (let k = 0; k < left; k++) this.rollCard(this.slay(pickMonster(floor)), false, 'sweep');
+    for (let k = 0; k < left; k++) this.rollCard(this.slay(pickMonster(floor), floor), false, 'sweep');
     const gold = Decimal.max(1, floorGold(floor).times(TRASH)).times(this.goldMult()).ceil().times(left);
     this.earn(gold);
     s.kills += left;
@@ -1757,10 +1760,19 @@ export class Game {
   // ---------- cards ----------
 
   /** Count a kill toward its card's tally; returns the card id. */
-  private slay(def: MonsterDef) {
+  private slay(def: MonsterDef, floor = this.s.floor) {
     const id = cardId(def.name);
     this.s.slain[id] = (this.s.slain[id] ?? 0) + 1;
+    const lap = Math.min(lapOf(floor), CORRUPTION.length - 1);
+    if (lap) (this.s.slainLaps[id] ??= CORRUPTION.map(() => 0))[lap]++;
     return id;
+  }
+
+  /** Monsters of this card slain in one color (lap). */
+  slainOn(id: string, lap: number) {
+    const laps = this.s.slainLaps[id];
+    if (lap) return laps?.[lap] ?? 0;
+    return (this.s.slain[id] ?? 0) - (laps ?? []).reduce((a, n) => a + n, 0);
   }
 
   private cardRoll(odds: number) {
@@ -2172,7 +2184,7 @@ export class Game {
     this.s.kills += kills;
     // Every kill counts toward its monster's card, and rolls for it, as it would have at the keyboard.
     const before = this.events.length;
-    for (let k = 0; k < kills; k++) this.rollCard(this.slay(pickMonster(f)), false, 'sweep');
+    for (let k = 0; k < kills; k++) this.rollCard(this.slay(pickMonster(f), f), false, 'sweep');
     const cards = this.events.slice(before).filter((e): e is Extract<GameEvent, { t: 'card' }> => e.t === 'card');
     this.s.playTime += secs;
     this.s.runTime += secs;

@@ -754,9 +754,11 @@ export interface CardDef {
   kind: CardKind;
   /** Zone it's listed under (-1: the goblins). */
   zone: number;
-  /** Where it turns up, one line per place, with the first floor of that place's zone (a place is only listed once
-   *  you've reached its zone). */
-  where: { text: string; floor: number }[];
+  /** Where it turns up in each color (by lap), one line per place, with the first floor you see that place on (a
+   *  place is only listed once you've been that deep). */
+  where: { text: string; floor: number }[][];
+  /** The colors (laps) it comes in: a zone's newcomers only from Corrupted on, and only two of its first crowd come back. */
+  laps: number[];
   /** First floor of the first zone it turns up in: the card shows in the collection once you've reached that zone. */
   floor: number;
   /** Champions of this kind can drop a gold copy (every card but the goblins'). */
@@ -783,23 +785,36 @@ function mostOn(d: MonsterDef, first: number) {
 
 function buildCards(): CardDef[] {
   const out = new Map<string, CardDef>();
-  const add = (d: MonsterDef, kind: CardKind, zone: number, text: string, floor: number) => {
+  const add = (d: MonsterDef, kind: CardKind, zone: number, lap: number, text: string, floor: number) => {
     const id = cardId(d.name);
-    const known = out.get(id);
-    if (known) known.where.push({ text, floor });
-    else out.set(id, { id, name: d.name, sprite: d.sprite, tint: d.tint, kind, zone, where: [{ text, floor }], floor, gold: true });
+    const card = out.get(id) ?? { id, name: d.name, sprite: d.sprite, tint: d.tint, kind, zone, where: CORRUPTION.map(() => []), laps: [], floor, gold: true };
+    out.set(id, card);
+    card.where[lap].push({ text, floor });
+    if (!card.laps.includes(lap)) card.laps.push(lap);
+    card.floor = Math.min(card.floor, floor);
   };
   ZONES.forEach((z, i) => {
-    const a = i * 10;
-    const name = z.name.replace(/^The /, '');
-    z.band.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 1}–${a + 9}${mostOn(d, a + 1)}`, a + 1));
-    z.lap.forEach((d) => add(d, 'monster', i, `${name}, floors ${a + 81}–${a + 89}${mostOn(d, a + 81)}`, a + 81));
-    add(z.mid, 'mid', i, `Floor ${a + 5} boss`, a + 1);
-    add(z.boss, 'boss', i, `Floor ${a + 10} boss`, a + 1);
+    CORRUPTION.forEach((_, lap) => {
+      const a = i * 10 + lap * ZONES.length * 10;
+      // Places are listed once you've seen them on any lap: a zone from its plain floors, its newcomers from their first.
+      const seen = i * 10 + (lap ? 1 : 0) * ZONES.length * 10 + 1;
+      const crowd = (d: MonsterDef) => add(d, 'monster', i, lap, `${zoneName(a + 1).replace(/^The /, '')}, floors ${a + 1}–${a + 9}${mostOn(d, a + 1)}`, seen);
+      bandFor(a + 1).forEach(crowd);
+      add(z.mid, 'mid', i, lap, `Floor ${a + 5} boss`, i * 10 + 1);
+      add(z.boss, 'boss', i, lap, `Floor ${a + 10} boss`, i * 10 + 1);
+    });
   });
-  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: [], floor: 1, gold: false });
-  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: [], floor: 1, gold: false });
+  const everywhere = CORRUPTION.map((_, lap) => lap);
+  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: CORRUPTION.map(() => []), laps: everywhere, floor: 1, gold: false });
+  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: CORRUPTION.map(() => []), laps: everywhere, floor: 1, gold: false });
   return [...out.values()];
+}
+
+/** "Abyssal Skeleton", "The Abyssal Lich": a card's name in a lap's color. */
+export function cardName(name: string, lap: number) {
+  const color = lap ? CORRUPTION[lap].name : '';
+  if (!color) return name;
+  return name.startsWith('The ') ? `The ${color} ${name.slice(4)}` : `${color} ${name}`;
 }
 
 export const CARDS = buildCards();

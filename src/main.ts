@@ -205,9 +205,9 @@ async function boot() {
         const n = CORRUPTION.map(() => 0);
         const gold = CORRUPTION.map(() => 0);
         // Only colors it can come in: the later laps' newcomers have no plain copy.
-        const first = lapOf(c.floor);
+        const first = c.laps[0];
         n[first] = 1 + Math.floor(rand() * 6);
-        if (first === 0 && lapOf(depth) > 0 && rand() < 0.2) n[1] = 1;
+        if (first === 0 && c.laps.includes(1) && lapOf(depth) > 0 && rand() < 0.2) n[1] = 1;
         if (c.gold && rand() < 0.08) gold[first] = 1;
         s.cards[c.id] = { n, gold, at: 1000 + Math.floor(rand() * 90000) };
       }
