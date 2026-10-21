@@ -2042,7 +2042,7 @@ export class Ui {
         room: 'Your room: the binder, and Dan and Victor to trade with.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        blade: `Phantom Blade: attacks the front monster for you ${perSec(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades make it faster${g.abilityUnlocked('legion') ? ', and Phantom Legion splits it into a blade for every monster for a while' : ''}.`,
+        blade: `Phantom Blade: ${perSec(g.autoRate())} attack${g.autoRate() === 1 ? '' : 's'} a second.`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }
