@@ -52,10 +52,17 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
         continue-on-error: true
-      # Pages refuses a deploy while the last one is still finishing on its side (two pushes a minute or two apart):
-      # wait, then try once more.
+      # Pages refuses a deploy while it still counts an earlier one as in progress, and now and then it keeps a finished
+      # one that way for good (it reported success, then blocked every deploy after it). Cancel whatever it's holding,
+      # then try once more.
       - if: steps.deployment.outcome == 'failure'
-        run: sleep 90
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for sha in $(gh api "repos/${{ github.repository }}/deployments?environment=github-pages&per_page=5" --jq '.[].sha' | sort -u); do
+            [ "$sha" = "${{ github.sha }}" ] || gh api -X POST "repos/${{ github.repository }}/pages/deployments/$sha/cancel" || true
+          done
+          sleep 20
       - id: retry
         if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
