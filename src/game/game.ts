@@ -92,6 +92,8 @@ const BOSS_RESPAWN = 2.5;
 /** Seconds from the boss timer running out (the party knocked flat, getting up, running for it) to falling back a
  *  floor. */
 export const DOWNED_SECONDS = 3.4;
+/** And on the floor above, seconds for the party to run back in before its monsters come. */
+const REGROUP_SECONDS = 1.8;
 /** Share of treasure goblins that are rainbow goblins. Catching one opens the Rainbow Vault a quarter of the time
  *  (always the first time); otherwise it drops a Rainbow Haul of RAINBOW_HAUL times a goblin's plunder. */
 const RAINBOW_CHANCE = 1 / 8;
@@ -973,8 +975,9 @@ export class Game {
 
   // ---------- floors and monsters ----------
 
-  /** Move to a floor. `cleared`: because the last one was just cleared (the UI and scene make a moment of it). */
-  private enterFloor(f: number, quiet = false, cleared = false, bossDelay = 0) {
+  /** Move to a floor. `cleared`: because the last one was just cleared (the UI and scene make a moment of it).
+   *  `spawnDelay`: seconds before its first monster (or its boss) comes. */
+  private enterFloor(f: number, quiet = false, cleared = false, spawnDelay = 0) {
     this.bankAllDrops();
     const s = this.s;
     // Stepping off the deepest floor keeps its kills, and coming back to it picks them up again (its monsters respawn).
@@ -987,7 +990,7 @@ export class Game {
     this.downed = 0;
     this.stash = [];
     // During the Rainbow Vault the boss waits until the vault closes.
-    if (bossDelay) this.spawnT = bossDelay;
+    if (spawnDelay) this.spawnT = spawnDelay;
     else if (isBossFloor(f) && !this.inVault()) this.spawnBoss();
     if (!quiet) this.events.push({ t: 'floor', floor: f, boss: isBossFloor(f), cleared });
   }
@@ -2116,7 +2119,7 @@ export class Game {
     if (!vault && this.bossFloor() && this.bossTime > 0) {
       this.bossTime -= dt;
       if (this.bossTime <= 0) this.bossFailed();
-    } else if (this.downed > 0 && (this.downed -= dt) <= 0) this.enterFloor(Math.max(1, s.floor - 1));
+    } else if (this.downed > 0 && (this.downed -= dt) <= 0) this.enterFloor(Math.max(1, s.floor - 1), false, false, REGROUP_SECONDS);
 
     // Buffs.
     let expired = false;

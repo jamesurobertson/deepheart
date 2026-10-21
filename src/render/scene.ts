@@ -380,6 +380,8 @@ export class Scene {
   /** The party beaten by a boss: seconds since its timer ran out, and each one's fall (when the lunge throws them, and
    *  which way). */
   private fall: { t: number; who: Map<number, { at: number; dir: number }> } | null = null;
+  /** After a fall, seconds the party's been running back in from the right of the floor above. */
+  private regroup: number | null = null;
   /** In the Rainbow Vault's treasure room, and the portal trip in or out of it (the game pauses during the run-up). */
   private inVaultRoom = false;
   /** The vault's chests on the floor. */
@@ -1146,14 +1148,42 @@ export class Scene {
     if (boss && was < firstUp && f.t >= firstUp) boss.hopV = 5;
   }
 
-  /** On the floor above, the party's themselves again (and walks back in from wherever it ran to). */
+  /** On the floor above, the party comes running in from the right, still in retreat, before its monsters arrive. */
   private endFall() {
     for (const c of this.party) {
       c.inner.rotation.z = 0;
       c.inner.position.set(0, 0, c.inner.position.z);
       c.sprite.mesh.material.color.setScalar(1);
+      c.act = null;
+      c.body.position.set(15 + Math.random() * 3, 0, c.home.z);
     }
+    this.heroVel.set(0, 0, 0);
     this.fall = null;
+    this.regroup = 0;
+  }
+
+  private updateRegroup(dt: number) {
+    this.regroup! += dt;
+    let running = false;
+    for (const c of this.party) {
+      if (!c.body.visible) continue;
+      const p = c.body.position;
+      const d = c.home.clone().sub(p).setY(0);
+      const step = 12 * dt;
+      if (d.length() > step) {
+        p.add(d.setLength(step));
+        c.sprite.flip = true;
+        c.sprite.play(c.run);
+        c.inner.position.y = Math.abs(Math.sin(this.time * 16 + c.comp)) * 0.1;
+        running = true;
+      } else {
+        p.copy(c.home);
+        c.sprite.play(c.idle);
+        c.inner.position.y = 0;
+      }
+      c.sprite.update(dt);
+    }
+    if (!running || this.regroup! > 3) this.regroup = null;
   }
 
   /** Turn a companion `angle` about their middle, shifted `x` along and `y` up, from standing (`flat` 0) to lying on
@@ -2726,6 +2756,7 @@ export class Scene {
     this.updateMonsters(dt, game);
     if (!holding) {
       if (this.fall) this.updateFall(dt);
+      else if (this.regroup !== null) this.updateRegroup(dt);
       else {
         this.updateParty(dt, game);
         this.updateHero(dt, game);
