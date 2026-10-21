@@ -228,12 +228,13 @@ class Stairs {
   private toX: number | null = null;
   private held = new Set<'left' | 'right' | 'down'>();
   private jumpAsked = false;
+  /** When your hero last stood on a ledge: a jump still works a moment after stepping off one ("coyote time"). */
+  private groundedAt = 0;
   private facing = 1;
   private dt = 0;
   /** A hero lost to the deep: embers in their colours thrown back up from where they fell, and the red below flaring
    *  for a moment. */
   private embers: { x: number; y: number; vx: number; vy: number; life: number; color: string }[] = [];
-  private pillar = { x0: 0, x1: 0, y: 0 };
   private flare = 0;
   /** The scale, the stairway's span and the canvas's height, from the last frame (a click lands on the steps; the
    *  keys can walk you off the top of the landing). */
@@ -342,17 +343,6 @@ class Stairs {
     /** Which step a sprite standing at `x` (its left edge) has its feet on. */
     const stepAt = (x: number) => (x + 8 < landX + 36 ? 0 : Math.floor((x + 8 - landX - 36) / run) + 1);
     this.geo = { S, minX: landX, maxX: W - 20, W, H };
-    // A pillar one step up at the landing's far end (a hop onto it, then the jump to the DEMO stamp is just in reach).
-    const pillar = { x0: landX - 14, x1: landX, y: landY - rise };
-    for (let yy = pillar.y; yy < H; yy += 16) tile(tiles, pillar.x0, yy);
-    tile(floor, pillar.x0, pillar.y, 5);
-    g.fillStyle = 'rgba(8, 3, 4, 0.2)';
-    g.fillRect(pillar.x0, pillar.y + 5, 14, H - pillar.y);
-    g.fillStyle = 'rgba(255, 210, 160, 0.34)';
-    g.fillRect(pillar.x0, pillar.y, 14, 1);
-    g.fillStyle = 'rgba(0, 0, 0, 0.45)';
-    g.fillRect(pillar.x1 - 2, pillar.y + 5, 2, H - pillar.y);
-    this.pillar = pillar;
     for (let k = 0; k < steps; k++) {
       const x = k === 0 ? landX : stepX(k);
       const y = stepY(k);
@@ -443,7 +433,7 @@ class Stairs {
   }
 
   /** Your hero, free on the stairs. Each step is a ledge running off the right edge of the screen: walk along it (and off
-   *  either end), jump up through the one above and land on it, drop (↓) through to the one below. The DEMO stamp and the Wishlist button are ledges too, just about in reach of a jump. Walk off
+   *  either end), jump up through the one above and land on it, drop (↓) through to the one below. The DEMO stamp and the Wishlist button are ledges too, just in reach of a jump from the very end of the landing. Walk off
    *  the end of a ledge (the top of the landing, or the screen's edge) and they fall into the dark, and the next in
    *  line takes over (until nobody's left: they're back next time the menu opens). A click walks them along the front
    *  of the steps to where you clicked. */
@@ -457,14 +447,11 @@ class Stairs {
       const r = el.getBoundingClientRect();
       return { x0: (r.left * dpr) / geo.S, x1: (r.right * dpr) / geo.S, y: (r.top * dpr) / geo.S };
     });
-    const pillar = this.pillar;
-    const onPillar = (x: number) => x + 8 >= pillar.x0 && x + 8 < pillar.x1;
-    /** Every ledge under x: the steps (to the front one), the pillar, and the menu's elements that x is over. */
+    /** Every ledge under x: the steps (to the front one) and the menu's elements that x is over. */
     const ledges = (x: number) => {
       const f = front(x);
       const out: { id: number; y: number }[] = [];
       if (f !== null) for (let j = 0; j <= f; j++) out.push({ id: j, y: stepY(j) });
-      if (onPillar(x)) out.push({ id: 50, y: pillar.y });
       extras.forEach((e, i) => {
         if (x + 8 >= e.x0 && x + 8 <= e.x1 && e.y > 0) out.push({ id: 100 + i, y: e.y });
       });
@@ -472,6 +459,14 @@ class Stairs {
     };
     const h = (this.hero ??= { x: from, y: stepY(stepAt(from)), vy: 0, on: stepAt(from), drop: null });
     const dt = this.dt;
+    // The jump first: pressed at a ledge's very end, it beats this frame's step off it.
+    if (h.on !== null) this.groundedAt = this.t;
+    if (this.jumpAsked && h.vy >= 0 && this.t - this.groundedAt < 0.1) {
+      h.vy = -215;
+      h.on = null;
+      this.groundedAt = -1;
+    }
+    this.jumpAsked = false;
     const clicked = this.toX !== null && !this.held.size;
     let dir = (this.held.has('right') ? 1 : 0) - (this.held.has('left') ? 1 : 0);
     if (!dir && this.toX !== null) {
@@ -482,11 +477,21 @@ class Stairs {
     if (dir) {
       this.facing = dir;
       const step = 72 * dt;
-      const nx = clicked
-        ? Math.min(geo.maxX, Math.max(geo.minX, h.x + dir * Math.min(Math.abs(this.toX! - h.x), step)))
+      let nx = clicked
+        ? h.x + dir * Math.min(Math.abs(this.toX! - h.x), step)
         : Math.min(geo.W + 24, Math.max(-24, h.x + dir * step));
-      // Steps are ledges you can walk off either end of; only the pillar's side stops a walk (a click climbs it).
-      if (clicked || !onPillar(nx) || h.y <= pillar.y + 0.5) h.x = nx;
+      // A click never walks you off what you're standing on: off the DEMO stamp or the Wishlist button it stops at
+      // the edge (getting down is a jump or a drop).
+      if (clicked) {
+        const plat = h.on !== null && h.on >= 100 ? extras[h.on - 100] : null;
+        const lo = plat ? plat.x0 - 8 : geo.minX;
+        const hi = plat ? plat.x1 - 8 : geo.maxX;
+        if (nx < lo || nx > hi) {
+          nx = Math.min(hi, Math.max(lo, nx));
+          this.toX = null;
+        }
+      }
+      h.x = nx;
     }
     if (h.on !== null) {
       const f = front(h.x);
@@ -499,15 +504,11 @@ class Stairs {
         else h.on = null;
       }
     }
-    if (h.on !== null && this.jumpAsked) {
-      h.vy = -215;
-      h.on = null;
-    } else if (h.on !== null && this.held.has('down') && ledges(h.x).some((l) => l.y > h.y + 0.5)) {
+    if (h.on !== null && this.held.has('down') && ledges(h.x).some((l) => l.y > h.y + 0.5)) {
       h.drop = h.on;
       h.on = null;
       h.vy = 1;
     }
-    this.jumpAsked = false;
     if (h.on === null) {
       const was = h.y;
       h.vy += (this.held.has('down') ? 1600 : 700) * dt;
