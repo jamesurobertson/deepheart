@@ -8,7 +8,7 @@
 import { TUNE } from '../src/game/game.ts';
 import { COMPS } from '../src/game/data.ts';
 import { duration } from '../src/game/format.ts';
-import { Sim, seedRandom, type Profile } from './bot.ts';
+import { NONSTOP, Sim, seedRandom, type Profile } from './bot.ts';
 
 const H = 3600;
 const args = process.argv.slice(2);
@@ -22,7 +22,7 @@ const idle = args.includes('--idle');
 if (process.env.TUNE) Object.assign(TUNE, JSON.parse(process.env.TUNE));
 seedRandom(flag('--seed', 1));
 
-const PLAYER: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 1, ascendEager: eager, ascendMin: 5, awakenRatio: 1, stall: 180, catchRate: 0.5, resetActive: 0, shopEvery: 1 };
+const PLAYER: Profile = { ...NONSTOP, ascendEager: eager };
 
 let best = 1;
 let bestAt = 0;

@@ -3,7 +3,7 @@
  * slots the best relics, and prestiges once it stops making progress.
  */
 import Decimal from 'break_infinity.js';
-import { COST_GROWTH, Game, MANUAL_RATE, newSave, type GameEvent } from '../src/game/game.ts';
+import { COST_GROWTH, Game, MANUAL_RATE, newSave, type GameEvent, type SaveState } from '../src/game/game.ts';
 import { ABILITIES, COMPS, HEART, UPG_BY_ID } from '../src/game/data.ts';
 
 export interface Profile {
@@ -37,6 +37,23 @@ export interface SimHooks {
   descend?: (souls: number, sim: Sim) => void;
   awaken?: (stones: number, sim: Sim) => void;
   tick?: (sim: Sim) => void;
+}
+
+/** Someone who plays nonstop: always holding attack, using Rampage and every skill the moment they're ready, and
+ *  ascending once stuck. */
+export const NONSTOP: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 1, ascendMin: 5, awakenRatio: 1, stall: 180, catchRate: 0.5, resetActive: 0, shopEvery: 1 };
+
+/** The save of a nonstop player the moment they first reach `floor` (or after `maxHours`), for trying a depth by hand
+ *  with what you'd really have there (the dev build's ?sim=). Leaves Math.random as it found it. */
+export function playTo(floor: number, maxHours = 48): { save: SaveState; hours: number } {
+  const random = Math.random;
+  seedRandom(1);
+  const sim = new Sim(NONSTOP);
+  sim.startSession(maxHours * 3600);
+  while (sim.game.s.bestFloor < floor && sim.t < maxHours * 3600) sim.runUntil(sim.t + 10);
+  Math.random = random;
+  sim.game.bankAllDrops();
+  return { save: sim.game.saveState(), hours: sim.t / 3600 };
 }
 
 /** Deterministic Math.random, so a pacing run gives the same answer twice. */

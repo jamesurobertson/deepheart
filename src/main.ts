@@ -30,7 +30,10 @@ const TEST_STATE = import.meta.env.DEV ? params.get('state') : null;
 // The playtest site and the demo share an origin with the live game (jamesurobertson.github.io), so each saves to its
 // own slot.
 const PLAYTEST = location.pathname.startsWith('/dev-deepheart/');
-const SLOT = params.get('slot') ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
+// ?sim=300 (dev only): play from where a nonstop player first reaches floor 300, in its own slot. It's built the first
+// time (the pacing bot plays it out, a few seconds); &fresh builds it again.
+const SIM_FLOOR = import.meta.env.DEV ? Number(params.get('sim')) || 0 : 0;
+const SLOT = params.get('slot') ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (SIM_FLOOR ? `sim-${SIM_FLOOR}` : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
 const SAVE_KEY = 'deepheart-save' + (SLOT ? `:${SLOT}` : '');
 // The game opens on its main menu once a visit: a refresh after you've started playing (or the menu's own New Game,
 // which wipes the save and reloads) goes straight back in, as do test runs (?slot=, ?state=) and ?menu=0. Closing the
@@ -43,7 +46,7 @@ const inGame = () => {
     return false;
   }
 };
-const SKIP_MENU = params.get('menu') === '0' || (import.meta.env.DEV && (params.has('slot') || !!TEST_STATE)) || inGame();
+const SKIP_MENU = params.get('menu') === '0' || (import.meta.env.DEV && (params.has('slot') || !!TEST_STATE || !!SIM_FLOOR)) || inGame();
 const STEP = 1 / 30;
 /** Away (tab hidden or closed) longer than this counts as offline: paid at the offline rate, with a summary. Shorter is played out at full speed. */
 const OFFLINE_AFTER = 60;
@@ -71,6 +74,14 @@ async function boot() {
   const atlas = await Atlas.load(`${BASE}assets/sprites/atlas.png`, `${BASE}assets/sprites/atlas.txt`);
   setAtlas(atlas);
 
+  if (import.meta.env.DEV && SIM_FLOOR > 1 && (!load() || params.has('fresh'))) {
+    const { playTo } = await import('../scripts/bot.ts');
+    const { save, hours } = playTo(SIM_FLOOR);
+    // (Now, so the time it took isn't paid out as time away.)
+    save.lastSave = Date.now();
+    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    console.info(`?sim: floor ${save.bestFloor} after ${hours.toFixed(1)} h of nonstop play, ${save.descents} ascents`);
+  }
   const saved = load();
   const game = new Game(saved ?? newSave());
   const sfx = new Sfx(`${BASE}assets/sfx`, `${BASE}assets/music`);
