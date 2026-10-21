@@ -65,10 +65,18 @@ export class TitleMenu {
   private hasRun: boolean;
   private hooks: MenuHooks;
   private view: 'main' | 'credits' | 'confirm' = 'main';
-  /** Up and down (or W and S) move through the menu, wrapping round; Enter or Space picks; Escape backs out. */
+  /** Up and down (or W and S) move through the menu, wrapping round; Enter or Space picks; Escape backs out. While the
+   *  stairway has focus (it was clicked), the keys walk your hero there instead. No key reaches the game behind the
+   *  menu (Space would attack, U buy an upgrade). */
   private keys = (e: KeyboardEvent) => {
     if (document.querySelector('.modal-wrap:not([hidden])')) return;
+    e.stopPropagation();
     const k = e.key.toLowerCase();
+    if (document.activeElement === this.stairs.canvas) {
+      if (k === 'escape') this.el.querySelector<HTMLElement>('.mm-panel button, .mm-panel a')?.focus();
+      else if (this.stairs.control(k, true)) e.preventDefault();
+      return;
+    }
     const step = k === 'arrowdown' || k === 's' ? 1 : k === 'arrowup' || k === 'w' ? -1 : 0;
     if (step) {
       e.preventDefault();
@@ -76,6 +84,12 @@ export class TitleMenu {
       const at = items.indexOf(document.activeElement as HTMLElement);
       items[at < 0 ? 0 : (at + step + items.length) % items.length]?.focus();
     } else if (k === 'escape' && this.view !== 'main') this.show('main');
+  };
+
+  private keysUp = (e: KeyboardEvent) => {
+    if (document.querySelector('.modal-wrap:not([hidden])')) return;
+    e.stopPropagation();
+    this.stairs.control(e.key.toLowerCase(), false);
   };
 
   constructor(root: HTMLElement, game: Game, hasRun: boolean, hooks: MenuHooks) {
@@ -88,22 +102,33 @@ export class TitleMenu {
     document.body.classList.add('at-menu');
     const canvas = document.createElement('canvas');
     canvas.className = 'mm-stairs';
+    canvas.tabIndex = 0;
+    canvas.setAttribute('aria-label', 'The stairway: arrow keys or WASD to walk and jump, Space to jump, Escape to go back to the menu');
     this.el.appendChild(canvas);
+    const hint = document.createElement('p');
+    hint.className = 'mm-stairs-hint';
+    hint.textContent = 'Walk ← →  ·  Jump ↑ or Space  ·  Menu Esc';
+    this.el.appendChild(hint);
     this.stairs = new Stairs(canvas, game);
     const panel = document.createElement('div');
     panel.className = 'mm-panel';
     this.el.appendChild(panel);
     this.el.addEventListener('click', (e) => this.act((e.target as HTMLElement).closest<HTMLElement>('[data-mm]')?.dataset.mm));
+    // The game behind the menu takes a press on the battlefield as an attack: none of the menu's get through.
+    for (const ev of ['pointerdown', 'pointerup', 'mousedown']) this.el.addEventListener(ev, (e) => e.stopPropagation());
     this.fit();
     addEventListener('resize', this.fit);
-    addEventListener('keydown', this.keys);
+    // (Capturing, so the menu sees keys before the game's own listeners do.)
+    addEventListener('keydown', this.keys, true);
+    addEventListener('keyup', this.keysUp, true);
     this.show('main');
   }
 
   close() {
     this.stairs.stop();
     removeEventListener('resize', this.fit);
-    removeEventListener('keydown', this.keys);
+    removeEventListener('keydown', this.keys, true);
+    removeEventListener('keyup', this.keysUp, true);
     this.el.remove();
     document.body.classList.remove('at-menu');
   }
@@ -167,21 +192,24 @@ export class TitleMenu {
 /** The stairway beside the full game's menu: a wall of dungeon bricks, steps going down to the right into a red glow,
  *  torches, and your party standing on the steps in pairs. */
 class Stairs {
-  private canvas: HTMLCanvasElement;
+  readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private raf = 0;
   private t = 0;
   private last = 0;
-  private party: { frames: ReturnType<typeof spriteFrames>; phase: number }[];
-  /** Your hero (the party's leader) walks wherever on the stairs you click: their run frames, where they are now and
-   *  where they're headed (sprite pixels along the stairway), and which way they face. */
-  private leaderRun: ReturnType<typeof spriteFrames>;
-  private walkX: number | null = null;
+  private party: { frames: ReturnType<typeof spriteFrames>; run: ReturnType<typeof spriteFrames>; phase: number }[];
+  /** Your hero (the party's leader) can be walked about the stairs: to where you click, or with the keys (and made to
+   *  jump). Where they stand (sprite pixels: left edge, feet), how fast they're rising or falling, the way they
+   *  face, the keys held, and where a click is taking them. Null until you first move them (they stand in the line). */
+  private hero: { x: number; y: number; vy: number } | null = null;
   private toX: number | null = null;
+  private held = new Set<'left' | 'right' | 'down'>();
+  private jumpAsked = false;
   private facing = 1;
   private dt = 0;
-  /** The scale and the stairway's span, from the last frame, for turning a click into a spot on the steps. */
-  private geo: { S: number; minX: number; maxX: number } | null = null;
+  /** The scale, the stairway's span and the canvas's height, from the last frame (a click lands on the steps; the
+   *  keys can walk you off the top of the landing). */
+  private geo: { S: number; minX: number; maxX: number; H: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement, game: Game) {
     this.canvas = canvas;
@@ -190,19 +218,38 @@ class Stairs {
     const owned = COMPS.map((_, i) => i).filter((i) => game.s.owned[i] > 0);
     const hero = game.heroIndex();
     const order = owned.length ? [...owned.filter((i) => i === hero), ...owned.filter((i) => i !== hero)] : [0];
-    this.party = order.map((i) => ({ frames: spriteFrames(COMPS[i].sprite), phase: Math.random() }));
-    this.leaderRun = spriteFrames(`${COMPS[order[0]].sprite}_run`);
+    this.party = order.map((i) => ({ frames: spriteFrames(COMPS[i].sprite), run: spriteFrames(`${COMPS[i].sprite}_run`), phase: Math.random() }));
     canvas.addEventListener('pointerdown', (e) => {
       if (!this.geo) return;
+      e.preventDefault();
+      canvas.focus({ preventScroll: true });
       const r = canvas.getBoundingClientRect();
       const x = ((e.clientX - r.left) * (devicePixelRatio || 1)) / this.geo.S - 8;
       this.toX = Math.min(this.geo.maxX, Math.max(this.geo.minX, x));
     });
+    canvas.addEventListener('blur', () => this.held.clear());
     this.frame(performance.now());
   }
 
   stop() {
     cancelAnimationFrame(this.raf);
+  }
+
+  /** A key down or up while the stairway has focus; true if it's one of the walking keys. */
+  control(key: string, down: boolean) {
+    const dir = key === 'arrowleft' || key === 'a' ? 'left' : key === 'arrowright' || key === 'd' ? 'right' : key === 'arrowdown' || key === 's' ? 'down' : null;
+    if (dir) {
+      if (down) {
+        this.held.add(dir);
+        if (dir !== 'down') this.toX = null;
+      } else this.held.delete(dir);
+      return true;
+    }
+    if (key === ' ' || key === 'arrowup' || key === 'w') {
+      if (down) this.jumpAsked = true;
+      return true;
+    }
+    return false;
   }
 
   private frame = (now: number) => {
@@ -257,7 +304,7 @@ class Stairs {
     const stepY = (k: number) => landY + k * rise;
     /** Which step a sprite standing at `x` (its left edge) has its feet on. */
     const stepAt = (x: number) => (x + 8 < landX + 36 ? 0 : Math.floor((x + 8 - landX - 36) / run) + 1);
-    this.geo = { S, minX: landX, maxX: W - 20 };
+    this.geo = { S, minX: landX, maxX: W - 20, H };
     for (let k = 0; k < steps; k++) {
       const x = k === 0 ? landX : stepX(k);
       const y = stepY(k);
@@ -311,14 +358,14 @@ class Stairs {
       const k = Math.floor((this.party.length - 1 - i) / 4);
       const side = (this.party.length - 1 - i) % 4;
       const x = (k === 0 ? landX + 6 : stepX(k)) + side * 6;
-      if (i === 0 && this.toX !== null) return [this.leader(p.frames, x, stepAt)];
+      if (i === 0 && (this.hero || this.toX !== null || this.held.size || this.jumpAsked)) return this.leader(p, x, landX, stepAt, stepY);
       const f = p.frames.frames[Math.floor((this.t + p.phase) * 6) % p.frames.frames.length];
-      return [{ img: p.frames.img, f, k, x, flip: false }];
+      return [{ img: p.frames.img, f, k, x, feet: stepY(k), flip: false, shadow: true }];
     });
     g.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    for (const h of placed) g.fillRect(h.x + 2, stepY(h.k), h.f.w - 4, 2);
+    for (const h of placed) if (h.shadow) g.fillRect(h.x + 2, stepY(h.k), h.f.w - 4, 2);
     for (const h of [...placed].sort((a, b) => a.k - b.k)) {
-      const y = stepY(h.k) + 1 - h.f.h;
+      const y = h.feet + 1 - h.f.h;
       if (!h.flip) g.drawImage(h.img, h.f.x, h.f.y, h.f.w, h.f.h, h.x, y, h.f.w, h.f.h);
       else {
         g.save();
@@ -330,19 +377,50 @@ class Stairs {
     }
   }
 
-  /** Your hero on the way to where you clicked (from their place in the line the first time), running, then idling
-   *  there. */
-  private leader(idle: NonNullable<ReturnType<typeof spriteFrames>>, from: number, stepAt: (x: number) => number) {
-    this.walkX ??= from;
-    const to = this.toX ?? this.walkX;
-    const gap = to - this.walkX;
-    const moving = Math.abs(gap) > 0.5;
-    if (moving) {
-      this.facing = Math.sign(gap);
-      this.walkX += Math.sign(gap) * Math.min(Math.abs(gap), 42 * this.dt);
+  /** Your hero, free on the stairs: walking (keys held, or on the way to a click), stepping up and down the steps,
+   *  jumping and falling back to them. Walk off the top of the landing and they fall into the dark, and the next in
+   *  line takes over (until nobody's left: they're back next time the menu opens). */
+  private leader(p: (typeof this.party)[number], from: number, landX: number, stepAt: (x: number) => number, stepY: (k: number) => number) {
+    if (!p.frames) return [];
+    const geo = this.geo!;
+    const ground = (x: number) => (x + 8 < landX ? Infinity : stepY(stepAt(x)));
+    const h = (this.hero ??= { x: from, y: stepY(stepAt(from)), vy: 0 });
+    const dt = this.dt;
+    let dir = (this.held.has('right') ? 1 : 0) - (this.held.has('left') ? 1 : 0);
+    if (!dir && this.toX !== null) {
+      const gap = this.toX - h.x;
+      if (Math.abs(gap) > 0.5) dir = Math.sign(gap);
+      else this.toX = null;
     }
-    const anim = moving && this.leaderRun ? this.leaderRun : idle;
-    const f = anim.frames[Math.floor(this.t * (moving ? 10 : 6)) % anim.frames.length];
-    return { img: anim.img, f, k: stepAt(this.walkX), x: Math.round(this.walkX), flip: this.facing < 0 };
+    if (dir) {
+      this.facing = dir;
+      const step = 72 * dt;
+      const to = this.toX !== null && !this.held.size ? Math.min(Math.abs(this.toX - h.x), step) : step;
+      h.x = Math.min(geo.maxX, Math.max(-24, h.x + dir * to));
+    }
+    const onGround = h.vy === 0 && h.y >= ground(h.x) - 0.5;
+    // A step up is walked straight onto; a step down, a jump's way back, or the drop off the landing is fallen.
+    if (onGround && ground(h.x) < h.y) h.y = ground(h.x);
+    if (this.jumpAsked && h.vy === 0 && h.y >= ground(h.x) - 0.5) h.vy = -190;
+    this.jumpAsked = false;
+    if (h.vy !== 0 || h.y < ground(h.x)) {
+      h.vy += (this.held.has('down') ? 1600 : 700) * dt;
+      h.y += h.vy * dt;
+      if (h.y >= ground(h.x) && h.vy > 0) {
+        h.y = ground(h.x);
+        h.vy = 0;
+      }
+    }
+    if (h.y > geo.H + 40) {
+      this.party.shift();
+      this.hero = null;
+      this.toX = null;
+      this.held.clear();
+      return [];
+    }
+    const airborne = h.vy !== 0;
+    const anim = (dir || airborne) && p.run ? p.run : p.frames;
+    const f = airborne ? anim.frames[2 % anim.frames.length] : anim.frames[Math.floor(this.t * (dir ? 10 : 6)) % anim.frames.length];
+    return [{ img: anim.img, f, k: stepAt(h.x), x: Math.round(h.x), feet: Math.round(h.y), flip: this.facing < 0, shadow: !airborne }];
   }
 }
