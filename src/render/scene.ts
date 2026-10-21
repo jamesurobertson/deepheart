@@ -1177,13 +1177,17 @@ export class Scene {
         c.inner.position.y = Math.abs(Math.sin(this.time * 16 + c.comp)) * 0.1;
         running = true;
       } else {
+        // Home again: turn back round to face the fight.
         p.copy(c.home);
+        c.sprite.flip = false;
         c.sprite.play(c.idle);
         c.inner.position.y = 0;
       }
       c.sprite.update(dt);
     }
-    if (!running || this.regroup! > 3) this.regroup = null;
+    if (running && this.regroup! <= 3) return;
+    for (const c of this.party) c.sprite.flip = false;
+    this.regroup = null;
   }
 
   /** Turn a companion `angle` about their middle, shifted `x` along and `y` up, from standing (`flat` 0) to lying on
