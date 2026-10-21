@@ -226,6 +226,8 @@ class Stairs {
    *  dropped through. */
   private hero: { x: number; y: number; vy: number; on: number | null; drop: number | null } | null = null;
   private toX: number | null = null;
+  /** How high the click was: it picks which of the steps running under `toX` to go to. */
+  private toY = 0;
   private held = new Set<'left' | 'right' | 'down'>();
   private jumpAsked = false;
   /** When your hero last stood on a ledge: a jump still works a moment after stepping off one ("coyote time"). */
@@ -257,6 +259,7 @@ class Stairs {
       const r = canvas.getBoundingClientRect();
       const x = ((e.clientX - r.left) * (devicePixelRatio || 1)) / this.geo.S - 8;
       this.toX = Math.min(this.geo.maxX, Math.max(this.geo.minX, x));
+      this.toY = ((e.clientY - r.top) * (devicePixelRatio || 1)) / this.geo.S;
     });
     canvas.addEventListener('blur', () => this.held.clear());
     this.frame(performance.now());
@@ -435,8 +438,8 @@ class Stairs {
   /** Your hero, free on the stairs. Each step is a ledge running off the right edge of the screen: walk along it (and off
    *  either end), jump up through the one above and land on it, drop (↓) through to the one below. The DEMO stamp and the Wishlist button are ledges too, just in reach of a jump from the very end of the landing. Walk off
    *  the end of a ledge (the top of the landing, or the screen's edge) and they fall into the dark, and the next in
-   *  line takes over (until nobody's left: they're back next time the menu opens). A click walks them to the front step
-   *  where you clicked, hopping up and down the steps (and off the DEMO stamp or the Wishlist button) on the way. */
+   *  line takes over (until nobody's left: they're back next time the menu opens). A click walks them to where you clicked,
+   *  hopping up and dropping down through the steps (and off the DEMO stamp) to the one at that height. */
   private leader(p: (typeof this.party)[number], from: number, landX: number, stepAt: (x: number) => number, stepY: (k: number) => number) {
     if (!p.frames) return [];
     const geo = this.geo!;
@@ -479,12 +482,17 @@ class Stairs {
     }
     this.jumpAsked = false;
     const clicked = this.toX !== null && !this.held.size;
+    // The step a click picked: the first at or below the click, of the steps running under it.
+    let goal = 0;
+    if (this.toX !== null) {
+      const last = front(this.toX) ?? 0;
+      while (goal < last && stepY(goal) < this.toY - 2) goal++;
+    }
     let dir = (this.held.has('right') ? 1 : 0) - (this.held.has('left') ? 1 : 0);
     if (!dir && this.toX !== null) {
       const gap = this.toX - h.x;
       if (Math.abs(gap) > 0.5) dir = Math.sign(gap);
-      // (Kept until they're down on the front step: a hop can land them on a step above it, still to come off.)
-      else if (h.on !== null && h.on === front(h.x)) this.toX = null;
+      else if (h.on === goal) this.toX = null;
     }
     if (dir) {
       this.facing = dir;
@@ -493,24 +501,28 @@ class Stairs {
       if (clicked && h.on !== null) {
         const plat = h.on >= 100 ? extras[h.on - 100] : null;
         // Off a menu element, a full jump across the gap, if one lands anywhere (the Wishlist button sits too low:
-        // there the walk stops at its edge). Up a step, a hop just short of its edge, low enough to land on that step
-        // and not the one above.
+        // there the walk stops at its edge).
         if (plat && (nx + 8 < plat.x0 || nx + 8 > plat.x1)) {
-          if (jumpLands(h.x, h.y, dir)) h.vy = -215;
-          else {
+          if (jumpLands(h.x, h.y, dir)) {
+            h.vy = -215;
+            h.on = null;
+          } else {
             nx = h.x;
             this.toX = null;
           }
-        } else if (!plat && (front(nx + dir * 10) ?? h.on) < h.on) h.vy = -170;
-        if (h.vy < 0) h.on = null;
+        }
       }
       h.x = nx;
     }
-    // Over a lower step, a click's walk hops down onto it (the keys walk on along the step above).
-    if (clicked && h.on !== null && h.on < 100 && (front(h.x) ?? -1) > h.on) {
-      h.drop = h.on;
-      h.on = null;
-      h.vy = -60;
+    // On the way, a click's walk hops up through the steps above to the one it picked (high enough for the next step,
+    // not the one after), or drops through to the ones below as they come.
+    if (clicked && h.on !== null && h.on < 100 && h.on !== goal) {
+      if (h.on > goal) h.vy = -170;
+      else if ((front(h.x) ?? -1) > h.on) {
+        h.drop = h.on;
+        h.vy = -60;
+      }
+      if (h.vy < 0) h.on = null;
     }
     if (h.on !== null) {
       const still = ledges(h.x).find((l) => l.id === h.on);
