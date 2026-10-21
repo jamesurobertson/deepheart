@@ -190,6 +190,23 @@ export class TitleMenu {
   }
 }
 
+/** The colours a sprite's first frame is drawn in (its opaque pixels, less the near-black outline that would vanish
+ *  against the dark), for the embers a fallen hero bursts into. */
+function colorsOf(src: NonNullable<ReturnType<typeof spriteFrames>>): string[] {
+  const f = src.frames[0];
+  const c = document.createElement('canvas');
+  c.width = f.w;
+  c.height = f.h;
+  const g = c.getContext('2d')!;
+  g.drawImage(src.img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+  const d = g.getImageData(0, 0, f.w, f.h).data;
+  const out: string[] = [];
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] > 200 && d[i] + d[i + 1] + d[i + 2] > 120) out.push(`rgb(${d[i]}, ${d[i + 1]}, ${d[i + 2]})`);
+  }
+  return out.length ? out : ['#ffd27a'];
+}
+
 /** The stairway beside the full game's menu: a wall of dungeon bricks, steps going down to the right into a red glow,
  *  torches, and your party standing on the steps in pairs. */
 class Stairs {
@@ -213,8 +230,9 @@ class Stairs {
   private jumpAsked = false;
   private facing = 1;
   private dt = 0;
-  /** A hero lost to the deep: embers thrown back up from where they fell, and the red below flaring for a moment. */
-  private embers: { x: number; y: number; vx: number; vy: number; life: number }[] = [];
+  /** A hero lost to the deep: embers in their colours thrown back up from where they fell, and the red below flaring
+   *  for a moment. */
+  private embers: { x: number; y: number; vx: number; vy: number; life: number; color: string }[] = [];
   private pillar = { x0: 0, x1: 0, y: 0 };
   private flare = 0;
   /** The scale, the stairway's span and the canvas's height, from the last frame (a click lands on the steps; the
@@ -404,7 +422,7 @@ class Stairs {
       e.vy += 90 * this.dt;
       e.x += e.vx * this.dt;
       e.y += e.vy * this.dt;
-      a.fillStyle = e.life > 0.5 ? '#ffd27a' : e.life > 0.25 ? '#ff8a3a' : '#e8402e';
+      a.fillStyle = e.color;
       a.globalAlpha = Math.min(1, e.life * 2.5);
       a.fillRect(Math.round(e.x), Math.round(e.y), 2, 2);
     }
@@ -424,9 +442,8 @@ class Stairs {
     }
   }
 
-  /** Your hero, free on the stairs. Each step is a ledge running off the right edge of the screen: walk along it, jump
-   *  up through the one above and land on it, drop (↓) through to the one below, and a step's riser stops you
-   *  walking into it. The DEMO stamp and the Wishlist button are ledges too, just about in reach of a jump. Walk off
+  /** Your hero, free on the stairs. Each step is a ledge running off the right edge of the screen: walk along it (and off
+   *  either end), jump up through the one above and land on it, drop (↓) through to the one below. The DEMO stamp and the Wishlist button are ledges too, just about in reach of a jump. Walk off
    *  the end of a ledge (the top of the landing, or the screen's edge) and they fall into the dark, and the next in
    *  line takes over (until nobody's left: they're back next time the menu opens). A click walks them along the front
    *  of the steps to where you clicked. */
@@ -468,11 +485,8 @@ class Stairs {
       const nx = clicked
         ? Math.min(geo.maxX, Math.max(geo.minX, h.x + dir * Math.min(Math.abs(this.toX! - h.x), step)))
         : Math.min(geo.W + 24, Math.max(-24, h.x + dir * step));
-      // A riser in the way (feet below the front step, or the pillar's top, there) stops a walk, but not a click's (it
-      // climbs the steps).
-      const f = front(nx);
-      const top = onPillar(nx) ? pillar.y : f === null ? null : stepY(f);
-      if (clicked || top === null || h.y <= top + 0.5) h.x = nx;
+      // Steps are ledges you can walk off either end of; only the pillar's side stops a walk (a click climbs it).
+      if (clicked || !onPillar(nx) || h.y <= pillar.y + 0.5) h.x = nx;
     }
     if (h.on !== null) {
       const f = front(h.x);
@@ -510,8 +524,11 @@ class Stairs {
     }
     if (h.y > geo.H + 40) {
       this.flare = 1;
-      for (let i = 0; i < 18; i++) {
-        this.embers.push({ x: h.x + 8 + (Math.random() - 0.5) * 10, y: geo.H - 1, vx: (Math.random() - 0.5) * 70, vy: -(70 + Math.random() * 110), life: 0.6 + Math.random() * 0.5 });
+      const colors = colorsOf(p.frames);
+      // (From where they fell, kept on screen: off the right edge, the burst comes up at the edge.)
+      const at = Math.min(geo.W - 10, Math.max(10, h.x + 8));
+      for (let i = 0; i < 22; i++) {
+        this.embers.push({ x: at + (Math.random() - 0.5) * 10, y: geo.H - 1, vx: (Math.random() - 0.5) * 70, vy: -(70 + Math.random() * 110), life: 0.6 + Math.random() * 0.5, color: colors[Math.floor(Math.random() * colors.length)] });
       }
       this.party.shift();
       this.hero = null;
