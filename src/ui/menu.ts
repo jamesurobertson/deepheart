@@ -435,8 +435,8 @@ class Stairs {
   /** Your hero, free on the stairs. Each step is a ledge running off the right edge of the screen: walk along it (and off
    *  either end), jump up through the one above and land on it, drop (↓) through to the one below. The DEMO stamp and the Wishlist button are ledges too, just in reach of a jump from the very end of the landing. Walk off
    *  the end of a ledge (the top of the landing, or the screen's edge) and they fall into the dark, and the next in
-   *  line takes over (until nobody's left: they're back next time the menu opens). A click walks them along the front
-   *  of the steps to where you clicked. */
+   *  line takes over (until nobody's left: they're back next time the menu opens). A click walks them to the front step
+   *  where you clicked, hopping up and down the steps (and off the DEMO stamp or the Wishlist button) on the way. */
   private leader(p: (typeof this.party)[number], from: number, landX: number, stepAt: (x: number) => number, stepY: (k: number) => number) {
     if (!p.frames) return [];
     const geo = this.geo!;
@@ -457,6 +457,17 @@ class Stairs {
       });
       return out;
     };
+    /** Whether a full jump from (x, y), heading `dir`, comes down on a ledge other than the one it left. */
+    const jumpLands = (x: number, y: number, dir: number) => {
+      for (let vy = -215; y < geo.H; ) {
+        const was = y;
+        vy += 700 / 60;
+        y += vy / 60;
+        x += (dir * 72) / 60;
+        if (vy > 0 && ledges(x).some((l) => l.id !== this.hero?.on && was <= l.y && y >= l.y)) return true;
+      }
+      return false;
+    };
     const h = (this.hero ??= { x: from, y: stepY(stepAt(from)), vy: 0, on: stepAt(from), drop: null });
     const dt = this.dt;
     // The jump first: pressed at a ledge's very end, it beats this frame's step off it.
@@ -472,37 +483,39 @@ class Stairs {
     if (!dir && this.toX !== null) {
       const gap = this.toX - h.x;
       if (Math.abs(gap) > 0.5) dir = Math.sign(gap);
-      else this.toX = null;
+      // (Kept until they're down on the front step: a hop can land them on a step above it, still to come off.)
+      else if (h.on !== null && h.on === front(h.x)) this.toX = null;
     }
     if (dir) {
       this.facing = dir;
       const step = 72 * dt;
-      let nx = clicked
-        ? h.x + dir * Math.min(Math.abs(this.toX! - h.x), step)
-        : Math.min(geo.W + 24, Math.max(-24, h.x + dir * step));
-      // A click never walks you off what you're standing on: off the DEMO stamp or the Wishlist button it stops at
-      // the edge (getting down is a jump or a drop).
-      if (clicked) {
-        const plat = h.on !== null && h.on >= 100 ? extras[h.on - 100] : null;
-        const lo = plat ? plat.x0 - 8 : geo.minX;
-        const hi = plat ? plat.x1 - 8 : geo.maxX;
-        if (nx < lo || nx > hi) {
-          nx = Math.min(hi, Math.max(lo, nx));
-          this.toX = null;
-        }
+      let nx = clicked ? h.x + dir * Math.min(Math.abs(this.toX! - h.x), step) : Math.min(geo.W + 24, Math.max(-24, h.x + dir * step));
+      if (clicked && h.on !== null) {
+        const plat = h.on >= 100 ? extras[h.on - 100] : null;
+        // Off a menu element, a full jump across the gap, if one lands anywhere (the Wishlist button sits too low:
+        // there the walk stops at its edge). Up a step, a hop just short of its edge, low enough to land on that step
+        // and not the one above.
+        if (plat && (nx + 8 < plat.x0 || nx + 8 > plat.x1)) {
+          if (jumpLands(h.x, h.y, dir)) h.vy = -215;
+          else {
+            nx = h.x;
+            this.toX = null;
+          }
+        } else if (!plat && (front(nx + dir * 10) ?? h.on) < h.on) h.vy = -170;
+        if (h.vy < 0) h.on = null;
       }
       h.x = nx;
     }
+    // Over a lower step, a click's walk hops down onto it (the keys walk on along the step above).
+    if (clicked && h.on !== null && h.on < 100 && (front(h.x) ?? -1) > h.on) {
+      h.drop = h.on;
+      h.on = null;
+      h.vy = -60;
+    }
     if (h.on !== null) {
-      const f = front(h.x);
-      if (clicked && f !== null && h.on < 100) {
-        h.on = f;
-        h.y = stepY(f);
-      } else {
-        const still = ledges(h.x).find((l) => l.id === h.on);
-        if (still) h.y = still.y;
-        else h.on = null;
-      }
+      const still = ledges(h.x).find((l) => l.id === h.on);
+      if (still) h.y = still.y;
+      else h.on = null;
     }
     if (h.on !== null && this.held.has('down') && ledges(h.x).some((l) => l.y > h.y + 0.5)) {
       h.drop = h.on;
