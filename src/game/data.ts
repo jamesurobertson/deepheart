@@ -555,7 +555,7 @@ export const ABILITIES: AbilityDef[] = [
   { id: 'cleave', name: 'Cleave', desc: 'Your clicks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 10 * 60 },
   { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold for 30 seconds.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 15 * 60 },
   { id: 'drums', name: 'War Drums', desc: 'Your clicks and Phantom Blade are 50% more likely to land critical hits, for 30 seconds.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 10 * 60 },
-  { id: 'legion', name: 'Phantom Legion', desc: 'Your Phantom Blade attacks ten times as fast for 30 seconds.', kind: 'button', comp: compIndex('stormcaller'), trait: 4, dur: 30, cooldown: 15 * 60 },
+  { id: 'legion', name: 'Phantom Legion', desc: 'Your Phantom Blade splits: a blade for every monster on the floor, for 30 seconds.', kind: 'button', comp: compIndex('stormcaller'), trait: 4, dur: 30, cooldown: 15 * 60 },
 ];
 export const ABILITY_BY_ID = new Map(ABILITIES.map((a) => [a.id, a]));
 /** The trait upgrade that unlocks an ability. */

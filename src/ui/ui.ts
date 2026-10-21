@@ -93,6 +93,7 @@ function buffText(b: Buff) {
   if (b.id === 'cleave') return 'clicks hit every monster';
   if (b.id === 'flurry') return '10 clicks a second';
   if (b.id === 'drums') return '+50% critical hits';
+  if (b.id === 'legion') return 'a blade for every monster';
   if (b.blade && b.blade > 1) return `Phantom Blade ×${b.blade}`;
   if (b.dps > 1 && b.click > 1) return `×${b.dps} damage`;
   if (b.dps > 1) return `×${b.dps} companion damage`;
@@ -2041,7 +2042,7 @@ export class Ui {
         room: 'Your room: the binder, and Dan and Victor to trade with.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        blade: `Phantom Blade: attacks the front monster for you ${perSec(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades make it faster${g.abilityUnlocked('legion') ? ', and Phantom Legion makes it ten times as fast for a while' : ''}.`,
+        blade: `Phantom Blade: attacks the front monster for you ${perSec(g.autoRate())} time${g.autoRate() === 1 ? '' : 's'} a second. Shop upgrades make it faster${g.abilityUnlocked('legion') ? ', and Phantom Legion splits it into a blade for every monster for a while' : ''}.`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }

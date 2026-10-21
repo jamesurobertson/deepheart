@@ -603,7 +603,6 @@ export class Game {
     const dur = a.dur ?? 0;
     const buff: Buff = { id, name: a.name, t: dur, dur, dps: 1, click: 1, gold: 1 };
     if (id === 'treasure') buff.gold = 3;
-    else if (id === 'legion') buff.blade = 10;
     this.addBuff(buff);
     this.s.cooldowns[id] = a.cooldown ?? 0;
     this.events.push({ t: 'ability', id });
@@ -2085,9 +2084,12 @@ export class Game {
     const rate = this.autoRate();
     if (rate) {
       this.autoClick += dt * rate;
+      // Phantom Legion: the Blade splits, one for every monster on the floor, each swing hitting them all.
+      const legion = s.buffs.some((b) => b.id === 'legion');
       while (this.autoClick >= 1) {
         this.autoClick--;
-        this.click(null, -1, -1, true);
+        if (legion) for (const m of this.monsters.filter((x) => x.arrive <= 0)) this.click(m.id, -1, -1, true);
+        else this.click(null, -1, -1, true);
       }
     }
 
