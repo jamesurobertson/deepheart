@@ -64,6 +64,19 @@ export class TitleMenu {
   private game: Game;
   private hasRun: boolean;
   private hooks: MenuHooks;
+  private view: 'main' | 'credits' | 'confirm' = 'main';
+  /** Up and down (or W and S) move through the menu, wrapping round; Enter or Space picks; Escape backs out. */
+  private keys = (e: KeyboardEvent) => {
+    if (document.querySelector('.modal-wrap:not([hidden])')) return;
+    const k = e.key.toLowerCase();
+    const step = k === 'arrowdown' || k === 's' ? 1 : k === 'arrowup' || k === 'w' ? -1 : 0;
+    if (step) {
+      e.preventDefault();
+      const items = [...this.el.querySelectorAll<HTMLElement>('.mm-panel button, .mm-panel a')];
+      const at = items.indexOf(document.activeElement as HTMLElement);
+      items[at < 0 ? 0 : (at + step + items.length) % items.length]?.focus();
+    } else if (k === 'escape' && this.view !== 'main') this.show('main');
+  };
 
   constructor(root: HTMLElement, game: Game, hasRun: boolean, hooks: MenuHooks) {
     this.game = game;
@@ -83,12 +96,14 @@ export class TitleMenu {
     this.el.addEventListener('click', (e) => this.act((e.target as HTMLElement).closest<HTMLElement>('[data-mm]')?.dataset.mm));
     this.fit();
     addEventListener('resize', this.fit);
+    addEventListener('keydown', this.keys);
     this.show('main');
   }
 
   close() {
     this.stairs.stop();
     removeEventListener('resize', this.fit);
+    removeEventListener('keydown', this.keys);
     this.el.remove();
     document.body.classList.remove('at-menu');
   }
@@ -103,6 +118,7 @@ export class TitleMenu {
   }
 
   private show(view: 'main' | 'credits' | 'confirm') {
+    this.view = view;
     const panel = this.el.querySelector<HTMLElement>('.mm-panel')!;
     panel.innerHTML = view === 'credits' ? this.credits() : view === 'confirm' ? this.confirm() : this.mainMenu();
     panel.querySelector<HTMLElement>(view === 'credits' ? '[data-mm="main"]' : 'button, a')?.focus({ preventScroll: true });
@@ -157,6 +173,15 @@ class Stairs {
   private t = 0;
   private last = 0;
   private party: { frames: ReturnType<typeof spriteFrames>; phase: number }[];
+  /** Your hero (the party's leader) walks wherever on the stairs you click: their run frames, where they are now and
+   *  where they're headed (sprite pixels along the stairway), and which way they face. */
+  private leaderRun: ReturnType<typeof spriteFrames>;
+  private walkX: number | null = null;
+  private toX: number | null = null;
+  private facing = 1;
+  private dt = 0;
+  /** The scale and the stairway's span, from the last frame, for turning a click into a spot on the steps. */
+  private geo: { S: number; minX: number; maxX: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement, game: Game) {
     this.canvas = canvas;
@@ -166,6 +191,13 @@ class Stairs {
     const hero = game.heroIndex();
     const order = owned.length ? [...owned.filter((i) => i === hero), ...owned.filter((i) => i !== hero)] : [0];
     this.party = order.map((i) => ({ frames: spriteFrames(COMPS[i].sprite), phase: Math.random() }));
+    this.leaderRun = spriteFrames(`${COMPS[order[0]].sprite}_run`);
+    canvas.addEventListener('pointerdown', (e) => {
+      if (!this.geo) return;
+      const r = canvas.getBoundingClientRect();
+      const x = ((e.clientX - r.left) * (devicePixelRatio || 1)) / this.geo.S - 8;
+      this.toX = Math.min(this.geo.maxX, Math.max(this.geo.minX, x));
+    });
     this.frame(performance.now());
   }
 
@@ -174,7 +206,8 @@ class Stairs {
   }
 
   private frame = (now: number) => {
-    this.t += Math.min(0.1, (now - (this.last || now)) / 1000);
+    this.dt = Math.min(0.1, (now - (this.last || now)) / 1000);
+    this.t += this.dt;
     this.last = now;
     this.draw();
     this.raf = requestAnimationFrame(this.frame);
@@ -222,6 +255,9 @@ class Stairs {
     const steps = Math.ceil((W - landX) / run) + 1;
     const stepX = (k: number) => landX + 36 + (k - 1) * run;
     const stepY = (k: number) => landY + k * rise;
+    /** Which step a sprite standing at `x` (its left edge) has its feet on. */
+    const stepAt = (x: number) => (x + 8 < landX + 36 ? 0 : Math.floor((x + 8 - landX - 36) / run) + 1);
+    this.geo = { S, minX: landX, maxX: W - 20 };
     for (let k = 0; k < steps; k++) {
       const x = k === 0 ? landX : stepX(k);
       const y = stepY(k);
@@ -274,11 +310,39 @@ class Stairs {
       if (!p.frames) return [];
       const k = Math.floor((this.party.length - 1 - i) / 4);
       const side = (this.party.length - 1 - i) % 4;
+      const x = (k === 0 ? landX + 6 : stepX(k)) + side * 6;
+      if (i === 0 && this.toX !== null) return [this.leader(p.frames, x, stepAt)];
       const f = p.frames.frames[Math.floor((this.t + p.phase) * 6) % p.frames.frames.length];
-      return [{ img: p.frames.img, f, k, x: (k === 0 ? landX + 6 : stepX(k)) + side * 6 }];
+      return [{ img: p.frames.img, f, k, x, flip: false }];
     });
     g.fillStyle = 'rgba(0, 0, 0, 0.35)';
     for (const h of placed) g.fillRect(h.x + 2, stepY(h.k), h.f.w - 4, 2);
-    for (const h of [...placed].sort((a, b) => a.k - b.k)) g.drawImage(h.img, h.f.x, h.f.y, h.f.w, h.f.h, h.x, stepY(h.k) + 1 - h.f.h, h.f.w, h.f.h);
+    for (const h of [...placed].sort((a, b) => a.k - b.k)) {
+      const y = stepY(h.k) + 1 - h.f.h;
+      if (!h.flip) g.drawImage(h.img, h.f.x, h.f.y, h.f.w, h.f.h, h.x, y, h.f.w, h.f.h);
+      else {
+        g.save();
+        g.translate(h.x + h.f.w, 0);
+        g.scale(-1, 1);
+        g.drawImage(h.img, h.f.x, h.f.y, h.f.w, h.f.h, 0, y, h.f.w, h.f.h);
+        g.restore();
+      }
+    }
+  }
+
+  /** Your hero on the way to where you clicked (from their place in the line the first time), running, then idling
+   *  there. */
+  private leader(idle: NonNullable<ReturnType<typeof spriteFrames>>, from: number, stepAt: (x: number) => number) {
+    this.walkX ??= from;
+    const to = this.toX ?? this.walkX;
+    const gap = to - this.walkX;
+    const moving = Math.abs(gap) > 0.5;
+    if (moving) {
+      this.facing = Math.sign(gap);
+      this.walkX += Math.sign(gap) * Math.min(Math.abs(gap), 42 * this.dt);
+    }
+    const anim = moving && this.leaderRun ? this.leaderRun : idle;
+    const f = anim.frames[Math.floor(this.t * (moving ? 10 : 6)) % anim.frames.length];
+    return { img: anim.img, f, k: stepAt(this.walkX), x: Math.round(this.walkX), flip: this.facing < 0 };
   }
 }

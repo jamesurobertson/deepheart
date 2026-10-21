@@ -410,10 +410,11 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 .coin-fly .px, .drop.spinning .px { animation: coinspin 0.32s linear infinite; }
 @keyframes coinspin { 50% { transform: scaleX(0.15); } }
 
-.bars { position: fixed; inset: 0; pointer-events: none; }
+/* Over the damage numbers, so a monster's health still reads under a flurry of hits. */
+.bars { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
 .hp { position: absolute; left: -22px; top: 0; width: 44px; height: 6px; background: #1a0c0e; box-shadow: 0 0 0 2px var(--ink); }
 .hp i { display: block; height: 100%; background: linear-gradient(#ff7a6a, #c8302a); }
-.hp.boss { left: -60px; width: 120px; height: 10px; }
+.hp.boss { left: -75px; width: 150px; height: 12px; box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px rgba(255, 220, 200, 0.35), 0 3px 10px rgba(0, 0, 0, 0.6); }
 
 /* ---------- dock ---------- */
 
@@ -1395,7 +1396,7 @@ body.at-menu #ui { z-index: 20; }
 body.at-menu #stage { visibility: hidden; }
 body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticker, body.at-menu .hero-mark { display: none !important; }
 .title-menu { background: #0d0709; }
-.mm-stairs { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.mm-stairs { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; cursor: pointer; }
 .mm-panel { position: relative; align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 34px; width: min(560px, 100% / var(--mm-scale, 1)); zoom: var(--mm-scale, 1); box-sizing: border-box;
   padding: 40px 40px 40px max(72px, calc(8vw + var(--safe-l))); background: linear-gradient(90deg, rgba(8, 4, 6, 0.94) 62%, rgba(8, 4, 6, 0)); }
 .mm-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }

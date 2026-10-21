@@ -1269,7 +1269,7 @@ export class Ui {
         this.bars.set(m.id, bar);
       }
       // Keep bars on screen even when a big monster stands near the edge.
-      const half = m.boss ? 62 : 24;
+      const half = m.boss ? 79 : 24;
       const x = Math.min(innerWidth - half, Math.max(half, s.x));
       bar.style.transform = `translate(${Math.round(x)}px, ${Math.round(Math.max(4, s.y - 8))}px)`;
       (bar.firstChild as HTMLElement).style.width = `${Math.max(0, m.hp.div(m.max).toNumber()) * 100}%`;
