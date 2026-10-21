@@ -520,7 +520,7 @@ function buildUpgrades(): UpgDef[] {
   const fever: [string, string, number, number, Effect][] = [
     ['Battle Fury', 'Rampage fills 25% faster.', 1, 2_000, { t: 'fever', fill: 1.25 }],
     ['Blood Frenzy', 'Rampage lasts 50% longer.', 5, 5e7, { t: 'fever', dur: 1.5 }],
-    ['Unstoppable', 'Rampage +1.', 15, 5e12, { t: 'fever', power: 1 }],
+    ['Unstoppable', 'Rampage hits harder: ×3, then ×4 when held (was ×2, ×3).', 15, 5e12, { t: 'fever', power: 1 }],
   ];
   fever.forEach(([name, desc, n, cost, effect], k) => out.push({ id: `fev${k}`, name, desc, cost, icon: { sprite: 'flask_big_red', tier: k }, effect, req: { t: 'fevers', n }, needs: 'rampage' }));
   return out;
@@ -554,7 +554,7 @@ export const ABILITIES: AbilityDef[] = [
   { id: 'rampage', name: 'Rampage', desc: 'Attacks charge it. Unleash for ×2 party damage for 10s. Keep attacking for ×3.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
   { id: 'cleave', name: 'Cleave', desc: 'Your clicks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 10 * 60 },
   { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold for 30 seconds.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 15 * 60 },
-  { id: 'drums', name: 'War Drums', desc: 'Your party deals ×2 damage for 30 seconds.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 10 * 60 },
+  { id: 'drums', name: 'War Drums', desc: 'Your clicks and Phantom Blade are 50% more likely to land critical hits, for 30 seconds.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 10 * 60 },
   { id: 'legion', name: 'Phantom Legion', desc: 'Your Phantom Blade attacks ten times as fast for 30 seconds.', kind: 'button', comp: compIndex('stormcaller'), trait: 4, dur: 30, cooldown: 15 * 60 },
 ];
 export const ABILITY_BY_ID = new Map(ABILITIES.map((a) => [a.id, a]));

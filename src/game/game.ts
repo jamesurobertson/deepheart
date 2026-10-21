@@ -60,6 +60,7 @@ const FEVER_CLICKS = 60;
  *  Unstoppable upgrade and the Blood Drum add to both). */
 const RAMPAGE_STEPS = [20];
 const RAMPAGE_TIERS = [2, 3];
+const DRUMS_CRIT = 0.5;
 const RAMPAGE_EXTEND = 3;
 /** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
 const CLUTCH_GOLD = 1.5;
@@ -601,8 +602,7 @@ export class Game {
     if (!a || a.kind !== 'button' || !this.abilityUnlocked(id) || this.abilityCooldown(id) > 0) return false;
     const dur = a.dur ?? 0;
     const buff: Buff = { id, name: a.name, t: dur, dur, dps: 1, click: 1, gold: 1 };
-    if (id === 'drums') buff.dps = 2;
-    else if (id === 'treasure') buff.gold = 3;
+    if (id === 'treasure') buff.gold = 3;
     else if (id === 'legion') buff.blade = 10;
     this.addBuff(buff);
     this.s.cooldowns[id] = a.cooldown ?? 0;
@@ -827,8 +827,9 @@ export class Game {
     return this.owned.has(id);
   }
 
+  /** War Drums, while they play, add DRUMS_CRIT to the chance. */
   critChance() {
-    return this.c.crit;
+    return Math.min(1, this.c.crit + (this.s.buffs.some((b) => b.id === 'drums') ? DRUMS_CRIT : 0));
   }
 
   critMult() {

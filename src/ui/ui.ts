@@ -92,6 +92,7 @@ const starsOf = (lv: number) => (relicStars(lv) ? ` <span class="stars">${'★'.
 function buffText(b: Buff) {
   if (b.id === 'cleave') return 'clicks hit every monster';
   if (b.id === 'flurry') return '10 clicks a second';
+  if (b.id === 'drums') return '+50% critical hits';
   if (b.blade && b.blade > 1) return `Phantom Blade ×${b.blade}`;
   if (b.dps > 1 && b.click > 1) return `×${b.dps} damage`;
   if (b.dps > 1) return `×${b.dps} companion damage`;
