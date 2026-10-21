@@ -42,10 +42,13 @@ export interface BinderCard {
   first: { plain: string; gold: string };
 }
 
-/** A color you can have binders for: its name and tint. */
+/** A color you can have binders for: its name and tint, the floor its cards start turning up on, and whether you've
+ *  been that deep (every color's binder is there from the start, so you can see what waits further down). */
 export interface BinderColor {
   name: string;
   tint: string;
+  from: number;
+  reached: boolean;
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -63,6 +66,8 @@ export class Binder {
   private sound: (name: BinderSound) => void;
   /** New cards that have already slammed into their pockets (they keep their NEW tag until the binder closes). */
   private landed = new Set<string>();
+  /** New cards you've opened up: no longer new (`key`s). */
+  private viewed = new Set<string>();
   private timers: number[] = [];
   /** Turning to each page with new cards on its own, until you turn a page yourself. */
   private touring = true;
@@ -103,7 +108,7 @@ export class Binder {
   }
 
   private isFresh(i: number, lap = this.lap, gold = this.gold) {
-    return this.cards[i].fresh.includes(`${lap}:${gold ? 1 : 0}`);
+    return this.cards[i].fresh.includes(`${lap}:${gold ? 1 : 0}`) && !this.viewed.has(this.key(i, lap, gold));
   }
 
   close() {
@@ -181,16 +186,21 @@ export class Binder {
     else this.flip(by);
   };
 
-  /** The color tabs across the top, each with how much of that binder you've filled, and the gold toggle. */
+  /** The color tabs across the top, each with how much of that binder you've filled (one row: the gold toggle sits
+   *  down by the page arrows). */
   private tabs() {
     const filled = (lap: number) => {
       const can = this.cards.filter((c) => c.laps.includes(lap) && (!this.gold || c.canGold));
       const got = can.filter((c) => ((this.gold ? c.gold : c.n)[lap] ?? 0) > 0);
       return `${got.length}/${can.length}`;
     };
-    const anyNew = (lap: number, gold: boolean) => this.cards.some((_, i) => this.isFresh(i, lap, gold));
-    const tabs = this.colors.map((c, l) => `<button class="bnd-tab${l === this.lap ? ' on' : ''}${anyNew(l, this.gold) ? ' new' : ''}" data-bd="lap" data-l="${l}" style="--lc:${c.tint}"><i></i>${esc(c.name)} <em>${filled(l)}</em></button>`).join('');
-    return `<div class="bnd-tabs">${tabs}${this.goldSwitch(anyNew(this.lap, !this.gold))}</div>`;
+    const tabs = this.colors.map((c, l) => `<button class="bnd-tab${l === this.lap ? ' on' : ''}${c.reached ? '' : ' far'}${this.anyNew(l, this.gold) ? ' new' : ''}" data-bd="lap" data-l="${l}" style="--lc:${c.tint}"><i></i>${esc(c.name)} <em>${filled(l)}</em></button>`).join('');
+    return `<div class="bnd-tabs">${tabs}</div>`;
+  }
+
+  /** Cards new since you last looked in this color's binder (plain or gold). */
+  private anyNew(lap: number, gold: boolean) {
+    return this.cards.some((_, i) => this.isFresh(i, lap, gold));
   }
 
   private goldSwitch(otherNew = false) {
@@ -222,18 +232,21 @@ export class Binder {
     };
     const last = this.spreads - 1;
     this.landNew(from);
+    const color = this.colors[this.lap];
     this.el.innerHTML = `
       ${this.tabs()}
+      ${color.reached ? '' : `<p class="bnd-far">${esc(color.name)} cards start on floor ${color.from}.</p>`}
       <div class="bnd-spread">${page(from)}<div class="bnd-rings"><i></i><i></i><i></i></div>${page(from + PER_PAGE)}</div>
       <div class="bnd-nav">
         <button data-bd="prev" ${this.spread ? '' : 'disabled'} aria-label="Previous pages">◀</button>
         <span>${this.spread * 2 + 1}–${this.spread * 2 + 2} / ${last * 2 + 2}</span>
         <button data-bd="next" ${this.spread < last ? '' : 'disabled'} aria-label="Next pages">▶</button>
+        ${this.goldSwitch(this.anyNew(this.lap, !this.gold))}
       </div>
       <button class="bnd-x" data-bd="close" aria-label="Close the binder">✕</button>`;
   }
 
-  /** A slot for a card that doesn't come in this binder's color: says where it does (without naming colors you haven't reached). */
+  /** A slot for a card that doesn't come in this binder's color: says where it does. */
   private elsewhere(c: BinderCard) {
     if (this.gold && !c.canGold) return '<i class="bnd-pocket none"><small>No gold</small></i>';
     if (this.lap > c.laps[0]) return `<i class="bnd-pocket none"><small>${c.laps.length === 1 && !c.laps[0] ? 'Plain only' : 'Not in this color'}</small></i>`;
@@ -302,6 +315,7 @@ export class Binder {
   }
 
   private renderCard(i: number) {
+    this.viewed.add(this.key(i));
     const c = this.cards[i];
     const n = this.count(i);
     const frame = this.gold ? CARD_FRAME.gold : CARD_FRAME[c.def.kind];
@@ -312,7 +326,7 @@ export class Binder {
       return `<button class="${owned ? 'on' : ''}${l === this.lap ? ' at' : ''}" data-bd="lap" data-l="${l}" style="--lc:${col.tint}" ${can ? '' : 'disabled'} aria-label="${esc(col.name)}"></button>`;
     }).join('');
     const colorsFound = this.colors.filter((_, l) => ((this.gold ? c.gold : c.n)[l] ?? 0) > 0).length;
-    const where = c.where[this.lap].length ? c.where[this.lap].map((w) => `<li>${esc(w)}</li>`).join('') : '<li>Turns up anywhere</li>';
+    const where = c.where[this.lap].length ? c.where[this.lap].map((w) => `<li>${esc(w)}</li>`).join('') : `<li>${c.def.kind === 'goblin' ? 'Turns up anywhere' : 'Somewhere deeper'}</li>`;
     const title = `${this.gold ? 'Gold ' : ''}${cardName(c.def.name, this.lap)}`;
     this.el.innerHTML = `
       <div class="bnd-detail">
@@ -321,7 +335,6 @@ export class Binder {
           <canvas class="bnd-art" width="64" height="48"></canvas>
           <span class="bnd-type">${esc(c.kind)}<em>${no(i)}</em></span>
         </div>
-        ${c.canGold ? this.goldSwitch() : ''}
         <div class="bnd-info">
           <small>You have <b class="bnd-count">${n ? `×${n}` : 'none yet'}</b></small>
           <div><small>Colors ${colorsFound}/${this.colors.length}</small><div class="bnd-laps">${dots}</div></div>
@@ -333,7 +346,9 @@ export class Binder {
         <button data-bd="cprev" aria-label="Previous card">◀</button>
         <button data-bd="back" class="bnd-back">Back to binder</button>
         <button data-bd="cnext" aria-label="Next card">▶</button>
-      </div>`;
+        ${c.canGold ? this.goldSwitch() : ''}
+      </div>
+      <button class="bnd-x" data-bd="close" aria-label="Close the binder">✕</button>`;
     this.paint(this.el.querySelector('canvas')!, c, n > 0);
   }
 

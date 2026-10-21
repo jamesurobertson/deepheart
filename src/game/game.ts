@@ -8,6 +8,8 @@ import {
 } from './data.ts';
 
 export const SAVE_VERSION = 2;
+/** A card someone gave you, as its `via` ("gift:Pip"). */
+export const giftVia = (who: string) => `gift:${who}`;
 export { COST_GROWTH };
 /** COST_GROWTH^k, remembered: level costs ask for the same powers over and over. */
 const costPows: Decimal[] = [];
@@ -257,6 +259,12 @@ export interface SaveState {
   trades: number;
   /** The hidden cards (in your room and around town) you've found. */
   stashes: string[];
+  /** Dan and Victor have told you how collecting works (before your first trade with either). */
+  brosMet: boolean;
+  /** Who has given you their one spare card: Pip next door, Dan when you had next to none. */
+  gifts: string[];
+  /** The brothers you've gone to since they told you about collecting. */
+  talkedTo: string[];
   /** Bosses beaten in the last seconds, champions slain, Rainbow Vaults opened, highest Rampage tier reached. */
   clutches: number;
   champions: number;
@@ -296,7 +304,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
@@ -520,6 +528,9 @@ export class Game {
     if (s.bestCleared === undefined) s.bestCleared = (s.bestFloor ?? 1) - 1;
     s.peakKills ??= 0;
     s.slainLaps ??= {};
+    s.brosMet ??= (s.trades ?? 0) > 0;
+    s.gifts ??= [];
+    s.talkedTo ??= s.brosMet ? ['dan', 'victor'] : [];
     // The six companions that wait on deep floors used to cost so little there that they arrived at level 150–400.
     // Repriced to the gold at their floor (and stronger to match), they start over, with every gold piece paid back.
     if (!s.latePrices) {
@@ -540,19 +551,30 @@ export class Game {
     // Before Rainbow Hauls, every rainbow goblin caught opened the vault.
     if (s.rainbows === undefined) s.rainbows = s.vaults ?? 0;
     if (s.rainbowSeen === undefined) s.rainbowSeen = (s.rainbows ?? 0) > 0;
-    // The Rotting Deep's floor-45 boss used to be the Bloated Ogre: its cards and kills pass to the Sludge Walker.
-    const ogre = s.cards?.['bloated-ogre'];
-    if (ogre) {
-      const walker = (s.cards['sludge-walker'] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
-      walker.n = walker.n.map((n, i) => n + (ogre.n[i] ?? 0));
-      walker.gold = walker.gold.map((n, i) => n + (ogre.gold[i] ?? 0));
-      walker.at ??= ogre.at;
-      walker.goldAt ??= ogre.goldAt;
-      delete s.cards['bloated-ogre'];
-    }
-    if (s.slain?.['bloated-ogre']) {
-      s.slain['sludge-walker'] = (s.slain['sludge-walker'] ?? 0) + s.slain['bloated-ogre'];
-      delete s.slain['bloated-ogre'];
+    // Renamed monsters (a card's id is its name): cards and kills pass to the new name. The Rotting Deep's floor-45
+    // boss used to be the Bloated Ogre.
+    for (const [was, now] of [['bloated-ogre', 'sludge-walker'], ['bone-archer', 'skeleton-archer']]) {
+      const old = s.cards?.[was];
+      if (old) {
+        const card = (s.cards[now] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
+        card.n = card.n.map((n, i) => n + (old.n[i] ?? 0));
+        card.gold = card.gold.map((n, i) => n + (old.gold[i] ?? 0));
+        card.at ??= old.at;
+        card.goldAt ??= old.goldAt;
+        card.via ??= old.via;
+        card.goldVia ??= old.goldVia;
+        delete s.cards[was];
+      }
+      if (s.slain?.[was]) {
+        s.slain[now] = (s.slain[now] ?? 0) + s.slain[was];
+        delete s.slain[was];
+      }
+      const laps = s.slainLaps[was];
+      if (laps) {
+        s.slainLaps[now] = CORRUPTION.map((_, i) => (s.slainLaps[now]?.[i] ?? 0) + (laps[i] ?? 0));
+        delete s.slainLaps[was];
+      }
+      if (s.dreamCards) s.dreamCards = s.dreamCards.map((key) => (key.startsWith(`${was}:`) ? now + key.slice(was.length) : key));
     }
     // Companion milestone upgrades were renumbered (new levels, no end). The levels both lists share carry over;
     // the old 150/250/300/400 ones are gone.
@@ -1927,6 +1949,16 @@ export class Game {
       }
     }
     return true;
+  }
+
+  /** Someone's one spare card (once each): a plain one from the first two zones, one you don't have if they've got it. */
+  giftCard(who: string) {
+    if (this.s.gifts.includes(who)) return null;
+    const early = CARDS.filter((c) => c.kind === 'monster' && c.zone <= 1 && c.laps.includes(0));
+    const missing = early.filter((c) => !this.cardCount(c.id));
+    const pool = missing.length ? missing : early;
+    this.s.gifts.push(who);
+    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, giftVia(who));
   }
 
   private receive(id: string, gold: boolean, from: string) {

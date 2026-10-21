@@ -188,12 +188,12 @@ async function boot() {
       scene.rebuild(game);
     }
     // ?state=awaken: deep enough to Awaken for the first time, with a binder full of cards (lots of spares to trade,
-    // a few gold, a handful new since you last woke). ?state=reawaken: the same, having awakened once already.
+    // a few gold, a handful new since you last woke), or none with &cards=0. ?state=reawaken: the same, having awakened once already.
     // Rebuilt on every load, so you can Awaken, reload and do it again.
     if (TEST_STATE === 'awaken' || TEST_STATE === 'reawaken') {
       const s = game.s;
       const again = TEST_STATE === 'reawaken';
-      Object.assign(s, { awakens: again ? 1 : 0, dreamSeen: again, stones: again ? 1 : 0, souls: again ? 2e6 : 5e4, soulsLifetime: again ? 5e5 : 0 });
+      Object.assign(s, { awakens: again ? 1 : 0, dreamSeen: again, brosMet: again, gifts: again ? ['Dan', 'Pip'] : [], talkedTo: again ? ['dan', 'victor'] : [], stones: again ? 1 : 0, souls: again ? 2e6 : 5e4, soulsLifetime: again ? 5e5 : 0 });
       const depth = game.awakenFloor();
       Object.assign(s, { maxFloor: depth, bestFloor: Math.max(s.bestFloor, depth), cycleBest: depth, bestCleared: depth - 1, auto: true });
       s.owned = s.owned.map((n) => Math.max(n, 40 + depth * 4));
@@ -212,6 +212,11 @@ async function boot() {
         s.cards[c.id] = { n, gold, at: 1000 + Math.floor(rand() * 90000) };
       }
       s.dreamCards = Object.keys(s.cards).filter(() => rand() < 0.12).slice(0, 6).map((id) => `${id}:${s.cards[id].n.findIndex((n) => n > 0)}:0`);
+      // &cards=0: awaken with an empty binder, as most first awakenings are (Dan gives you your first).
+      if (params.get('cards') === '0') {
+        s.cards = {};
+        s.dreamCards = [];
+      }
       game.invalidate();
       game.goFloor(depth);
       scene.rebuild(game);

@@ -17,8 +17,9 @@ export interface Prop {
   y: number;
   w?: number;
   h?: number;
-  /** Something you can walk up to and use (its id picks what happens; the label is its prompt). */
-  use?: { id: string; label: string };
+  /** Something you can walk up to and use (its id picks what happens; the label is its prompt). `hit` is where it's
+   *  drawn (x, y, w, h in pixels): pointing there, and only there, picks it. */
+  use?: { id: string; label: string; hit: [number, number, number, number] };
   /** Walk-through decoration. */
   flat?: boolean;
 }
@@ -30,6 +31,9 @@ export interface Warp {
   tx: number;
   ty: number;
   dir: Dir;
+  /** What pointing at it says, and where it's drawn (the stairs, the doormat, the front door): clicking it walks you through. */
+  label: string;
+  hit: [number, number, number, number];
 }
 
 export interface NpcDef {
@@ -196,6 +200,8 @@ export const PARTY_SPOTS = [[121, 73], [129, 77]];
 export const FOE_SPOTS = [[142, 74], [150, 77]];
 /** Figures lined up along the top of the dresser (feet). */
 export const SHELF_SPOTS = [[96, 24], [106, 24], [116, 24], [126, 24], [136, 24], [146, 24]];
+/** Koko, the family's black cat, sitting on the sofa downstairs (drawn live: she blinks and flicks her tail). */
+export const KOKO = { x: 115, y: 80, hit: [115, 80, 14, 12] as [number, number, number, number] };
 /** Where the "!" hangs when the binder on the desk has cards you haven't seen. */
 export const BINDER_MARK = [72, 4];
 /** Cards hidden around the place: stand on the spot and press (or tap yourself) to find one. Each turns up once. */
@@ -266,16 +272,16 @@ function blanket(ctx: Ctx) {
 const bedroom: MapDef = {
   id: 'bedroom', w: 10, h: 9, wallRows: 2,
   props: [
-    { x: 0, y: 2, w: 2, h: 3, use: { id: 'bed', label: 'Bed' } },
-    { x: 6, y: 3, w: 4, h: 2, use: { id: 'playset', label: 'Keep playing' } },
-    { x: 4, y: 2, w: 2, use: { id: 'binder', label: 'Binder' } },
-    { x: 6, y: 2, w: 4, use: { id: 'toys', label: 'Figures' } },
-    { x: 0, y: 1, use: { id: 'poster', label: 'Poster' } },
-    { x: 2, y: 1, w: 2, use: { id: 'window', label: 'Window' } },
+    { x: 0, y: 2, w: 2, h: 3, use: { id: 'bed', label: 'Bed', hit: [0, 24, 32, 56] } },
+    { x: 6, y: 3, w: 4, h: 2, use: { id: 'playset', label: 'Keep playing', hit: [96, 46, 64, 32] } },
+    { x: 4, y: 2, w: 2, use: { id: 'binder', label: 'Binder', hit: [68, 15, 14, 9] } },
+    { x: 6, y: 2, w: 4 },
+    { x: 0, y: 1, use: { id: 'poster', label: 'Poster', hit: [7, 2, 18, 22] } },
+    { x: 2, y: 1, w: 2, use: { id: 'window', label: 'Window', hit: [30, 4, 36, 27] } },
     { x: 0, y: 7 },
-    { x: 5, y: 5, use: { id: 'brosGame', label: 'Their game' } },
+    { x: 5, y: 5, use: { id: 'brosGame', label: 'Their game', hit: [77, 83, 22, 19] } },
   ],
-  warps: [{ x: 9, y: 7, to: 'house', tx: 8, ty: 2, dir: 'left' }],
+  warps: [{ x: 9, y: 7, to: 'house', tx: 8, ty: 2, dir: 'left', label: 'Downstairs', hit: [144, 112, 16, 16] }],
   // The older brothers, on the rug, facing each other over a game of cards.
   npcs: [
     { id: 'dan', name: 'Dan', sprite: 'ef_elf_m', x: 4, y: 5, dir: 'right' },
@@ -289,13 +295,11 @@ const bedroom: MapDef = {
     for (let y = 39; y < 112; y += 8) px(ctx, 0, y, 160, 1, C.floorD);
     windowPane(ctx, 32, 4);
     px(ctx, 30, 28, 36, 3, C.trim);
-    // The DEEPHEART poster, over the bed.
+    // The DEEPHEART poster, over the bed: the Squire under the heart.
     px(ctx, 7, 2, 18, 22, C.ink);
     px(ctx, 8, 3, 16, 20, C.poster);
-    pixels(ctx, ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'], 12, 5, C.heart);
-    px(ctx, 10, 14, 12, 1, C.gold);
-    px(ctx, 11, 17, 10, 1, C.gold);
-    px(ctx, 12, 20, 8, 1, C.gold);
+    pixels(ctx, ['.#.#.', '#####', '.###.', '..#..'], 14, 4, C.heart);
+    drawSprite(ctx, 'knight_m', 0, 16, 22, false, false, 0.5);
     // Bed against the wall, in the corner.
     px(ctx, 0, 24, 32, 56, C.ink);
     px(ctx, 1, 25, 30, 8, C.bed);
@@ -326,15 +330,16 @@ const bedroom: MapDef = {
 const house: MapDef = {
   id: 'house', w: 10, h: 9, wallRows: 2,
   props: [
-    { x: 0, y: 2, w: 4, use: { id: 'kitchen', label: 'Kitchen' } },
-    { x: 4, y: 4, w: 2, h: 2, use: { id: 'table', label: 'Table' } },
-    { x: 7, y: 5, w: 2, use: { id: 'sofa', label: 'Sofa' } },
-    { x: 6, y: 1, use: { id: 'photo', label: 'Photo' } },
+    { x: 0, y: 2, w: 4, use: { id: 'kitchen', label: 'Kitchen', hit: [0, 22, 64, 26] } },
+    { x: 4, y: 4, w: 2, h: 2, use: { id: 'table', label: 'Table', hit: [62, 62, 36, 28] } },
+    { x: 7, y: 5, use: { id: 'koko', label: 'Pet Koko', hit: KOKO.hit } },
+    { x: 7, y: 4, w: 2, h: 2, use: { id: 'sofa', label: 'Sofa', hit: [111, 74, 34, 22] } },
+    { x: 6, y: 1, use: { id: 'photo', label: 'Photo', hit: [99, 6, 14, 14] } },
   ],
   warps: [
-    { x: 9, y: 2, to: 'bedroom', tx: 8, ty: 7, dir: 'left' },
-    { x: 4, y: 8, to: 'town', tx: 4, ty: 6, dir: 'down' },
-    { x: 5, y: 8, to: 'town', tx: 4, ty: 6, dir: 'down' },
+    { x: 9, y: 2, to: 'bedroom', tx: 8, ty: 7, dir: 'left', label: 'Upstairs', hit: [144, 32, 16, 16] },
+    { x: 4, y: 8, to: 'town', tx: 4, ty: 6, dir: 'down', label: 'Outside', hit: [64, 128, 32, 16] },
+    { x: 5, y: 8, to: 'town', tx: 4, ty: 6, dir: 'down', label: 'Outside', hit: [64, 128, 32, 16] },
   ],
   npcs: [{ id: 'mum', name: 'Mum', sprite: 'ef_highelf_f', x: 2, y: 3, dir: 'down' }],
   draw(ctx) {
@@ -375,8 +380,6 @@ const house: MapDef = {
     px(ctx, 139, 75, 5, 19, C.sofaD);
     px(ctx, 113, 76, 3, 2, C.blanketL);
     px(ctx, 140, 76, 3, 2, C.blanketL);
-    px(ctx, 118, 86, 8, 5, C.rugB);
-    px(ctx, 119, 87, 6, 1, C.rug);
     // Stairs up, and the doormat by the front door.
     stairs(ctx, 144, 32, false);
     px(ctx, 64, 128, 32, 16, C.rugD);
@@ -395,18 +398,18 @@ const town: MapDef = {
   id: 'town', w: 20, h: 18, wallRows: 0,
   // Doors come before the houses they're set in: the first prop on a tile is the one you use.
   props: [
-    { x: 14, y: 5, use: { id: 'friendDoor', label: 'Door' } },
-    { x: 9, y: 12, use: { id: 'shop', label: 'Card shop' } },
-    { x: 7, y: 5, use: { id: 'mailbox', label: 'Mailbox' } },
-    { x: 9, y: 7, use: { id: 'sign', label: 'Sign' } },
-    { x: 2, y: 11, w: 4, h: 4, use: { id: 'pond', label: 'Pond' } },
+    { x: 14, y: 5, use: { id: 'friendDoor', label: 'Door', hit: [226, 82, 12, 14] } },
+    { x: 9, y: 12, use: { id: 'shop', label: 'Card shop', hit: [112, 144, 96, 64] } },
+    { x: 7, y: 5, use: { id: 'mailbox', label: 'Mailbox', hit: [115, 81, 10, 15] } },
+    { x: 9, y: 7, use: { id: 'sign', label: 'Sign', hit: [145, 114, 14, 14] } },
+    { x: 2, y: 11, w: 4, h: 4, use: { id: 'pond', label: 'Pond', hit: [32, 176, 64, 64] } },
     { x: 2, y: 2, w: 5, h: 4 },
     { x: 12, y: 2, w: 5, h: 4 },
     { x: 7, y: 9, w: 6, h: 4 },
     { x: 14, y: 10, w: 4 },
     ...TREES.map(([x, y]) => ({ x, y })),
   ],
-  warps: [{ x: 4, y: 5, to: 'house', tx: 4, ty: 7, dir: 'up' }],
+  warps: [{ x: 4, y: 5, to: 'house', tx: 4, ty: 7, dir: 'up', label: 'Home', hit: [66, 82, 12, 14] }],
   npcs: [
     { id: 'friend', name: 'Pip', sprite: 'cr_elf', x: 13, y: 7, dir: 'down', roam: [11, 6, 17, 7] },
     { id: 'fisher', name: 'Old Bram', sprite: 'ef_fatcleric', x: 6, y: 13, dir: 'left' },

@@ -120,7 +120,7 @@ export const ZONES: ZoneDef[] = [
   },
   {
     name: 'The Bone Crypts', tiles: 'crypt',
-    band: [m('skelet', 'Skeleton'), m('tiny_zombie', 'Rotling'), m('skelet', 'Bone Archer', 0.9, 0xe8d49a), m('necromancer', 'Grave Priest', 0.9)],
+    band: [m('skelet', 'Skeleton'), m('tiny_zombie', 'Rotling'), m('skelet', 'Skeleton Archer', 0.9, 0xe8d49a), m('necromancer', 'Grave Priest', 0.9)],
     mid: m('ef_golem', 'Bone Golem', 1, 0xd8d0c0), boss: m('necromancer', 'The Lich', 1, 0xb0a0ff),
     lap: [m('cr_skeleton', 'Grave Walker'), m('cr_blue_wraith', 'Pale Wraith'), m('cr_frost_skeleton', 'Hooded Bones', 0.9, 0xd0c8ff)],
   },

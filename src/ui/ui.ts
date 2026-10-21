@@ -1,7 +1,7 @@
 import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, isTraitId, levelMult, milestoneAt, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, FLOOR_KILLS, RELICS_ON, TUNE, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, FLOOR_KILLS, RELICS_ON, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
@@ -2645,6 +2645,31 @@ export class Ui {
         this.hooks.save();
         return CARD_BY_ID.get(got.id)!.name;
       },
+      brosMet: g.s.brosMet,
+      meetBros: () => {
+        g.s.brosMet = true;
+        this.hooks.save();
+      },
+      gifts: [...g.s.gifts],
+      traded: () => g.s.trades > 0,
+      muted: () => g.s.settings.muted,
+      toggleSound: () => {
+        g.s.settings.muted = !g.s.settings.muted;
+        this.syncMute();
+        this.hooks.settings();
+      },
+      mainMenu: () => this.hooks.mainMenu(),
+      talkedTo: [...g.s.talkedTo],
+      talkTo: (who) => {
+        g.s.talkedTo.push(who);
+        this.hooks.save();
+      },
+      gift: (who) => {
+        const got = g.giftCard(who);
+        if (!got) return null;
+        this.hooks.save();
+        return CARD_BY_ID.get(got.id)!.name;
+      },
       cover: () => {
         g.wake();
         this.hooks.save();
@@ -2691,13 +2716,14 @@ export class Ui {
 
   private viaLine(via: string, what = '') {
     const spot = STASHES.find((s) => s.id === via);
-    return spot ? `Found${what} ${spot.found}` : `Traded${what} from ${via}`;
+    if (spot) return `Found${what} ${spot.found}`;
+    return via.startsWith(giftVia('')) ? `A gift from ${via.slice(giftVia('').length)}` : `Traded${what} from ${via}`;
   }
 
   /** The binders you have: plain, plus each lap's color once you've been that deep. */
   private binderColors(): BinderColor[] {
-    const laps = Math.min(lapOf(this.game.s.bestFloor), CORRUPTION.length - 1);
-    return CORRUPTION.slice(0, laps + 1).map((c, l) => ({ name: l ? c.name : 'Plain', tint: `#${(l ? c.tint : 0xc9b8a0).toString(16).padStart(6, '0')}` }));
+    const laps = lapOf(this.game.s.bestFloor);
+    return CORRUPTION.map((c, l) => ({ name: l ? c.name : 'Plain', tint: `#${(l ? c.tint : 0xc9b8a0).toString(16).padStart(6, '0')}`, from: l * ZONES.length * 10 + 1, reached: l <= laps }));
   }
 
   private renderDescendConfirm() {
