@@ -2017,7 +2017,9 @@ export class Ui {
     if (kind === 'hero') {
       const i = Number(id);
       const now = g.heroIndex() === i;
-      return `<div class="tt-h"><b>${now ? 'Your hero' : 'Make hero'}</b></div><p class="tt-d">${now ? `The ${esc(COMPS[i].name)} follows your mouse around the battlefield and fights whatever they reach. Click the ${G.star()} again to have no hero.` : `Make the ${esc(COMPS[i].name)} your hero: they'll leave the line and follow your mouse around the battlefield.`}</p>`;
+      return now
+        ? `<div class="tt-h"><b>The ${esc(COMPS[i].name)} is your hero</b></div><p class="tt-d">Click the ${G.star()} again to have no hero.</p>`
+        : `<div class="tt-h"><b>Make the ${esc(COMPS[i].name)} your hero</b></div>`;
     }
     if (kind === 'fm') {
       const f = Number(id);
