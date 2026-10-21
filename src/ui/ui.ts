@@ -2478,7 +2478,8 @@ export class Ui {
     if (this.cardQueue.length === 1) this.revealCard();
   }
 
-  /** The card turns up big over the room face-down, flips over in a burst of light, then flies into the Collection button. */
+  /** The card turns up big over the room face-down and flips over in a burst of light; clicked, it flies into the
+   *  Collection button. */
   private revealCard() {
     const ev = this.cardQueue[0];
     if (!ev) return;
@@ -2497,7 +2498,7 @@ export class Ui {
     const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
       <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96)}</div></div></div>
-      <div class="cr-text"><small>${head}</small><b>${esc(d.name)} Card</b>${line}</div>`;
+      <div class="cr-text"><small>${head}</small><b>${esc(d.name)} Card</b>${line}<span class="cr-tap">${this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
     this.el.loot.parentElement!.appendChild(el);
     // The sound lands with the flip.
     setTimeout(() => this.hooks.sound(ev.gold || d.kind !== 'monster' ? 'drop4' : 'drop3', { vol: 0.8 }), 380);
@@ -2512,11 +2513,20 @@ export class Ui {
       if (!this.cardQueue.length && !this.cardsComing) this.releaseTrophies();
       this.revealCard();
     };
-    el.querySelector('.cr-card')!.addEventListener('animationend', (e) => {
+    // It waits, face up, for a click (so a card found while you're away is still there when you're back); the click
+    // isn't an attack on whatever is behind it.
+    const card = el.querySelector<HTMLElement>('.cr-card')!;
+    card.addEventListener('pointerdown', (e) => e.stopPropagation());
+    card.addEventListener('click', () => {
+      if (el.classList.contains('go')) return;
+      el.classList.add('go');
+      this.hooks.sound('card', { vol: 0.6 });
+      // In case the flight never plays (reduced motion, a hidden tab).
+      setTimeout(finish, 900);
+    });
+    card.addEventListener('animationend', (e) => {
       if ((e as AnimationEvent).animationName === 'cr-fly') finish();
     });
-    // In case the animation never runs (reduced motion, a hidden tab).
-    setTimeout(finish, 4500);
   }
 
   private renderAwakenConfirm() {

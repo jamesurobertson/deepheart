@@ -1098,14 +1098,17 @@ body.compact .card-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap:
 
 /* ---------- card reveal ---------- */
 
-.card-reveal { --hold: 2.3s; position: absolute; z-index: 24; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); pointer-events: none !important; }
-.card-reveal.dupe { --hold: 1.4s; }
-.card-reveal.gold { --hold: 2.8s; }
+/* A found card turns over and stays, face up, until it's clicked (.go): then it flies into the Collection button. */
+.card-reveal { position: absolute; z-index: 24; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); pointer-events: none !important; }
 .cr-rays { position: absolute; left: 50%; top: 90px; width: 440px; height: 440px; margin: -220px 0 0 -220px; border-radius: 50%;
   background: repeating-conic-gradient(color-mix(in srgb, var(--rc) 50%, transparent) 0deg 7deg, transparent 7deg 18deg);
   mask: radial-gradient(circle, #000 18%, transparent 66%); -webkit-mask: radial-gradient(circle, #000 18%, transparent 66%);
-  animation: cr-rays-in 0.45s 0.35s both, cr-spin 9s linear infinite, cr-out 0.3s var(--hold) forwards; }
-.cr-card { position: relative; perspective: 700px; animation: cr-in 0.35s cubic-bezier(0.2, 1.5, 0.4, 1) both, cr-fly 0.5s cubic-bezier(0.5, 0, 0.9, 0.6) var(--hold) forwards; }
+  animation: cr-rays-in 0.45s 0.35s both, cr-spin 9s linear infinite; }
+.cr-card { position: relative; perspective: 700px; animation: cr-in 0.35s cubic-bezier(0.2, 1.5, 0.4, 1) both; pointer-events: auto !important; cursor: pointer; }
+.cr-card:hover .mcard { filter: brightness(1.12); }
+.card-reveal.go .cr-rays { animation: cr-spin 9s linear infinite, cr-out 0.3s forwards; }
+.card-reveal.go .cr-card { animation: cr-fly 0.5s cubic-bezier(0.5, 0, 0.9, 0.6) forwards; pointer-events: none !important; }
+.card-reveal.go .cr-text { animation: cr-out 0.25s forwards; }
 .cr-flip { position: relative; width: 132px; height: 180px; transform-style: preserve-3d; animation: cr-flip 0.55s ease-out 0.3s both; }
 .cr-back, .cr-front { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .cr-back { display: grid; place-items: center; transform: rotateY(180deg); color: var(--ess); border: 5px solid #d8456a; box-shadow: 0 0 0 3px var(--ink);
@@ -1114,7 +1117,9 @@ body.compact .card-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap:
 .cr-front .mc-name { height: 34px; margin-top: 6px; font-size: 15px; }
 .gold .cr-front .mcard { animation: gilded 0.9s ease-in-out infinite alternate; }
 .gold .cr-front .mcard::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 250, 220, 0.7) 50%, transparent 65%); background-size: 260% 100%; animation: cr-shine 1.1s 0.8s ease-in-out 2 both; mix-blend-mode: screen; }
-.cr-text { position: relative; margin-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; white-space: nowrap; animation: cr-text 0.3s 0.75s both, cr-out 0.25s var(--hold) forwards; }
+.cr-text { position: relative; margin-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; white-space: nowrap; animation: cr-text 0.3s 0.75s both; }
+.cr-tap { margin-top: 6px; font: 400 12px/1 'Silkscreen', monospace; letter-spacing: 2px; text-transform: uppercase; color: var(--gold-hi); text-shadow: var(--outline); animation: cr-text 0.3s 1.6s both, cr-tap 1.2s 1.9s ease-in-out infinite; }
+@keyframes cr-tap { 50% { opacity: 0.45; } }
 .cr-text small { font: 400 12px/1 'Silkscreen'; letter-spacing: 1px; text-transform: uppercase; color: var(--rc); text-shadow: var(--outline); }
 .cr-text b { font: 400 44px/0.9 'Jersey 10'; color: #fff; letter-spacing: 1px; text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 0 0 20px color-mix(in srgb, var(--rc) 70%, transparent); }
 .cr-text em { font: 500 14px/1 var(--f-text); font-style: normal; color: var(--dim); text-shadow: var(--outline); }
