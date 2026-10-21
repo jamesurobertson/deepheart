@@ -1397,10 +1397,7 @@ body.at-menu #stage { visibility: hidden; }
 body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticker, body.at-menu .hero-mark { display: none !important; }
 .title-menu { background: #0d0709; }
 .mm-stairs { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; cursor: pointer; outline: none; }
-/* Shown while the stairway has the keys. */
-.mm-stairs-hint { position: absolute; right: calc(20px + var(--safe-r)); bottom: calc(16px + var(--safe-b)); margin: 0; padding: 6px 12px 5px; background: rgba(8, 4, 6, 0.75); box-shadow: 0 0 0 2px var(--ink);
-  font: 400 14px/1 'Silkscreen', monospace; letter-spacing: 2px; color: var(--text); opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: pre; }
-.mm-stairs:focus + .mm-stairs-hint { opacity: 1; }
+.mm-actor { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
 .mm-panel { position: relative; align-self: stretch; display: flex; flex-direction: column; justify-content: center; gap: 34px; width: min(560px, 100% / var(--mm-scale, 1)); zoom: var(--mm-scale, 1); box-sizing: border-box;
   padding: 40px 40px 40px max(72px, calc(8vw + var(--safe-l))); background: linear-gradient(90deg, rgba(8, 4, 6, 0.94) 62%, rgba(8, 4, 6, 0)); }
 .mm-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }

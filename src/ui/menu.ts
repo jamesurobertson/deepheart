@@ -103,16 +103,17 @@ export class TitleMenu {
     const canvas = document.createElement('canvas');
     canvas.className = 'mm-stairs';
     canvas.tabIndex = 0;
-    canvas.setAttribute('aria-label', 'The stairway: arrow keys or WASD to walk and jump, Space to jump, Escape to go back to the menu');
+    canvas.setAttribute('aria-label', 'The stairway: left and right (or A and D) walk, up, W or Space jumps, down or S drops a step, Escape goes back to the menu');
     this.el.appendChild(canvas);
-    const hint = document.createElement('p');
-    hint.className = 'mm-stairs-hint';
-    hint.textContent = 'Walk ← →  ·  Jump ↑ or Space  ·  Menu Esc';
-    this.el.appendChild(hint);
-    this.stairs = new Stairs(canvas, game);
+    // Your hero, once you move them, draws on a layer over the menu: they can jump onto the DEMO stamp and the Wishlist
+    // button, which are the panel's.
+    const actor = document.createElement('canvas');
+    actor.className = 'mm-actor';
+    this.stairs = new Stairs(canvas, actor, game, () => [...this.el.querySelectorAll<HTMLElement>('.mm-stamp, .mm-btn.steam')]);
     const panel = document.createElement('div');
     panel.className = 'mm-panel';
     this.el.appendChild(panel);
+    this.el.appendChild(actor);
     this.el.addEventListener('click', (e) => this.act((e.target as HTMLElement).closest<HTMLElement>('[data-mm]')?.dataset.mm));
     // The game behind the menu takes a press on the battlefield as an attack: none of the menu's get through.
     for (const ev of ['pointerdown', 'pointerup', 'mousedown']) this.el.addEventListener(ev, (e) => e.stopPropagation());
@@ -194,6 +195,9 @@ export class TitleMenu {
 class Stairs {
   readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
+  private actor: CanvasRenderingContext2D;
+  /** The menu's elements your hero can stand on (their tops). */
+  private standOn: () => HTMLElement[];
   private raf = 0;
   private t = 0;
   private last = 0;
@@ -201,19 +205,27 @@ class Stairs {
   /** Your hero (the party's leader) can be walked about the stairs: to where you click, or with the keys (and made to
    *  jump). Where they stand (sprite pixels: left edge, feet), how fast they're rising or falling, the way they
    *  face, the keys held, and where a click is taking them. Null until you first move them (they stand in the line). */
-  private hero: { x: number; y: number; vy: number } | null = null;
+  /** `on`: the ledge stood on (a step's index, or 100 + a menu element's), null in the air; `drop`: the one being
+   *  dropped through. */
+  private hero: { x: number; y: number; vy: number; on: number | null; drop: number | null } | null = null;
   private toX: number | null = null;
   private held = new Set<'left' | 'right' | 'down'>();
   private jumpAsked = false;
   private facing = 1;
   private dt = 0;
+  /** A hero lost to the deep: embers thrown back up from where they fell, and the red below flaring for a moment. */
+  private embers: { x: number; y: number; vx: number; vy: number; life: number }[] = [];
+  private pillar = { x0: 0, x1: 0, y: 0 };
+  private flare = 0;
   /** The scale, the stairway's span and the canvas's height, from the last frame (a click lands on the steps; the
    *  keys can walk you off the top of the landing). */
-  private geo: { S: number; minX: number; maxX: number; H: number } | null = null;
+  private geo: { S: number; minX: number; maxX: number; W: number; H: number } | null = null;
 
-  constructor(canvas: HTMLCanvasElement, game: Game) {
+  constructor(canvas: HTMLCanvasElement, actor: HTMLCanvasElement, game: Game, standOn: () => HTMLElement[]) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
+    this.actor = actor.getContext('2d')!;
+    this.standOn = standOn;
     // The party you've gathered, your hero leading; a new game has only the Squire, who joins first.
     const owned = COMPS.map((_, i) => i).filter((i) => game.s.owned[i] > 0);
     const hero = game.heroIndex();
@@ -265,9 +277,11 @@ class Stairs {
     const dpr = devicePixelRatio || 1;
     const w = Math.round(c.clientWidth * dpr);
     const h = Math.round(c.clientHeight * dpr);
-    if (c.width !== w || c.height !== h) {
-      c.width = w;
-      c.height = h;
+    for (const cv of [c, this.actor.canvas]) {
+      if (cv.width !== w || cv.height !== h) {
+        cv.width = w;
+        cv.height = h;
+      }
     }
     const tiles = spriteFrames('wall_mid');
     const floor = spriteFrames('floor_1');
@@ -281,6 +295,11 @@ class Stairs {
     const g = this.ctx;
     g.setTransform(S, 0, 0, S, 0, 0);
     g.imageSmoothingEnabled = false;
+    const a = this.actor;
+    a.setTransform(1, 0, 0, 1, 0, 0);
+    a.clearRect(0, 0, w, h);
+    a.setTransform(S, 0, 0, S, 0, 0);
+    a.imageSmoothingEnabled = false;
 
     const tile = (src: NonNullable<ReturnType<typeof spriteFrames>>, x: number, y: number, crop = 16) => {
       const f = src.frames[0];
@@ -304,7 +323,18 @@ class Stairs {
     const stepY = (k: number) => landY + k * rise;
     /** Which step a sprite standing at `x` (its left edge) has its feet on. */
     const stepAt = (x: number) => (x + 8 < landX + 36 ? 0 : Math.floor((x + 8 - landX - 36) / run) + 1);
-    this.geo = { S, minX: landX, maxX: W - 20, H };
+    this.geo = { S, minX: landX, maxX: W - 20, W, H };
+    // A pillar one step up at the landing's far end (a hop onto it, then the jump to the DEMO stamp is just in reach).
+    const pillar = { x0: landX - 14, x1: landX, y: landY - rise };
+    for (let yy = pillar.y; yy < H; yy += 16) tile(tiles, pillar.x0, yy);
+    tile(floor, pillar.x0, pillar.y, 5);
+    g.fillStyle = 'rgba(8, 3, 4, 0.2)';
+    g.fillRect(pillar.x0, pillar.y + 5, 14, H - pillar.y);
+    g.fillStyle = 'rgba(255, 210, 160, 0.34)';
+    g.fillRect(pillar.x0, pillar.y, 14, 1);
+    g.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    g.fillRect(pillar.x1 - 2, pillar.y + 5, 2, H - pillar.y);
+    this.pillar = pillar;
     for (let k = 0; k < steps; k++) {
       const x = k === 0 ? landX : stepX(k);
       const y = stepY(k);
@@ -322,7 +352,8 @@ class Stairs {
 
     // Down at the bottom, the red.
     const glow = g.createRadialGradient(W, H, 0, W, H, Math.max(W, H) * 0.65);
-    const pulse = 0.5 + 0.08 * Math.sin(this.t * 2.2);
+    this.flare = Math.max(0, this.flare - this.dt * 1.6);
+    const pulse = 0.5 + 0.08 * Math.sin(this.t * 2.2) + 0.45 * this.flare;
     glow.addColorStop(0, `rgba(255, 70, 45, ${pulse})`);
     glow.addColorStop(0.45, 'rgba(140, 20, 20, 0.22)');
     glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -360,32 +391,71 @@ class Stairs {
       const x = (k === 0 ? landX + 6 : stepX(k)) + side * 6;
       if (i === 0 && (this.hero || this.toX !== null || this.held.size || this.jumpAsked)) return this.leader(p, x, landX, stepAt, stepY);
       const f = p.frames.frames[Math.floor((this.t + p.phase) * 6) % p.frames.frames.length];
-      return [{ img: p.frames.img, f, k, x, feet: stepY(k), flip: false, shadow: true }];
+      return [{ img: p.frames.img, f, k, x, feet: stepY(k), flip: false, shadow: true, free: false }];
     });
-    g.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    for (const h of placed) if (h.shadow) g.fillRect(h.x + 2, stepY(h.k), h.f.w - 4, 2);
-    for (const h of [...placed].sort((a, b) => a.k - b.k)) {
+    for (const h of placed) {
+      if (!h.shadow) continue;
+      const c = h.free ? a : g;
+      c.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      c.fillRect(h.x + 2, h.feet, h.f.w - 4, 2);
+    }
+    for (const e of this.embers) {
+      e.life -= this.dt;
+      e.vy += 90 * this.dt;
+      e.x += e.vx * this.dt;
+      e.y += e.vy * this.dt;
+      a.fillStyle = e.life > 0.5 ? '#ffd27a' : e.life > 0.25 ? '#ff8a3a' : '#e8402e';
+      a.globalAlpha = Math.min(1, e.life * 2.5);
+      a.fillRect(Math.round(e.x), Math.round(e.y), 2, 2);
+    }
+    a.globalAlpha = 1;
+    this.embers = this.embers.filter((e) => e.life > 0);
+    for (const h of [...placed].sort((p, q) => p.k - q.k)) {
+      const c = h.free ? a : g;
       const y = h.feet + 1 - h.f.h;
-      if (!h.flip) g.drawImage(h.img, h.f.x, h.f.y, h.f.w, h.f.h, h.x, y, h.f.w, h.f.h);
+      if (!h.flip) c.drawImage(h.img, h.f.x, h.f.y, h.f.w, h.f.h, h.x, y, h.f.w, h.f.h);
       else {
-        g.save();
-        g.translate(h.x + h.f.w, 0);
-        g.scale(-1, 1);
-        g.drawImage(h.img, h.f.x, h.f.y, h.f.w, h.f.h, 0, y, h.f.w, h.f.h);
-        g.restore();
+        c.save();
+        c.translate(h.x + h.f.w, 0);
+        c.scale(-1, 1);
+        c.drawImage(h.img, h.f.x, h.f.y, h.f.w, h.f.h, 0, y, h.f.w, h.f.h);
+        c.restore();
       }
     }
   }
 
-  /** Your hero, free on the stairs: walking (keys held, or on the way to a click), stepping up and down the steps,
-   *  jumping and falling back to them. Walk off the top of the landing and they fall into the dark, and the next in
-   *  line takes over (until nobody's left: they're back next time the menu opens). */
+  /** Your hero, free on the stairs. Each step is a ledge running off the right edge of the screen: walk along it, jump
+   *  up through the one above and land on it, drop (↓) through to the one below, and a step's riser stops you
+   *  walking into it. The DEMO stamp and the Wishlist button are ledges too, just about in reach of a jump. Walk off
+   *  the end of a ledge (the top of the landing, or the screen's edge) and they fall into the dark, and the next in
+   *  line takes over (until nobody's left: they're back next time the menu opens). A click walks them along the front
+   *  of the steps to where you clicked. */
   private leader(p: (typeof this.party)[number], from: number, landX: number, stepAt: (x: number) => number, stepY: (k: number) => number) {
     if (!p.frames) return [];
     const geo = this.geo!;
-    const ground = (x: number) => (x + 8 < landX ? Infinity : stepY(stepAt(x)));
-    const h = (this.hero ??= { x: from, y: stepY(stepAt(from)), vy: 0 });
+    const dpr = devicePixelRatio || 1;
+    // The front step at x (every step above it runs past here too), or null over the void.
+    const front = (x: number) => (x + 8 < landX || x + 8 > geo.W ? null : stepAt(x));
+    const extras = this.standOn().map((el) => {
+      const r = el.getBoundingClientRect();
+      return { x0: (r.left * dpr) / geo.S, x1: (r.right * dpr) / geo.S, y: (r.top * dpr) / geo.S };
+    });
+    const pillar = this.pillar;
+    const onPillar = (x: number) => x + 8 >= pillar.x0 && x + 8 < pillar.x1;
+    /** Every ledge under x: the steps (to the front one), the pillar, and the menu's elements that x is over. */
+    const ledges = (x: number) => {
+      const f = front(x);
+      const out: { id: number; y: number }[] = [];
+      if (f !== null) for (let j = 0; j <= f; j++) out.push({ id: j, y: stepY(j) });
+      if (onPillar(x)) out.push({ id: 50, y: pillar.y });
+      extras.forEach((e, i) => {
+        if (x + 8 >= e.x0 && x + 8 <= e.x1 && e.y > 0) out.push({ id: 100 + i, y: e.y });
+      });
+      return out;
+    };
+    const h = (this.hero ??= { x: from, y: stepY(stepAt(from)), vy: 0, on: stepAt(from), drop: null });
     const dt = this.dt;
+    const clicked = this.toX !== null && !this.held.size;
     let dir = (this.held.has('right') ? 1 : 0) - (this.held.has('left') ? 1 : 0);
     if (!dir && this.toX !== null) {
       const gap = this.toX - h.x;
@@ -395,32 +465,63 @@ class Stairs {
     if (dir) {
       this.facing = dir;
       const step = 72 * dt;
-      const to = this.toX !== null && !this.held.size ? Math.min(Math.abs(this.toX - h.x), step) : step;
-      h.x = Math.min(geo.maxX, Math.max(-24, h.x + dir * to));
+      const nx = clicked
+        ? Math.min(geo.maxX, Math.max(geo.minX, h.x + dir * Math.min(Math.abs(this.toX! - h.x), step)))
+        : Math.min(geo.W + 24, Math.max(-24, h.x + dir * step));
+      // A riser in the way (feet below the front step, or the pillar's top, there) stops a walk, but not a click's (it
+      // climbs the steps).
+      const f = front(nx);
+      const top = onPillar(nx) ? pillar.y : f === null ? null : stepY(f);
+      if (clicked || top === null || h.y <= top + 0.5) h.x = nx;
     }
-    const onGround = h.vy === 0 && h.y >= ground(h.x) - 0.5;
-    // A step up is walked straight onto; a step down, a jump's way back, or the drop off the landing is fallen.
-    if (onGround && ground(h.x) < h.y) h.y = ground(h.x);
-    if (this.jumpAsked && h.vy === 0 && h.y >= ground(h.x) - 0.5) h.vy = -190;
+    if (h.on !== null) {
+      const f = front(h.x);
+      if (clicked && f !== null && h.on < 100) {
+        h.on = f;
+        h.y = stepY(f);
+      } else {
+        const still = ledges(h.x).find((l) => l.id === h.on);
+        if (still) h.y = still.y;
+        else h.on = null;
+      }
+    }
+    if (h.on !== null && this.jumpAsked) {
+      h.vy = -215;
+      h.on = null;
+    } else if (h.on !== null && this.held.has('down') && ledges(h.x).some((l) => l.y > h.y + 0.5)) {
+      h.drop = h.on;
+      h.on = null;
+      h.vy = 1;
+    }
     this.jumpAsked = false;
-    if (h.vy !== 0 || h.y < ground(h.x)) {
+    if (h.on === null) {
+      const was = h.y;
       h.vy += (this.held.has('down') ? 1600 : 700) * dt;
       h.y += h.vy * dt;
-      if (h.y >= ground(h.x) && h.vy > 0) {
-        h.y = ground(h.x);
-        h.vy = 0;
+      if (h.vy > 0) {
+        const land = ledges(h.x).filter((l) => l.id !== h.drop && was <= l.y + 0.01 && h.y >= l.y).sort((p, q) => p.y - q.y)[0];
+        if (land) {
+          h.y = land.y;
+          h.vy = 0;
+          h.on = land.id;
+          h.drop = null;
+        }
       }
     }
     if (h.y > geo.H + 40) {
+      this.flare = 1;
+      for (let i = 0; i < 18; i++) {
+        this.embers.push({ x: h.x + 8 + (Math.random() - 0.5) * 10, y: geo.H - 1, vx: (Math.random() - 0.5) * 70, vy: -(70 + Math.random() * 110), life: 0.6 + Math.random() * 0.5 });
+      }
       this.party.shift();
       this.hero = null;
       this.toX = null;
       this.held.clear();
       return [];
     }
-    const airborne = h.vy !== 0;
+    const airborne = h.on === null;
     const anim = (dir || airborne) && p.run ? p.run : p.frames;
     const f = airborne ? anim.frames[2 % anim.frames.length] : anim.frames[Math.floor(this.t * (dir ? 10 : 6)) % anim.frames.length];
-    return [{ img: anim.img, f, k: stepAt(h.x), x: Math.round(h.x), feet: Math.round(h.y), flip: this.facing < 0, shadow: !airborne }];
+    return [{ img: anim.img, f, k: 999, x: Math.round(h.x), feet: Math.round(h.y), flip: this.facing < 0, shadow: !airborne, free: true }];
   }
 }
