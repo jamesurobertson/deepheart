@@ -1,4 +1,4 @@
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, OLD_ONES, OLD_ONE_BY_ID, OFFER_SIZE, RESPEC_REFUND, type OldOneId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, OLD_ONES, OLD_ONE_BY_ID, OFFER_SIZE, RESPEC_REFUND, oldCost, type OldOneDef, type OldOneId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TUNE, bossSouls, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -62,6 +62,23 @@ function cardFace(card: (typeof CARDS)[number], state: 'locked' | 'got', gilded 
   const frame = gilded ? CARD_FRAME.gold : CARD_FRAME[card.kind];
   const art = cardArt(card, box, state === 'got' && card.id === 'rainbow-goblin' ? 'rainbow' : '', lap);
   return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'locked' ? '???' : esc(card.name)}</span></span>`;
+}
+
+const KIND_NAME = { power: 'Power', utility: 'Utility', sink: 'Sink' } as const;
+
+/** An Old One in full: what it boosts and by how much now (level 1, if not summoned), the next four levels with their
+ *  cost, where it tops out, the rule worth knowing, and its line. */
+function oldDetail(d: OldOneDef, lv: number): string {
+  const now = Math.max(1, lv);
+  const rows = Array.from({ length: 4 }, (_, k) => now + 1 + k)
+    .filter((n) => !d.maxLv || n <= d.maxLv)
+    .map((n) => `<tr><td>Level ${n}</td><td>${G.soul(1.2)} ${fmt(oldCost(d, n - 1))}</td><td>${esc(d.value(n))}</td></tr>`).join('');
+  const top = d.maxLv ? `Max level ${d.maxLv}` : d.cap ? `Tops out at ${d.cap}` : 'No max level';
+  return `<p class="od-what">${esc(d.what)}: <b class="up">${esc(d.value(now))}</b>${lv ? '' : ' at level 1'}</p>
+    ${rows ? `<table class="od-lv">${rows}</table>` : ''}
+    <p class="od-top">${top}</p>
+    ${d.note ? `<p class="od-note">${esc(d.note)}</p>` : ''}
+    <p class="tt-f">“${esc(d.flavor)}”</p>`;
 }
 
 /** What this many kept souls add to all damage, as a percentage ("+300%"). */
@@ -647,12 +664,11 @@ export class Ui {
         } else this.deny(old);
         return;
       }
-      const summon = t.closest<HTMLElement>('[data-summon]');
-      if (summon) {
-        if (this.game.summonOldOne(summon.dataset.summon as OldOneId)) {
-          this.hideTip();
-          this.renderModal();
-        } else this.deny(summon);
+      const pickEl = t.closest<HTMLElement>('[data-pick]');
+      if (pickEl) {
+        this.oldPick = pickEl.dataset.pick as OldOneId;
+        this.hooks.sound('toggle', { vol: 0.4 });
+        this.renderModal();
         return;
       }
       const away = t.closest<HTMLElement>('[data-mark-away]');
@@ -831,6 +847,10 @@ export class Ui {
         } else this.hooks.reset();
         break;
       case 'descend': this.renderDescendConfirm(); break;
+      case 'summon':
+        if (this.oldPick && this.game.summonOldOne(this.oldPick)) this.renderModal();
+        else this.deny(el);
+        break;
       case 'reroll':
         if (this.game.rerollOldOnes()) this.renderModal();
         else this.deny(el);
@@ -2043,9 +2063,7 @@ export class Ui {
     if (kind === 'old') {
       const d = OLD_ONE_BY_ID.get(id as OldOneId)!;
       const lv = g.oldLv(d.id);
-      const kindName = d.kind === 'power' ? 'power' : d.kind === 'utility' ? 'utility' : 'sink';
-      const next = lv && !g.oldMaxed(d.id) ? `<p class="tt-gain">Next level (${G.soul(1.5)} ${fmt(g.oldLevelCost(d.id))}): ${esc(d.desc(lv + 1))}</p>` : '';
-      return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? `level ${lv}` : kindName}</span></div><p class="tt-d">${esc(d.desc(lv))}</p>${next}<p class="tt-f">“${esc(d.flavor)}”</p>`;
+      return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? `level ${lv}` : KIND_NAME[d.kind]}</span></div>${oldDetail(d, lv)}`;
     }
     if (kind === 'mark') {
       const i = Number(id);
@@ -2227,35 +2245,42 @@ export class Ui {
       ${this.cursesHtml()}`;
   }
 
-  /** The soul shop: the Old Ones you've summoned (tap to level), three on offer, a reroll and a respec. */
+  /** The soul shop: three Old Ones on pedestals (pick one to read it, then summon), a reroll, the ones you've summoned
+   *  (tap to level) and a respec. */
   private oldOnesHtml(): string {
     const g = this.game;
     const free = g.soulsFree();
+    const offer = g.oldOffer();
+    const price = g.summonPrice();
+    if (!offer.includes(this.oldPick as OldOneId)) this.oldPick = offer[0] ?? null;
+    const pick = this.oldPick ? OLD_ONE_BY_ID.get(this.oldPick)! : null;
+    const pedestals = offer.map((id) => {
+      const d = OLD_ONE_BY_ID.get(id)!;
+      return `<button class="pedestal ${id === this.oldPick ? 'on' : ''}" data-pick="${id}"><span class="ped-fig">${charFit(d.sprite, 72, 96)}</span><span class="ped-stone"></span><b>${esc(d.name)}</b></button>`;
+    }).join('');
+    const summon = pick
+      ? `<p class="old-warn">Summon one for <b>${G.soul(2)} ${fmt(price)} soul${price === 1 ? '' : 's'}</b>. Every soul you spend gives up ${soulPct(1)} damage.</p>
+        <div class="pedestals">${pedestals}</div>
+        <div class="old-panel">
+          <div class="tt-h"><b>${esc(pick.name)}</b><span class="tt-own">${KIND_NAME[pick.kind]}</span></div>
+          ${oldDetail(pick, 0)}
+          <div class="set-row"><button class="btn primary" data-act="summon" ${free >= price ? '' : 'disabled'}>Summon ${esc(pick.name.replace(/^The /, 'the '))}</button>
+          ${OLD_ONES.length - g.oldOwned() > OFFER_SIZE ? `<button class="btn" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>Reroll · ${G.soul(1.5)} ${fmt(g.rerollPrice())}</button>` : ''}</div>
+        </div>`
+      : '<p class="muted">Every Old One is awake.</p>';
     const owned = OLD_ONES.filter((d) => g.oldLv(d.id) > 0).map((d) => {
       const lv = g.oldLv(d.id);
       const maxed = g.oldMaxed(d.id);
       const cost = g.oldLevelCost(d.id);
       return `<button class="aby old ${maxed ? 'owned' : free >= cost ? 'can' : 'avail'}" data-old="${d.id}" data-tip="old:${d.id}" ${maxed ? 'disabled' : ''}>
-        <span class="aby-ico">${charFit(d.sprite, 32)}</span><b>${esc(d.name)} <i class="lv">${lv}</i></b><small>${maxed ? 'Maxed' : `${G.soul(1.5)} ${fmt(cost)}`}</small></button>`;
+        <span class="aby-ico">${charFit(d.sprite, 32)}</span><b>${esc(d.name)} <i class="lv">${lv}</i></b><small>${maxed ? 'Max' : `${G.soul(1.5)} ${fmt(cost)}`}</small></button>`;
     }).join('');
-    const offer = g.oldOffer();
-    const price = g.summonPrice();
-    const offers = offer.map((id) => {
-      const d = OLD_ONE_BY_ID.get(id)!;
-      return `<button class="old-offer ${free >= price ? 'can' : ''}" data-summon="${id}" data-tip="old:${id}">
-        ${charFit(d.sprite, 44)}<b>${esc(d.name)}</b><small class="kind">${d.kind === 'power' ? 'Power' : d.kind === 'utility' ? 'Utility' : 'Sink'}</small><small>${esc(d.desc(0))}</small></button>`;
-    }).join('');
-    const summon = offer.length
-      ? `<h3>Summon an Old One <span class="muted">${G.soul(1.5)} ${fmt(price)} for any one of these</span></h3>
-        <div class="old-offers">${offers}</div>
-        <div class="set-row">${OLD_ONES.length - g.oldOwned() > OFFER_SIZE ? `<button class="btn" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>Reroll the offer · ${G.soul(1.5)} ${fmt(g.rerollPrice())}</button>` : ''}</div>`
-      : '<p class="muted">Every Old One is awake.</p>';
     const respec = g.oldOwned()
-      ? `<div class="set-row"><button class="btn danger" data-act="respec">Respec: put them all back to sleep for ${G.soul(1.5)} ${fmt(Math.floor(g.s.oldSpent * RESPEC_REFUND))}</button></div>`
+      ? `<div class="set-row"><button class="btn danger" data-act="respec">Respec: back to sleep for ${G.soul(1.5)} ${fmt(Math.floor(g.s.oldSpent * RESPEC_REFUND))}</button></div>`
       : '';
-    return `<p class="muted bd-help">Souls you keep add ${soulPct(1)} damage each. Souls you spend wake an Old One: summoning costs more for each one you have; power Old Ones cost one soul more every level, utility ones double.</p>
+    return `${summon}
       ${owned ? `<h3>Awake <span class="muted">tap one to level it</span></h3><div class="aby-grid">${owned}</div>` : ''}
-      ${summon}${respec}`;
+      ${respec}`;
   }
 
   /** Heartmarks: who has them, and moving them around for souls. */
@@ -2278,6 +2303,8 @@ export class Ui {
   /** The curse chosen for the next ascent (null: an ordinary descent). */
   private curseChoice: string | null = null;
   private respecArmed = false;
+  /** The Old One picked on the summon pedestals. */
+  private oldPick: OldOneId | null = null;
 
   /** Cursed descents on offer: pick one before ascending. Each shows its rule, its tiers so far and the next reward. */
   private cursesHtml(): string {

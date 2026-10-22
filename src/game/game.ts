@@ -1856,7 +1856,7 @@ export class Game {
     const lv = this.oldLv(id);
     if (!lv) return false;
     const def = OLD_ONE_BY_ID.get(id)!;
-    if (id === 'thinning' && lv >= 10) return false;
+    if (def.maxLv && lv >= def.maxLv) return false;
     const price = oldCost(def, lv);
     if (this.soulsFree() < price) return false;
     this.spendSouls(price, true);
@@ -1867,7 +1867,8 @@ export class Game {
   }
 
   oldMaxed(id: OldOneId) {
-    return id === 'thinning' && this.oldLv(id) >= 10;
+    const max = OLD_ONE_BY_ID.get(id)!.maxLv;
+    return !!max && this.oldLv(id) >= max;
   }
 
   /** Every Old One goes back to sleep; RESPEC_REFUND of the souls they took comes back. */

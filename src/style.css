@@ -680,17 +680,31 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .soul-src span { display: grid; gap: 2px; color: var(--text); min-width: 0; }
 .soul-src small { font-size: 12px; color: var(--dim); }
 .soul-src b { font: 400 22px/1 'Jersey 10'; color: var(--soul); }
-/* The Old Ones on offer: any one of them for the summon price. */
-.old-offers { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; margin-bottom: 6px; }
-.old-offer {
-  display: grid; justify-items: center; gap: 4px; padding: 10px 8px; text-align: center;
-  border: 6px solid transparent; border-image: var(--f-btn) 2 fill / 6px stretch;
+/* Summoning: three Old Ones on stone pedestals; the picked one's details below. */
+.old-warn { margin: 4px 0 10px; text-align: center; font: 700 17px/1.3 var(--f-text); color: var(--soul); }
+.old-warn b { color: var(--text); white-space: nowrap; }
+.pedestals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+.pedestal { display: grid; justify-items: center; align-content: end; gap: 0; padding: 6px 4px 8px; background: none; border: 0; cursor: pointer; }
+.ped-fig { position: relative; z-index: 1; display: grid; place-items: end center; height: 100px; margin-bottom: -10px; filter: drop-shadow(0 0 0 transparent); transition: transform 0.15s; }
+.ped-stone {
+  width: 96px; height: 26px; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 35%, #6c6070 0 30%, #4a3f4e 31% 62%, #2a2230 63%);
+  box-shadow: 0 6px 0 #1a141d, 0 10px 14px rgba(0, 0, 0, 0.55);
 }
-.old-offer:hover { border-image-source: var(--f-btn-hi); }
-.old-offer.can { box-shadow: 0 0 0 2px var(--soul), 0 0 14px rgba(179, 140, 255, 0.5); }
-.old-offer b { font: 700 15px/1.1 var(--f-text); color: var(--text); }
-.old-offer small { font-size: 12px; line-height: 1.25; color: var(--dim); }
-.old-offer .kind { font: 400 15px/1 'Jersey 10'; letter-spacing: 0.04em; text-transform: uppercase; color: var(--soul); }
+.pedestal b { margin-top: 12px; font: 700 14px/1.1 var(--f-text); color: var(--dim); }
+.pedestal:hover .ped-fig { transform: translateY(-3px); }
+.pedestal.on .ped-fig { filter: drop-shadow(0 0 10px rgba(179, 140, 255, 0.85)); }
+.pedestal.on .ped-stone { background: radial-gradient(ellipse at 50% 35%, #8c7ab0 0 30%, #5c4a78 31% 62%, #2f2440 63%); }
+.pedestal.on b { color: var(--text); }
+.old-panel { padding: 10px 12px; margin-bottom: 8px; background: rgba(0, 0, 0, 0.25); box-shadow: inset 0 0 0 2px #3b2b2e; }
+.old-panel .set-row { margin-top: 8px; }
+/* An Old One's details, in the panel and its tooltip. */
+.od-what { margin: 4px 0; color: var(--text); }
+.od-lv { border-collapse: collapse; margin: 4px 0; font-size: 13px; }
+.od-lv td { padding: 1px 12px 1px 0; color: var(--dim); white-space: nowrap; }
+.od-lv td:last-child { color: var(--text); }
+.od-top { margin: 2px 0; font-size: 13px; color: var(--dim); }
+.od-note { margin: 4px 0; font-size: 13px; color: var(--soul); }
 .gen-name .marks { display: inline-flex; align-items: center; gap: 2px; font: 400 15px/1 'Jersey 10'; color: var(--ess); vertical-align: middle; }
 
 .stats { display: flex; flex-direction: column; gap: 6px; margin: 0; }

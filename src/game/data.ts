@@ -638,8 +638,15 @@ export interface OldOneDef {
   kind: OldOneKind;
   sprite: string;
   flavor: string;
-  /** What it does at a level (0: what the first level will do). */
-  desc: (lv: number) => string;
+  /** What it boosts, in a few words. */
+  what: string;
+  /** Its bonus at a level ("+75%", "−3 kills"). */
+  value: (lv: number) => string;
+  /** The rule a player needs to know (what counts as idle, when a streak ends), if any. */
+  note?: string;
+  /** Where a utility bonus tops out, and the level that ends it (only the Thinning has one). */
+  cap?: string;
+  maxLv?: number;
 }
 
 /** Utility effects close in on their cap: this share of it at level L is 1 − 0.9^L. */
@@ -660,30 +667,30 @@ export const rerollCost = (owned: number) => Math.ceil(summonCost(owned) / 3);
 export const OFFER_SIZE = 3;
 export const RESPEC_REFUND = 0.75;
 
-const pctOf = (n: number) => `${+(n * 100).toFixed(1)}%`;
-const o = (id: OldOneId, name: string, kind: OldOneKind, sprite: string, flavor: string, desc: (lv: number) => string): OldOneDef => ({ id, name, kind, sprite, flavor, desc });
-const each = (lv: number, per: number, what: string) => `${what} +${Math.round(per * 100)}% a level${lv ? ` (now +${Math.round(per * lv * 100)}%)` : ''}.`;
-/** A utility effect now (or at level 1, before it's summoned), and its cap. */
-const capped = (lv: number, cap: number, what: (n: number) => string, top: string) => `${what(cap * oldShare(Math.max(1, lv)))}${lv ? '' : ' at level 1'} (up to ${top}).`;
+const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
+const IDLE_NOTE = 'Idle means a minute without clicking or holding attack. The Phantom Blade, Flurry and time away all count as idle.';
+const per = (k: number) => (lv: number) => `+${Math.round(k * lv * 100)}%`;
+const share = (cap: number, show: (n: number) => string) => (lv: number) => show(cap * oldShare(lv));
+const o = (d: OldOneDef) => d;
 
 export const OLD_ONES: OldOneDef[] = [
-  o('sleeper', 'The Sleeper', 'power', 'big_zombie', 'It has not moved in an age. Neither should you.', (lv) => each(lv, 0.25, 'Damage while you haven\'t attacked for a minute (and while away):')),
-  o('fist', 'The Fist', 'power', 'ef_golem', 'Every blow you land, it lands with you.', (lv) => each(lv, 0.2, 'Your attacks and the Phantom Blade:')),
-  o('needle', 'The Needle', 'power', 'cr_plague_crow', 'Finds the soft spot. Pushes.', (lv) => each(lv, 0.15, 'Critical hit damage:')),
-  o('hoard', 'The Hoard', 'power', 'chest_full_open', 'A dragon\'s worth of gold, and no dragon.', (lv) => each(lv, 0.05, 'Gold:')),
-  o('patient', 'The Patient', 'power', 'swampy', 'Waits. Collects. Waits some more.', (lv) => each(lv, 0.5, 'Gold while you haven\'t attacked for a minute (and while away):')),
-  o('goblinking', 'The Goblin King', 'power', 'goblin', 'Every goblin pays him a cut. He pays you.', (lv) => each(lv, 0.5, 'Treasure goblin and Rainbow Vault gold:')),
-  o('unbroken', 'The Unbroken', 'power', 'ogre', 'Never stops. Never slows. Never lets you.', (lv) => `All damage +${+(lv ? lv * 0.01 : 0.01).toFixed(2)}% for every attack in your current streak (a streak breaks after 2 seconds without attacking).`),
-  o('hourglass', 'The Hourglass', 'utility', 'ef_ent', 'The sand falls up if you ask nicely.', (lv) => capped(lv, 30, (n) => `Bosses give you ${+n.toFixed(1)} more seconds`, '30')),
-  o('wither', 'The Wither', 'utility', 'necromancer', 'Bosses arrive tired. It sees to that.', (lv) => capped(lv, 0.5, (n) => `Bosses have ${pctOf(n)} less health`, '50%')),
-  o('thinning', 'The Thinning', 'utility', 'skelet', 'Fewer of them. It ate the rest.', (lv) => `Floors need ${Math.min(10, Math.max(1, lv))} fewer kill${Math.min(10, Math.max(1, lv)) === 1 ? '' : 's'}${lv ? '' : ' at level 1'}, one more a level, up to 10.`),
-  o('haggler', 'The Haggler', 'utility', 'masked_orc', 'Knows what everyone is worth. Pays less.', (lv) => `Companion levels cost ${pctOf(1 - 0.95 ** Math.max(1, lv))} less${lv ? '' : ' at level 1'} (−5% more a level).`),
-  o('restless', 'The Restless', 'utility', 'cr_crimson_wraith', 'It cannot wait. Now neither can you.', (lv) => capped(lv, 0.75, (n) => `Ability cooldowns are ${pctOf(n)} shorter`, '75%')),
-  o('lingering', 'The Lingering', 'utility', 'cr_ice_ghost', 'What it touches stays a while.', (lv) => capped(lv, 1, (n) => `Abilities and Rampage last ${pctOf(n)} longer`, '100%')),
-  o('soulcaller', 'The Soulcaller', 'utility', 'angel', 'Calls the gold out of the deep.', (lv) => capped(lv, 0.75, (n) => `Gold bosses come ${pctOf(0.25 + n)} of the time instead of 25%`, '100%')),
-  o('lure', 'The Lure', 'utility', 'chest_mimic_open', 'Goblins can\'t resist it. Goblins have never resisted anything.', (lv) => capped(lv, 2, (n) => `Treasure goblins come ${pctOf(n)} more often`, '200%')),
-  o('collector', 'The Collector', 'utility', 'ef_gnollshaman', 'Keeps one of everything. Shares.', (lv) => capped(lv, 2, (n) => `Cards drop ${pctOf(n)} more often`, '200%')),
-  o('hungry', 'The Hungry Dark', 'sink', 'big_demon', 'It takes souls. It gives back a little more than it takes.', (lv) => `All damage +11% for every soul fed to it${lv ? ` (now +${lv * 11}%)` : ''}. A soul you keep gives +10%.`),
+  o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'big_zombie', what: 'Party damage while idle', value: per(0.25), note: IDLE_NOTE, flavor: 'It has not moved in an age. Neither should you.' }),
+  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'ef_golem', what: 'Your attacks and the Phantom Blade', value: per(0.2), flavor: 'Every blow you land, it lands with you.' }),
+  o({ id: 'needle', name: 'The Needle', kind: 'power', sprite: 'cr_plague_crow', what: 'Critical hit damage', value: per(0.15), flavor: 'Finds the soft spot. Pushes.' }),
+  o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'chest_full_open', what: 'All gold', value: per(0.05), flavor: "A dragon's worth of gold, and no dragon." }),
+  o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'swampy', what: 'Gold while idle', value: per(0.5), note: IDLE_NOTE, flavor: 'Waits. Collects. Waits some more.' }),
+  o({ id: 'goblinking', name: 'The Goblin King', kind: 'power', sprite: 'goblin', what: 'Gold from treasure goblins and the Rainbow Vault', value: per(0.5), flavor: 'Every goblin pays him a cut. He pays you.' }),
+  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'ogre', what: 'All damage, for each attack in your streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}% per attack`, note: 'A streak ends 2 seconds after your last attack, and counts up to 2,000 attacks.', flavor: 'Never stops. Never slows. Never lets you.' }),
+  o({ id: 'hourglass', name: 'The Hourglass', kind: 'utility', sprite: 'ef_ent', what: 'Time to beat a boss', value: share(30, (n) => `+${+n.toFixed(1)}s`), cap: '+30s', flavor: 'The sand falls up if you ask nicely.' }),
+  o({ id: 'wither', name: 'The Wither', kind: 'utility', sprite: 'necromancer', what: 'Boss health', value: share(0.5, (n) => `−${pct(n)}`), cap: '−50%', flavor: 'Bosses arrive tired. It sees to that.' }),
+  o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'skelet', what: 'Kills to clear a floor', value: (lv) => `−${Math.min(10, lv)}`, cap: '−10', maxLv: 10, flavor: 'Fewer of them. It ate the rest.' }),
+  o({ id: 'haggler', name: 'The Haggler', kind: 'utility', sprite: 'masked_orc', what: 'Companion level costs', value: (lv) => `−${pct(1 - 0.95 ** lv)}`, flavor: 'Knows what everyone is worth. Pays less.' }),
+  o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'cr_crimson_wraith', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`), cap: '−75%', flavor: 'It cannot wait. Now neither can you.' }),
+  o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'cr_ice_ghost', what: 'How long abilities and Rampage last', value: share(1, (n) => `+${pct(n)}`), cap: '+100%', flavor: 'What it touches stays a while.' }),
+  o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'angel', what: 'Chance a boss is gold (floor 100 on)', value: share(0.75, (n) => pct(0.25 + n)), cap: '100%', note: 'Without it, 25% of bosses are gold.', flavor: 'Calls the gold out of the deep.' }),
+  o({ id: 'lure', name: 'The Lure', kind: 'utility', sprite: 'chest_mimic_open', what: 'How often treasure goblins come', value: share(2, (n) => `+${pct(n)}`), cap: '+200%', flavor: "Goblins can't resist it. Goblins have never resisted anything." }),
+  o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'ef_gnollshaman', what: 'Card drop chance', value: share(2, (n) => `+${pct(n)}`), cap: '+200%', flavor: 'Keeps one of everything. Shares.' }),
+  o({ id: 'hungry', name: 'The Hungry Dark', kind: 'sink', sprite: 'big_demon', what: 'All damage, for every soul fed to it', value: (lv) => `+${lv * 11}%`, note: 'A soul you keep gives +10%. One fed here gives +11%, but you can only get it back with a respec.', flavor: 'It takes souls. It gives back a little more than it takes.' }),
 ];
 export const OLD_ONE_BY_ID = new Map(OLD_ONES.map((d) => [d.id, d]));
 /** Your first offer always includes these, so the first pick is a good one. */
