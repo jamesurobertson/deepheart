@@ -281,17 +281,24 @@ async function boot() {
   if (dream) ui.playDream(dream === 'first');
 
   /** Time away: short breaks play out at full speed; longer ones pay the offline rate and say so. */
+  /** Drop what happened while away, except gold being banked: coins still lying on screen have to fly up. */
+  const flushAway = () => {
+    const banked = game.events.filter((ev) => ev.t === 'bank');
+    game.events.length = 0;
+    for (const ev of banked) ui.handle(ev);
+  };
   const catchUp = (seconds: number) => {
     if (game.demoOver() || atMenu) return;
     if (seconds <= OFFLINE_AFTER) {
       for (let t = 0; t < seconds && !game.demoOver(); t += 0.2) game.update(0.2);
-      game.events.length = 0;
+      flushAway();
       // (The last boss fell while you were away: no stairs to watch, straight to the end.)
       if (game.demoOver()) ui.showDemoEnd();
       return;
     }
+    game.bankAllDrops();
     const o = game.applyOffline(seconds);
-    game.events.length = 0;
+    flushAway();
     if (o.gold.gt(0)) ui.showOffline(o);
     save();
   };
