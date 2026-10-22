@@ -3,7 +3,8 @@ import Decimal from 'break_infinity.js';
 import {
   CARD_BY_ID, AWAKEN_MILESTONES, COST_GROWTH, FURY, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor, pickMonster,
   CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, levelMult, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
-  type AbilityId, type MilestoneId,
+  OLD_ONES, OLD_ONE_BY_ID, FIRST_OFFER, OFFER_SIZE, RESPEC_REFUND, oldCost, oldShare, summonCost, rerollCost,
+  type AbilityId, type MilestoneId, type OldOneId,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
@@ -14,8 +15,20 @@ export { COST_GROWTH };
 /** COST_GROWTH^k, remembered: level costs ask for the same powers over and over. */
 const costPows: Decimal[] = [];
 const costPow = (k: number) => (costPows[k] ??= Decimal.pow(COST_GROWTH, k));
-/** Kills needed to clear a normal floor. */
+/** Kills needed to clear a normal floor (fewer with the Thinning). */
 export const FLOOR_KILLS = 20;
+/** Seconds without attacking by hand before you count as idle (the Sleeper, the Patient), and before a streak breaks
+ *  (the Unbroken). */
+export const IDLE_AFTER = 60;
+const STREAK_GAP = 2;
+/** The Unbroken counts a streak up to this many attacks (about 7 minutes of holding attack). */
+export const STREAK_CAP = 2000;
+/** Heartmarks: the first time ever you beat each 10th floor past this one's boss, a random companion gets one (+50%
+ *  damage each, until you awaken). Moving one to a random companion, or to the one you choose, costs souls. */
+const MARK_FROM = 100;
+export const MARK_POWER = 0.5;
+export const MARK_REROLL = 1;
+export const MARK_MOVE = 10;
 /** A boss guards every Nth floor. */
 export const BOSS_EVERY = 5;
 const BOSS_TIME = 30;
@@ -26,8 +39,6 @@ const SPAWN_GAP = 0.12;
 const SWEEP_SECONDS = 1;
 /** Seconds between swept floors, so a blitz through old floors still reads as one. */
 const SWEEP_GAP = 0.6;
-/** Damage multiplier a pair upgrade gives each partner. */
-const SYNERGY_MULT = 2;
 /** Seconds a kill's gold lies on the floor before it flies to the bank by itself (your hero or the cursor grabs it sooner). */
 const GOLD_WAIT = 6;
 /** Most piles of gold on the floor at once: past this the oldest is banked straight away. */
@@ -128,26 +139,20 @@ export const AWAKEN_ON = false;
 export const DESCEND_FLOOR = 100;
 /**
  * Pacing knobs, in one place (the balance tools override them to search for good values).
- * - Souls: all the souls you've earned since your last awakening come to (gold earned since then / 10^`soulDigits`)
- *   ^`soulExp`, less one, times the soul-gain bonuses: about 5 at the first ascent. An ascent pays what's new; the same
- *   depth again pays only a trickle. Each soul adds `soulPower` (+100%) to all damage.
- *   `soulExp` is the balance point of the whole game: doubling souls must take about as many new floors as doubling
- *   damage buys, or runs bloat (too low) or collapse (too high). Balanced near
- *   (ln deepHp − α·ln deepGold) / ln deepGold, where α = (ln LEVEL_BONUS.mult / LEVEL_BONUS.every) / ln COST_GROWTH
- *   is damage bought per gold: 0.61 today, putting the balance near 0.39. It sits a little below on purpose: each
- *   run's souls carry the next one a little less far, so runs end at walls instead of feeding each other. Re-derive it after changing any of those, then re-fit `soulDigits` to
- *   log10(gold by the first ascent, ~1e20) − log10(6) / soulExp so the first ascent still pays about 5.
+ * - Souls, as in Clicker Heroes: an ascent pays 1 for every `levelsPerSoul` companion levels bought this run, plus what
+ *   the run's gold bosses paid. From floor `goldBossFrom` each boss is gold (a soul boss) on a `goldBossChance` roll the
+ *   first time you reach it in a run, and always on GOLD_BOSS_SURE floors; it pays floor(((floor − 75) / 25)^1.3).
+ *   Each soul you keep adds `soulPower` (+10%) to all damage; the Old Ones are the other thing to do with them.
  * - Heartstones the same way, a level up: (every soul ever earned / `stoneSouls`)^`stoneExp` in all; an awakening pays what's new.
  * - Heart of Fury multiplies all damage by `fury` per level. Zone bosses have `zoneBoss`× the health of mid-bosses.
  * - Up to floor `deepFrom` each floor has about `hpBase`× the health of the last, past it `deepHp`×. A floor's gold
- *   starts at `goldBase` and grows `goldGrowth`× a floor, `deepGold`× past `deepFrom`. Until then gold barely outpaces
- *   health: it compounds (×1.6 against ×1.55 was ×80 by floor 140, and the first climb met the whole party in an hour). `deepFrom` sits at the way up (DESCEND_FLOOR) so ascents happen on the gentle curve: each buys a
- *   dozen or more floors instead of a handful. Past it gold grows a little slower than health, so every floor deeper
- *   costs more damage per gold: at ×1.15 against ×1.145 a player who rarely ascended flew 150 floors a run.
+ *   starts at `goldBase` and grows `goldGrowth`× a floor, `deepGold`× past `deepFrom`. Companion damage grows about
+ *   gold^0.82 once levels pass 200 (×1.07 a level against ×4 every 25), so past `deepFrom` every floor is about 2%
+ *   further out of reach than the last: the gap souls, Old Ones and Heartmarks close.
  *   A floor's health and gold are shared across its 25 monsters.
  * - Each awakening needs `awakenStep` more floors than the last; `heartGrowth` steepens Heart power costs.
  */
-export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.56, deepGold: 1.14, soulDigits: 17, soulExp: 0.35, soulPower: 1, stoneSouls: 1, stoneExp: 0.37, fury: FURY, deepHp: 1.145, deepFrom: 100, zoneBoss: 2, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
+export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.62, deepGold: 1.15, levelsPerSoul: 2000, goldBossFrom: 100, goldBossChance: 0.25, soulPower: 0.1, stoneSouls: 1, stoneExp: 0.37, fury: FURY, deepHp: 1.145, deepFrom: 100, zoneBoss: 1, hpCreep: 0.004, heartGrowth: 2, awakenStep: 10, awakenFloor: AWAKEN_FLOOR };
 
 /** How gold on the floor reached the bank: picked up, left too long, swept up leaving the floor, or flown up when
  *  a rainbow portal opens. */
@@ -206,8 +211,19 @@ export interface SaveState {
   cooldowns: Record<string, number>;
   /** Abilities ever unlocked (they stay if ABILITIES_KEEP). */
   abilitiesFound: string[];
-  /** Gold earned since the last awakening: souls come from its digits. */
-  cycleGold: Decimal;
+  /** Souls this run's gold bosses have paid (they come with the ascent). */
+  bossSouls: number;
+  /** Boss floors reached this run from goldBossFrom on, and whether that boss is gold (false once beaten). */
+  goldBosses: Record<number, boolean>;
+  /** Souls were recounted under the level-and-boss rules. */
+  soulsV2?: boolean;
+  /** Old Ones summoned, by level; the ones on offer; souls spent summoning and leveling them (a respec refunds part). */
+  oldOnes: Record<string, number>;
+  oldOffer: string[];
+  oldSpent: number;
+  /** Heartmarks on each companion, and the deepest floor that has given one (this awakening cycle). */
+  marks: number[];
+  markBest: number;
   /** Souls earned in earlier awakening cycles: heartstones are the cube root of all souls ever. */
   soulsLifetime: number;
   /** The curse on this descent (null for none), and the reward tier reached under each curse. */
@@ -305,7 +321,7 @@ export interface SaveState {
 export function newSave(): SaveState {
   return {
     v: SAVE_VERSION, gold: new Decimal(0), runGold: new Decimal(0), totalGold: new Decimal(0), kills: 0, bosses: 0, clicks: 0, crits: 0,
-    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], cycleGold: new Decimal(0), soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
+    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], bossSouls: 0, goldBosses: {}, oldOnes: {}, oldOffer: [], oldSpent: 0, marks: COMPS.map(() => 0), markBest: 0, soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
@@ -353,7 +369,9 @@ export type GameEvent =
   | { t: 'floor'; floor: number; boss: boolean; cleared?: boolean }
   | { t: 'sweep'; floor: number; gold: Decimal }
   | { t: 'bossFail'; floor: number }
-  | { t: 'bossWin'; floor: number; first: boolean; clutch?: { left: number; gold: Decimal } }
+  | { t: 'bossWin'; floor: number; first: boolean; clutch?: { left: number; gold: Decimal }; souls?: number }
+  | { t: 'oldOne'; id: OldOneId; lv: number; summoned: boolean }
+  | { t: 'mark'; comp: number; from?: number; moved?: boolean }
   | { t: 'buyComp'; comp: number; n: number }
   | { t: 'reveal'; comp: number }
   | { t: 'buyUpg'; id: string }
@@ -387,7 +405,6 @@ export type GameEvent =
 export interface Parts {
   /** Per companion: tier upgrades and synergies. */
   tier: number[];
-  syn: number[];
   whet: number;
   blades: number;
   upgrades: number;
@@ -455,7 +472,10 @@ export interface OfflineSummary {
 /** Health of an ordinary monster on a floor (the classic clicker curve). */
 export function floorHp(f: number): Decimal {
   if (f <= TUNE.deepFrom) return new Decimal(10 * (f - 1 + TUNE.hpBase ** (f - 1)));
-  return floorHp(TUNE.deepFrom).times(Decimal.pow(TUNE.deepHp, f - TUNE.deepFrom));
+  // Past deepFrom each floor's growth creeps up by hpCreep (in natural log) every 100 floors, so walls steepen the
+  // deeper you go and runs settle into steady gains instead of snowballing.
+  const n = f - TUNE.deepFrom;
+  return floorHp(TUNE.deepFrom).times(Decimal.pow(TUNE.deepHp, n)).times(Decimal.exp((TUNE.hpCreep * n * n) / 200));
 }
 
 /** Gold for one ordinary monster's worth of a floor (monsters get a share of it, like their health). */
@@ -465,6 +485,19 @@ export function floorGold(f: number): Decimal {
 }
 
 export const isBossFloor = (f: number) => f % BOSS_EVERY === 0;
+
+/** Floors whose boss is always gold (from goldBossFrom): the first four zone bosses, so a first ascent pays, then every 50th. */
+export const GOLD_BOSS_SURE = (f: number) => f >= TUNE.goldBossFrom && ((f <= 130 && f % 10 === 0) || f % 50 === 0);
+
+/** Souls a gold boss on this floor pays (Clicker Heroes' primal bosses). */
+export const bossSouls = (f: number) => Math.max(GOLD_BOSS_SURE(f) ? 2 : 1, Math.floor(((f - 75) / 25) ** 1.3));
+
+/** What one run down to this floor pays in gold bosses on average: the sure ones and a goldBossChance share of the rest. */
+export function expectedBossSouls(floor: number, chance = TUNE.goldBossChance) {
+  let sum = 0;
+  for (let f = TUNE.goldBossFrom; f <= floor; f += BOSS_EVERY) sum += bossSouls(f) * (GOLD_BOSS_SURE(f) ? 1 : chance);
+  return sum;
+}
 
 /**
  * The whole game state and rules. Deterministic apart from Math.random (spawns, crits,
@@ -509,6 +542,10 @@ export class Game {
   private autoClick = 0;
   /** Seconds until the next attack by hand can land. */
   private manualCd = 0;
+  /** Seconds since you last attacked by hand, and attacks in the current streak (the Sleeper, the Patient, the
+   *  Unbroken). A fresh load starts attentive. */
+  sinceAttack = 0;
+  streak = 0;
   /** Held down on the battlefield (mouse, finger or Space): attack by hand at MANUAL_RATE until let go. */
   hold: { id: number | null; x: number; y: number } | null = null;
   /** Where the cursor is over the battlefield (set by the UI while Flurry runs): Flurry hits what you point at. */
@@ -610,13 +647,18 @@ export class Game {
     delete legacy.abyssLv;
     delete legacy.runSouls;
     // Saved as plain numbers (older saves) or strings (Decimal's JSON form).
-    for (const k of ['gold', 'runGold', 'totalGold', 'bestDps', 'cycleGold'] as const) s[k] = new Decimal(s[k] ?? 0);
+    for (const k of ['gold', 'runGold', 'totalGold', 'bestDps'] as const) s[k] = new Decimal(s[k] ?? 0);
     while (s.owned.length < COMPS.length) s.owned.push(0);
+    while (s.marks.length < COMPS.length) s.marks.push(0);
     this.owned = new Set(s.upgrades);
     this.known = new Set(s.upgradesKnown);
-    if (fromAbyss) {
-      s.souls = this.soulTarget();
+    // Souls used to come from gold: recounted as what a run to your deepest floor pays in gold bosses (the sure ones
+    // and a quarter of the rest), all of them unspent.
+    if (fromAbyss || !s.soulsV2) {
+      delete (s as unknown as { cycleGold?: unknown }).cycleGold;
+      s.souls = s.descents > 0 || fromAbyss ? Math.round(expectedBossSouls(s.bestFloor)) : 0;
       s.spentSouls = 0;
+      s.soulsV2 = true;
     }
     if (!s.soulsLifetime && this.stonesEarned() > 0) s.soulsLifetime = Math.max(0, TUNE.stoneSouls * this.stonesEarned() ** (1 / TUNE.stoneExp) - s.souls);
     this.trophySet = new Set(s.trophies);
@@ -625,7 +667,7 @@ export class Game {
     // Pick up where you left off on this floor (its monsters respawn, the kills so far still count).
     const kills = s.floorKills ?? 0;
     this.enterFloor(s.floor, true);
-    if (!this.bossFloor()) s.floorKills = Math.min(kills, FLOOR_KILLS);
+    if (!this.bossFloor()) s.floorKills = Math.min(kills, this.killsNeeded());
   }
 
   // ---------- lookups ----------
@@ -652,11 +694,11 @@ export class Game {
     const a = ABILITY_BY_ID.get(id);
     if (id === 'rampage') return this.unleashRampage();
     if (!a || a.kind !== 'button' || !this.abilityUnlocked(id) || this.abilityCooldown(id) > 0) return false;
-    const dur = a.dur ?? 0;
+    const dur = (a.dur ?? 0) * (1 + oldShare(this.oldLv('lingering')));
     const buff: Buff = { id, name: a.name, t: dur, dur, dps: 1, click: 1, gold: 1 };
     if (id === 'treasure') buff.gold = 3;
     this.addBuff(buff);
-    this.s.cooldowns[id] = a.cooldown ?? 0;
+    this.s.cooldowns[id] = (a.cooldown ?? 0) * (1 - 0.75 * oldShare(this.oldLv('restless')));
     this.events.push({ t: 'ability', id });
     return true;
   }
@@ -758,18 +800,15 @@ export class Game {
     return 1;
   }
 
+  /** +1% damage a trophy, added up (multiplying them compounds with every new trophy and runs away). */
   trophyMult() {
-    // Trophy upgrades add to what each trophy gives (multiplying them compounds with every new trophy and runs away).
-    let perTrophy = 0.01;
-    for (const e of this.effects()) if (e.t === 'trophy') perTrophy += e.k;
-    return 1 + this.s.trophies.length * perTrophy;
+    return 1 + this.s.trophies.length * 0.01;
   }
 
   private compute() {
     const s = this.s;
     const effects = this.effects();
     const tier = COMPS.map(() => 1);
-    const syn = COMPS.map(() => 1);
     const whet = 1 + this.relic('click');
     let blades = 1;
     let clickDpsUpg = 0;
@@ -792,15 +831,10 @@ export class Game {
         if (e.chance) critUpg += e.chance;
         if (e.add) critMultUpg += e.add;
       } else if (e.t === 'cleave') cleaveUpg *= 1 + e.pct;
-      else if (e.t === 'syn') {
-        // Flat, so a pair never outgrows the pricier companions above it.
-        syn[e.a] *= SYNERGY_MULT;
-        syn[e.b] *= SYNERGY_MULT;
-      }
     }
     // Every multiplier, kept apart so the stats page can show where the numbers come from.
     const parts: Parts = {
-      tier, syn, whet, blades,
+      tier, whet, blades,
       upgrades: 1 + global,
       trophies: this.trophyMult(),
       souls: this.soulMult(),
@@ -816,16 +850,16 @@ export class Game {
       goldUpg: 1 + gold, goldRelic: 1 + 0.5 * this.relic('gold'),
     };
     const all = parts.fury.times(parts.upgrades * parts.trophies * parts.souls * parts.shard);
-    const baseComp = COMPS.map((c, i) => c.dps * s.owned[i] * levelMult(s.owned[i]) * tier[i] * syn[i]);
+    const baseComp = COMPS.map((c, i) => c.dps * s.owned[i] * levelMult(s.owned[i]) * tier[i] * (1 + MARK_POWER * s.marks[i]));
     const perComp = baseComp.map((b) => all.times(b * parts.party * parts.banner));
     const dps = perComp.reduce((a, b) => a.plus(b), new Decimal(0));
-    const click = all.times(whet * blades).plus(dps.times(parts.clickDps));
+    const click = all.times(whet * blades).plus(dps.times(parts.clickDps)).times(1 + 0.2 * this.oldLv('fist'));
     this.cache = {
       dps, perComp, baseComp, parts, all, click,
       crit: this.abilityUnlocked('crit') ? parts.critBase + parts.critUpg + parts.critRelic : 0,
-      critMult: (parts.critMultBase + parts.critMultUpg) * parts.critMultRelic,
+      critMult: (parts.critMultBase + parts.critMultUpg) * parts.critMultRelic * (1 + 0.15 * this.oldLv('needle')),
       cleave: this.abilityUnlocked('cleave') && this.s.buffs.some((b) => b.id === 'cleave') ? (CLEAVE_BASE + parts.cleaveRelic) * parts.cleaveUpg : 0,
-      gold: parts.goldUpg * parts.goldRelic,
+      gold: parts.goldUpg * parts.goldRelic * (1 + 0.05 * this.oldLv('hoard')),
       autoBase: AUTO_BASE + [0, 0.5, 1, 2][this.curseTier('silent')] + 0.5 * this.relic('phantom') + effects.reduce((sum, e) => sum + (e.t === 'auto' ? e.add : 0), 0),
     };
     return this.cache;
@@ -850,7 +884,7 @@ export class Game {
   }
 
   dps() {
-    return this.c.dps.times(this.buffMult('dps'));
+    return this.c.dps.times(this.buffMult('dps') * this.liveMult());
   }
 
   compDps(i: number) {
@@ -861,11 +895,11 @@ export class Game {
   compNext(i: number) {
     const c = this.c;
     const n = this.s.owned[i];
-    return c.all.times(COMPS[i].dps * ((n + 1) * levelMult(n + 1) - n * levelMult(n)) * c.parts.tier[i] * c.parts.syn[i] * c.parts.party * c.parts.banner);
+    return c.all.times(COMPS[i].dps * ((n + 1) * levelMult(n + 1) - n * levelMult(n)) * c.parts.tier[i] * (1 + MARK_POWER * this.s.marks[i]) * c.parts.party * c.parts.banner);
   }
 
   clickDamage() {
-    return this.c.click.times(this.buffMult('click'));
+    return this.c.click.times(this.buffMult('click') * (1 + 0.0001 * this.oldLv('unbroken') * this.streak));
   }
 
   /** One of your clicks right now, as it lands, plus cleave on every other monster in the room. (Rampage is the party's,
@@ -908,7 +942,7 @@ export class Game {
   }
 
   goldMult() {
-    return this.c.gold * this.buffMult('gold');
+    return this.c.gold * this.buffMult('gold') * (this.idle() ? 1 + 0.5 * this.oldLv('patient') : 1);
   }
 
   /** A running Rampage's multiplier on all your damage. */
@@ -941,7 +975,7 @@ export class Game {
   // ---------- costs ----------
 
   private compBase(i: number) {
-    return COMPS[i].cost;
+    return COMPS[i].cost * 0.95 ** this.oldLv('haggler');
   }
 
   compCost(i: number, n = 1) {
@@ -983,7 +1017,7 @@ export class Game {
     // Stepping off the deepest floor keeps its kills, and coming back to it picks them up again (its monsters respawn).
     if (s.floor === s.maxFloor && !isBossFloor(s.floor)) s.peakKills = s.floorKills;
     s.floor = f;
-    s.floorKills = f === s.maxFloor && !isBossFloor(f) ? Math.min(s.peakKills, FLOOR_KILLS) : 0;
+    s.floorKills = f === s.maxFloor && !isBossFloor(f) ? Math.min(s.peakKills, this.killsNeeded()) : 0;
     this.monsters = [];
     this.spawnT = 0.3;
     this.bossTime = 0;
@@ -1019,7 +1053,7 @@ export class Game {
   /** Kills still needed on this floor (0 once cleared). */
   floorLeft() {
     if (this.bossFloor()) return this.monsters.length;
-    return Math.max(0, FLOOR_KILLS - this.s.floorKills);
+    return Math.max(0, this.killsNeeded() - this.s.floorKills);
   }
 
   private spot(big: boolean): { x: number; z: number } {
@@ -1062,9 +1096,9 @@ export class Game {
     this.s.vaults++;
     this.stash = this.monsters;
     this.monsters = [];
-    const coin = floorGold(this.s.floor).times(TRASH * VAULT_PAY * VAULT_COIN_SHARE * this.goldMult()).div(VAULT_COINS);
+    const coin = floorGold(this.s.floor).times(TRASH * VAULT_PAY * VAULT_COIN_SHARE * this.goldMult() * this.goblinKing()).div(VAULT_COINS);
     const coins = Array.from({ length: VAULT_COINS }, () => ({ id: this.seq++, x: -12 + Math.random() * (VAULT_LENGTH + 10), z: -3 + Math.random() * 6.5, gold: coin, taken: false }));
-    const chest = floorGold(this.s.floor).times(TRASH * VAULT_PAY * this.goldMult()).div(VAULT_CHESTS);
+    const chest = floorGold(this.s.floor).times(TRASH * VAULT_PAY * this.goldMult() * this.goblinKing()).div(VAULT_CHESTS);
     const rainbows = Math.random() < 0.5 ? 2 : 1;
     const goblins = Array.from({ length: VAULT_GOBLINS + rainbows }, (_, k) => {
       const rainbow = k < rainbows;
@@ -1078,7 +1112,7 @@ export class Game {
 
   /** Chests spread over the floor, kept apart from each other; the vault's worth shared out (a Rainbow Chest counts many). */
   private makeChests(n: number, rainbows: number): VaultChest[] {
-    const worth = floorGold(this.s.floor).times(TRASH * VAULT_PAY * this.goldMult()).times(n / VAULT_CHESTS);
+    const worth = floorGold(this.s.floor).times(TRASH * VAULT_PAY * this.goldMult() * this.goblinKing()).times(n / VAULT_CHESTS);
     const each = worth.div(n - rainbows + rainbows * RAINBOW_CHEST_WEIGHT);
     const out: VaultChest[] = [];
     for (let k = 0; k < n; k++) {
@@ -1176,21 +1210,43 @@ export class Game {
     // floor-30 boss are a little softer so the first wall is that one.
     const zone = this.s.floor % 10 === 0 && this.s.floor >= DESCEND_FLOOR ? TUNE.zoneBoss : 1;
     const first = this.s.floor <= 10 ? 0.5 : this.s.floor < DESCEND_FLOOR ? 0.5 : 1;
-    // Only on a boss floor you've beaten before, so a champion never stands in the way of new ground.
-    const champ = this.championsOn() && this.s.floor < this.s.bestFloor && Math.random() < (this.debugCards ? 0.34 : CHAMP_BOSS_CHANCE);
+    const champ = this.goldBoss(this.s.floor);
+    // Gold bosses from goldBossFrom are soul bosses at their floor's usual strength, so bad luck never walls a push.
+    const champHp = champ && this.s.floor < TUNE.goldBossFrom ? CHAMP_BOSS_HP : 1;
     // Bosses toughen over the first floors (from bossHpFrom to bossHp by floor bossRamp): the opening stays gentle, and
     // further down they're the walls you go back and grow stronger for.
     const toughness = TUNE.bossHpFrom + (TUNE.bossHp - TUNE.bossHpFrom) * Math.min(1, (this.s.floor - 1) / TUNE.bossRamp);
-    const hp = floorHp(this.s.floor).times(toughness * zone * first * (giant ? 1 + 2 * bite : 1) * (champ ? CHAMP_BOSS_HP : 1));
+    const wither = 1 - 0.5 * oldShare(this.oldLv('wither'));
+    const hp = floorHp(this.s.floor).times(toughness * zone * first * (giant ? 1 + 2 * bite : 1) * champHp * wither);
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, champ, ...this.spot(true) };
     this.monsters.push(m);
-    let time = BOSS_TIME + 5 * this.curseTier('fuse') + Math.min(30, 3 * this.relic('time'));
+    let time = BOSS_TIME + 5 * this.curseTier('fuse') + Math.min(30, 3 * this.relic('time')) + this.bossTimeBonus();
     if (this.curseActive('fuse')) time *= 0.5;
     if (mods.includes('enraged')) time *= 1 - 0.5 * bite;
-    if (giant || champ) time *= 1.5;
+    if (giant || champHp > 1) time *= 1.5;
     this.bossTimeMax = time;
     this.bossTime = time;
     this.events.push({ t: 'spawn', id: m.id });
+  }
+
+  /** Is this floor's boss gold? From goldBossFrom it's rolled the first time you reach the floor in a run (and kept
+   *  until beaten); before that, now and then on a boss floor you've beaten before, so it never stands in new ground's
+   *  way. */
+  private goldBoss(floor: number) {
+    if (!this.championsOn()) return false;
+    if (floor < TUNE.goldBossFrom) return floor < this.s.bestFloor && Math.random() < (this.debugCards ? 0.34 : CHAMP_BOSS_CHANCE);
+    const rolls = this.s.goldBosses;
+    rolls[floor] ??= GOLD_BOSS_SURE(floor) || Math.random() < this.goldBossChance();
+    return rolls[floor];
+  }
+
+  goldBossChance() {
+    return TUNE.goldBossChance + (1 - TUNE.goldBossChance) * oldShare(this.oldLv('soulcaller'));
+  }
+
+  /** The Hourglass's extra seconds on every boss. */
+  bossTimeBonus() {
+    return 30 * oldShare(this.oldLv('hourglass'));
   }
 
   /** Share of companion damage an armored boss shrugs off. */
@@ -1278,7 +1334,14 @@ export class Game {
       }
       this.bossTime = 0;
       this.unlockNext();
-      this.events.push({ t: 'bossWin', floor: this.s.floor, first: firstClear, clutch });
+      let souls: number | undefined;
+      if (m.champ && this.s.floor >= TUNE.goldBossFrom && this.s.goldBosses[this.s.floor]) {
+        souls = bossSouls(this.s.floor);
+        this.s.bossSouls += souls;
+        this.s.goldBosses[this.s.floor] = false;
+      }
+      this.events.push({ t: 'bossWin', floor: this.s.floor, first: firstClear, clutch, souls });
+      if (this.s.floor > MARK_FROM && this.s.floor % 10 === 0 && this.s.floor > this.s.markBest) this.giveMark(this.s.floor);
       this.rollCard(this.slay(m.def), !!m.champ, 'kill', true);
       if (firstWin || this.debugRelics) this.rollRelic(this.s.floor);
       // The demo's last boss always leads down the stairs, where it ends.
@@ -1286,7 +1349,7 @@ export class Game {
       else this.enterFloor(this.s.floor, false, false, BOSS_RESPAWN);
     } else if (!this.bossFloor()) {
       this.s.floorKills++;
-      if (this.s.floorKills >= FLOOR_KILLS) {
+      if (this.s.floorKills >= this.killsNeeded()) {
         this.unlockNext();
         if (this.s.auto && this.s.floor + 1 <= this.s.maxFloor) this.enterFloor(this.s.floor + 1, false, true);
       }
@@ -1296,7 +1359,7 @@ export class Game {
   /** Strong enough to clear what's left of this floor at once (the toughest monster type counts for all of them).
    *  Only while auto-advancing: with auto off you're staying to farm the floor. */
   private canSweep() {
-    if (!this.s.auto || this.bossFloor() || this.s.floorKills >= FLOOR_KILLS) return false;
+    if (!this.s.auto || this.bossFloor() || this.s.floorKills >= this.killsNeeded()) return false;
     const toughest = Math.max(...bandFor(this.s.floor).map((d) => d.hp));
     return this.dps().times(SWEEP_SECONDS).gte(floorHp(this.s.floor).times(this.floorLeft() * toughest * TRASH));
   }
@@ -1332,14 +1395,14 @@ export class Game {
       if (s.floor !== floor) return;
       this.kill(m, 'dps');
     }
-    if (s.floor !== floor || s.floorKills >= FLOOR_KILLS) return;
-    const left = FLOOR_KILLS - s.floorKills;
+    if (s.floor !== floor || s.floorKills >= this.killsNeeded()) return;
+    const left = this.killsNeeded() - s.floorKills;
     for (let k = 0; k < left; k++) this.rollCard(this.slay(pickMonster(floor), floor), false, 'sweep');
     const gold = Decimal.max(1, floorGold(floor).times(TRASH)).times(this.goldMult()).ceil().times(left);
     this.earn(gold);
     s.kills += left;
     this.killAcc += left;
-    s.floorKills = FLOOR_KILLS;
+    s.floorKills = this.killsNeeded();
     this.events.push({ t: 'sweep', floor, gold });
     this.unlockNext();
     // (A sweep announces itself, so it doesn't count as a 'cleared' floor change.)
@@ -1373,6 +1436,8 @@ export class Game {
       if (!flurry) {
         if (this.manualCd > 0) return new Decimal(0);
         this.manualCd = 1 / MANUAL_RATE;
+        this.streak = this.sinceAttack <= STREAK_GAP ? Math.min(STREAK_CAP, this.streak + 1) : 1;
+        this.sinceAttack = 0;
       }
     }
     const crit = Math.random() < this.critChance();
@@ -1416,8 +1481,8 @@ export class Game {
     return true;
   }
 
-  /** Phantom Blade attacks a second: none until the Squire's first trait, then a slow start, faster with shop upgrades
-   *  and companions. */
+  /** Phantom Blade attacks a second: none until the Squire's first trait, then a slow start, faster with companion
+   *  traits. */
   autoRate() {
     if (!this.abilityUnlocked('blade')) return 0;
     let rate = this.c.autoBase;
@@ -1459,7 +1524,7 @@ export class Game {
 
   /** Seconds a Rampage lasts (before attacking through it adds a little). */
   rampageDuration() {
-    let dur = FEVER_TIME;
+    let dur = FEVER_TIME * (1 + oldShare(this.oldLv('lingering')));
     for (const e of this.effects()) if (e.t === 'fever' && e.dur) dur *= e.dur;
     return dur;
   }
@@ -1534,7 +1599,6 @@ export class Game {
     const s = this.s;
     switch (r.t) {
       case 'owned': return s.owned[r.comp] >= r.n;
-      case 'owned2': return s.owned[r.a] >= r.n && s.owned[r.b] >= r.n;
       case 'floor': return s.maxFloor >= r.n;
       case 'raids': return s.raids >= r.n;
       case 'trophies': return s.trophies.length >= r.n;
@@ -1569,7 +1633,7 @@ export class Game {
       return true;
     }
     if (r.rainbow) {
-      const amount = floorGold(this.s.floor).times(this.goldMult() * RAINBOW_HAUL * (10 + Math.random() * 10));
+      const amount = floorGold(this.s.floor).times(this.goldMult() * this.goblinKing() * RAINBOW_HAUL * (10 + Math.random() * 10));
       this.earn(amount);
       this.events.push({ t: 'raidCatch', id: r.id, reward: 'rainbow', amount });
       this.scheduleRaid();
@@ -1581,7 +1645,7 @@ export class Game {
     const ev: GameEvent = { t: 'raidCatch', id: r.id, reward };
     if (reward === 'plunder') {
       // One to two floors' worth of kills: a nice haul, not a reason to stop playing and wait for goblins.
-      const amount = floorGold(this.s.floor).times(this.goldMult() * (10 + Math.random() * 10));
+      const amount = floorGold(this.s.floor).times(this.goldMult() * this.goblinKing() * (10 + Math.random() * 10));
       this.earn(amount);
       ev.amount = amount;
     } else {
@@ -1592,6 +1656,11 @@ export class Game {
     this.events.push(ev);
     this.scheduleRaid();
     return true;
+  }
+
+  /** The Goblin King's cut of goblin and vault gold. */
+  goblinKing() {
+    return 1 + 0.5 * this.oldLv('goblinking');
   }
 
   private rollReward(): RaidReward {
@@ -1613,7 +1682,7 @@ export class Game {
   }
 
   private scheduleRaid() {
-    let f = 1 + 0.3 * this.relic('goblin');
+    let f = (1 + 0.3 * this.relic('goblin')) * (1 + 2 * oldShare(this.oldLv('lure')));
     for (const e of this.effects()) if (e.t === 'raid' && e.freq) f *= e.freq;
     this.s.raidTimer = this.debugRainbow ? 5 : (RAID_MIN + Math.random() * (RAID_MAX - RAID_MIN)) / f;
   }
@@ -1636,15 +1705,14 @@ export class Game {
     return (1 + 0.15 * this.relic('souls')) * (1 + this.heartLv('siphon')) * [1, 1.25, 1.5, 2][this.curseTier('two')];
   }
 
-  /** All the souls this awakening cycle has earned so far: a root of its gold (see TUNE). */
-  soulTarget() {
-    const roots = this.s.cycleGold.div(10 ** TUNE.soulDigits).max(1).pow(TUNE.soulExp).toNumber() - 1;
-    return Math.max(0, Math.floor(roots * this.soulGainMult()));
+  /** Companion levels bought this run. */
+  runLevels() {
+    return this.s.owned.reduce((a, b) => a + b, 0);
   }
 
-  /** Souls a descent would pay right now: everything banked from bosses this descent. */
+  /** Souls an ascent would pay right now: this run's levels and gold bosses. */
   pendingSouls() {
-    return Math.max(0, this.soulTarget() - this.s.souls);
+    return Math.floor((Math.floor(this.runLevels() / TUNE.levelsPerSoul) + this.s.bossSouls) * this.soulGainMult());
   }
 
   /** The boss floor a run has to reach before the way up opens. (After that, an ascent needs new souls, which only
@@ -1668,6 +1736,7 @@ export class Game {
     this.s.souls += gained;
     this.s.descents++;
     this.s.lastAscent = Math.max(this.s.lastAscent, this.s.maxFloor);
+    this.s.bossSouls = 0;
     this.s.curse = curse && this.cursesOpen().some((c) => c.id === curse) ? curse : null;
     this.resetRun();
     this.events.push({ t: 'descend', souls: gained });
@@ -1698,6 +1767,7 @@ export class Game {
     this.scheduleRaid();
     s.maxFloor = 1;
     s.peakKills = 0;
+    s.goldBosses = {};
     this.invalidate();
     this.enterFloor(1, true);
   }
@@ -1708,7 +1778,176 @@ export class Game {
 
   /** Damage from souls: +`soulPower` each. */
   soulMult(free = this.soulsFree()) {
-    return 1 + TUNE.soulPower * free;
+    return 1 + TUNE.soulPower * free + 0.11 * this.oldLv('hungry');
+  }
+
+  // ---------- the Old Ones ----------
+
+  oldLv(id: OldOneId) {
+    return this.s.oldOnes[id] ?? 0;
+  }
+
+  oldOwned() {
+    return Object.keys(this.s.oldOnes).length;
+  }
+
+  /** The Old Ones wake with your first ascent. */
+  oldOnesOpen() {
+    return this.s.descents > 0 || this.s.awakens > 0 || this.s.souls > 0;
+  }
+
+  summonPrice() {
+    return summonCost(this.oldOwned());
+  }
+
+  rerollPrice() {
+    return rerollCost(this.oldOwned());
+  }
+
+  /** Three Old Ones you don't have yet (your very first offer always holds the Sleeper, the Fist and the Hoard). */
+  private rollOffer() {
+    const s = this.s;
+    const left = OLD_ONES.filter((d) => !(d.id in s.oldOnes)).map((d) => d.id as string);
+    if (this.oldOwned() === 0 && s.spentSouls === 0) {
+      s.oldOffer = FIRST_OFFER.filter((id) => left.includes(id));
+      return;
+    }
+    // A reroll shows as many new faces as it can.
+    const fresh = left.filter((id) => !s.oldOffer.includes(id));
+    const pool = fresh.length >= OFFER_SIZE ? fresh : left;
+    const pick: string[] = [];
+    while (pick.length < Math.min(OFFER_SIZE, pool.length)) {
+      const id = pool[Math.floor(Math.random() * pool.length)];
+      if (!pick.includes(id)) pick.push(id);
+    }
+    s.oldOffer = pick;
+  }
+
+  /** The Old Ones on offer right now (rolled the first time you look). */
+  oldOffer(): OldOneId[] {
+    if (this.oldOnesOpen() && !this.s.oldOffer.length && this.oldOwned() < OLD_ONES.length) this.rollOffer();
+    return this.s.oldOffer as OldOneId[];
+  }
+
+  summonOldOne(id: OldOneId) {
+    const price = this.summonPrice();
+    if (!this.oldOffer().includes(id) || this.soulsFree() < price) return false;
+    this.spendSouls(price, true);
+    this.s.oldOnes[id] = 1;
+    this.rollOffer();
+    this.invalidate();
+    this.events.push({ t: 'oldOne', id, lv: 1, summoned: true });
+    return true;
+  }
+
+  rerollOldOnes() {
+    const price = this.rerollPrice();
+    if (!this.oldOnesOpen() || this.soulsFree() < price || this.oldOwned() >= OLD_ONES.length - OFFER_SIZE) return false;
+    this.spendSouls(price, false);
+    this.rollOffer();
+    return true;
+  }
+
+  oldLevelCost(id: OldOneId) {
+    return oldCost(OLD_ONE_BY_ID.get(id)!, this.oldLv(id));
+  }
+
+  levelOldOne(id: OldOneId) {
+    const lv = this.oldLv(id);
+    if (!lv) return false;
+    const def = OLD_ONE_BY_ID.get(id)!;
+    if (id === 'thinning' && lv >= 10) return false;
+    const price = oldCost(def, lv);
+    if (this.soulsFree() < price) return false;
+    this.spendSouls(price, true);
+    this.s.oldOnes[id] = lv + 1;
+    this.invalidate();
+    this.events.push({ t: 'oldOne', id, lv: lv + 1, summoned: false });
+    return true;
+  }
+
+  oldMaxed(id: OldOneId) {
+    return id === 'thinning' && this.oldLv(id) >= 10;
+  }
+
+  /** Every Old One goes back to sleep; RESPEC_REFUND of the souls they took comes back. */
+  respecOldOnes() {
+    const s = this.s;
+    if (!this.oldOwned()) return false;
+    s.spentSouls -= Math.floor(s.oldSpent * RESPEC_REFUND);
+    s.oldSpent = 0;
+    s.oldOnes = {};
+    s.oldOffer = [];
+    this.rollOffer();
+    this.invalidate();
+    return true;
+  }
+
+  /** `kept`: spent on an Old One (a respec refunds part of it), or gone for good (a reroll). */
+  private spendSouls(n: number, kept: boolean) {
+    this.s.spentSouls += n;
+    if (kept) this.s.oldSpent += n;
+  }
+
+  /** Kills a normal floor needs. */
+  killsNeeded() {
+    return FLOOR_KILLS - Math.min(10, this.oldLv('thinning'));
+  }
+
+  /** No attack by hand for IDLE_AFTER seconds. */
+  idle() {
+    return this.sinceAttack >= IDLE_AFTER;
+  }
+
+  /** Multipliers that change from moment to moment: the Sleeper while idle, the Unbroken with your streak. */
+  private liveMult() {
+    return (this.idle() ? 1 + 0.25 * this.oldLv('sleeper') : 1) * (1 + 0.0001 * this.oldLv('unbroken') * this.streak);
+  }
+
+  // ---------- Heartmarks ----------
+
+  /** Companions a Heartmark can land on: everyone you could hire. */
+  private markable() {
+    return COMPS.map((_, i) => i).filter((i) => this.compUnlocked(i));
+  }
+
+  private giveMark(floor: number) {
+    this.s.markBest = floor;
+    const pool = this.markable();
+    const comp = pool[Math.floor(Math.random() * pool.length)];
+    this.s.marks[comp]++;
+    this.invalidate();
+    this.events.push({ t: 'mark', comp });
+  }
+
+  marksTotal() {
+    return this.s.marks.reduce((a, b) => a + b, 0);
+  }
+
+  /** Move one of this companion's Heartmarks to someone else, at random. */
+  rerollMark(from: number) {
+    const pool = this.markable().filter((i) => i !== from);
+    if (!this.s.marks[from] || !pool.length || this.soulsFree() < MARK_REROLL) return false;
+    this.spendSouls(MARK_REROLL, false);
+    const to = pool[Math.floor(Math.random() * pool.length)];
+    this.s.marks[from]--;
+    this.s.marks[to]++;
+    this.invalidate();
+    this.events.push({ t: 'mark', comp: to, from, moved: true });
+    return true;
+  }
+
+  /** Bring one Heartmark to this companion, taken from someone else's at random. */
+  moveMarkTo(to: number) {
+    const from = COMPS.map((_, i) => i).filter((i) => i !== to && this.s.marks[i] > 0);
+    if (!from.length || !this.compUnlocked(to) || this.soulsFree() < MARK_MOVE) return false;
+    this.spendSouls(MARK_MOVE, false);
+    const pick = from[Math.floor(Math.random() * from.length)];
+    this.s.marks[pick]--;
+    this.s.marks[to]++;
+    this.invalidate();
+    this.events.push({ t: 'mark', comp: to, from: pick, moved: true });
+    return true;
   }
 
   // ---------- relics ----------
@@ -1807,7 +2046,12 @@ export class Game {
     s.soulsLifetime += s.souls;
     s.souls = 0;
     s.spentSouls = 0;
-    s.cycleGold = new Decimal(0);
+    s.oldOnes = {};
+    s.oldOffer = [];
+    s.oldSpent = 0;
+    s.marks = COMPS.map(() => 0);
+    s.markBest = 0;
+    s.bossSouls = 0;
     s.curse = null;
     this.resetRun();
     this.events.push({ t: 'awaken', stones: gained });
@@ -1855,6 +2099,7 @@ export class Game {
   }
 
   private cardRoll(odds: number) {
+    odds /= 1 + 2 * oldShare(this.oldLv('collector'));
     return Math.random() * (this.debugCards ? Math.max(1, odds / 500) : odds) < 1;
   }
 
@@ -2093,8 +2338,6 @@ export class Game {
   }
 
   private earn(n: Decimal) {
-    // Souls come only from new depths: floors already gathered from (this cycle) add none.
-    if (this.s.floor > this.s.lastAscent) this.s.cycleGold = this.s.cycleGold.plus(n);
     this.s.gold = this.s.gold.plus(n);
     this.s.runGold = this.s.runGold.plus(n);
     this.s.totalGold = this.s.totalGold.plus(n);
@@ -2103,6 +2346,8 @@ export class Game {
   update(dt: number) {
     const s = this.s;
     s.playTime += dt;
+    this.sinceAttack += dt;
+    if (this.sinceAttack > STREAK_GAP) this.streak = 0;
     for (const d of this.drops) d.t += dt;
     while (this.drops.length && this.drops[0].t >= GOLD_WAIT) this.bankDrop(0, 'time');
     for (const id in s.cooldowns) if ((s.cooldowns[id] -= dt) <= 0) delete s.cooldowns[id];
@@ -2118,7 +2363,7 @@ export class Game {
     } else if (!this.bossFloor()) {
       this.spawnT -= dt;
       // No more monsters than the floor still needs, so it ends on its last one (farming with auto off: no limit).
-      const cap = s.auto && s.floorKills < FLOOR_KILLS ? Math.min(MAX_ON, this.floorLeft()) : MAX_ON;
+      const cap = s.auto && s.floorKills < this.killsNeeded() ? Math.min(MAX_ON, this.floorLeft()) : MAX_ON;
       if (this.spawnT <= 0 && this.monsters.length < cap) {
         this.spawn();
         this.spawnT = SPAWN_GAP;
@@ -2266,9 +2511,11 @@ export class Game {
     for (const id in this.s.cooldowns) if ((this.s.cooldowns[id] -= secs) <= 0) delete this.s.cooldowns[id];
     this.invalidate();
     const f = isBossFloor(this.s.floor) ? Math.max(1, this.s.floor - 1) : this.s.floor;
-    const perSec = Math.min(1 / SPAWN_GAP, this.baseDps().div(floorHp(f).times(TRASH)).toNumber());
+    // Away counts as idle: the Sleeper and the Patient work through it.
+    const sleeper = 1 + 0.25 * this.oldLv('sleeper');
+    const perSec = Math.min(1 / SPAWN_GAP, this.baseDps().times(sleeper).div(floorHp(f).times(TRASH)).toNumber());
     const kills = Math.floor(perSec * secs * pct);
-    const gold = floorGold(f).times(kills * TRASH * this.c.gold);
+    const gold = floorGold(f).times(kills * TRASH * this.c.gold * (1 + 0.5 * this.oldLv('patient')));
     this.earn(gold);
     this.s.kills += kills;
     // Every kill counts toward its monster's card, and rolls for it, as it would have at the keyboard.

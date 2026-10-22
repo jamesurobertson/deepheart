@@ -446,24 +446,14 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
   box-shadow: inset 4px 0 0 #3b2b2e, -8px 0 24px rgba(0, 0, 0, 0.5);
 }
 .shop-head { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 16px 8px; border-bottom: 2px solid #2d2224; }
-.shop-head h2, .upgs h3 { margin: 0; font: 700 22px/1 var(--f-text); color: var(--gold-hi); text-shadow: var(--shadow); }
+.shop-head h2 { margin: 0; font: 700 22px/1 var(--f-text); color: var(--gold-hi); text-shadow: var(--shadow); }
 .shop-sub { font: 400 12px/1 'Silkscreen'; color: var(--faint); }
 
-.upgs { padding: 10px 12px; border-bottom: 2px solid #2d2224; }
-.upgs-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; min-height: 28px; }
-.upgs h3 { font-size: 16px; color: var(--dim); }
-.upgs-acts { display: flex; gap: 4px; }
+.auto-upg { color: var(--faint); }
+/* Room for the Auto toggle beside the hire modes: the HIRE label steps aside and the modes share the row. */
+.modes:has(.auto-upg:not([hidden])) > span { display: none; }
+.modes:has(.auto-upg:not([hidden])) .mode { flex: 1 1 0; min-width: 0; padding: 0 4px; }
 .auto-upg.on { color: var(--green); }
-.upgs-empty { margin: 0; font-size: 14px; color: var(--faint); }
-.upg-grid { display: grid; grid-template-columns: repeat(auto-fill, 52px); gap: 4px; max-height: 116px; overflow-y: auto; }
-.upg {
-  position: relative; width: 52px; height: 52px; display: grid; place-items: center;
-  border: 6px solid transparent; border-image: var(--f-cell) 2 fill / 6px stretch;
-  opacity: 0.55; filter: saturate(0.4);
-}
-/* Affordable: the tile itself lights up (a glow outside it would be clipped by the scrolling grid). */
-.upg.can { opacity: 1; filter: none; border-image-source: var(--f-gold); box-shadow: inset 0 0 10px rgba(242, 193, 78, 0.45); animation: popin 0.3s; }
-.upg:hover { transform: translateY(-2px); }
 
 .ico { position: relative; display: grid; place-items: center; }
 .ico .tier {
@@ -684,6 +674,25 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .aby.locked { opacity: 0.4; }
 .aby.avail { opacity: 0.8; }
 
+/* Where an ascent's souls come from. */
+.soul-src { list-style: none; margin: 8px auto; padding: 0; max-width: 460px; display: grid; gap: 4px; text-align: left; }
+.soul-src li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 10px; background: rgba(0, 0, 0, 0.18); }
+.soul-src span { display: grid; gap: 2px; color: var(--text); min-width: 0; }
+.soul-src small { font-size: 12px; color: var(--dim); }
+.soul-src b { font: 400 22px/1 'Jersey 10'; color: var(--soul); }
+/* The Old Ones on offer: any one of them for the summon price. */
+.old-offers { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; margin-bottom: 6px; }
+.old-offer {
+  display: grid; justify-items: center; gap: 4px; padding: 10px 8px; text-align: center;
+  border: 6px solid transparent; border-image: var(--f-btn) 2 fill / 6px stretch;
+}
+.old-offer:hover { border-image-source: var(--f-btn-hi); }
+.old-offer.can { box-shadow: 0 0 0 2px var(--soul), 0 0 14px rgba(179, 140, 255, 0.5); }
+.old-offer b { font: 700 15px/1.1 var(--f-text); color: var(--text); }
+.old-offer small { font-size: 12px; line-height: 1.25; color: var(--dim); }
+.old-offer .kind { font: 400 15px/1 'Jersey 10'; letter-spacing: 0.04em; text-transform: uppercase; color: var(--soul); }
+.gen-name .marks { display: inline-flex; align-items: center; gap: 2px; font: 400 15px/1 'Jersey 10'; color: var(--ess); vertical-align: middle; }
+
 .stats { display: flex; flex-direction: column; gap: 6px; margin: 0; }
 .stats div { display: flex; align-items: baseline; }
 .stats dt { display: flex; flex: 1; align-items: baseline; color: var(--dim); }
@@ -816,12 +825,6 @@ body.compact .tip { width: min(300px, calc(100vw - 16px)); }
 body.compact:not(.phone) { --shop-w: min(360px, 44vw); }
 body.compact .shop-head { padding: 8px 12px 6px calc(12px + 0px); }
 body.compact .shop-head h2 { font-size: 18px; }
-body.compact .upgs { padding: 6px 10px; }
-body.compact .upgs-head { margin-bottom: 4px; min-height: 24px; }
-body.compact .upg-grid { grid-template-columns: repeat(auto-fill, 46px); max-height: 96px; }
-body.compact .upg { width: 46px; height: 46px; }
-body.compact .upg .ico .px { zoom: 0.85; }
-body.compact .upgs-empty { display: none; }
 body.compact .modes { padding: 4px 10px; }
 body.compact .mode { min-width: 44px; min-height: 32px; font-size: 14px; }
 body.compact .gens { padding: 4px 6px calc(12px + var(--safe-b)); }
@@ -848,16 +851,8 @@ body.phone .shop-head .shop-sub { margin-left: auto; font-size: 10px; }
 body.phone .sheet-grip { position: absolute; left: 50%; top: 4px; width: 40px; height: 4px; margin-left: -20px; background: #5a4648; box-shadow: 0 0 0 1px var(--ink); }
 body.phone .shop.min .shop-sub { display: none; }
 /* Folded: just the header, plus a strip of affordable upgrades (tap to buy) when there are any. */
-body.phone .shop.min.has-strip { height: calc(44px + 52px + var(--safe-b)); }
-body.phone .shop.min .upg:not(.can) { display: none; }
 body.phone .shop.min .modes, body.phone .shop.min .gens { visibility: hidden; }
 /* Upgrades: one row that scrolls sideways. */
-body.phone .upgs { padding: 4px 8px; flex: none; }
-body.phone .upgs-head { display: none; }
-body.phone .upg-grid { display: flex; gap: 4px; max-height: none; overflow-x: auto; overflow-y: hidden; padding-bottom: 0; touch-action: pan-x; overscroll-behavior: contain; }
-body.phone .upg { flex: none; width: 44px; height: 44px; }
-body.phone .upg-grid::-webkit-scrollbar { display: none; }
-body.phone .upgs:has(.upg-grid:empty) { display: none; }
 body.phone .modes { padding: 4px 8px; flex: none; }
 body.phone .modes > span { display: none; }
 body.phone .modes .mode { flex: 1; }
@@ -898,7 +893,7 @@ body.phone .toasts { bottom: calc(100% - var(--free-h, 50%) + 6px); }
 /* Gestures: the fight never scrolls or zooms the page; lists only scroll themselves. */
 html, body { position: fixed; inset: 0; overflow: hidden; }
 #stage, #stage canvas { touch-action: none; }
-.modal, .gens, .upg-grid, .tro-grid { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.modal, .gens, .tro-grid { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .modal { touch-action: pan-y; }
 button { touch-action: manipulation; }
 

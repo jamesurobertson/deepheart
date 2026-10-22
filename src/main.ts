@@ -443,6 +443,7 @@ function playSound(sfx: Sfx, ev: GameEvent) {
     case 'floor': if (ev.boss) sfx.play('boss', { vol: 0.8 }); break;
     case 'bossWin':
       sfx.play('drop3', { vol: 0.8 });
+      if (ev.souls) setTimeout(() => sfx.play('awaken', { vol: 0.45, rate: 1.3 }), 350);
       // A clutch kill: a deep, slowed boom as time drops, then the hit landing as it lets go.
       if (ev.clutch) {
         sfx.play('mega', { vol: 0.9, rate: 0.55 });
@@ -469,6 +470,8 @@ function playSound(sfx: Sfx, ev: GameEvent) {
     case 'raidEscape': sfx.play('close', { vol: 0.5, rate: 0.8 }); break;
     case 'fever': if (ev.on) sfx.play('awaken', { vol: 0.8 }); break;
     case 'heart': sfx.play('awaken', { vol: 0.6, rate: 0.8 }); break;
+    case 'oldOne': sfx.play(ev.summoned ? 'awaken' : 'levelup', { vol: ev.summoned ? 0.6 : 0.45, rate: ev.summoned ? 0.7 : 1 }); break;
+    case 'mark': sfx.play(ev.moved ? 'equip' : 'jackpot', { vol: 0.5 }); break;
     case 'split': sfx.play('bosskill', { vol: 0.6, rate: 1.3 }); break;
   }
 }
