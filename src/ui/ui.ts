@@ -1264,14 +1264,14 @@ export class Ui {
     this.shown = bank.lt(this.shown) || bank.minus(this.shown).lt(1) ? bank : this.shown.plus(bank.minus(this.shown).times(Math.min(1, dt * 10)));
     this.el.bank.textContent = fmt(this.shown);
 
-    // Health bars over every monster that has arrived.
+    // Health bars over bosses, and over monsters once they've been hit.
     const seen = new Set<number>();
     for (const m of g.monsters) {
-      if (m.arrive > 0 && !m.boss) continue;
+      let bar = this.bars.get(m.id);
+      if (!m.boss && (m.arrive > 0 || (!bar && m.hp.gte(m.max)))) continue;
       const s = this.scene.screenOf(m.id);
       if (!s) continue;
       seen.add(m.id);
-      let bar = this.bars.get(m.id);
       if (!bar) {
         bar = document.createElement('div');
         bar.className = `hp ${m.boss ? 'boss' : ''}`;
