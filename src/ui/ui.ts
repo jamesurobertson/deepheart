@@ -2261,11 +2261,11 @@ export class Ui {
     const summon = pick
       ? `<p class="old-warn">Summon one for <b>${G.soul(2)} ${fmt(price)} soul${price === 1 ? '' : 's'}</b>. Every soul you spend gives up ${soulPct(1)} damage.</p>
         <div class="pedestals">${pedestals}</div>
+        ${OLD_ONES.length - g.oldOwned() > OFFER_SIZE ? `<div class="old-reroll"><button class="btn" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>Reroll all three · ${G.soul(1.5)} ${fmt(g.rerollPrice())}</button></div>` : ''}
         <div class="old-panel">
           <div class="tt-h"><b>${esc(pick.name)}</b><span class="tt-own">${KIND_NAME[pick.kind]}</span></div>
           ${oldDetail(pick, 0)}
-          <div class="set-row"><button class="btn primary" data-act="summon" ${free >= price ? '' : 'disabled'}>Summon ${esc(pick.name.replace(/^The /, 'the '))}</button>
-          ${OLD_ONES.length - g.oldOwned() > OFFER_SIZE ? `<button class="btn" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>Reroll · ${G.soul(1.5)} ${fmt(g.rerollPrice())}</button>` : ''}</div>
+          <div class="set-row"><button class="btn primary" data-act="summon" ${free >= price ? '' : 'disabled'}>Summon ${esc(pick.name.replace(/^The /, 'the '))}</button></div>
         </div>`
       : '<p class="muted">Every Old One is awake.</p>';
     const owned = OLD_ONES.filter((d) => g.oldLv(d.id) > 0).map((d) => {
