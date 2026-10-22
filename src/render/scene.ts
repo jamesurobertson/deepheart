@@ -1430,6 +1430,11 @@ export class Scene {
     // (From the floor, not the room: the vault's treasure room has no lap.)
     const lap = Math.floor(zoneOf(this.lastFloor) / ZONES.length);
     if (lap) tint.lerp(tint.clone().multiply(new THREE.Color(corruptionOf(lap).tint)), 0.7);
+    // A champion is solid gold, whatever it would otherwise wear.
+    if (m.champ) {
+      tint.setScalar(1);
+      sprite.gild();
+    }
     sprite.mesh.material.color.copy(tint);
     if (m.half && this.settings.particles) this.fx.burst(body.position.clone().setY(1), '#d58aff', 14, 4, 0.08, 8);
     let ring: MonView['ring'] = null;
@@ -1450,6 +1455,7 @@ export class Scene {
         for (const [x, z, size, fps] of [[-1.9, -1.4, 0.5, 7], [2.6, -0.2, 0.6, 10], [1.5, 1.5, 0.45, 12]]) {
           const extra = new PixelSprite(this.atlas.texture, this.atlas.size, run, { fps, flip: x > 0 });
           extra.update(Math.random());
+          if (m.champ) extra.gild();
           extra.mesh.material.color.copy(tint);
           const holder = new THREE.Group();
           holder.position.set(x / scale, 0, z / scale);
@@ -1526,12 +1532,10 @@ export class Scene {
       v.sprite.flash = v.flash;
       for (const extra of v.extras) extra.flash = v.flash;
       if (v.glow) {
-        const g = v.glow === 'champ' ? 0.22 + Math.sin(this.time * 7 + v.id) * 0.12 : 0.08;
         if (v.ring) {
-          v.ring.material.opacity = 0.6 + g;
-          v.ring.scale.setScalar(1 + Math.sin(this.time * 7 + v.id) * 0.08);
+          v.ring.material.opacity = 0.7 + Math.sin(this.time * 2.5 + v.id) * 0.1;
+          v.ring.scale.setScalar(1 + Math.sin(this.time * 2.5 + v.id) * 0.04);
         }
-        v.sprite.mesh.material.emissive.setRGB(v.flash + g, v.flash + g * 0.75, v.flash + g * 0.2);
         if (v.glow === 'champ' && this.settings.particles && Math.random() < dt * 8) {
           this.fx.burst(p.clone().setY(v.height * (0.3 + Math.random() * 0.6)), '#ffd070', 1, 1.5, 0.06, 2, true);
         }

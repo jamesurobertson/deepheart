@@ -126,6 +126,13 @@ export function spriteFit(name: string, box: number, cls = ''): string {
 /** A character as a flat silhouette in `color`, at a fixed on-screen height. Cut on each pixel's opacity, so a sprite's
  *  faint glow doesn't turn into a dark box (as a CSS brightness(0) filter would make it). */
 export function silhouette(name: string, height: number, color: string): string {
+  const key = `${name}|${height}|${color}`;
+  return silhouettes.get(key) ?? silhouettes.set(key, cutSilhouette(name, height, color)).get(key)!;
+}
+// Open panels rebuild their HTML every tick; the cut (a canvas and a data URL) is too slow to redo each time.
+const silhouettes = new Map<string, string>();
+
+function cutSilhouette(name: string, height: number, color: string): string {
   const src = spriteFrames(name);
   const f = src && atlas!.trimmed(src.frames[0]);
   if (!src || !f) return '';

@@ -1689,7 +1689,7 @@ export class Game {
     return true;
   }
 
-  /** The Goblin King's cut of goblin and vault gold. */
+  /** The Wish's cut of goblin and vault gold. */
   goblinKing() {
     return 1 + 0.5 * this.legendLv('goblinking');
   }

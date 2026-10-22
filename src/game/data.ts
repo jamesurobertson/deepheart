@@ -637,15 +637,13 @@ export interface LegendDef {
   name: string;
   kind: LegendKind;
   sprite: string;
-  flavor: string;
   /** What it boosts, in a few words. */
   what: string;
   /** Its bonus at a level ("+75%", "−3 kills"). */
   value: (lv: number) => string;
   /** The rule a player needs to know (what counts as idle, when a streak ends), if any. */
   note?: string;
-  /** Where a utility bonus tops out, and the level that ends it (only the Thinning has one). */
-  cap?: string;
+  /** The level that ends it (only the Thinning has one). */
   maxLv?: number;
 }
 
@@ -668,30 +666,29 @@ export const OFFER_SIZE = 3;
 export const RESPEC_REFUND = 0.75;
 
 const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
-const IDLE_NOTE = 'Idle means a minute without clicking or holding attack. The Phantom Blade, Flurry and time away all count as idle.';
 const per = (k: number) => (lv: number) => `+${Math.round(k * lv * 100)}%`;
 const share = (cap: number, show: (n: number) => string) => (lv: number) => show(cap * legendShare(lv));
 const o = (d: LegendDef) => d;
 
 export const LEGENDS: LegendDef[] = [
-  o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Party damage while idle', value: per(0.25), note: IDLE_NOTE, flavor: 'It has not moved in an age. Neither should you.' }),
-  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Your attacks and the Phantom Blade', value: per(0.2), flavor: 'Every blow you land, it lands with you.' }),
-  o({ id: 'needle', name: 'The Needle', kind: 'power', sprite: 'sd_executioner', what: 'Critical hit damage', value: per(0.15), flavor: 'Finds the soft spot. Pushes.' }),
-  o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'sd_mountain_king', what: 'All gold', value: per(0.05), flavor: "A dragon's worth of gold, and no dragon." }),
-  o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'sm_sohei', what: 'Gold while idle', value: per(0.5), note: IDLE_NOTE, flavor: 'Waits. Collects. Waits some more.' }),
-  o({ id: 'goblinking', name: 'The Goblin King', kind: 'power', sprite: 'sd_merchant', what: 'Gold from treasure goblins and the Rainbow Vault', value: per(0.5), flavor: 'Every goblin pays him a cut. He pays you.' }),
-  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'sm_large_samurai', what: 'All damage, for each attack in your streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}% per attack`, note: 'A streak ends 2 seconds after your last attack, and counts up to 2,000 attacks.', flavor: 'Never stops. Never slows. Never lets you.' }),
-  o({ id: 'hourglass', name: 'The Hourglass', kind: 'utility', sprite: 'sd_magic_shopkeeper', what: 'Time to beat a boss', value: share(30, (n) => `+${+n.toFixed(1)}s`), cap: '+30s', flavor: 'The sand falls up if you ask nicely.' }),
-  o({ id: 'wither', name: 'The Wither', kind: 'utility', sprite: 'sd_bishop', what: 'Boss health', value: share(0.5, (n) => `−${pct(n)}`), cap: '−50%', flavor: 'Bosses arrive tired. It sees to that.' }),
-  o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${Math.min(10, lv)}`, cap: '−10', maxLv: 10, flavor: 'Fewer of them. It ate the rest.' }),
-  o({ id: 'haggler', name: 'The Haggler', kind: 'utility', sprite: 'sm_merchant', what: 'Companion level costs', value: (lv) => `−${pct(1 - 0.95 ** lv)}`, flavor: 'Knows what everyone is worth. Pays less.' }),
-  o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'sm_kabuki', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`), cap: '−75%', flavor: 'It cannot wait. Now neither can you.' }),
-  o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'sm_geisha', what: 'How long abilities and Rampage last', value: share(1, (n) => `+${pct(n)}`), cap: '+100%', flavor: 'What it touches stays a while.' }),
-  o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Chance a boss is gold (floor 100 on)', value: share(0.75, (n) => pct(0.25 + n)), cap: '100%', note: 'Without it, 25% of bosses are gold.', flavor: 'Calls the gold out of the deep.' }),
-  o({ id: 'lure', name: 'The Lure', kind: 'utility', sprite: 'chest_mimic_open', what: 'How often treasure goblins come', value: share(2, (n) => `+${pct(n)}`), cap: '+200%', flavor: "Goblins can't resist it. Goblins have never resisted anything." }),
-  o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'sd_princess', what: 'Card drop chance', value: share(2, (n) => `+${pct(n)}`), cap: '+200%', flavor: 'Keeps one of everything. Shares.' }),
-  o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance on overkill kills', value: (lv) => `up to ×${1 + lv}`, note: "A kill that deals N× a monster's health has N× the chance to drop its card (gold cards too), up to the cap. Swept floors and time away count.", flavor: 'One clean cut. Everything it was carrying falls out.' }),
-  o({ id: 'hungry', name: 'The Hungry Dark', kind: 'sink', sprite: 'sm_oni_king', what: 'All damage, for every soul fed to it', value: (lv) => `+${lv * 11}%`, note: 'A soul you keep gives +10%. One fed here gives +11%, but you can only get it back with a respec.', flavor: 'It takes souls. It gives back a little more than it takes.' }),
+  o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Party damage while idle', value: per(0.25) }),
+  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Your attacks and the Phantom Blade', value: per(0.2) }),
+  o({ id: 'needle', name: 'The Needle', kind: 'power', sprite: 'sd_executioner', what: 'Critical hit damage', value: per(0.15) }),
+  o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'sd_mountain_king', what: 'All gold', value: per(0.05) }),
+  o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'sm_sohei', what: 'Gold while idle', value: per(0.5) }),
+  o({ id: 'goblinking', name: 'The Wish', kind: 'power', sprite: 'ef_fairy', what: 'Gold from treasure goblins and the Rainbow Vault', value: per(0.5) }),
+  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'sm_large_samurai', what: 'All damage, for each attack in your streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}% per attack`, note: 'A streak ends 2 seconds after your last attack, and counts up to 2,000 attacks.' }),
+  o({ id: 'hourglass', name: 'The Hourglass', kind: 'utility', sprite: 'sd_magic_shopkeeper', what: 'Time to beat a boss', value: share(30, (n) => `+${+n.toFixed(1)}s`) }),
+  o({ id: 'wither', name: 'The Wither', kind: 'utility', sprite: 'sd_bishop', what: 'Boss health', value: share(0.5, (n) => `−${pct(n)}`) }),
+  o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${Math.min(10, lv)}`, maxLv: 10 }),
+  o({ id: 'haggler', name: 'The Haggler', kind: 'utility', sprite: 'sm_merchant', what: 'Companion level costs', value: (lv) => `−${pct(1 - 0.95 ** lv)}` }),
+  o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'sm_kabuki', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`) }),
+  o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'sm_geisha', what: 'How long abilities and Rampage last', value: share(1, (n) => `+${pct(n)}`) }),
+  o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Increased chance a boss is a champion boss (starting on floor 100)', value: share(0.75, (n) => pct(0.25 + n)) }),
+  o({ id: 'lure', name: 'The Lure', kind: 'utility', sprite: 'chest_mimic_open', what: 'How often treasure goblins come', value: share(2, (n) => `+${pct(n)}`) }),
+  o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'sd_princess', what: 'Card drop chance', value: share(2, (n) => `+${pct(n)}`) }),
+  o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance on overkill kills', value: (lv) => `up to ×${1 + lv}`, note: "A kill that deals N× a monster's health has N× the chance to drop its card (gold cards too), up to the cap. Swept floors and time away count." }),
+  o({ id: 'hungry', name: 'The Hungry Dark', kind: 'sink', sprite: 'sm_oni_king', what: 'All damage, for every soul fed to it', value: (lv) => `+${lv * 11}%`, note: 'A soul you keep gives +10%. One fed here gives +11%, but you can only get it back with a respec.' }),
 ];
 export const LEGEND_BY_ID = new Map(LEGENDS.map((d) => [d.id, d]));
 /** Your first offer always includes these, so the first pick is a good one. */

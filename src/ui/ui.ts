@@ -67,19 +67,21 @@ function cardFace(card: (typeof CARDS)[number], state: 'locked' | 'got', gilded 
 const KIND_NAME = { power: 'Power', utility: 'Utility', sink: 'Sink' } as const;
 
 /** A Legend in full: what it boosts and by how much now (level 1, if not summoned), the next four levels with their
- *  cost, where it tops out, the rule worth knowing, and its line. */
+ *  cost, and the rule worth knowing. */
 function legendDetail(d: LegendDef, lv: number): string {
   const now = Math.max(1, lv);
   const rows = Array.from({ length: 4 }, (_, k) => now + 1 + k)
     .filter((n) => !d.maxLv || n <= d.maxLv)
     .map((n) => `<tr><td>Level ${n}</td><td>${G.soul(1.2)} ${fmt(legendCost(d, n - 1))}</td><td>${esc(d.value(n))}</td></tr>`).join('');
-  const top = d.maxLv ? `Max level ${d.maxLv}` : d.cap ? `Tops out at ${d.cap}` : 'No max level';
-  return `<p class="od-what">${esc(d.what)}: <b class="up">${esc(d.value(now))}</b>${lv ? '' : ' at level 1'}</p>
+  return `<p class="od-what">${esc(d.what)}: <b class="od-now">${esc(d.value(now))}</b>${lv ? '' : ' at level 1'}</p>
     ${rows ? `<table class="od-lv">${rows}</table>` : ''}
-    <p class="od-top">${top}</p>
-    ${d.note ? `<p class="od-note">${esc(d.note)}</p>` : ''}
-    <p class="tt-f">“${esc(d.flavor)}”</p>`;
+    ${d.maxLv ? `<p class="od-max">Max level ${d.maxLv}</p>` : ''}
+    ${d.note ? `<p class="od-note">${esc(d.note)}</p>` : ''}`;
 }
+
+/** The figures behind a sleeping Legend's pedestal: a few soul wisps, placed by index so a re-render draws the same ones. */
+const WISPS = Array.from({ length: 7 }, (_, k) =>
+  `<i style="--x:${10 + ((k * 37) % 80)}%;--d:${(2.4 + ((k * 13) % 22) / 10).toFixed(1)}s;--w:${-((k * 29) % 40) / 10}s;--s:${(0.6 + ((k * 7) % 8) / 10).toFixed(1)}"></i>`).join('');
 
 /** What this many kept souls add to all damage, as a percentage ("+300%"). */
 const soulPct = (n: number) => `+${fmt(n * TUNE.soulPower * 100)}%`;
@@ -658,17 +660,21 @@ export class Ui {
       }
       const old = t.closest<HTMLElement>('[data-legend]');
       if (old) {
-        if (this.game.levelLegend(old.dataset.legend as LegendId)) {
+        const id = old.dataset.legend as LegendId;
+        if (this.game.levelLegend(id)) {
           this.renderModal();
           this.refreshTip();
+          this.flareLegend(id);
         } else this.deny(old);
         return;
       }
       const pickEl = t.closest<HTMLElement>('[data-pick]');
       if (pickEl) {
+        if (pickEl.classList.contains('on')) return;
         this.legendPick = pickEl.dataset.pick as LegendId;
         this.hooks.sound('toggle', { vol: 0.4 });
         this.renderModal();
+        this.el.modal.querySelector(`[data-pick="${this.legendPick}"]`)?.classList.add('materialize');
         return;
       }
       const away = t.closest<HTMLElement>('[data-mark-away]');
@@ -847,12 +853,16 @@ export class Ui {
         } else this.hooks.reset();
         break;
       case 'descend': this.renderDescendConfirm(); break;
-      case 'summon':
-        if (this.legendPick && this.game.summonLegend(this.legendPick)) this.renderModal();
-        else this.deny(el);
+      case 'summon': {
+        const id = this.legendPick;
+        if (id && this.game.summonLegend(id)) {
+          this.renderModal();
+          this.flareLegend(id);
+        } else this.deny(el);
         break;
+      }
       case 'reroll':
-        if (this.game.rerollLegends()) this.renderModal();
+        if (this.game.rerollLegends()) this.rerollFx();
         else this.deny(el);
         break;
       case 'respec':
@@ -967,9 +977,9 @@ export class Ui {
           const mods = g.bossMods(ev.floor).map((id) => MOD_BY_ID.get(id)!.name);
           const time = `Kill it in ${Math.round(g.bossTimeMax)} seconds`;
           const souls = boss?.champ && ev.floor >= TUNE.goldBossFrom ? ` · ${bossSouls(ev.floor)} souls` : '';
-          this.banner(`${souls ? 'Gold boss' : 'Boss'}: ${boss?.def.name ?? 'Guardian'}`, (mods.length ? `${mods.join(' · ')} — ${time.toLowerCase()}` : time) + souls, 'boss');
+          this.banner(`${souls ? 'Champion boss' : 'Boss'}: ${boss?.def.name ?? 'Guardian'}`, (mods.length ? `${mods.join(' · ')} — ${time.toLowerCase()}` : time) + souls, 'boss');
         } else if (ev.boss && ev.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.boss && m.champ)) {
-          this.banner('Gold boss!', `Beat it for ${bossSouls(ev.floor)} soul${bossSouls(ev.floor) === 1 ? '' : 's'}`, 'boss');
+          this.banner('Champion boss!', `Beat it for ${bossSouls(ev.floor)} soul${bossSouls(ev.floor) === 1 ? '' : 's'}`, 'boss');
         }
         break;
       case 'bossWin':
@@ -984,7 +994,7 @@ export class Ui {
           this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold${ev.souls ? ` · +${ev.souls} souls` : ''}`, 'clutch');
         }
         else if (ev.first) this.banner('Victory!', `Floor ${ev.floor} conquered${ev.souls ? ` · +${ev.souls} soul${ev.souls === 1 ? '' : 's'}` : ''}`, 'win');
-        else if (ev.souls) this.banner('Gold boss down!', `+${ev.souls} soul${ev.souls === 1 ? '' : 's'} for your next ascent`, 'win');
+        else if (ev.souls) this.banner('Champion boss down!', `+${ev.souls} soul${ev.souls === 1 ? '' : 's'} for your next ascent`, 'win');
         break;
       case 'bossFail':
         // The first wall: this is where the game teaches you to descend.
@@ -1437,7 +1447,7 @@ export class Ui {
     if (rateEl.textContent !== rate) rateEl.textContent = rate;
 
     this.hints();
-    if (this.modal && ['trophies', 'cards', 'abyss', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
+    if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
     this.refreshTip();
   }
 
@@ -2060,6 +2070,13 @@ export class Ui {
       if (!lv) return `${head}<p class="tt-f">Not found yet. ${d.rarity === 3 ? 'Legendary relics mostly turn up deep down.' : 'Keep killing bosses.'}</p>`;
       return `${head}<p class="tt-d">${esc(relicText(d, lv))}</p><p class="tt-gain">Next level: ${esc(relicText(d, lv + 1))}</p><p class="tt-f">“${esc(d.flavor)}”</p>`;
     }
+    if (kind === 'souls') {
+      return `<div class="tt-h"><b>How souls work</b></div>
+        <p class="tt-d">You get them when you ascend:</p>
+        <ul class="tt-l"><li>1 soul for every ${fmt(TUNE.levelsPerSoul)} companion levels you bought this run.</li>
+        <li>Champion bosses (from floor ${TUNE.goldBossFrom}) drop souls the first time you beat them each run, more the deeper they are.</li></ul>
+        <p class="tt-d">Each soul you keep adds ${soulPct(1)} damage. Or spend them on Legends.</p>`;
+    }
     if (kind === 'legend') {
       const d = LEGEND_BY_ID.get(id as LegendId)!;
       const lv = g.legendLv(d.id);
@@ -2106,7 +2123,7 @@ export class Ui {
       const text: Record<string, string> = {
         trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length} (each gives +1% damage) and ${g.cardsFound()} monster card${g.cardsFound() === 1 ? '' : 's'}.`,
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
-        abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat gold bosses for souls.' : `The way up opens at the floor ${g.ascendFloor()} boss.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
+        abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at the floor ${g.ascendFloor()} boss.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
         stats: 'Your numbers, and where every bonus comes from.',
         room: 'Your room: the binder, and Dan and Victor to trade with.',
         settings: 'Sound, visuals and saves.',
@@ -2179,9 +2196,9 @@ export class Ui {
     } else if (name === 'cards') {
       html = head('Cards') + this.troTabs('cards') + this.cardsHtml();
 
-    } else if (name === 'abyss' || name === 'legends' || name === 'marks') {
+    } else if (name === 'abyss' || name === 'marks') {
       const sub = `${G.soul()} ${fmt(g.soulsFree())} souls kept · ${soulPct(g.soulsFree())} damage`;
-      html = head('Ascend', sub) + this.tabs(name) + (name === 'abyss' ? this.abyssHtml() : name === 'legends' ? this.legendsHtml() : this.marksHtml());
+      html = head('Ascend', sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
     } else if (name === 'heart') {
       html = head('The Heart', g.s.awakens ? `${G.heart()} ${fmt(g.s.stones)} heartstones · ${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}` : '') + this.tabs('heart') + this.heartHtml();
     } else if (name === 'relics') {
@@ -2210,53 +2227,66 @@ export class Ui {
           ${document.body.classList.contains('at-menu') ? '' : '<div class="set-row"><button class="btn" data-act="mainMenu">Main menu</button></div>'}
         </div>`;
     }
-    if (soft && html === this.modalKey) return;
+    if (soft && (html === this.modalKey || performance.now() < this.modalHold)) return;
     this.modalKey = html;
     this.el.modal.className = `modal pnl m-${name}`;
     this.el.modal.innerHTML = html;
   }
 
-  private abyssHtml(): string {
+  /** The Ascend strip atop the window: where this run's souls come from (companion levels, with the way to the next
+   *  soul, and champion bosses), and either the way up's progress or the Ascend button. */
+  private ascendHtml(): string {
     const g = this.game;
-    const pending = g.pendingSouls();
-    const curse = this.curseChoice ? CURSE_BY_ID.get(this.curseChoice) : undefined;
-    const levels = g.runLevels();
-    const fromLevels = Math.floor(levels / TUNE.levelsPerSoul);
-    const where = `<ul class="soul-src">
-        <li><span>Companion levels <small>${fmt(levels)} this run, 1 soul per ${fmt(TUNE.levelsPerSoul)}</small></span><b>${fmt(fromLevels)}</b></li>
-        <li><span>Gold bosses <small>from floor ${TUNE.goldBossFrom}: ${Math.round(g.goldBossChance() * 100)}% of bosses, the first time you reach them each run</small></span><b>${fmt(g.s.bossSouls)}</b></li>
-      </ul>`;
-    const desc = g.canDescend() && pending < 1
-      ? `<p>The curse can be lifted: ascend to leave this descent. No new souls yet.</p>
-         <button class="btn primary big" data-act="descend">Ascend${curse ? ` cursed: ${esc(curse.name)}` : ''}</button>`
-      : g.canDescend()
-      ? `<p>The way up is open.</p>${where}
-         <button class="btn primary big" data-act="descend">Ascend${curse ? ` cursed: ${esc(curse.name)}` : ''} for ${G.soul()} ${fmt(pending)} soul${pending === 1 ? '' : 's'}</button>
-         <p class="muted">${soulPct(pending)} damage while you keep them</p>`
-      : !g.descendOpen()
-        ? `<p>The way up opens at the <b>floor ${g.ascendFloor()}</b> boss.</p>
-           <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / g.ascendFloor()) * 100)}%"></i></div>`
-        : `<p>Level your companions and beat gold bosses for souls.</p>${where}`;
+    const help = '<span class="soul-help" data-tip="souls:" tabindex="0" aria-label="How souls work">?</span>';
     const active = g.s.curse ? CURSE_BY_ID.get(g.s.curse) : undefined;
     const activeLine = active
       ? `<p class="curse-now"><b>This descent is cursed: ${esc(active.name)}.</b> ${esc(active.rule)}${g.curseTier(active.id) < CURSE_FLOORS.length ? ` Reach floor ${CURSE_FLOORS[g.curseTier(active.id)]} for tier ${g.curseTier(active.id) + 1}.` : ' Every tier broken.'}</p>`
       : '';
-    return `<div class="descend-box">${activeLine}${desc}</div>
-      ${this.cursesHtml()}`;
+    const levels = g.runLevels();
+    const per = TUNE.levelsPerSoul;
+    const mult = g.soulGainMult();
+    const rows = `<div class="as-rows">
+        <div class="as-h">Souls this run ${help}</div>
+        <div class="as-row"><span>Companion levels <em>${fmt(levels)}</em></span><b>${G.soul()} ${fmt(Math.floor(levels / per))}</b>
+          <div class="as-bar"><i style="width:${((levels % per) / per) * 100}%"></i></div><small>${fmt(levels % per)} / ${fmt(per)}</small></div>
+        <div class="as-row"><span>Champion bosses</span><b>${G.soul()} ${fmt(g.s.bossSouls)}</b></div>
+        ${mult > 1 ? `<div class="as-row"><span>Soul bonus</span><b>×${+mult.toFixed(2)}</b></div>` : ''}
+      </div>`;
+    if (!g.descendOpen()) {
+      return `${activeLine}<div class="ascend">${rows}<div class="as-go locked"><small>The way up opens at the floor ${g.ascendFloor()} boss</small>
+        <span class="as-floor">Floor ${fmt(g.s.maxFloor)} / ${g.ascendFloor()}</span>
+        <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / g.ascendFloor()) * 100)}%"></i></div></div></div>`;
+    }
+    const pending = g.pendingSouls();
+    const curse = this.curseChoice ? CURSE_BY_ID.get(this.curseChoice) : undefined;
+    const go = `<button class="btn primary${g.s.descents ? '' : ' big'}" data-act="descend" ${g.canDescend() ? '' : 'disabled'}>Ascend${curse ? ` cursed: ${esc(curse.name)}` : ''}</button>`;
+    const total = g.canDescend() && pending < 1
+      ? '<small>The curse can be lifted: ascend to leave this descent. No new souls yet.</small>'
+      : `<span class="as-total">${G.soul(2.4)} ${fmt(pending)}</span>`;
+    return `${activeLine}<div class="ascend">${rows}<div class="as-go">${total}${go}</div></div>${this.cursesHtml()}`;
   }
 
-  /** The soul shop: three Legends on pedestals (pick one to read it, then summon), a reroll, the ones you've summoned
-   *  (tap to level) and a respec. */
+  /** The soul shop. Before your first ascent: three Legends asleep as silhouettes (spirits once the way up opens). After:
+   *  the offer as spirits, the picked one in full color with its details, a reroll, your Legends as cards, and a respec. */
   private legendsHtml(): string {
     const g = this.game;
-    const free = g.soulsFree();
     const offer = g.legendOffer();
+    if (!g.legendsOpen()) {
+      const stirring = g.canDescend();
+      const peds = offer.map((id) => {
+        const d = LEGEND_BY_ID.get(id)!;
+        const fig = stirring ? charFit(d.sprite, 84, 92) : silhouette(d.sprite, 84, '#0b0710');
+        return `<div class="pedestal shade${stirring ? ' stirring' : ''}"><span class="spirit">${WISPS}</span><span class="ped-fig">${fig}</span><span class="ped-stone"></span></div>`;
+      }).join('');
+      return `<div class="legend-await"><div class="pedestals">${peds}</div><p>Legends await after you ascend</p></div>`;
+    }
+    const free = g.soulsFree();
     const price = g.summonPrice();
     if (!offer.includes(this.legendPick as LegendId)) this.legendPick = offer[0] ?? null;
     const pick = this.legendPick ? LEGEND_BY_ID.get(this.legendPick)! : null;
     const pedestals = offer.map((id) => {
       const d = LEGEND_BY_ID.get(id)!;
-      return `<button class="pedestal ${id === this.legendPick ? 'on' : ''}" data-pick="${id}"><span class="ped-fig">${charFit(d.sprite, 72, 96)}</span><span class="ped-stone"></span><b>${esc(d.name)}</b></button>`;
+      return `<button class="pedestal ${id === this.legendPick ? 'on' : 'ghost'}" data-pick="${id}"><span class="ped-fig">${charFit(d.sprite, 72, 96)}</span><span class="ped-stone"></span><b>${esc(d.name)}</b></button>`;
     }).join('');
     const summon = pick
       ? `<p class="legend-warn">Summon a Legend for <b>${G.soul(2)} ${fmt(price)} soul${price === 1 ? '' : 's'}</b>. Every soul you spend gives up ${soulPct(1)} damage.</p>
@@ -2268,19 +2298,81 @@ export class Ui {
           <div class="set-row"><button class="btn primary" data-act="summon" ${free >= price ? '' : 'disabled'}>Summon ${esc(pick.name.replace(/^The /, 'the '))}</button></div>
         </div>`
       : '<p class="muted">Every Legend has joined you.</p>';
-    const owned = LEGENDS.filter((d) => g.legendLv(d.id) > 0).map((d) => {
+    const owned = LEGENDS.filter((d) => g.legendLv(d.id) > 0);
+    const cards = owned.map((d) => {
       const lv = g.legendLv(d.id);
-      const maxed = g.legendMaxed(d.id);
       const cost = g.legendLevelCost(d.id);
-      return `<button class="aby legend ${maxed ? 'owned' : free >= cost ? 'can' : 'avail'}" data-legend="${d.id}" data-tip="legend:${d.id}" ${maxed ? 'disabled' : ''}>
-        <span class="aby-ico">${charFit(d.sprite, 32)}</span><b>${esc(d.name)} <i class="lv">${lv}</i></b><small>${maxed ? 'Max' : `${G.soul(1.5)} ${fmt(cost)}`}</small></button>`;
+      const next = g.legendMaxed(d.id)
+        ? '<span class="lc-max">Max level</span>'
+        : `<span>Next: ${esc(d.value(lv + 1))}</span><button class="btn primary" data-legend="${d.id}" ${free >= cost ? '' : 'disabled'}>Level up · ${G.soul(1.5)} ${fmt(cost)}</button>`;
+      return `<div class="lcard" data-card="${d.id}">
+        <div class="lc-fig" data-tip="legend:${d.id}"><span class="ped-fig">${charFit(d.sprite, 88, 96)}</span><span class="ped-stone"></span></div>
+        <div class="lc-nm"><b>${esc(d.name)}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
+        <div class="lc-val">${esc(d.value(lv))}</div>
+        <div class="lc-what">${esc(d.what)}</div>
+        <div class="lc-next">${next}</div>
+      </div>`;
     }).join('');
-    const respec = g.legendsOwned()
-      ? `<div class="set-row"><button class="btn danger" data-act="respec">Respec: let them go for ${G.soul(1.5)} ${fmt(Math.floor(g.s.legendSpent * RESPEC_REFUND))}</button></div>`
+    const respec = owned.length
+      ? `<div class="lc-respec"><button class="btn small" data-act="respec">Respec: let them all go for ${G.soul(1.2)} ${fmt(Math.floor(g.s.legendSpent * RESPEC_REFUND))}</button></div>`
       : '';
     return `${summon}
-      ${owned ? `<h3>Awake <span class="muted">tap one to level it</span></h3><div class="aby-grid">${owned}</div>` : ''}
+      ${owned.length ? `<div class="lc-head"><h3>Your Legends</h3><small>${owned.length} · ${G.soul(1.2)} ${fmt(free)} to spend</small></div><div class="lcards">${cards}</div>` : ''}
       ${respec}`;
+  }
+
+  /** Until then, ticks leave the open panel alone, so an animation in it plays out. */
+  private modalHold = 0;
+
+  /** A reroll: the three spirits burst away, then the new ones rise off their stones, one after another. */
+  private rerollFx() {
+    const peds = this.el.modal.querySelector('.pedestals');
+    if (!peds || matchMedia('(prefers-reduced-motion: reduce)').matches) return this.renderModal();
+    this.hooks.sound('descend', { vol: 0.35, rate: 1.4 });
+    peds.classList.add('vanish');
+    this.modalHold = performance.now() + 1400;
+    setTimeout(() => {
+      this.renderModal();
+      this.el.modal.querySelector('.pedestals')?.classList.add('arrive');
+      this.hooks.sound('card', { vol: 0.45 });
+    }, 380);
+  }
+
+  /** A Legend just summoned or levelled: bring its card into view, then let it flare once the scroll settles. */
+  private flareLegend(id: LegendId) {
+    const card = this.el.modal.querySelector<HTMLElement>(`[data-card="${id}"]`);
+    if (!card) return;
+    const box = card.getBoundingClientRect();
+    const view = this.el.modal.getBoundingClientRect();
+    if (box.top >= view.top && box.bottom <= view.bottom) return this.flare(card);
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      this.el.modal.removeEventListener('scrollend', go);
+      if (card.isConnected) this.flare(card);
+    };
+    this.el.modal.addEventListener('scrollend', go);
+    // Browsers without scrollend still flare, a beat later.
+    setTimeout(go, 900);
+  }
+
+  private flare(card: HTMLElement) {
+    card.classList.remove('pop');
+    void card.offsetWidth;
+    card.classList.add('pop');
+    const sparks = document.createElement('div');
+    sparks.className = 'sparks';
+    for (let k = 0; k < 14; k++) {
+      const spark = document.createElement('i');
+      const angle = (k / 14) * Math.PI * 2;
+      spark.style.setProperty('--dx', `${Math.cos(angle) * (40 + Math.random() * 30)}px`);
+      spark.style.setProperty('--dy', `${Math.sin(angle) * (40 + Math.random() * 30)}px`);
+      sparks.appendChild(spark);
+    }
+    card.appendChild(sparks);
+    setTimeout(() => sparks.remove(), 800);
   }
 
   /** Heartmarks: who has them, and moving them around for souls. */
@@ -2468,7 +2560,7 @@ export class Ui {
     const offline = g.offlineSpeed();
     const souls = table('Souls and the Heart',
       row('Souls', fmt(g.s.souls), `${fmt(g.soulsFree())} unspent`) +
-      row('An ascent now pays', fmt(g.pendingSouls()), `${fmt(Math.floor(g.runLevels() / TUNE.levelsPerSoul))} from levels, ${fmt(g.s.bossSouls)} from gold bosses`) +
+      row('An ascent now pays', fmt(g.pendingSouls()), `${fmt(Math.floor(g.runLevels() / TUNE.levelsPerSoul))} from levels, ${fmt(g.s.bossSouls)} from champion bosses`) +
       mul('Soul gain', g.soulGainMult(), `${g.relic('souls') ? `${relicName('cage')} ` : ''}${g.heartLv('siphon') ? `Soul Siphon ${g.heartLv('siphon')}` : ''}`.trim(), 'Soul Siphon (Heart)') +
       row('Heartstones', fmt(g.s.stones), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`) +
       row('Speed while away', pc(offline), 'of full speed'));
@@ -2504,13 +2596,13 @@ export class Ui {
     return `<dl class="stats">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
   }
 
-  private tabs(on: 'abyss' | 'legends' | 'marks' | 'heart') {
+  private tabs(on: 'abyss' | 'marks' | 'heart') {
     const g = this.game;
+    if (!g.marksTotal() && !AWAKEN_ON) return '';
     const hot = g.canAwaken() ? ' hot' : '';
     return `<nav class="tabs">
-      <button class="tab ${on === 'abyss' ? 'on' : ''}" data-open="abyss">${G.soul()} Ascend</button>
-      ${g.legendsOpen() ? `<button class="tab ${on === 'legends' ? 'on' : ''}" data-open="legends">Legends</button>` : ''}
-      ${g.marksTotal() ? `<button class="tab ${on === 'marks' ? 'on' : ''}" data-open="marks">${G.heart()} Heartmarks</button>` : ''}
+      <button class="tab ${on === 'abyss' ? 'on' : ''}" data-open="abyss">Legends</button>
+      ${g.marksTotal() ? `<button class="tab ${on === 'marks' ? 'on' : ''}" data-open="marks">${G.heart()} Heartmarks ${g.marksTotal()}</button>` : ''}
       ${AWAKEN_ON ? `<button class="tab ${on === 'heart' ? 'on' : ''}${hot}" data-open="heart">${G.heart()} Awaken</button>` : ''}
     </nav>`;
   }

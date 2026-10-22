@@ -56,6 +56,23 @@ export class PixelSprite {
     return !this.loop && Math.floor(this.t * this.fps) >= this.frames.length - 1;
   }
 
+  /** Cast it in gold, for champions: each pixel's brightness read off a gold ramp, lit a little from within so it
+   *  reads in the dark rooms. (Values are linear: the shader works after the texture's sRGB decode.) */
+  gild() {
+    const mat = this.mesh.material;
+    mat.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          vec3 gold = mix(vec3(0.16, 0.05, 0.004), vec3(0.89, 0.53, 0.08), smoothstep(0.0, 0.3, lum));
+          diffuseColor.rgb = mix(gold, vec3(1.0, 0.87, 0.46), smoothstep(0.3, 0.75, lum));`)
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+          totalEmissiveRadiance += diffuseColor.rgb * 0.35;`);
+    };
+    mat.customProgramCacheKey = () => 'gilded';
+    mat.needsUpdate = true;
+  }
+
   /** White silhouette flash (0..1) for hits. */
   set flash(v: number) {
     this.mesh.material.emissive.setScalar(v);
