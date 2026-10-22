@@ -1814,11 +1814,14 @@ export class Scene {
         // Going down into a zone you haven't reached this descent: the staircase. Not while blitzing back through old
         // floors after a descent (sweeping them in seconds), where a staircase every ten floors would just stall you.
         const deeper = z > zoneOf(this.lastFloor) && ev.floor >= game.s.maxFloor && this.time - this.sweptAt > 4;
+        // The demo ends at the bottom of its last staircase, so that one always plays (the game has stopped by then).
+        const demoEnd = z === this.endBefore;
         this.lastFloor = ev.floor;
         if (this.cine) this.cine.zone = z;
         else if (this.hold) this.hold.zone = z;
         // Let the boss's light, gold and sparks settle (longer if a relic dropped) before the party heads for the stairs.
-        else if (deeper && this.settings.cinematics) this.hold = { zone: z, t: this.relicDropped ? 2.8 : 1.6 };
+        else if ((deeper || demoEnd) && this.settings.cinematics) this.hold = { zone: z, t: this.relicDropped ? 2.8 : 1.6 };
+        else if (demoEnd) this.onEnd?.();
         else if (this.clutch) this.pendingBand = z;
         else this.setBand(z);
         this.relicDropped = false;
