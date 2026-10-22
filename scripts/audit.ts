@@ -36,7 +36,7 @@ function sources(game: Game) {
   const p = c.parts;
   const raw = COMPS.reduce((sum, comp, i) => sum + comp.dps * game.s.owned[i], 0);
   const lv = COMPS.reduce((sum, comp, i) => sum + comp.dps * game.s.owned[i] * levelMult(game.s.owned[i]), 0);
-  const traits = COMPS.reduce((sum, comp, i) => sum + comp.dps * game.s.owned[i] * levelMult(game.s.owned[i]) * p.tier[i] * p.syn[i], 0);
+  const traits = COMPS.reduce((sum, comp, i) => sum + comp.dps * game.s.owned[i] * levelMult(game.s.owned[i]) * p.tier[i], 0);
   const l = Math.log10;
   return { levels: l(raw), bonus: l(lv / raw), traits: l(traits / lv), party: l(p.party), shop: l(p.upgrades), trophies: l(p.trophies), souls: l(p.souls) };
 }

@@ -3,8 +3,8 @@
  * slots the best relics, and prestiges once it stops making progress.
  */
 import Decimal from 'break_infinity.js';
-import { COST_GROWTH, Game, MANUAL_RATE, newSave, type GameEvent, type SaveState } from '../src/game/game.ts';
-import { ABILITIES, COMPS, HEART, UPG_BY_ID } from '../src/game/data.ts';
+import { COST_GROWTH, Game, MANUAL_RATE, MARK_MOVE, newSave, TUNE, type GameEvent, type SaveState } from '../src/game/game.ts';
+import { ABILITIES, COMPS, HEART, OLD_ONE_BY_ID, UPG_BY_ID, type OldOneId } from '../src/game/data.ts';
 
 export interface Profile {
   /** Attacks by hand per second while the player is active (the game caps it at MANUAL_RATE, i.e. holding the button). */
@@ -28,7 +28,21 @@ export interface Profile {
   resetActive?: number;
   /** Seconds between shop visits while idle (default 1; every second while playing actively). */
   shopEvery?: number;
+  /** Which Old Ones it favors: an active player's (attacks, crits, streaks) or an idle one's (the Sleeper, the Patient).
+   *  Default: active. */
+  style?: 'active' | 'idle';
 }
+
+/** Old Ones in the order each kind of player wants them, and what a level of each power one is worth to them (the
+ *  share of all damage it adds, roughly). */
+const OLD_PREF: Record<'active' | 'idle', OldOneId[]> = {
+  active: ['fist', 'unbroken', 'hoard', 'needle', 'thinning', 'hourglass', 'wither', 'soulcaller', 'restless', 'lingering', 'haggler', 'lure', 'goblinking', 'collector', 'hungry', 'sleeper', 'patient'],
+  idle: ['sleeper', 'patient', 'hoard', 'thinning', 'hourglass', 'wither', 'soulcaller', 'haggler', 'lure', 'goblinking', 'restless', 'lingering', 'collector', 'hungry', 'needle', 'fist', 'unbroken'],
+};
+const OLD_WORTH: Record<'active' | 'idle', Partial<Record<OldOneId, number>>> = {
+  active: { fist: 0.15, unbroken: 0.1, needle: 0.08, hoard: 0.04, goblinking: 0.01 },
+  idle: { sleeper: 0.25, patient: 0.4, hoard: 0.04, goblinking: 0.01 },
+};
 
 export interface SimHooks {
   event?: (ev: GameEvent, sim: Sim) => void;
@@ -41,7 +55,7 @@ export interface SimHooks {
 
 /** Someone who plays nonstop: always holding attack, using Rampage and every skill the moment they're ready, and
  *  ascending once stuck. */
-export const NONSTOP: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 1, ascendMin: 5, awakenRatio: 1, stall: 180, catchRate: 0.5, resetActive: 0, shopEvery: 1 };
+export const NONSTOP: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 0.5, ascendMin: 5, awakenRatio: 1, stall: 180, catchRate: 0.5, resetActive: 0, shopEvery: 1 };
 
 /** The save of a nonstop player the moment they first reach `floor` (or after `maxHours`), for trying a depth by hand
  *  with what you'd really have there (the dev build's ?sim=). Leaves Math.random as it found it. */
@@ -69,7 +83,7 @@ export function seedRandom(seed: number) {
 }
 
 /** Upgrade effects that change what everything else is worth. */
-const DAMAGE_EFFECTS = new Set(['comp', 'global', 'party', 'syn', 'click', 'clickDps', 'trophy']);
+const DAMAGE_EFFECTS = new Set(['comp', 'party', 'clickDps']);
 
 /** Seconds at most between shop checks while saving up for something. */
 const SHOP_RECHECK = 10;
@@ -192,8 +206,10 @@ export class Sim {
       const souls = game.pendingSouls();
       this.descents++;
       this.hooks.descend?.(souls, this);
+      this.gatherMarks();
       game.descend(this.pickCurse());
       this.afterReset();
+      this.feedOldOnes();
     }
     if (stalled && game.canAwaken() && game.pendingStones() >= Math.max(1, this.totalStones() * profile.awakenRatio)) {
       const stones = game.pendingStones();
@@ -322,6 +338,46 @@ export class Sim {
       }
       if (!bought) return;
     }
+  }
+
+  /** Spend souls on the Old Ones: summon what this player favors (rerolling a little for it), level power ones while a
+   *  level adds more than the souls it takes would as souls kept, and utility ones while they're cheap. */
+  feedOldOnes() {
+    const { game } = this;
+    const style = this.profile.style ?? 'active';
+    const pref = OLD_PREF[style];
+    const worth = OLD_WORTH[style];
+    for (let pass = 0; pass < 200; pass++) {
+      const free = game.soulsFree();
+      const offer = game.oldOffer();
+      let did = false;
+      if (offer.length && game.summonPrice() <= Math.max(1, free * 0.3)) {
+        const best = [...offer].sort((a, b) => pref.indexOf(a) - pref.indexOf(b))[0];
+        if (pref.indexOf(best) < 9 || game.rerollPrice() > free * 0.05) did = game.summonOldOne(best);
+        else did = game.rerollOldOnes();
+      }
+      for (const id of pref) {
+        const lv = game.oldLv(id);
+        if (!lv || game.oldMaxed(id)) continue;
+        const def = OLD_ONE_BY_ID.get(id)!;
+        const cost = game.oldLevelCost(id);
+        if (cost > game.soulsFree()) continue;
+        const p = worth[id];
+        const keep = (cost * TUNE.soulPower) / game.soulMult();
+        const buy = def.kind === 'power' ? p !== undefined && p / (1 + p * lv) > keep : def.kind === 'utility' && cost <= game.soulsFree() * 0.05;
+        if (buy && game.levelOldOne(id)) did = true;
+      }
+      if (!did) break;
+    }
+  }
+
+  /** Before ascending: bring Heartmarks to whoever is carrying the party, while it costs little of the souls in hand. */
+  private gatherMarks() {
+    const { game } = this;
+    if (!game.marksTotal()) return;
+    let carrier = 0;
+    for (let i = 1; i < COMPS.length; i++) if (game.compDps(i).gt(game.compDps(carrier))) carrier = i;
+    while (game.marksTotal() > game.s.marks[carrier] && game.soulsFree() * 0.2 >= MARK_MOVE && game.moveMarkTo(carrier)) { /* keep going */ }
   }
 
   private equipRelics() {

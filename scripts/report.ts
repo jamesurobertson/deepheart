@@ -1,6 +1,7 @@
 /**
  * The numbers the souls rework is tuned against, for the always-active player:
- *   node scripts/report.ts [hours=12] [--seed n]      TUNE='{"deepGold":1.15}' overrides pacing knobs.
+ *   node scripts/report.ts [hours=12] [--seed n] [--gain 0.5]      TUNE='{"deepGold":1.15}' overrides pacing knobs.
+ * --gain: ascend once stalled and the souls on offer grow yours by this share (default +50%, the game's own hint).
  * Every ascent (levels bought, souls paid, which companion was carrying the party), how long new deepest floors take,
  * and what purchases cost in seconds of income: minutes is a decision, under a second is a formality.
  */
@@ -20,7 +21,8 @@ const hours = Number(args.find((a, i) => !a.startsWith('--') && !args[i - 1]?.st
 if (process.env.TUNE) Object.assign(TUNE, JSON.parse(process.env.TUNE));
 seedRandom(flag('--seed', 1));
 
-/** Total gold earned, sampled each second over the last minute, for the income rate. */
+/** This run's gold earned, sampled each second over the last minute, for the income rate (all-time gold is too big
+ *  for a new run's income to show in it). */
 const earned: number[] = [];
 const incomeRate = () => (earned.length > 1 ? Math.max(1e-9, (earned[earned.length - 1] - earned[0]) / (earned.length - 1)) : 1e-9);
 
@@ -52,8 +54,9 @@ const newFloors: { t: number; secs: number }[] = [];
 let best = 1;
 let bestAt = 0;
 let runStart = 0;
+const firstAt: string[] = [];
 
-sim = new Sim(NONSTOP, {
+sim = new Sim({ ...NONSTOP, descendGain: flag('--gain', NONSTOP.descendGain ?? 1) }, {
   descend(souls, { game, t }) {
     const levels = game.s.owned.reduce((a, b) => a + b, 0);
     const hired = COMPS.map((_, i) => i).filter((i) => game.s.owned[i] > 0);
@@ -63,13 +66,15 @@ sim = new Sim(NONSTOP, {
     const n = game.s.descents + 1;
     ascents.push(`${String(n).padStart(4)}  ${duration(t).padStart(9)}  ${duration(t - runStart).padStart(8)}  ${String(game.s.maxFloor).padStart(5)}  ${String(levels).padStart(7)}  ${('+' + souls).padStart(9)}  ${String(game.s.souls + souls).padStart(10)}   ${COMPS[carrier].name}${age ? ` (${age} newer)` : ''}`);
     runStart = t;
+    earned.length = 0;
   },
   tick({ game, t }) {
     if (Math.floor(t) !== Math.floor(t - 0.1)) {
-      earned.push(game.s.totalGold.toNumber());
+      earned.push(game.s.runGold.toNumber());
       if (earned.length > 61) earned.shift();
     }
     if (game.s.bestFloor > best) {
+      if ([10, 30, 50, 100].includes(game.s.bestFloor)) firstAt.push(`floor ${game.s.bestFloor} ${duration(t)}`);
       newFloors.push({ t, secs: t - bestAt });
       best = game.s.bestFloor;
       bestAt = t;
@@ -83,6 +88,7 @@ const pct = (xs: number[], p: number) => (xs.length ? [...xs].sort((a, b) => a -
 const secs = (s: number) => (Number.isNaN(s) ? '-' : s < 1 ? '<1s' : s < 120 ? `${s.toFixed(0)}s` : s < 2 * H ? `${(s / 60).toFixed(0)}m` : `${(s / H).toFixed(1)}h`);
 
 console.log(`Always-active player, ${hours} h, seed ${flag('--seed', 1)}${process.env.TUNE ? `, TUNE ${process.env.TUNE}` : ''}`);
+console.log(`First reached: ${firstAt.join(' · ')}`);
 console.log(`\nAscents (${ascents.length})`);
 console.log('   #     played      run  floor   levels      souls       total   carrying the party');
 const shown = ascents.length > 14 ? [...ascents.slice(0, 10), '   …', ...ascents.slice(-3)] : ascents;
@@ -108,4 +114,7 @@ for (const [label, keep] of [['first run', (r: number) => r === 0], ['runs 2–5
   });
   console.log(`  ${label.padEnd(10)} ${cells.join('   ')}`);
 }
-console.log(`\nAt ${hours} h: deepest floor ${sim.game.s.bestFloor}, souls ${sim.game.s.souls}`);
+const g = sim.game;
+console.log(`\nAt ${hours} h: deepest floor ${g.s.bestFloor}, souls ${g.s.souls} (${g.soulsFree()} kept: ×${g.soulMult().toFixed(1)} damage)`);
+console.log(`  Old Ones: ${Object.entries(g.s.oldOnes).map(([id, lv]) => `${id} ${lv}`).join(', ') || 'none'}`);
+console.log(`  Heartmarks: ${COMPS.map((c, i) => (g.s.marks[i] ? `${c.name} ${g.s.marks[i]}` : '')).filter(Boolean).join(', ') || 'none'}`);
