@@ -411,7 +411,7 @@ const town: MapDef = {
   ],
   warps: [{ x: 4, y: 5, to: 'house', tx: 4, ty: 7, dir: 'up', label: 'Home', hit: [66, 82, 12, 14] }],
   npcs: [
-    { id: 'friend', name: 'Pip', sprite: 'cr_elf', x: 13, y: 7, dir: 'down', roam: [11, 6, 17, 7] },
+    { id: 'friend', name: 'Pip', sprite: 'rm_rocker', x: 13, y: 7, dir: 'down', roam: [11, 6, 17, 7] },
     { id: 'fisher', name: 'Old Bram', sprite: 'ef_fatcleric', x: 6, y: 13, dir: 'left' },
   ],
   draw(ctx) {

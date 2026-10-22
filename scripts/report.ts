@@ -116,5 +116,5 @@ for (const [label, keep] of [['first run', (r: number) => r === 0], ['runs 2–5
 }
 const g = sim.game;
 console.log(`\nAt ${hours} h: deepest floor ${g.s.bestFloor}, souls ${g.s.souls} (${g.soulsFree()} kept: ×${g.soulMult().toFixed(1)} damage)`);
-console.log(`  Old Ones: ${Object.entries(g.s.oldOnes).map(([id, lv]) => `${id} ${lv}`).join(', ') || 'none'}`);
+console.log(`  Legends: ${Object.entries(g.s.legends).map(([id, lv]) => `${id} ${lv}`).join(', ') || 'none'}`);
 console.log(`  Heartmarks: ${COMPS.map((c, i) => (g.s.marks[i] ? `${c.name} ${g.s.marks[i]}` : '')).filter(Boolean).join(', ') || 'none'}`);

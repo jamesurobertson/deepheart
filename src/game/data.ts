@@ -56,15 +56,15 @@ export const COMPS: CompDef[] = [
   c('stormcaller', 'Stormcaller', 'wizzard_f', 1e10, 3.4e7, 'storm', 'Brought her own weather. Down here, of all places.'),
   c('venomblade', 'Venomblade', 'lizard_f', 7e10, 3.8e8, 'dark', 'Every blade is poisoned. Every single one. She has a lot.'),
   c('doctor', 'Plague Doctor', 'doc', 5e11, 1.1e9, 'dark', 'Treats monsters with a strict regimen of dying.'),
-  c('frostimp', 'Frost Imp', 'cr_frost_imp', 4e12, 6.6e9, 'storm', 'Followed you home from the Frozen Vault. Will not leave. Brings its own blizzard.'),
+  c('frostimp', 'Frost Oni', 'sm_oni_blue', 4e12, 6.6e9, 'storm', 'Followed you up from the Frozen Vault. Will not leave. Brings its own blizzard and a very big club.'),
   c('hollow', 'Hollow Knight', 'pumpkin_dude', 2.5e13, 3.3e10, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.'),
   c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 2e14, 2e11, 'dark', 'Broke every vow but one: never stop swinging.'),
   c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2.5e11, 'bolt', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
-  c('wraith', 'Bound Wraith', 'cr_crimson_wraith', 2e19, 3.2e15, 'dark', 'The Heart sent it. It hums a song nobody taught it.', 95),
+  c('wraith', 'The Count', 'rm_dracula', 2e19, 3.2e15, 'dark', 'Came down for the dark. Stayed for the company.', 95),
   c('necro', 'Turncoat Necromancer', 'necromancer', 6e22, 6.4e17, 'dark', 'Used to raise these monsters. Now it lowers them.', 130),
-  c('king', 'Exiled King', 'cr_king', 1.5e24, 2e19, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 190),
+  c('king', 'Exiled King', 'sd_king', 1.5e24, 2e19, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 190),
   c('angel', 'Fallen Angel', 'angel', 1e28, 1.5e22, 'fire', 'Fell from somewhere bright. Landed swinging.', 240),
-  c('ogre', 'Tamed Ogre', 'ogre', 3e29, 1.1e24, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 300, true),
+  c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 3e29, 1.1e24, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 300, true),
   c('demon', 'Bound Demon', 'big_demon', 1e32, 1.8e25, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 370, true),
 ];
 
@@ -116,11 +116,11 @@ export const ZONES: ZoneDef[] = [
     name: 'The Upper Halls', tiles: 'halls',
     band: [m('goblin', 'Goblin', 0.9), m('tiny_zombie', 'Rotling'), m('imp', 'Imp', 0.8), m('tiny_slug', 'Slug', 1.2), m('ef_bandit', 'Deserter')],
     mid: m('ef_bear', 'Cave Bear'), boss: m('ogre', 'Ogre Chieftain'),
-    lap: [m('cr_crimson_wraith', 'Crimson Wraith'), m('cr_plague_crow', 'Plague Crow', 0.9), m('cr_purple_knight', 'Fallen Knight', 1.2)],
+    lap: [m('cr_crimson_wraith', 'Crimson Wraith'), m('cr_plague_crow', 'Plague Crow', 0.9), m('sd_knight_heavy', 'Fallen Knight', 1.2)],
   },
   {
     name: 'The Bone Crypts', tiles: 'crypt',
-    band: [m('skelet', 'Skeleton'), m('tiny_zombie', 'Rotling'), m('skelet', 'Skeleton Archer', 0.9, 0xe8d49a), m('necromancer', 'Grave Priest', 0.9)],
+    band: [m('skelet', 'Skeleton'), m('tiny_zombie', 'Rotling'), m('skelet', 'Skeleton Archer', 0.9, 0xe8d49a), m('necromancer', 'Grave Priest', 0.9), m('rm_zombie', 'Ghoul', 1.1)],
     mid: m('ef_golem', 'Bone Golem', 1, 0xd8d0c0), boss: m('necromancer', 'The Lich', 1, 0xb0a0ff),
     lap: [m('cr_skeleton', 'Grave Walker'), m('cr_blue_wraith', 'Pale Wraith'), m('cr_frost_skeleton', 'Hooded Bones', 0.9, 0xd0c8ff)],
   },
@@ -151,8 +151,8 @@ export const ZONES: ZoneDef[] = [
   {
     name: 'The Demon Gate', tiles: 'halls',
     band: [m('chort', 'Chort'), m('wogol', 'Wogol', 1.1), m('imp', 'Imp', 0.8), m('masked_orc', 'Cultist', 1.2, 0xff8a8a)],
-    mid: m('ogre', 'Hellfire Ogre', 1, 0xff9070), boss: m('big_demon', 'Pit Lord'),
-    lap: [m('cr_gold_knight', 'Gilded Zealot', 1.2), m('cr_purple_knight', 'Fallen Knight', 1.2), m('cr_king', 'Damned King', 1.1)],
+    mid: m('ogre', 'Hellfire Ogre', 1, 0xff9070), boss: m('sm_oni_red', 'Pit Lord'),
+    lap: [m('sd_knight_elite', 'Gilded Zealot', 1.2), m('sd_knight_heavy', 'Fallen Knight', 1.2), m('cr_king', 'Damned King', 1.1)],
   },
   {
     name: 'The Frozen Vault', tiles: 'halls',
@@ -352,7 +352,7 @@ const MILESTONE_NAMES: Record<string, string[]> = {
   hollow: ['Gourd Duty', 'Pumpkin Spice', 'Carved Up', 'Patch Work', 'Squash Them'],
   oathbreaker: ['Promise Ring', 'Broken Vow', 'Fine Print', 'Word Breaker', 'No Take-Backs'],
   archmage: ['Old School', 'Back in My Day', 'Spell Check', 'Arch Rival', 'Senior Moment', 'Old Magic'],
-  wraith: ['Ghost Note', 'Haunting Melody', 'Spirited', 'Dead Ringer', 'Soul Music'],
+  wraith: ['First Bite', 'Night Owl', 'Blood Bank', 'Old Blood', 'Count Me In'],
   necro: ['Change of Heart', 'Grave Mistake', 'Dead Serious', 'Bone to Pick', 'Raise the Stakes'],
   king: ['Royal Pain', 'Throne Away', 'Heavy Is the Head', "King's Ransom", 'Royal Decree', 'Crown Jewels'],
   angel: ['Fall Guy', 'Grounded', 'Fallen Grace', 'Wing It', 'Halo Effect'],
@@ -392,7 +392,7 @@ const MILESTONE_FLAVOR: Record<string, string[]> = {
   hollow: ['Reporting for it.', 'Seasonal. Lethal.', "The pumpkin's smile gets wider every fight.", 'Fresh from the patch. Ready to work.', 'Pun intended.'],
   oathbreaker: ["Doesn't count. Never did.", "Another one. He's keeping count.", 'He read it. Then ignored it.', 'His word means nothing. His sword means everything.', 'Swings first. Never apologises.'],
   archmage: ['The original school. He built it.', 'Monsters were bigger. He was faster.', 'Every spell checked. Every monster checked out.', "He has one. It's the dungeon.", 'Forgot what he was casting. Cast it anyway. Worked.', 'Older than the dungeon. Stronger, too.'],
-  wraith: ['Heard but not seen. Then felt.', "Monsters can't get it out of their heads.", 'Enthusiastic, for the dead.', 'Sounds like doom. Is doom.', 'Played on monsters.'],
+  wraith: ['Polite about it. Mostly.', 'Sleeps all day. Down here it is always night.', 'Every monster makes a deposit.', 'Older than the dungeon. Younger than the Archmage. He checks.', 'Never misses a fight. Never misses a meal.'],
   necro: ['Used to raise them. Now he lowers them.', 'The monsters made it.', 'About the job. About the dead.', 'With every skeleton he ever raised.', 'And then drive them in.'],
   king: ["A pain in every monster's neck.", "He's fine about it. Mostly.", 'Heavy is the fist, too.', "Nobody's paying it. He's taking it.", 'All monsters: begone.', 'He kept one crown. It is very heavy. He swings it.'],
   angel: ['Took the fall. Gave back worse.', 'Literally. Angrily.', 'Not so graceful now. Much more punchy.', 'No plan. Lots of wing.', 'Monsters see it. Then they see nothing.'],
@@ -622,20 +622,20 @@ export function relicText(def: RelicDef, lv: number): string {
 
 const fmtN = (n: number) => (Math.round(n * 100) / 100).toString();
 
-// ---------- the Old Ones (spending souls) ----------
+// ---------- Legends (spending souls) ----------
 
-export type OldOneId =
+export type LegendId =
   | 'sleeper' | 'fist' | 'needle' | 'hoard' | 'patient' | 'goblinking' | 'unbroken'
-  | 'hourglass' | 'wither' | 'thinning' | 'haggler' | 'restless' | 'lingering' | 'soulcaller' | 'lure' | 'collector'
+  | 'hourglass' | 'wither' | 'thinning' | 'haggler' | 'restless' | 'lingering' | 'soulcaller' | 'lure' | 'collector' | 'ronin'
   | 'hungry';
 
 /** Power grows steadily (level n costs n souls), utility steeply (2^n, and its effect has a cap), the sink costs 1. */
-export type OldOneKind = 'power' | 'utility' | 'sink';
+export type LegendKind = 'power' | 'utility' | 'sink';
 
-export interface OldOneDef {
-  id: OldOneId;
+export interface LegendDef {
+  id: LegendId;
   name: string;
-  kind: OldOneKind;
+  kind: LegendKind;
   sprite: string;
   flavor: string;
   /** What it boosts, in a few words. */
@@ -650,51 +650,52 @@ export interface OldOneDef {
 }
 
 /** Utility effects close in on their cap: this share of it at level L is 1 − 0.9^L. */
-export const oldShare = (lv: number) => 1 - 0.9 ** lv;
+export const legendShare = (lv: number) => 1 - 0.9 ** lv;
 
-/** Souls to raise an Old One from `lv` to lv + 1. */
-export function oldCost(def: OldOneDef, lv: number) {
+/** Souls to raise a Legend from `lv` to lv + 1. */
+export function legendCost(def: LegendDef, lv: number) {
   if (def.kind === 'sink') return 1;
   if (def.kind === 'utility') return 2 ** (lv + 1);
   return def.id === 'unbroken' ? Math.ceil((lv + 1) ** 1.5) : lv + 1;
 }
 
-/** Souls to summon your next Old One, by how many you have; a reroll of the offer costs a third of it. */
-export const SUMMON_COST = [1, 2, 4, 8, 16, 35, 70, 125, 250, 500, 800, 1200, 1700, 2200, 2750, 3400, 4100];
+/** Souls to summon your next Legend, by how many you have; a reroll of the offer costs a third of it. */
+export const SUMMON_COST = [1, 2, 4, 8, 16, 35, 70, 125, 250, 500, 800, 1200, 1700, 2200, 2750, 3400, 4100, 5000];
 export const summonCost = (owned: number) => SUMMON_COST[Math.min(owned, SUMMON_COST.length - 1)];
 export const rerollCost = (owned: number) => Math.ceil(summonCost(owned) / 3);
-/** Old Ones offered at a time, and the share of souls a respec gives back. */
+/** Legends offered at a time, and the share of souls a respec gives back. */
 export const OFFER_SIZE = 3;
 export const RESPEC_REFUND = 0.75;
 
 const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
 const IDLE_NOTE = 'Idle means a minute without clicking or holding attack. The Phantom Blade, Flurry and time away all count as idle.';
 const per = (k: number) => (lv: number) => `+${Math.round(k * lv * 100)}%`;
-const share = (cap: number, show: (n: number) => string) => (lv: number) => show(cap * oldShare(lv));
-const o = (d: OldOneDef) => d;
+const share = (cap: number, show: (n: number) => string) => (lv: number) => show(cap * legendShare(lv));
+const o = (d: LegendDef) => d;
 
-export const OLD_ONES: OldOneDef[] = [
-  o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'big_zombie', what: 'Party damage while idle', value: per(0.25), note: IDLE_NOTE, flavor: 'It has not moved in an age. Neither should you.' }),
-  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'ef_golem', what: 'Your attacks and the Phantom Blade', value: per(0.2), flavor: 'Every blow you land, it lands with you.' }),
-  o({ id: 'needle', name: 'The Needle', kind: 'power', sprite: 'cr_plague_crow', what: 'Critical hit damage', value: per(0.15), flavor: 'Finds the soft spot. Pushes.' }),
-  o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'chest_full_open', what: 'All gold', value: per(0.05), flavor: "A dragon's worth of gold, and no dragon." }),
-  o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'swampy', what: 'Gold while idle', value: per(0.5), note: IDLE_NOTE, flavor: 'Waits. Collects. Waits some more.' }),
-  o({ id: 'goblinking', name: 'The Goblin King', kind: 'power', sprite: 'goblin', what: 'Gold from treasure goblins and the Rainbow Vault', value: per(0.5), flavor: 'Every goblin pays him a cut. He pays you.' }),
-  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'ogre', what: 'All damage, for each attack in your streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}% per attack`, note: 'A streak ends 2 seconds after your last attack, and counts up to 2,000 attacks.', flavor: 'Never stops. Never slows. Never lets you.' }),
-  o({ id: 'hourglass', name: 'The Hourglass', kind: 'utility', sprite: 'ef_ent', what: 'Time to beat a boss', value: share(30, (n) => `+${+n.toFixed(1)}s`), cap: '+30s', flavor: 'The sand falls up if you ask nicely.' }),
-  o({ id: 'wither', name: 'The Wither', kind: 'utility', sprite: 'necromancer', what: 'Boss health', value: share(0.5, (n) => `−${pct(n)}`), cap: '−50%', flavor: 'Bosses arrive tired. It sees to that.' }),
-  o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'skelet', what: 'Kills to clear a floor', value: (lv) => `−${Math.min(10, lv)}`, cap: '−10', maxLv: 10, flavor: 'Fewer of them. It ate the rest.' }),
-  o({ id: 'haggler', name: 'The Haggler', kind: 'utility', sprite: 'masked_orc', what: 'Companion level costs', value: (lv) => `−${pct(1 - 0.95 ** lv)}`, flavor: 'Knows what everyone is worth. Pays less.' }),
-  o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'imp', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`), cap: '−75%', flavor: 'It cannot wait. Now neither can you.' }),
-  o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'cr_ice_ghost', what: 'How long abilities and Rampage last', value: share(1, (n) => `+${pct(n)}`), cap: '+100%', flavor: 'What it touches stays a while.' }),
-  o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'angel', what: 'Chance a boss is gold (floor 100 on)', value: share(0.75, (n) => pct(0.25 + n)), cap: '100%', note: 'Without it, 25% of bosses are gold.', flavor: 'Calls the gold out of the deep.' }),
+export const LEGENDS: LegendDef[] = [
+  o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Party damage while idle', value: per(0.25), note: IDLE_NOTE, flavor: 'It has not moved in an age. Neither should you.' }),
+  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Your attacks and the Phantom Blade', value: per(0.2), flavor: 'Every blow you land, it lands with you.' }),
+  o({ id: 'needle', name: 'The Needle', kind: 'power', sprite: 'sd_executioner', what: 'Critical hit damage', value: per(0.15), flavor: 'Finds the soft spot. Pushes.' }),
+  o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'sd_mountain_king', what: 'All gold', value: per(0.05), flavor: "A dragon's worth of gold, and no dragon." }),
+  o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'sm_sohei', what: 'Gold while idle', value: per(0.5), note: IDLE_NOTE, flavor: 'Waits. Collects. Waits some more.' }),
+  o({ id: 'goblinking', name: 'The Goblin King', kind: 'power', sprite: 'sd_merchant', what: 'Gold from treasure goblins and the Rainbow Vault', value: per(0.5), flavor: 'Every goblin pays him a cut. He pays you.' }),
+  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'sm_large_samurai', what: 'All damage, for each attack in your streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}% per attack`, note: 'A streak ends 2 seconds after your last attack, and counts up to 2,000 attacks.', flavor: 'Never stops. Never slows. Never lets you.' }),
+  o({ id: 'hourglass', name: 'The Hourglass', kind: 'utility', sprite: 'sd_magic_shopkeeper', what: 'Time to beat a boss', value: share(30, (n) => `+${+n.toFixed(1)}s`), cap: '+30s', flavor: 'The sand falls up if you ask nicely.' }),
+  o({ id: 'wither', name: 'The Wither', kind: 'utility', sprite: 'sd_bishop', what: 'Boss health', value: share(0.5, (n) => `−${pct(n)}`), cap: '−50%', flavor: 'Bosses arrive tired. It sees to that.' }),
+  o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${Math.min(10, lv)}`, cap: '−10', maxLv: 10, flavor: 'Fewer of them. It ate the rest.' }),
+  o({ id: 'haggler', name: 'The Haggler', kind: 'utility', sprite: 'sm_merchant', what: 'Companion level costs', value: (lv) => `−${pct(1 - 0.95 ** lv)}`, flavor: 'Knows what everyone is worth. Pays less.' }),
+  o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'sm_kabuki', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`), cap: '−75%', flavor: 'It cannot wait. Now neither can you.' }),
+  o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'sm_geisha', what: 'How long abilities and Rampage last', value: share(1, (n) => `+${pct(n)}`), cap: '+100%', flavor: 'What it touches stays a while.' }),
+  o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Chance a boss is gold (floor 100 on)', value: share(0.75, (n) => pct(0.25 + n)), cap: '100%', note: 'Without it, 25% of bosses are gold.', flavor: 'Calls the gold out of the deep.' }),
   o({ id: 'lure', name: 'The Lure', kind: 'utility', sprite: 'chest_mimic_open', what: 'How often treasure goblins come', value: share(2, (n) => `+${pct(n)}`), cap: '+200%', flavor: "Goblins can't resist it. Goblins have never resisted anything." }),
-  o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'ef_gnollshaman', what: 'Card drop chance', value: share(2, (n) => `+${pct(n)}`), cap: '+200%', flavor: 'Keeps one of everything. Shares.' }),
-  o({ id: 'hungry', name: 'The Hungry Dark', kind: 'sink', sprite: 'big_demon', what: 'All damage, for every soul fed to it', value: (lv) => `+${lv * 11}%`, note: 'A soul you keep gives +10%. One fed here gives +11%, but you can only get it back with a respec.', flavor: 'It takes souls. It gives back a little more than it takes.' }),
+  o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'sd_princess', what: 'Card drop chance', value: share(2, (n) => `+${pct(n)}`), cap: '+200%', flavor: 'Keeps one of everything. Shares.' }),
+  o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance on overkill kills', value: (lv) => `up to ×${1 + lv}`, note: "A kill that deals N× a monster's health has N× the chance to drop its card (gold cards too), up to the cap. Swept floors and time away count.", flavor: 'One clean cut. Everything it was carrying falls out.' }),
+  o({ id: 'hungry', name: 'The Hungry Dark', kind: 'sink', sprite: 'sm_oni_king', what: 'All damage, for every soul fed to it', value: (lv) => `+${lv * 11}%`, note: 'A soul you keep gives +10%. One fed here gives +11%, but you can only get it back with a respec.', flavor: 'It takes souls. It gives back a little more than it takes.' }),
 ];
-export const OLD_ONE_BY_ID = new Map(OLD_ONES.map((d) => [d.id, d]));
+export const LEGEND_BY_ID = new Map(LEGENDS.map((d) => [d.id, d]));
 /** Your first offer always includes these, so the first pick is a good one. */
-export const FIRST_OFFER: OldOneId[] = ['sleeper', 'fist', 'hoard'];
+export const FIRST_OFFER: LegendId[] = ['sleeper', 'fist', 'hoard'];
 
 // ---------- the heart (second prestige) ----------
 

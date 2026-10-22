@@ -81,7 +81,9 @@ https://jamesurobertson.github.io/deepheart/ (`.github/workflows/deploy.yml`).
 ## Credits
 
 All CC0. Art: [0x72 DungeonTileset II](https://0x72.itch.io/dungeontileset-ii) and its Sewers add-on,
-[Enchanted Forest Characters](https://superdark.itch.io/enchanted-forest-characters) by Superdark,
+[Enchanted Forest Characters](https://superdark.itch.io/enchanted-forest-characters), [Fantasy RPG Characters](https://superdark.itch.io/16x16-free-npc-pack) and
+[Samurai Fantasy Characters](https://superdark.itch.io/16-x-16-samurai-fantasy-characters) by Superdark,
+[Homage to 0x72](https://rancidmilk.itch.io/0x72-homage) by RancidMilk,
 [jungle & desert tiles](https://omniboy.itch.io/custom-dungeon-16x16-tileset) by Omniboy,
 [Dark Dungeon](https://kosinaz.itch.io/16x16-dark-dungeon-tileset) by Zoltan Kosina,
 [DungeonTileset II Extended](https://nijikokun.itch.io/dungeontileset-ii-extended) by Niji,

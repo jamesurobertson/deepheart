@@ -3,8 +3,8 @@ import Decimal from 'break_infinity.js';
 import {
   CARD_BY_ID, AWAKEN_MILESTONES, COST_GROWTH, FURY, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor, pickMonster,
   CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, levelMult, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
-  OLD_ONES, OLD_ONE_BY_ID, FIRST_OFFER, OFFER_SIZE, RESPEC_REFUND, oldCost, oldShare, summonCost, rerollCost,
-  type AbilityId, type MilestoneId, type OldOneId,
+  LEGENDS, LEGEND_BY_ID, FIRST_OFFER, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost,
+  type AbilityId, type MilestoneId, type LegendId,
   type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
@@ -142,13 +142,13 @@ export const DESCEND_FLOOR = 100;
  * - Souls, as in Clicker Heroes: an ascent pays 1 for every `levelsPerSoul` companion levels bought this run, plus what
  *   the run's gold bosses paid. From floor `goldBossFrom` each boss is gold (a soul boss) on a `goldBossChance` roll the
  *   first time you reach it in a run, and always on GOLD_BOSS_SURE floors; it pays floor(((floor − 75) / 25)^1.3).
- *   Each soul you keep adds `soulPower` (+10%) to all damage; the Old Ones are the other thing to do with them.
+ *   Each soul you keep adds `soulPower` (+10%) to all damage; Legends are the other thing to do with them.
  * - Heartstones the same way, a level up: (every soul ever earned / `stoneSouls`)^`stoneExp` in all; an awakening pays what's new.
  * - Heart of Fury multiplies all damage by `fury` per level. Zone bosses have `zoneBoss`× the health of mid-bosses.
  * - Up to floor `deepFrom` each floor has about `hpBase`× the health of the last, past it `deepHp`×. A floor's gold
  *   starts at `goldBase` and grows `goldGrowth`× a floor, `deepGold`× past `deepFrom`. Companion damage grows about
  *   gold^0.82 once levels pass 200 (×1.07 a level against ×4 every 25), so past `deepFrom` every floor is about 2%
- *   further out of reach than the last: the gap souls, Old Ones and Heartmarks close.
+ *   further out of reach than the last: the gap souls, Legends and Heartmarks close.
  *   A floor's health and gold are shared across its 25 monsters.
  * - Each awakening needs `awakenStep` more floors than the last; `heartGrowth` steepens Heart power costs.
  */
@@ -217,10 +217,15 @@ export interface SaveState {
   goldBosses: Record<number, boolean>;
   /** Souls were recounted under the level-and-boss rules. */
   soulsV2?: boolean;
-  /** Old Ones summoned, by level; the ones on offer; souls spent summoning and leveling them (a respec refunds part). */
-  oldOnes: Record<string, number>;
-  oldOffer: string[];
-  oldSpent: number;
+  /** Legends summoned, by level; the ones on offer; souls spent summoning and leveling them (a respec refunds part). */
+  legends: Record<string, number>;
+  legendOffer: string[];
+  legendSpent: number;
+  /** Legend offers come from this seed and a count of rolls, so reloading (or an older save) can't fish for better ones. */
+  legendSeed: number;
+  legendRolls: number;
+  /** This run's seed for gold boss rolls: whether a floor's boss is gold is settled for the run. */
+  runSeed: number;
   /** Heartmarks on each companion, and the deepest floor that has given one (this awakening cycle). */
   marks: number[];
   markBest: number;
@@ -321,7 +326,7 @@ export interface SaveState {
 export function newSave(): SaveState {
   return {
     v: SAVE_VERSION, gold: new Decimal(0), runGold: new Decimal(0), totalGold: new Decimal(0), kills: 0, bosses: 0, clicks: 0, crits: 0,
-    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], bossSouls: 0, goldBosses: {}, oldOnes: {}, oldOffer: [], oldSpent: 0, marks: COMPS.map(() => 0), markBest: 0, soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
+    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], bossSouls: 0, goldBosses: {}, legends: {}, legendOffer: [], legendSpent: 0, legendSeed: freshSeed(), legendRolls: 0, runSeed: freshSeed(), marks: COMPS.map(() => 0), markBest: 0, soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
@@ -370,7 +375,7 @@ export type GameEvent =
   | { t: 'sweep'; floor: number; gold: Decimal }
   | { t: 'bossFail'; floor: number }
   | { t: 'bossWin'; floor: number; first: boolean; clutch?: { left: number; gold: Decimal }; souls?: number }
-  | { t: 'oldOne'; id: OldOneId; lv: number; summoned: boolean }
+  | { t: 'legend'; id: LegendId; lv: number; summoned: boolean }
   | { t: 'mark'; comp: number; from?: number; moved?: boolean }
   | { t: 'buyComp'; comp: number; n: number }
   | { t: 'reveal'; comp: number }
@@ -485,6 +490,17 @@ export function floorGold(f: number): Decimal {
 }
 
 export const isBossFloor = (f: number) => f % BOSS_EVERY === 0;
+
+const freshSeed = () => Math.floor(Math.random() * 2 ** 31);
+
+/** A number in [0, 1) fixed by two integers (mulberry32 on their mix): the same draw every time for the same pair. */
+function seeded(a: number, b: number) {
+  let t = (a ^ Math.imul(b + 0x9e3779b9, 0x85ebca6b)) >>> 0;
+  t = (t + 0x6d2b79f5) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
 
 /** Floors whose boss is always gold (from goldBossFrom): the first four zone bosses, so a first ascent pays, then every 50th. */
 export const GOLD_BOSS_SURE = (f: number) => f >= TUNE.goldBossFrom && ((f <= 130 && f % 10 === 0) || f % 50 === 0);
@@ -650,6 +666,16 @@ export class Game {
     for (const k of ['gold', 'runGold', 'totalGold', 'bestDps'] as const) s[k] = new Decimal(s[k] ?? 0);
     while (s.owned.length < COMPS.length) s.owned.push(0);
     while (s.marks.length < COMPS.length) s.marks.push(0);
+    // The Old Ones were renamed Legends.
+    const legacyOld = s as unknown as { oldOnes?: Record<string, number>; oldOffer?: string[]; oldSpent?: number };
+    if (legacyOld.oldOnes) {
+      s.legends = legacyOld.oldOnes;
+      s.legendOffer = legacyOld.oldOffer ?? [];
+      s.legendSpent = legacyOld.oldSpent ?? 0;
+      delete legacyOld.oldOnes;
+      delete legacyOld.oldOffer;
+      delete legacyOld.oldSpent;
+    }
     this.owned = new Set(s.upgrades);
     this.known = new Set(s.upgradesKnown);
     // Souls used to come from gold: recounted as what a run to your deepest floor pays in gold bosses (the sure ones
@@ -694,11 +720,11 @@ export class Game {
     const a = ABILITY_BY_ID.get(id);
     if (id === 'rampage') return this.unleashRampage();
     if (!a || a.kind !== 'button' || !this.abilityUnlocked(id) || this.abilityCooldown(id) > 0) return false;
-    const dur = (a.dur ?? 0) * (1 + oldShare(this.oldLv('lingering')));
+    const dur = (a.dur ?? 0) * (1 + legendShare(this.legendLv('lingering')));
     const buff: Buff = { id, name: a.name, t: dur, dur, dps: 1, click: 1, gold: 1 };
     if (id === 'treasure') buff.gold = 3;
     this.addBuff(buff);
-    this.s.cooldowns[id] = (a.cooldown ?? 0) * (1 - 0.75 * oldShare(this.oldLv('restless')));
+    this.s.cooldowns[id] = (a.cooldown ?? 0) * (1 - 0.75 * legendShare(this.legendLv('restless')));
     this.events.push({ t: 'ability', id });
     return true;
   }
@@ -853,13 +879,13 @@ export class Game {
     const baseComp = COMPS.map((c, i) => c.dps * s.owned[i] * levelMult(s.owned[i]) * tier[i] * (1 + MARK_POWER * s.marks[i]));
     const perComp = baseComp.map((b) => all.times(b * parts.party * parts.banner));
     const dps = perComp.reduce((a, b) => a.plus(b), new Decimal(0));
-    const click = all.times(whet * blades).plus(dps.times(parts.clickDps)).times(1 + 0.2 * this.oldLv('fist'));
+    const click = all.times(whet * blades).plus(dps.times(parts.clickDps)).times(1 + 0.2 * this.legendLv('fist'));
     this.cache = {
       dps, perComp, baseComp, parts, all, click,
       crit: this.abilityUnlocked('crit') ? parts.critBase + parts.critUpg + parts.critRelic : 0,
-      critMult: (parts.critMultBase + parts.critMultUpg) * parts.critMultRelic * (1 + 0.15 * this.oldLv('needle')),
+      critMult: (parts.critMultBase + parts.critMultUpg) * parts.critMultRelic * (1 + 0.15 * this.legendLv('needle')),
       cleave: this.abilityUnlocked('cleave') && this.s.buffs.some((b) => b.id === 'cleave') ? (CLEAVE_BASE + parts.cleaveRelic) * parts.cleaveUpg : 0,
-      gold: parts.goldUpg * parts.goldRelic * (1 + 0.05 * this.oldLv('hoard')),
+      gold: parts.goldUpg * parts.goldRelic * (1 + 0.05 * this.legendLv('hoard')),
       autoBase: AUTO_BASE + [0, 0.5, 1, 2][this.curseTier('silent')] + 0.5 * this.relic('phantom') + effects.reduce((sum, e) => sum + (e.t === 'auto' ? e.add : 0), 0),
     };
     return this.cache;
@@ -899,7 +925,7 @@ export class Game {
   }
 
   clickDamage() {
-    return this.c.click.times(this.buffMult('click') * (1 + 0.0001 * this.oldLv('unbroken') * this.streak));
+    return this.c.click.times(this.buffMult('click') * (1 + 0.0001 * this.legendLv('unbroken') * this.streak));
   }
 
   /** One of your clicks right now, as it lands, plus cleave on every other monster in the room. (Rampage is the party's,
@@ -942,7 +968,7 @@ export class Game {
   }
 
   goldMult() {
-    return this.c.gold * this.buffMult('gold') * (this.idle() ? 1 + 0.5 * this.oldLv('patient') : 1);
+    return this.c.gold * this.buffMult('gold') * (this.idle() ? 1 + 0.5 * this.legendLv('patient') : 1);
   }
 
   /** A running Rampage's multiplier on all your damage. */
@@ -975,7 +1001,7 @@ export class Game {
   // ---------- costs ----------
 
   private compBase(i: number) {
-    return COMPS[i].cost * 0.95 ** this.oldLv('haggler');
+    return COMPS[i].cost * 0.95 ** this.legendLv('haggler');
   }
 
   compCost(i: number, n = 1) {
@@ -1216,7 +1242,7 @@ export class Game {
     // Bosses toughen over the first floors (from bossHpFrom to bossHp by floor bossRamp): the opening stays gentle, and
     // further down they're the walls you go back and grow stronger for.
     const toughness = TUNE.bossHpFrom + (TUNE.bossHp - TUNE.bossHpFrom) * Math.min(1, (this.s.floor - 1) / TUNE.bossRamp);
-    const wither = 1 - 0.5 * oldShare(this.oldLv('wither'));
+    const wither = 1 - 0.5 * legendShare(this.legendLv('wither'));
     const hp = floorHp(this.s.floor).times(toughness * zone * first * (giant ? 1 + 2 * bite : 1) * champHp * wither);
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, champ, ...this.spot(true) };
     this.monsters.push(m);
@@ -1236,17 +1262,17 @@ export class Game {
     if (!this.championsOn()) return false;
     if (floor < TUNE.goldBossFrom) return floor < this.s.bestFloor && Math.random() < (this.debugCards ? 0.34 : CHAMP_BOSS_CHANCE);
     const rolls = this.s.goldBosses;
-    rolls[floor] ??= GOLD_BOSS_SURE(floor) || Math.random() < this.goldBossChance();
+    rolls[floor] ??= GOLD_BOSS_SURE(floor) || seeded(this.s.runSeed, floor) < this.goldBossChance();
     return rolls[floor];
   }
 
   goldBossChance() {
-    return TUNE.goldBossChance + (1 - TUNE.goldBossChance) * oldShare(this.oldLv('soulcaller'));
+    return TUNE.goldBossChance + (1 - TUNE.goldBossChance) * legendShare(this.legendLv('soulcaller'));
   }
 
   /** The Hourglass's extra seconds on every boss. */
   bossTimeBonus() {
-    return 30 * oldShare(this.oldLv('hourglass'));
+    return 30 * legendShare(this.legendLv('hourglass'));
   }
 
   /** Share of companion damage an armored boss shrugs off. */
@@ -1278,13 +1304,14 @@ export class Game {
     if (kind === 'dps') this.dpsShown.set(m.id, (this.dpsShown.get(m.id) ?? new Decimal(0)).plus(amount));
     else this.events.push({ t: 'hit', id: m.id, amount, kind, x, y });
     if (m.hp.lte(0)) {
-      this.kill(m, kind);
+      // How many times over this hit killed it (the Ronin's card luck).
+      this.kill(m, kind, amount.div(m.max).toNumber());
       return m.hp.neg();
     }
     return new Decimal(0);
   }
 
-  private kill(m: Monster, by: HitKind) {
+  private kill(m: Monster, by: HitKind, overkill = 1) {
     const i = this.monsters.indexOf(m);
     if (i < 0) return;
     this.monsters.splice(i, 1);
@@ -1304,7 +1331,7 @@ export class Game {
     this.killAcc++;
     if (m.champ && !m.half) this.s.champions++;
     this.events.push({ t: 'kill', id: m.id, gold, boss: m.boss, by, champ: m.champ });
-    if (!m.boss) this.rollCard(this.slay(m.def), !!m.champ, 'kill');
+    if (!m.boss) this.rollCard(this.slay(m.def), !!m.champ, 'kill', false, overkill);
     if (m.boss && m.mods.includes('split') && !m.half) {
       // Two halves climb out of the body; the clock keeps running.
       const frac = 0.5 * this.modBite() + 0.25 * (1 - this.modBite());
@@ -1342,7 +1369,7 @@ export class Game {
       }
       this.events.push({ t: 'bossWin', floor: this.s.floor, first: firstClear, clutch, souls });
       if (this.s.floor > MARK_FROM && this.s.floor % 10 === 0 && this.s.floor > this.s.markBest) this.giveMark(this.s.floor);
-      this.rollCard(this.slay(m.def), !!m.champ, 'kill', true);
+      this.rollCard(this.slay(m.def), !!m.champ, 'kill', true, overkill);
       if (firstWin || this.debugRelics) this.rollRelic(this.s.floor);
       // The demo's last boss always leads down the stairs, where it ends.
       if (this.s.auto || this.demoOver()) this.enterFloor(this.s.floor + 1);
@@ -1391,13 +1418,17 @@ export class Game {
     const s = this.s;
     const floor = s.floor;
     this.sweepT = SWEEP_GAP;
+    // A sweep is overkill by how many times over the party could clear what's left in SWEEP_SECONDS.
+    const left0 = Math.max(1, this.floorLeft());
+    const toughest = Math.max(...bandFor(floor).map((d) => d.hp));
+    const overkill = this.dps().times(SWEEP_SECONDS).div(floorHp(floor).times(TRASH * toughest * left0)).toNumber();
     for (const m of [...this.monsters]) {
       if (s.floor !== floor) return;
-      this.kill(m, 'dps');
+      this.kill(m, 'dps', overkill);
     }
     if (s.floor !== floor || s.floorKills >= this.killsNeeded()) return;
     const left = this.killsNeeded() - s.floorKills;
-    for (let k = 0; k < left; k++) this.rollCard(this.slay(pickMonster(floor), floor), false, 'sweep');
+    for (let k = 0; k < left; k++) this.rollCard(this.slay(pickMonster(floor), floor), false, 'sweep', false, overkill);
     const gold = Decimal.max(1, floorGold(floor).times(TRASH)).times(this.goldMult()).ceil().times(left);
     this.earn(gold);
     s.kills += left;
@@ -1524,7 +1555,7 @@ export class Game {
 
   /** Seconds a Rampage lasts (before attacking through it adds a little). */
   rampageDuration() {
-    let dur = FEVER_TIME * (1 + oldShare(this.oldLv('lingering')));
+    let dur = FEVER_TIME * (1 + legendShare(this.legendLv('lingering')));
     for (const e of this.effects()) if (e.t === 'fever' && e.dur) dur *= e.dur;
     return dur;
   }
@@ -1660,7 +1691,7 @@ export class Game {
 
   /** The Goblin King's cut of goblin and vault gold. */
   goblinKing() {
-    return 1 + 0.5 * this.oldLv('goblinking');
+    return 1 + 0.5 * this.legendLv('goblinking');
   }
 
   private rollReward(): RaidReward {
@@ -1682,7 +1713,7 @@ export class Game {
   }
 
   private scheduleRaid() {
-    let f = (1 + 0.3 * this.relic('goblin')) * (1 + 2 * oldShare(this.oldLv('lure')));
+    let f = (1 + 0.3 * this.relic('goblin')) * (1 + 2 * legendShare(this.legendLv('lure')));
     for (const e of this.effects()) if (e.t === 'raid' && e.freq) f *= e.freq;
     this.s.raidTimer = this.debugRainbow ? 5 : (RAID_MIN + Math.random() * (RAID_MAX - RAID_MIN)) / f;
   }
@@ -1768,6 +1799,7 @@ export class Game {
     s.maxFloor = 1;
     s.peakKills = 0;
     s.goldBosses = {};
+    s.runSeed = freshSeed();
     this.invalidate();
     this.enterFloor(1, true);
   }
@@ -1778,121 +1810,122 @@ export class Game {
 
   /** Damage from souls: +`soulPower` each. */
   soulMult(free = this.soulsFree()) {
-    return 1 + TUNE.soulPower * free + 0.11 * this.oldLv('hungry');
+    return 1 + TUNE.soulPower * free + 0.11 * this.legendLv('hungry');
   }
 
-  // ---------- the Old Ones ----------
+  // ---------- Legends ----------
 
-  oldLv(id: OldOneId) {
-    return this.s.oldOnes[id] ?? 0;
+  legendLv(id: LegendId) {
+    return this.s.legends[id] ?? 0;
   }
 
-  oldOwned() {
-    return Object.keys(this.s.oldOnes).length;
+  legendsOwned() {
+    return Object.keys(this.s.legends).length;
   }
 
-  /** The Old Ones wake with your first ascent. */
-  oldOnesOpen() {
+  /** Legends open with your first ascent. */
+  legendsOpen() {
     return this.s.descents > 0 || this.s.awakens > 0 || this.s.souls > 0;
   }
 
   summonPrice() {
-    return summonCost(this.oldOwned());
+    return summonCost(this.legendsOwned());
   }
 
   rerollPrice() {
-    return rerollCost(this.oldOwned());
+    return rerollCost(this.legendsOwned());
   }
 
-  /** Three Old Ones you don't have yet (your very first offer always holds the Sleeper, the Fist and the Hoard). */
+  /** Three Legends you don't have yet (your very first offer always holds the Sleeper, the Fist and the Hoard). */
   private rollOffer() {
     const s = this.s;
-    const left = OLD_ONES.filter((d) => !(d.id in s.oldOnes)).map((d) => d.id as string);
-    if (this.oldOwned() === 0 && s.spentSouls === 0) {
-      s.oldOffer = FIRST_OFFER.filter((id) => left.includes(id));
+    const left = LEGENDS.filter((d) => !(d.id in s.legends)).map((d) => d.id as string);
+    if (this.legendsOwned() === 0 && s.spentSouls === 0) {
+      s.legendOffer = FIRST_OFFER.filter((id) => left.includes(id));
       return;
     }
     // A reroll shows as many new faces as it can.
-    const fresh = left.filter((id) => !s.oldOffer.includes(id));
+    const fresh = left.filter((id) => !s.legendOffer.includes(id));
     const pool = fresh.length >= OFFER_SIZE ? fresh : left;
+    const roll = s.legendRolls++;
     const pick: string[] = [];
-    while (pick.length < Math.min(OFFER_SIZE, pool.length)) {
-      const id = pool[Math.floor(Math.random() * pool.length)];
+    for (let k = 0; pick.length < Math.min(OFFER_SIZE, pool.length); k++) {
+      const id = pool[Math.floor(seeded(s.legendSeed, roll * 64 + k) * pool.length)];
       if (!pick.includes(id)) pick.push(id);
     }
-    s.oldOffer = pick;
+    s.legendOffer = pick;
   }
 
-  /** The Old Ones on offer right now (rolled the first time you look). */
-  oldOffer(): OldOneId[] {
-    if (this.oldOnesOpen() && !this.s.oldOffer.length && this.oldOwned() < OLD_ONES.length) this.rollOffer();
-    return this.s.oldOffer as OldOneId[];
+  /** The Legends on offer right now (rolled the first time you look). */
+  legendOffer(): LegendId[] {
+    if (this.legendsOpen() && !this.s.legendOffer.length && this.legendsOwned() < LEGENDS.length) this.rollOffer();
+    return this.s.legendOffer as LegendId[];
   }
 
-  summonOldOne(id: OldOneId) {
+  summonLegend(id: LegendId) {
     const price = this.summonPrice();
-    if (!this.oldOffer().includes(id) || this.soulsFree() < price) return false;
+    if (!this.legendOffer().includes(id) || this.soulsFree() < price) return false;
     this.spendSouls(price, true);
-    this.s.oldOnes[id] = 1;
+    this.s.legends[id] = 1;
     this.rollOffer();
     this.invalidate();
-    this.events.push({ t: 'oldOne', id, lv: 1, summoned: true });
+    this.events.push({ t: 'legend', id, lv: 1, summoned: true });
     return true;
   }
 
-  rerollOldOnes() {
+  rerollLegends() {
     const price = this.rerollPrice();
-    if (!this.oldOnesOpen() || this.soulsFree() < price || this.oldOwned() >= OLD_ONES.length - OFFER_SIZE) return false;
+    if (!this.legendsOpen() || this.soulsFree() < price || this.legendsOwned() >= LEGENDS.length - OFFER_SIZE) return false;
     this.spendSouls(price, false);
     this.rollOffer();
     return true;
   }
 
-  oldLevelCost(id: OldOneId) {
-    return oldCost(OLD_ONE_BY_ID.get(id)!, this.oldLv(id));
+  legendLevelCost(id: LegendId) {
+    return legendCost(LEGEND_BY_ID.get(id)!, this.legendLv(id));
   }
 
-  levelOldOne(id: OldOneId) {
-    const lv = this.oldLv(id);
+  levelLegend(id: LegendId) {
+    const lv = this.legendLv(id);
     if (!lv) return false;
-    const def = OLD_ONE_BY_ID.get(id)!;
+    const def = LEGEND_BY_ID.get(id)!;
     if (def.maxLv && lv >= def.maxLv) return false;
-    const price = oldCost(def, lv);
+    const price = legendCost(def, lv);
     if (this.soulsFree() < price) return false;
     this.spendSouls(price, true);
-    this.s.oldOnes[id] = lv + 1;
+    this.s.legends[id] = lv + 1;
     this.invalidate();
-    this.events.push({ t: 'oldOne', id, lv: lv + 1, summoned: false });
+    this.events.push({ t: 'legend', id, lv: lv + 1, summoned: false });
     return true;
   }
 
-  oldMaxed(id: OldOneId) {
-    const max = OLD_ONE_BY_ID.get(id)!.maxLv;
-    return !!max && this.oldLv(id) >= max;
+  legendMaxed(id: LegendId) {
+    const max = LEGEND_BY_ID.get(id)!.maxLv;
+    return !!max && this.legendLv(id) >= max;
   }
 
-  /** Every Old One goes back to sleep; RESPEC_REFUND of the souls they took comes back. */
-  respecOldOnes() {
+  /** Every Legend is let go; RESPEC_REFUND of the souls they took comes back. */
+  respecLegends() {
     const s = this.s;
-    if (!this.oldOwned()) return false;
-    s.spentSouls -= Math.floor(s.oldSpent * RESPEC_REFUND);
-    s.oldSpent = 0;
-    s.oldOnes = {};
-    s.oldOffer = [];
+    if (!this.legendsOwned()) return false;
+    s.spentSouls -= Math.floor(s.legendSpent * RESPEC_REFUND);
+    s.legendSpent = 0;
+    s.legends = {};
+    s.legendOffer = [];
     this.rollOffer();
     this.invalidate();
     return true;
   }
 
-  /** `kept`: spent on an Old One (a respec refunds part of it), or gone for good (a reroll). */
+  /** `kept`: spent on a Legend (a respec refunds part of it), or gone for good (a reroll). */
   private spendSouls(n: number, kept: boolean) {
     this.s.spentSouls += n;
-    if (kept) this.s.oldSpent += n;
+    if (kept) this.s.legendSpent += n;
   }
 
   /** Kills a normal floor needs. */
   killsNeeded() {
-    return FLOOR_KILLS - Math.min(10, this.oldLv('thinning'));
+    return FLOOR_KILLS - Math.min(10, this.legendLv('thinning'));
   }
 
   /** No attack by hand for IDLE_AFTER seconds. */
@@ -1902,7 +1935,7 @@ export class Game {
 
   /** Multipliers that change from moment to moment: the Sleeper while idle, the Unbroken with your streak. */
   private liveMult() {
-    return (this.idle() ? 1 + 0.25 * this.oldLv('sleeper') : 1) * (1 + 0.0001 * this.oldLv('unbroken') * this.streak);
+    return (this.idle() ? 1 + 0.25 * this.legendLv('sleeper') : 1) * (1 + 0.0001 * this.legendLv('unbroken') * this.streak);
   }
 
   // ---------- Heartmarks ----------
@@ -2047,9 +2080,9 @@ export class Game {
     s.soulsLifetime += s.souls;
     s.souls = 0;
     s.spentSouls = 0;
-    s.oldOnes = {};
-    s.oldOffer = [];
-    s.oldSpent = 0;
+    s.legends = {};
+    s.legendOffer = [];
+    s.legendSpent = 0;
     s.marks = COMPS.map(() => 0);
     s.markBest = 0;
     s.bossSouls = 0;
@@ -2099,13 +2132,19 @@ export class Game {
     return (this.s.slain[id] ?? 0) - (laps ?? []).reduce((a, n) => a + n, 0);
   }
 
-  private cardRoll(odds: number) {
-    odds /= 1 + 2 * oldShare(this.oldLv('collector'));
+  /** The Ronin: a kill N times over has N× the card chance, up to ×(1 + level). */
+  overkillMult(overkill: number) {
+    const lv = this.legendLv('ronin');
+    return lv ? Math.max(1, Math.min(Math.floor(overkill), 1 + lv)) : 1;
+  }
+
+  private cardRoll(odds: number, mult = 1) {
+    odds /= (1 + 2 * legendShare(this.legendLv('collector'))) * mult;
     return Math.random() * (this.debugCards ? Math.max(1, odds / 500) : odds) < 1;
   }
 
   /** A killed monster's chance at its card: champions roll for a gold one first. */
-  private rollCard(id: string, champ: boolean, src: 'kill' | 'sweep', boss = false) {
+  private rollCard(id: string, champ: boolean, src: 'kill' | 'sweep', boss = false, overkill = 1) {
     // In the demo your first card is sure to turn up early (at normal odds a short session would never see one): each
     // kill in DEMO_FIRST_CARD's stretch has a 1 in (kills left) chance, so the drop lands evenly across it.
     const { from, by } = DEMO_FIRST_CARD;
@@ -2113,8 +2152,9 @@ export class Game {
       this.giveCard(id, false, src);
       return;
     }
-    if (champ && this.cardRoll(boss ? CARD_ODDS.champBoss : CARD_ODDS.champ)) this.giveCard(id, true, src);
-    else if (this.cardRoll(boss ? CARD_ODDS.boss : CARD_ODDS.monster)) this.giveCard(id, false, src);
+    const mult = this.overkillMult(overkill);
+    if (champ && this.cardRoll(boss ? CARD_ODDS.champBoss : CARD_ODDS.champ, mult)) this.giveCard(id, true, src);
+    else if (this.cardRoll(boss ? CARD_ODDS.boss : CARD_ODDS.monster, mult)) this.giveCard(id, false, src);
   }
 
   giveCard(id: string, gold = false, src: 'kill' | 'sweep' | 'raid' = 'kill') {
@@ -2513,15 +2553,17 @@ export class Game {
     this.invalidate();
     const f = isBossFloor(this.s.floor) ? Math.max(1, this.s.floor - 1) : this.s.floor;
     // Away counts as idle: the Sleeper and the Patient work through it.
-    const sleeper = 1 + 0.25 * this.oldLv('sleeper');
+    const sleeper = 1 + 0.25 * this.legendLv('sleeper');
     const perSec = Math.min(1 / SPAWN_GAP, this.baseDps().times(sleeper).div(floorHp(f).times(TRASH)).toNumber());
     const kills = Math.floor(perSec * secs * pct);
-    const gold = floorGold(f).times(kills * TRASH * this.c.gold * (1 + 0.5 * this.oldLv('patient')));
+    const gold = floorGold(f).times(kills * TRASH * this.c.gold * (1 + 0.5 * this.legendLv('patient')));
     this.earn(gold);
     this.s.kills += kills;
     // Every kill counts toward its monster's card, and rolls for it, as it would have at the keyboard.
     const before = this.events.length;
-    for (let k = 0; k < kills; k++) this.rollCard(this.slay(pickMonster(f), f), false, 'sweep');
+    // Every kill's overkill while away: the party's damage per kill against one monster's health.
+    const overkill = perSec > 0 ? this.baseDps().times(sleeper).div(floorHp(f).times(TRASH * perSec)).toNumber() : 1;
+    for (let k = 0; k < kills; k++) this.rollCard(this.slay(pickMonster(f), f), false, 'sweep', false, overkill);
     const cards = this.events.slice(before).filter((e): e is Extract<GameEvent, { t: 'card' }> => e.t === 'card');
     this.s.playTime += secs;
     this.s.runTime += secs;

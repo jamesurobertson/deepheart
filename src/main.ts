@@ -477,7 +477,7 @@ function playSound(sfx: Sfx, ev: GameEvent) {
     case 'raidEscape': sfx.play('close', { vol: 0.5, rate: 0.8 }); break;
     case 'fever': if (ev.on) sfx.play('awaken', { vol: 0.8 }); break;
     case 'heart': sfx.play('awaken', { vol: 0.6, rate: 0.8 }); break;
-    case 'oldOne': sfx.play(ev.summoned ? 'awaken' : 'levelup', { vol: ev.summoned ? 0.6 : 0.45, rate: ev.summoned ? 0.7 : 1 }); break;
+    case 'legend': sfx.play(ev.summoned ? 'awaken' : 'levelup', { vol: ev.summoned ? 0.6 : 0.45, rate: ev.summoned ? 0.7 : 1 }); break;
     case 'mark': sfx.play(ev.moved ? 'equip' : 'jackpot', { vol: 0.5 }); break;
     case 'split': sfx.play('bosskill', { vol: 0.6, rate: 1.3 }); break;
   }

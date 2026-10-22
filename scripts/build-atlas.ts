@@ -1,6 +1,7 @@
 /**
  * Packs every sprite the game uses into one sheet: the 0x72 DungeonTileset II atlas plus
- * the CC0 add-on packs in assets-src (zone tilesets, Enchanted Forest and CR+ creatures, the Sewers, DevWizard's spells).
+ * the CC0 add-on packs in assets-src (zone tilesets, Enchanted Forest and CR+ creatures, the Sewers, DevWizard's spells,
+ * Superdark's Samurai and Fantasy RPG characters, RancidMilk's Homage).
  *
  *   node scripts/build-atlas.ts
  *
@@ -277,6 +278,59 @@ for (const [zone, file] of [['jungle', 'omnibo_jungledungeon - copia.png'], ['to
     const img = readPng(join(dir, file));
     for (let k = 0; k < img.w / 16; k++) add(`spell_${name}_anim_f${k}`, img, k * 16, 0);
   }
+}
+
+/** Union of the drawn pixels of several frames (each a w×h cell at its own x), so a character stands still as it animates. */
+function unionBox(cells: { img: Image; x: number; y: number; w: number; h: number }[]) {
+  let box: { x: number; y: number; x2: number; y2: number } | null = null;
+  for (const c of cells) {
+    const b = bbox(c.img, c.x, c.y, c.w, c.h);
+    if (!b) continue;
+    const bx = b.x - c.x, by = b.y - c.y;
+    box = box ? { x: Math.min(box.x, bx), y: Math.min(box.y, by), x2: Math.max(box.x2, bx + b.w), y2: Math.max(box.y2, by + b.h) } : { x: bx, y: by, x2: bx + b.w, y2: by + b.h };
+  }
+  return box;
+}
+/** A character from separate frame images or strip cells: `slug_idle_anim_f*` and `slug_run_anim_f*`. */
+function character(slug: string, anims: [string, { img: Image; x: number; y: number; w: number; h: number }[]][]) {
+  const box = unionBox(anims.flatMap(([, cells]) => cells));
+  if (!box) throw new Error(`${slug}: no pixels`);
+  for (const [anim, cells] of anims) cells.forEach((c, k) => add(`${slug}_${anim}_anim_f${k}`, c.img, c.x + box.x, c.y + box.y, box.x2 - box.x, box.y2 - box.y));
+}
+const whole = (img: Image) => ({ img, x: 0, y: 0, w: img.w, h: img.h });
+const byNumber = (a: string, b: string) => Number(a.match(/(\d+)\.png$/)![1]) - Number(b.match(/(\d+)\.png$/)![1]);
+
+// Superdark's Fantasy Samurai (bought) and Fantasy RPG Characters, and RancidMilk's Homage to 0x72: CC0 add-ons in
+// 0x72's style. Only the characters the game uses: Legends, companions, monsters and Pip.
+{
+  // Bought, so like the Sewers it's kept out of git: unzip it into assets-src/samurai by hand on a new machine.
+  const dir = join(SRC, 'samurai/Final');
+  if (!existsSync(dir)) throw new Error(`${dir} is missing: unzip the Fantasy Samurai pack there (it's kept out of git)`);
+  const files = readdirSync(dir);
+  for (const name of ['oldman', 'large_oni_red', 'sohei', 'large_samurai', 'merchant', 'kabuki', 'geisha', 'tengu', 'oni_king', 'samurai', 'oni_blue', 'large_oni_blue', 'oni_red']) {
+    const frames = (anim: string) => files.filter((f) => f.startsWith(`${name}_${anim}_`)).sort(byNumber).map((f) => whole(readPng(join(dir, f))));
+    character(`sm_${name}`, [['idle', frames('idle')], ['run', frames('walk')]]);
+  }
+}
+{
+  const dir = join(SRC, 'fantasy-npcs/Fantasy RPG NPCs - Individuel Frames');
+  for (const folder of ['Executioner', 'Mountain King', 'Merchant', 'Magic Shopkeeper', 'Bishop', 'Butcher', 'Princess', 'King', 'Knight - Elite', 'Knight - Heavy']) {
+    const files = readdirSync(join(dir, folder)).filter((f) => f.endsWith('.png')).sort(byNumber);
+    const read = (re: RegExp) => files.filter((f) => re.test(f)).map((f) => whole(readPng(join(dir, folder, f))));
+    const both = read(/_Idle \+ Walk_/);
+    const slug = 'sd_' + folder.toLowerCase().replace(/[^a-z]+/g, '_');
+    character(slug, both.length ? [['idle', both], ['run', both]] : [['idle', read(/_Idle_/)], ['run', read(/_Walk_/)]]);
+  }
+}
+{
+  const dir = join(SRC, 'homage/SpriteSheets');
+  const strip = (file: string) => {
+    const img = readPng(join(dir, file));
+    return Array.from({ length: img.w / 28 }, (_, k) => ({ img, x: k * 28, y: 0, w: 28, h: img.h }));
+  };
+  character('rm_dracula', [['idle', strip('DraculaIdle.png')], ['run', strip('DraculaRun.png')]]);
+  character('rm_zombie', [['idle', strip('ZombieIdle1.png')], ['run', strip('ZombieRun.png')]]);
+  character('rm_rocker', [['idle', strip('TShirtDudeIdle.png')], ['run', strip('TShirtDudeRun.png')]]);
 }
 
 // ---------- pack ----------

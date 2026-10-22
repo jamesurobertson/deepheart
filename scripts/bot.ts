@@ -4,7 +4,7 @@
  */
 import Decimal from 'break_infinity.js';
 import { COST_GROWTH, Game, MANUAL_RATE, MARK_MOVE, newSave, TUNE, type GameEvent, type SaveState } from '../src/game/game.ts';
-import { ABILITIES, COMPS, HEART, OLD_ONE_BY_ID, UPG_BY_ID, type OldOneId } from '../src/game/data.ts';
+import { ABILITIES, COMPS, HEART, LEGEND_BY_ID, UPG_BY_ID, type LegendId } from '../src/game/data.ts';
 
 export interface Profile {
   /** Attacks by hand per second while the player is active (the game caps it at MANUAL_RATE, i.e. holding the button). */
@@ -28,18 +28,18 @@ export interface Profile {
   resetActive?: number;
   /** Seconds between shop visits while idle (default 1; every second while playing actively). */
   shopEvery?: number;
-  /** Which Old Ones it favors: an active player's (attacks, crits, streaks) or an idle one's (the Sleeper, the Patient).
+  /** Which Legends it favors: an active player's (attacks, crits, streaks) or an idle one's (the Sleeper, the Patient).
    *  Default: active. */
   style?: 'active' | 'idle';
 }
 
-/** Old Ones in the order each kind of player wants them, and what a level of each power one is worth to them (the
+/** Legends in the order each kind of player wants them, and what a level of each power one is worth to them (the
  *  share of all damage it adds, roughly). */
-const OLD_PREF: Record<'active' | 'idle', OldOneId[]> = {
-  active: ['fist', 'unbroken', 'hoard', 'needle', 'thinning', 'hourglass', 'wither', 'soulcaller', 'restless', 'lingering', 'haggler', 'lure', 'goblinking', 'collector', 'hungry', 'sleeper', 'patient'],
-  idle: ['sleeper', 'patient', 'hoard', 'thinning', 'hourglass', 'wither', 'soulcaller', 'haggler', 'lure', 'goblinking', 'restless', 'lingering', 'collector', 'hungry', 'needle', 'fist', 'unbroken'],
+const OLD_PREF: Record<'active' | 'idle', LegendId[]> = {
+  active: ['fist', 'unbroken', 'hoard', 'needle', 'thinning', 'hourglass', 'wither', 'soulcaller', 'restless', 'lingering', 'haggler', 'lure', 'goblinking', 'collector', 'ronin', 'hungry', 'sleeper', 'patient'],
+  idle: ['sleeper', 'patient', 'hoard', 'thinning', 'hourglass', 'wither', 'soulcaller', 'haggler', 'lure', 'goblinking', 'restless', 'lingering', 'collector', 'ronin', 'hungry', 'needle', 'fist', 'unbroken'],
 };
-const OLD_WORTH: Record<'active' | 'idle', Partial<Record<OldOneId, number>>> = {
+const OLD_WORTH: Record<'active' | 'idle', Partial<Record<LegendId, number>>> = {
   active: { fist: 0.15, unbroken: 0.1, needle: 0.08, hoard: 0.04, goblinking: 0.01 },
   idle: { sleeper: 0.25, patient: 0.4, hoard: 0.04, goblinking: 0.01 },
 };
@@ -209,7 +209,7 @@ export class Sim {
       this.gatherMarks();
       game.descend(this.pickCurse());
       this.afterReset();
-      this.feedOldOnes();
+      this.feedLegends();
     }
     if (stalled && game.canAwaken() && game.pendingStones() >= Math.max(1, this.totalStones() * profile.awakenRatio)) {
       const stones = game.pendingStones();
@@ -340,32 +340,32 @@ export class Sim {
     }
   }
 
-  /** Spend souls on the Old Ones: summon what this player favors (rerolling a little for it), level power ones while a
+  /** Spend souls on Legends: summon what this player favors (rerolling a little for it), level power ones while a
    *  level adds more than the souls it takes would as souls kept, and utility ones while they're cheap. */
-  feedOldOnes() {
+  feedLegends() {
     const { game } = this;
     const style = this.profile.style ?? 'active';
     const pref = OLD_PREF[style];
     const worth = OLD_WORTH[style];
     for (let pass = 0; pass < 200; pass++) {
       const free = game.soulsFree();
-      const offer = game.oldOffer();
+      const offer = game.legendOffer();
       let did = false;
       if (offer.length && game.summonPrice() <= Math.max(1, free * 0.3)) {
         const best = [...offer].sort((a, b) => pref.indexOf(a) - pref.indexOf(b))[0];
-        if (pref.indexOf(best) < 9 || game.rerollPrice() > free * 0.05) did = game.summonOldOne(best);
-        else did = game.rerollOldOnes();
+        if (pref.indexOf(best) < 9 || game.rerollPrice() > free * 0.05) did = game.summonLegend(best);
+        else did = game.rerollLegends();
       }
       for (const id of pref) {
-        const lv = game.oldLv(id);
-        if (!lv || game.oldMaxed(id)) continue;
-        const def = OLD_ONE_BY_ID.get(id)!;
-        const cost = game.oldLevelCost(id);
+        const lv = game.legendLv(id);
+        if (!lv || game.legendMaxed(id)) continue;
+        const def = LEGEND_BY_ID.get(id)!;
+        const cost = game.legendLevelCost(id);
         if (cost > game.soulsFree()) continue;
         const p = worth[id];
         const keep = (cost * TUNE.soulPower) / game.soulMult();
         const buy = def.kind === 'power' ? p !== undefined && p / (1 + p * lv) > keep : def.kind === 'utility' && cost <= game.soulsFree() * 0.05;
-        if (buy && game.levelOldOne(id)) did = true;
+        if (buy && game.levelLegend(id)) did = true;
       }
       if (!did) break;
     }
