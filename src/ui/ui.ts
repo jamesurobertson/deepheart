@@ -2610,14 +2610,15 @@ export class Ui {
   private recordsHtml(): string {
     const g = this.game;
     const s = g.s;
-    const rows: [string, string][] = [
+    const rows: [string, string, boolean?][] = [
       ['Floor', `${s.floor} (deepest this descent ${s.maxFloor})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
       ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses beaten', fmt(s.bosses)],
       ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rainbow Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
       ['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ...(RELICS_ON ? [['Relics', `${g.relicsFound()} / ${RELICS.length}`] as [string, string]] : []), ['Cards found', fmt(g.cardsFound())],
-      ['This descent', duration(s.runTime)], ['Time played', duration(s.playTime)],
+      ['This descent', duration(s.runTime)], ['Active', duration(s.runActive), true], ['Idle', duration(Math.max(0, s.runTime - s.runActive)), true],
+      ['Time played', duration(s.playTime)], ['Active', duration(s.activeTime), true], ['Idle', duration(Math.max(0, s.playTime - s.activeTime)), true],
     ];
-    return `<dl class="stats">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
+    return `<dl class="stats">${rows.map(([k, v, sub]) => `<div${sub ? ' class="sub"' : ''}><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
   }
 
   private tabs(on: 'abyss' | 'marks' | 'heart') {

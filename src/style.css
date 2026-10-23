@@ -801,6 +801,8 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .stats dt { display: flex; flex: 1; align-items: baseline; color: var(--dim); }
 /* Square pixel dots (a dotted border renders round) leading from each label to its value. */
 .stats dt::after { content: ''; flex: 1; min-width: 16px; height: 2px; margin: 0 10px; background: linear-gradient(to right, var(--faint) 2px, transparent 2px) 0 0 / 6px 2px repeat-x; }
+.stats .sub dt { padding-left: 16px; color: var(--faint); }
+.stats .sub dd { font-size: 18px; color: var(--dim); }
 .stats dd { margin: 0; font: 400 22px/1 'Jersey 10'; text-align: right; }
 
 .set { display: flex; flex-direction: column; gap: 12px; }

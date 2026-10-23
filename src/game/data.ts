@@ -463,7 +463,7 @@ export const ABILITIES: AbilityDef[] = [
   { id: 'blade', name: 'Phantom Blade', desc: 'Attacks the front monster for you, once a second.', kind: 'passive', comp: compIndex('squire'), trait: 0 },
   { id: 'flurry', name: 'Flurry', desc: 'Clicks for you, 10 times a second, for 30s.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 8 * 60 },
   { id: 'crit', name: 'Critical Hits', desc: 'Your clicks and Phantom Blade can land critical hits: a 3% chance for ×2 damage. Sharp-eyed companions raise both.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
-  { id: 'rampage', name: 'Rampage', desc: 'Attacks charge it. Unleash for ×2 party damage for 10s. Keep attacking for ×3.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
+  { id: 'rampage', name: 'Rampage', desc: 'Charged by attacking. ×2 damage for 10s.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
   { id: 'cleave', name: 'Cleave', desc: 'Your clicks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 12 * 60 },
   { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold for 30 seconds.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 25 * 60 },
   { id: 'drums', name: 'War Drums', desc: '+50% crit chance.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 20 * 60 },
@@ -527,7 +527,7 @@ export interface ModDef {
 }
 
 export const MODS: ModDef[] = [
-  { id: 'armored', name: 'Armored', desc: 'Companions deal 75% less damage to it. Clicks hit in full.', counter: 'pick', color: '#9fb4c8' },
+  { id: 'armored', name: 'Armored', desc: 'Companions deal 75% less damage to it.', counter: 'pick', color: '#9fb4c8' },
   { id: 'enraged', name: 'Enraged', desc: 'Only half the time to beat it.', counter: 'glass', color: '#ff6a4a' },
   { id: 'regen', name: 'Regenerating', desc: 'Heals 3% of its health every second.', counter: 'rot', color: '#7ee07a' },
   { id: 'split', name: 'Splitting', desc: 'Splits in two when it falls. Both halves have to die in time.', counter: 'cleaver', color: '#d58aff' },

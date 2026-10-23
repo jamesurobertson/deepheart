@@ -263,6 +263,9 @@ export interface SaveState {
   bestDps: Decimal;
   playTime: number;
   runTime: number;
+  /** Of playTime and runTime, the seconds spent actively playing (not idle, not away). */
+  activeTime: number;
+  runActive: number;
   startedAt: number;
   lastSave: number;
   /** Relic levels by id (0 / missing = not found yet). */
@@ -328,7 +331,7 @@ export function newSave(): SaveState {
     owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], bossSouls: 0, goldBosses: {}, legends: {}, legendOffer: [], legendSpent: 0, legendSeed: freshSeed(), legendRolls: 0, runSeed: freshSeed(), marks: COMPS.map(() => 0), markBest: 0, soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
-    bestDps: new Decimal(0), playTime: 0, runTime: 0, startedAt: Date.now(), lastSave: Date.now(),
+    bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(),
     relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
@@ -974,7 +977,7 @@ export class Game {
     if (id === 'crit') return `Your clicks and Phantom Blade can land critical hits: a ${pct(p.critBase + p.critUpg + p.critRelic)} chance for ×${+((p.critMultBase + p.critMultUpg) * p.critMultRelic).toFixed(2)} damage.`;
     if (id === 'blade') return `Attacks the front monster for you, ${this.c.autoBase === 1 ? 'once' : `${+this.c.autoBase.toFixed(1)} times`} a second.`;
     if (id === 'cleave') return `Your clicks also hit every other monster for ${pct((CLEAVE_BASE + p.cleaveRelic) * p.cleaveUpg)} damage.`;
-    if (id === 'rampage') return `Attacks charge it. Unleash for ×${+this.feverMult(0).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s. Keep attacking for ×${+this.feverMult(1).toFixed(1)}.`;
+    if (id === 'rampage') return `Charged by attacking. ×${+this.feverMult(0).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
     return ABILITY_BY_ID.get(id)!.desc;
   }
 
@@ -1803,6 +1806,7 @@ export class Game {
     this.rampageTier = 0;
     s.revealed = 0;
     s.runTime = 0;
+    s.runActive = 0;
     s.auto = true;
     this.owned.clear();
     this.raid = null;
@@ -2417,6 +2421,10 @@ export class Game {
     while (this.drops.length && this.drops[0].t >= GOLD_WAIT) this.bankDrop(0, 'time');
     for (const id in s.cooldowns) if ((s.cooldowns[id] -= dt) <= 0) delete s.cooldowns[id];
     s.runTime += dt;
+    if (!this.idle()) {
+      s.activeTime += dt;
+      s.runActive += dt;
+    }
 
     const vault = this.inVault();
     if (this.vaultOn && !vault) this.closeVault();
