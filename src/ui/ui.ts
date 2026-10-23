@@ -2380,7 +2380,9 @@ export class Ui {
     const box = card.getBoundingClientRect();
     const view = this.el.modal.getBoundingClientRect();
     if (box.top >= view.top && box.bottom <= view.bottom) return this.flare(card);
-    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    // Only the panel scrolls (scrollIntoView would also shift the game's own clipped layers sideways).
+    const by = box.top < view.top ? box.top - view.top - 12 : box.bottom - view.bottom + 12;
+    this.el.modal.scrollBy({ top: by, behavior: 'smooth' });
     let done = false;
     const go = () => {
       if (done) return;
