@@ -15,6 +15,8 @@ import { CARD_BY_ID, COMPS, RELIC_BY_ID, ZONES, corruptionOf, tilesFor, zoneOf, 
 import { TUNE, VAULT_LENGTH, type Game, type GameEvent, type Monster, type VaultChest } from '../game/game.ts';
 
 const WALL_Z = -6;
+/** How far in front of the back wall a companion's spot in the formation has to be (a tall screen spreads it deeper). */
+const HOME_CLEAR = 1.4;
 const STAIRS = new THREE.Vector3(7.5, 0, -4);
 /** Where the camera looks: between the party and the monsters. */
 const LOOK = new THREE.Vector3(0, 1.1, 0.5);
@@ -113,7 +115,7 @@ const PARTY_SLOTS: [number, number][] = [
   [-3, 0.8], [-3.4, -1.4], [-3.7, 2.6], [-4.4, -0.2], [-4.8, 1.7], [-5, -2.4], [-5.8, 0.8], [-6, 2.8],
   [-6.2, -1.3], [-6.9, 1.9], [-7.2, -0.3], [-7.4, -2.5], [-8, 2.6], [-8.3, 0.8], [-8.8, -1.4], [-9.3, 1.6],
   // The Heart's recruits fill the gaps.
-  [-4.1, 3.7], [-5.5, -3.5], [-6.5, 0.1], [-7.7, 1.3], [-5.2, 3.8], [-8.5, -2.9], [-6.6, -3.6], [-9, 0.2],
+  [-4.1, 3.7], [-5.5, -3.1], [-6.5, 0.1], [-7.7, 1.3], [-5.2, 3.8], [-8.5, -2.9], [-6.6, -3.2], [-9, 0.2],
 ];
 
 interface MonView {
@@ -398,7 +400,7 @@ export class Scene {
   private deep = 1;
   private look = LOOK.clone();
   private camBase = new THREE.Vector3();
-  settings = { particles: true, partyAttacks: true, shake: true, blood: true, cinematics: true };
+  settings = { particles: true, calm: false, shake: true, blood: true, cinematics: true };
   /** Zone-change interlude: the party leaves, descends a spiral staircase, arrives somewhere new. */
   /** A pause (the loot card is up) before the staircase starts. */
   private hold: { zone: number; t: number } | null = null;
@@ -829,7 +831,7 @@ export class Scene {
     const [x, z] = PARTY_SLOTS[i % PARTY_SLOTS.length];
     const home = new THREE.Vector3(x, 0, z);
     home.x = x * this.squeeze;
-    home.z = z * this.deep;
+    home.z = Math.max(WALL_Z + HOME_CLEAR, z * this.deep);
     body.position.copy(instant ? home : new THREE.Vector3(-16, 0, z));
     this.scene.add(body);
     this.party.push({ comp: i, body, inner, sprite, idle, run, cd: Math.random(), home, homeX: x, homeZ: z, base, stretch: 0, act: null });
@@ -1031,7 +1033,7 @@ export class Scene {
     const hero = game.heroIndex();
     for (const c of this.party) {
       c.home.x = c.homeX * this.squeeze;
-      c.home.z = c.homeZ * this.deep;
+      c.home.z = Math.max(WALL_Z + HOME_CLEAR, c.homeZ * this.deep);
       if (c.comp === hero || !c.body.visible) continue;
       const def = COMPS[c.comp];
       const p = c.body.position;
@@ -1231,7 +1233,7 @@ export class Scene {
       return;
     }
     const c = this.party.find((view) => view.comp === comp);
-    if (!c || !c.body.visible || !this.settings.partyAttacks) return;
+    if (!c || !c.body.visible) return;
     const kind = COMPS[comp].attack;
     c.act = kind === 'slash' ? { kind, phase: 'dash', t: 0, target: id, eta: delay } : { kind, phase: 'windup', t: Math.min(0.14, delay), target: id, eta: delay };
   }
@@ -1250,6 +1252,15 @@ export class Scene {
     // Struck from the right (a hero on that side), the swing and its spark come from the right.
     const fromRight = c.body.position.x > v.body.position.x;
     c.stretch = 1;
+    if (this.settings.calm) {
+      // Reduced flashing: a dim swing and the monster flinching, nothing bright.
+      this.fx.swipe(at, 0x4a4238, big ? 1.2 : 0.8, Math.PI * (0.6 + Math.random() * 0.5), undefined, fromRight);
+      if (v.dead < 0) {
+        this.react(v, big ? 0.4 : 0.2);
+        this.bleed(v, at, big ? 4 : 2, false);
+      }
+      return;
+    }
     this.fx.swipe(at, 0xfff0d8, big ? 1.5 : 0.95, Math.PI * (0.6 + Math.random() * 0.5), undefined, fromRight);
     this.fx.star(at.clone().setX(at.x + (fromRight ? 0.2 : -0.2)), 0xffffff, big ? 1.1 : 0.7);
     // (The blow still lands on one that died a moment ago, so a swing is never wasted on thin air.)
@@ -1276,7 +1287,7 @@ export class Scene {
     const def = COMPS[c.comp];
     const from = c.body.position.clone().add(new THREE.Vector3(c.sprite.flip ? -0.35 : 0.35, def.big ? 1.6 : 0.95, 0.1));
     const to = view.body.position.clone().setY(view.height * 0.45);
-    this.fx.star(from, SHOT_COLOR[kind], 0.5, 0.12);
+    if (!this.settings.calm) this.fx.star(from, SHOT_COLOR[kind], 0.5, 0.12);
     if (kind === 'bolt') {
       // Staff crackles as the spell goes up.
       if (this.settings.particles) this.fx.burst(from.clone().setY(from.y + 0.3), '#cfefff', 6, 2, 0.05, -2, true);
@@ -1289,9 +1300,9 @@ export class Scene {
       const others = [...this.mons.values()].filter((m) => m.id !== id && m.dead < 0 && m.born >= 1)
         .sort((a, b) => a.body.position.distanceTo(view.body.position) - b.body.position.distanceTo(view.body.position)).slice(0, 2);
       const hops = [view, ...others];
-      this.fx.chain([from, ...hops.map((m) => m.body.position.clone().setY(m.height * 0.5))], SHOT_COLOR.storm);
+      this.fx.chain([from, ...hops.map((m) => m.body.position.clone().setY(m.height * 0.5))], this.settings.calm ? 0x5a4a78 : SHOT_COLOR.storm);
       for (const m of hops) this.react(m, 0.25);
-      this.addShake(0.03);
+      if (!this.settings.calm) this.addShake(0.03);
       return;
     }
     if (kind === 'rune') {
@@ -1311,11 +1322,11 @@ export class Scene {
     sprite.mesh.scale.multiplyScalar(look.size ?? 1);
     // Arrows and spears are drawn point up: laid on their side to fly point first.
     if (look.point) sprite.mesh.rotation.z = -Math.PI / 2;
-    if (look.glow) sprite.mesh.material.emissive.setScalar(0.6);
+    if (look.glow) sprite.mesh.material.emissive.setScalar(this.settings.calm ? 0.15 : 0.6);
     const mesh = new THREE.Group().add(sprite.mesh);
     mesh.userData.spell = sprite;
     if (look.glow) {
-      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(SHOT_COLOR[kind]).multiplyScalar(1.2), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(SHOT_COLOR[kind]).multiplyScalar(1.2), transparent: true, opacity: this.settings.calm ? 0.12 : 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
       halo.scale.setScalar(1.2);
       mesh.add(halo);
       mesh.userData.halo = halo;
@@ -1353,7 +1364,9 @@ export class Scene {
       if (s.kind === 'bat') s.mesh.position.y += Math.sin(t * Math.PI * 6) * 0.25;
       (s.mesh.userData.spell as PixelSprite | undefined)?.update(dt);
       (s.mesh.userData.halo as THREE.Sprite | undefined)?.scale.setScalar(1.2 * (0.9 + Math.sin(this.time * 30) * 0.12));
-      if (s.kind === 'fire' || s.kind === 'dark') {
+      if (this.settings.calm) {
+        // (Reduced flashing: no trails.)
+      } else if (s.kind === 'fire' || s.kind === 'dark') {
         // Comet trail of fading copies.
         const tex = spellTextures();
         this.fx.afterimage(s.mesh.position, s.kind === 'fire' ? tex.fire : tex.void, s.kind === 'fire' ? 0xb05a20 : 0x8050c0, s.kind === 'fire' ? 0.55 : 0.5, 0.18);
@@ -1387,6 +1400,11 @@ export class Scene {
     }
     const col = SHOT_COLOR[s.kind];
     const parts = this.settings.particles;
+    if (this.settings.calm) {
+      // Reduced flashing: a few soft sparks in the attack's color, no flash, light or shake.
+      if (parts) this.fx.burst(at, hex(new THREE.Color(col).multiplyScalar(0.55).getHex()), 5, 1.6, 0.05, 6);
+      return;
+    }
     switch (s.kind) {
       case 'bolt':
         // Called down from above onto the target, not zapped across the room.
@@ -1480,7 +1498,7 @@ export class Scene {
 
   /** Visible reaction to being hit: white flash, squash, knocked back, a little hop. */
   private react(v: MonView, force: number) {
-    v.flash = Math.max(v.flash, 0.35 + force);
+    v.flash = Math.max(v.flash, this.settings.calm ? 0.1 + force * 0.2 : 0.35 + force);
     v.squash = Math.max(v.squash, force * 1.4);
     v.knock = Math.max(v.knock, force * (v.boss ? 0.4 : 0.9));
     if (!v.boss && v.hopY <= 0.001) v.hopV = 2 + force * 4;
@@ -2387,7 +2405,8 @@ export class Scene {
     // (A hero still walking in from off screen, newly hired or arriving in a new zone, is let through.)
     const was = p.clone();
     const inView = this.onScreen(was);
-    const allowed = (at: THREE.Vector3) => (!inView || this.onScreen(at)) && at.z >= WALL_Z + 0.9;
+    // (A hero already inside the wall may always step out of it.)
+    const allowed = (at: THREE.Vector3) => (!inView || this.onScreen(at)) && (at.z >= WALL_Z + 0.9 || at.z > was.z);
     const step = this.heroVel.clone().multiplyScalar(dt);
     // Blocked going diagonally into an edge: slide along it instead.
     const tries = [step, new THREE.Vector3(step.x, 0, 0), new THREE.Vector3(0, 0, step.z)];

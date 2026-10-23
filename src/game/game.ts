@@ -187,8 +187,8 @@ export interface Settings {
   muted: boolean;
   music: boolean;
   particles: boolean;
-  /** Show every companion's attacks, or only your hero's. */
-  partyAttacks: boolean;
+  /** Companion attacks without the bright flashes, light bursts and shake. */
+  calm: boolean;
   shake: boolean;
   numbers: boolean;
   notation: 'short' | 'sci';
@@ -296,6 +296,8 @@ export interface SaveState {
   soulBossDone: boolean;
   /** Your first Heartmark has been pointed out. */
   markTipSeen: boolean;
+  /** Auto-buy has been pointed out (after your first ascent). */
+  autoTipSeen: boolean;
   /** Cards you've got (found, traded or dug up) but not yet seen in the binder, as `id:lap:gold`; they slam in when you look. */
   dreamCards: string[];
   /** Trades made with the brothers. */
@@ -347,8 +349,8 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, soulBossDone: false, markTipSeen: false, dreamCards: [], trades: 0, stashes: [], brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
-    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, partyAttacks: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, dreamCards: [], trades: 0, stashes: [], brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
+    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
 
@@ -647,6 +649,8 @@ export class Game {
     // Before Rainbow Hauls, every rainbow goblin caught opened the vault.
     if (s.rainbows === undefined) s.rainbows = s.vaults ?? 0;
     if (s.rainbowSeen === undefined) s.rainbowSeen = (s.rainbows ?? 0) > 0;
+    // Anyone past their second ascent has met auto-buy already.
+    if (s.autoTipSeen === undefined) s.autoTipSeen = (s.descents ?? 0) > 1;
     if (s.soulBossDone === undefined) s.soulBossDone = (s.descents ?? 0) > 0 || (s.bossSouls ?? 0) > 0;
     // Renamed monsters (a card's id is its name): cards and kills pass to the new name. The Rotting Deep's floor-45
     // boss used to be the Bloated Ogre.
@@ -2636,6 +2640,11 @@ export class Game {
     this.s.auto = false;
     this.events.push({ t: 'bossFail', floor: f });
     this.downed = DOWNED_SECONDS;
+  }
+
+  /** Time passing while the fight is paused (the stairs between zones, the title menu): skill cooldowns still run. */
+  passTime(seconds: number) {
+    for (const id in this.s.cooldowns) if ((this.s.cooldowns[id] -= seconds) <= 0) delete this.s.cooldowns[id];
   }
 
   /**

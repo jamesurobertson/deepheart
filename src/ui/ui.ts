@@ -157,12 +157,12 @@ export class Ui {
   private pops: HTMLElement[] = [];
   /** Per monster: when it was last hit and how many hits its streak has run to. */
   private streaks = new Map<number, { at: number; n: number }>();
-  private coins = 0;
   private bars = new Map<number, HTMLElement>();
   /** Gold on the counter, easing toward the real bank. */
   private shown = new Decimal(0);
-  /** Gold banked whose coins are still on their way up to the counter. */
-  private inFlight = new Decimal(0);
+  /** Coins on their way up to the counter: the gold each carries and when it lands. Kept by the clock, not by the
+   *  animation finishing, which a hidden tab can skip, leaving gold counted as in the air for good. */
+  private flights: { share: Decimal; lands: number }[] = [];
   private newsT = 0;
   private newsIdx = -1;
   private modal: string | null = null;
@@ -267,7 +267,7 @@ export class Ui {
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>Stats</span></button>
         <button class="btn dock-b dock-stat blade-rate" data-tip="dock:blade" tabindex="-1">${spriteFit('weapon_knife', 20, 'glyph')}<span>1/s</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu(3)}<span>Options</span></button>
-        <button class="btn icon mute" data-act="mute" data-tip="dock:mute"></button>
+        <button class="btn icon mute" data-act="mute" data-tip="dock:mute" hidden></button>
       </nav>
       <nav class="abilities" aria-label="Abilities"></nav>
       <div class="drops"></div>
@@ -785,6 +785,7 @@ export class Ui {
       case 'buyAll': if (g.buyAllUpgs()) this.hideTip(); break;
       case 'autoUpg':
         g.s.settings.autoUpg = !g.s.settings.autoUpg;
+        g.s.autoTipSeen = true;
         this.refreshTip();
         break;
       case 'sound':
@@ -814,7 +815,7 @@ export class Ui {
         break;
       case 'music':
       case 'particles':
-      case 'partyAttacks':
+      case 'calm':
       case 'shake':
       case 'numbers':
       case 'blood':
@@ -1207,21 +1208,17 @@ export class Ui {
     const target = this.el.bankIco.getBoundingClientRect();
     const tx = target.left + target.width / 2;
     const ty = target.top + target.height / 2;
-    const share = value ? value.div(n) : null;
-    if (value) this.inFlight = this.inFlight.plus(value);
+    const share = value ? value.div(n) : new Decimal(0);
     for (let i = 0; i < n; i++) {
-      if (this.coins >= MAX_COINS) {
-        // Too many in the air already: this one's gold just counts.
-        if (share) this.inFlight = Decimal.max(0, this.inFlight.minus(share));
-        continue;
-      }
-      this.coins++;
+      // Too many in the air already: this one's gold just counts.
+      if (this.flights.length >= MAX_COINS) continue;
       const c = document.createElement('i');
       c.className = 'coin-fly';
       c.innerHTML = sprite('coin', 3);
       c.style.left = `${x}px`;
       c.style.top = `${y}px`;
       this.el.pops.appendChild(c);
+      const duration = 720 + Math.random() * 160;
       const hop = { x: (Math.random() - 0.5) * 30, y: -22 - Math.random() * 14 };
       const bend = { x: x + (tx - x) * 0.35 + (Math.random() - 0.5) * 140, y: y + (ty - y) * 0.35 - 40 - Math.random() * 50 };
       const anim = c.animate([
@@ -1229,11 +1226,10 @@ export class Ui {
         { transform: `translate(calc(-50% + ${hop.x}px), calc(-50% + ${hop.y}px)) scale(1.35)`, offset: 0.16, easing: 'cubic-bezier(.3,0,.6,1)' },
         { transform: `translate(calc(-50% + ${bend.x - x}px), calc(-50% + ${bend.y - y}px)) scale(1.1)`, offset: 0.5, easing: 'cubic-bezier(.5,0,1,.7)' },
         { transform: `translate(calc(-50% + ${tx - x}px), calc(-50% + ${ty - y}px)) scale(0.55)` },
-      ], { duration: 720 + Math.random() * 160, delay: i * 55, easing: 'linear', fill: 'backwards' });
+      ], { duration, delay: i * 55, easing: 'linear', fill: 'backwards' });
+      this.flights.push({ share, lands: performance.now() + i * 55 + duration });
       anim.onfinish = () => {
         c.remove();
-        this.coins--;
-        if (share) this.inFlight = Decimal.max(0, this.inFlight.minus(share));
         this.coinArrived(tx, ty);
       };
     }
@@ -1337,7 +1333,10 @@ export class Ui {
     input.stay = this.mouseStale && !this.keys.size && performance.now() - this.keyedAt < 4000;
     input.idle = performance.now() - this.inputAt > 20_000;
     // Gold still flying up to the bank isn't counted until its coin lands.
-    const bank = Decimal.max(0, g.s.gold.minus(this.inFlight));
+    const now = performance.now();
+    if (this.flights.length) this.flights = this.flights.filter((flight) => flight.lands > now);
+    const inFlight = this.flights.reduce((sum, flight) => sum.plus(flight.share), new Decimal(0));
+    const bank = Decimal.max(0, g.s.gold.minus(inFlight));
     this.shown = bank.lt(this.shown) || bank.minus(this.shown).lt(1) ? bank : this.shown.plus(bank.minus(this.shown).times(Math.min(1, dt * 10)));
     this.el.bank.textContent = fmt(this.shown);
 
@@ -1787,7 +1786,7 @@ export class Ui {
       const cy = r.top + r.height / 2;
       if (by === 'hand') this.sparkle(cx, cy);
       // Leaving a floor banks everything at once: a few coins make the trip, not all of them.
-      if (by !== 'all' || this.coins < 6) this.coinFly(cx, cy, 1, pile.gold.div(pile.coins.length));
+      if (by !== 'all' || this.flights.length < 6) this.coinFly(cx, cy, 1, pile.gold.div(pile.coins.length));
     }
   }
 
@@ -1841,6 +1840,8 @@ export class Ui {
     else if (!g.s.soulBossDone && g.s.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.champ && m.boss)) state = 'champ';
     // Your first Heartmark: pointed out on its companion's row for a few seconds.
     else if (!g.s.markTipSeen && g.marksTotal() > 0) state = 'mark';
+    // After your first ascent: the Auto button that buys back the traits you had.
+    else if (!g.s.autoTipSeen && g.autoUpgOpen() && !this.el.autoUpg.hidden) state = 'auto';
     else if (g.raid && g.s.raids === 0) state = 'raid';
     // Meeting your hero: first on the field, then (once there's someone to switch to) the star that picks one.
     else if (g.s.heroTips === 0 && g.heroIndex() >= 0) state = 'hero';
@@ -1869,6 +1870,9 @@ export class Ui {
       if (shown > 8_000) g.s.bladeSeen = true;
     } else if (state === 'rampage') {
       this.pointAt(this.el.abilities.querySelector('[data-ability="rampage"]'));
+    } else if (state === 'auto') {
+      this.pointAt(this.el.autoUpg);
+      if (this.hintState === 'auto' && performance.now() - this.tourAt > MARK_TIP_MS) g.s.autoTipSeen = true;
     } else if (state === 'mark') {
       const row = this.rows[this.markRow()];
       this.pointAt(row?.querySelector('.marks') ?? row);
@@ -1892,7 +1896,7 @@ export class Ui {
     }
     if (state === this.hintState) return;
     this.hintState = state;
-    const pointing = ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'blade', 'mark'].includes(state);
+    const pointing = ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'blade', 'mark', 'auto'].includes(state);
     this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ';
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero');
@@ -1907,6 +1911,7 @@ export class Ui {
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
             : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it, or press U'}</small></b>`
               : state === 'champ' ? this.champHint()
+              : state === 'auto' ? `<b>Auto-buy<small>Traits you've bought before buy themselves</small></b>`
               : state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
               : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
@@ -2026,7 +2031,7 @@ export class Ui {
     if (kind === 'shop') {
       const text = id === 'next'
         ? 'Hire up to each companion\'s next milestone, where a damage upgrade unlocks.'
-        : `Auto-buy: companion traits you've bought before buy themselves again as soon as you can afford them. ${g.s.settings.autoUpg ? 'On.' : 'Off.'}`;
+        : `Auto-buy traits you've bought before: ${g.s.settings.autoUpg ? 'On' : 'Off'}.`;
       return `<p class="tt-d">${text}</p>`;
     }
     if (kind === 'lvl') {
@@ -2128,6 +2133,9 @@ export class Ui {
     }
     if (kind === 'floor') {
       const mods = g.bossFloor() ? g.bossMods() : [];
+      const champ = g.bossFloor() && g.s.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.boss && m.champ) ? bossSouls(g.s.floor) : 0;
+      const souls = champ ? `<li><em class="mod soul-chip" style="--mc:var(--soul)">${G.soul(1)} ${champ} soul${champ === 1 ? '' : 's'}</em> Champion boss</li>` : '';
+      if (souls) return `<div class="tt-h"><b>Floor ${g.s.floor} boss</b></div><ul class="tt-l">${souls}${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
       if (!mods.length) return `<div class="tt-h"><b>Floor ${g.s.floor}</b><span class="tt-own">${esc(zoneName(g.s.floor))}</span></div><p class="tt-d">${g.bossFloor() ? `Beat the boss before the clock runs out.` : `Kill ${g.killsNeeded()} monsters to clear the floor.`}</p>${g.s.floor < 30 ? '<p class="tt-f">From floor 30, bosses start showing up with modifiers.</p>' : ''}<p class="tt-f">Click the floor number to jump to a floor.</p>`;
       return `<div class="tt-h"><b>Floor ${g.s.floor} boss</b></div><ul class="tt-l">${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
     }
@@ -2246,7 +2254,7 @@ export class Ui {
         <div class="set">
           <label>Effects volume <input type="range" min="0" max="100" value="${Math.round(s.sfxVol * 100)}" data-set="sfxVol"></label>
           <label>Music volume <input type="range" min="0" max="100" value="${Math.round(s.musicVol * 100)}" data-set="musicVol"></label>
-          <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('partyAttacks', s.partyAttacks, 'Companion attacks')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
+          <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('calm', s.calm, 'Reduce flashing')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
           <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button></div>
           <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
           <div class="cursors">${CURSORS.map((c) => {

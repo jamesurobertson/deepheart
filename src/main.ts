@@ -106,7 +106,7 @@ async function boot() {
     sfx.musicOn = s.music;
     sfx.setVolumes(s.sfxVol, s.musicVol);
     scene.settings.particles = s.particles;
-    scene.settings.partyAttacks = s.partyAttacks;
+    scene.settings.calm = s.calm;
     scene.settings.shake = s.shake;
     scene.settings.blood = s.blood;
     scene.settings.cinematics = s.cinematics;
@@ -383,7 +383,7 @@ async function boot() {
     // A long gap while visible means the computer slept.
     if (gap > OFFLINE_AFTER) return catchUp(gap);
     // The zone interlude pauses the fight (nothing is lost; it just waits). The end of the demo stops it for good.
-    if (scene.busy || game.demoOver() || atMenu) return;
+    if (scene.busy || game.demoOver() || atMenu) return game.passTime(gap);
     acc += gap * SPEED * (freeze > 0 ? 0.1 : 1) * timeScale;
     while (acc >= STEP) {
       game.update(STEP);
