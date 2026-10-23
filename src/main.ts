@@ -325,8 +325,6 @@ async function boot() {
     game.bankAllDrops();
     const o = game.applyOffline(seconds);
     flushAway();
-    // The party may have pushed on while you were gone.
-    scene.rebuild(game);
     if (o.gold.gt(0)) ui.showOffline(o);
     save();
   };

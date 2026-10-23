@@ -2576,17 +2576,17 @@ export class Game {
     // Away counts as idle: the Sleeper and the Patient work through it.
     const sleeper = 1 + 0.25 * this.legendLv('sleeper');
     const before = this.events.length;
-    const deepest = this.s.maxFloor;
-    const goldBefore = this.s.runGold;
-    const killsBefore = this.s.kills;
-    const secs = this.pushAway(seconds, sleeper);
-    if (isBossFloor(this.s.floor)) this.enterFloor(Math.max(1, this.s.floor - 1));
-    const f = this.s.floor;
+    const f = isBossFloor(this.s.floor) ? Math.max(1, this.s.floor - 1) : this.s.floor;
     const perSec = Math.min(1 / SPAWN_GAP, this.baseDps().times(sleeper).div(floorHp(f).times(TRASH)).toNumber());
-    const kills = Math.floor(perSec * secs);
-    const farmed = floorGold(f).times(kills * TRASH * this.c.gold * (1 + 0.5 * this.legendLv('patient')));
-    this.earn(farmed);
+    const kills = Math.floor(perSec * seconds);
+    const gold = floorGold(f).times(kills * TRASH * this.c.gold * (1 + 0.5 * this.legendLv('patient')));
+    this.earn(gold);
     this.s.kills += kills;
+    // Kills away count toward the floor you're on: enough of them and it's cleared when you're back.
+    if (f === this.s.floor && this.s.floorKills < this.killsNeeded()) {
+      this.s.floorKills = Math.min(this.killsNeeded(), this.s.floorKills + kills);
+      if (this.s.floorKills >= this.killsNeeded()) this.unlockNext();
+    }
     // Every kill counts toward its monster's card, and rolls for it, as it would have at the keyboard.
     // Every kill's overkill while away: the party's damage per kill against one monster's health.
     const overkill = perSec > 0 ? this.baseDps().times(sleeper).div(floorHp(f).times(TRASH * perSec)).toNumber() : 1;
@@ -2595,46 +2595,7 @@ export class Game {
     this.s.playTime += seconds;
     this.s.runTime += seconds;
     this.checkTrophies();
-    const gold = new Decimal(this.s.runGold).minus(goldBefore);
-    return { seconds, gold, kills: this.s.kills - killsBefore, floor: this.s.maxFloor > deepest ? this.s.maxFloor : undefined, cards };
-  }
-
-  /** Away with auto-advance on, the party pushes on as it would at the keyboard: a floor takes the time its kills need,
-   *  and a boss falls if the party beats its clock. The first boss it can't beat sends it back a floor to farm, with
-   *  auto-advance off (as a lost fight does). Returns the time left to farm. */
-  private pushAway(secs: number, sleeper: number) {
-    const s = this.s;
-    const dps = this.baseDps().times(sleeper);
-    for (let floors = 0; secs > 0 && s.auto && !this.demoOver() && floors < 10_000; floors++) {
-      const f = s.floor;
-      if (!this.bossFloor()) {
-        const perSec = Math.min(1 / SPAWN_GAP, dps.div(floorHp(f).times(TRASH)).toNumber());
-        const need = Math.max(0, this.killsNeeded() - s.floorKills) / perSec;
-        if (!(need <= secs)) return secs;
-        secs -= need;
-        this.sweep();
-      } else {
-        if (!this.monsters.some((m) => m.boss)) this.spawnBoss();
-        const boss = this.monsters.find((m) => m.boss)!;
-        const hit = dps.times(boss.mods.includes('armored') ? 1 - this.armor() : 1);
-        const net = hit.minus(boss.mods.includes('regen') ? boss.max.times(this.regen()) : 0);
-        const need = net.gt(0) ? boss.hp.div(net).toNumber() : Infinity;
-        if (need > this.bossTimeMax) {
-          s.auto = false;
-          this.enterFloor(Math.max(1, f - 1));
-          return secs;
-        }
-        secs -= need;
-        // (A splitting boss takes a few: each half has to die too.)
-        for (let k = 0; k < 8 && s.floor === f; k++) {
-          const half = this.monsters.find((m) => m.boss);
-          if (half) this.kill(half, 'dps');
-        }
-      }
-      this.bankAllDrops();
-      if (s.floor === f) return secs;
-    }
-    return secs;
+    return { seconds, gold, kills, cards };
   }
 
   /** Kills while away, in bulk: each monster takes its share of the floor's mix (as pickMonster picks them), and its
