@@ -1,5 +1,5 @@
 import type { SfxName } from '../audio/sfx.ts';
-import { CARD_BY_ID, ZONES, type CardDef } from '../game/data.ts';
+import { CARD_BY_ID, ZONES, cardName, type CardDef } from '../game/data.ts';
 import { DAN_GIVES, VICTOR_GIVES, type Game } from '../game/game.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import { G, cardArt, charFit } from './px.ts';
@@ -52,7 +52,7 @@ export class TradeMat {
   private el = document.createElement('div');
   /** Card ids on your side of the rug (an id twice is two copies). */
   private side: string[] = [];
-  private result: { id: string; gold: boolean; first: boolean } | null = null;
+  private result: { id: string; gold: boolean; lap: number; first: boolean } | null = null;
   private typing: number | null = null;
 
   constructor(o: TradeOpts) {
@@ -207,7 +207,7 @@ export class TradeMat {
   }
 
   private mini(c: CardDef, attrs: string, extra = '') {
-    return `<button class="tm-card" style="--fc:${CARD_FRAME[c.kind]}" ${attrs} aria-label="${esc(c.name)}">${cardArt(c, 40)}${extra}</button>`;
+    return `<button class="tm-card" style="--fc:${CARD_FRAME[c.kind]}" ${attrs} aria-label="${esc(c.name)}">${cardArt(c, 40, '', c.laps[0])}${extra}</button>`;
   }
 
   /** Redraw the rug, your spares and the buttons (the brother's bubble stays, so his line keeps typing). */
@@ -222,7 +222,7 @@ export class TradeMat {
     const odds = this.odds();
     const r = this.result;
     const his = r
-      ? `<div class="tm-flip${r.gold ? ' gold' : ''}"><div class="tm-big" style="--fc:${r.gold ? CARD_FRAME.gold : CARD_FRAME[CARD_BY_ID.get(r.id)!.kind]}">${cardArt(CARD_BY_ID.get(r.id)!, 64)}<b>${esc(CARD_BY_ID.get(r.id)!.name)}</b></div>${r.first ? '<em class="tm-stamp">NEW!</em>' : ''}</div>`
+      ? `<div class="tm-flip${r.gold ? ' gold' : ''}"><div class="tm-big" style="--fc:${r.gold ? CARD_FRAME.gold : CARD_FRAME[CARD_BY_ID.get(r.id)!.kind]}">${cardArt(CARD_BY_ID.get(r.id)!, 64, '', r.lap)}<b>${esc(cardName(CARD_BY_ID.get(r.id)!.name, r.lap))}</b></div>${r.first ? '<em class="tm-stamp">NEW!</em>' : ''}</div>`
       : `<div class="tm-back">${G.heart(3)}<span>DEEPHEART</span></div>`;
     // Where his card comes from: the sets on your side and their shares (Dan), or any gold card (Victor).
     const pct = (v: number) => `${Math.round(v * 100)}%`;

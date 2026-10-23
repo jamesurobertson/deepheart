@@ -1,7 +1,7 @@
 import { DEMO, DEMO_COMPANIONS, DEMO_FIRST_CARD, DEMO_LAST_FLOOR } from '../demo.ts';
 import Decimal from 'break_infinity.js';
 import {
-  CARD_BY_ID, AWAKEN_MILESTONES, COST_GROWTH, FURY, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, modsFor, pickMonster,
+  CARD_BY_ID, AWAKEN_MILESTONES, COST_GROWTH, FURY, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, featuredFor, modsFor, pickMonster,
   CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, levelMult, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
   LEGENDS, LEGEND_BY_ID, FIRST_OFFER, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost,
   type AbilityId, type MilestoneId, type LegendId,
@@ -87,7 +87,7 @@ const CHAMP_HP = 6;
 const CHAMP_GOLD = 10;
 /** A boss on a floor you've beaten before is now and then a champion (so farming a boss floor has a jackpot):
  *  tougher, more gold, and the only source of gold boss cards. */
-const CHAMP_BOSS_CHANCE = 1 / 150;
+const CHAMP_BOSS_CHANCE = 1 / 20;
 const CHAMP_BOSS_HP = 3;
 const CHAMP_BOSS_GOLD = 10;
 /** Card drops: 1 in this many kills (or catches). A 12-hour absence is ~170k kills, so ordinary cards sit at 0.001%;
@@ -129,7 +129,6 @@ const VAULT_GOBLIN_CHESTS = 0.5;
 const VAULT_RAINBOW_GOBLIN_CHESTS = 6;
 const BASE_CRIT = 0.03;
 const BASE_CRIT_MULT = 2;
-const OFFLINE_CAP = 72 * 3600;
 /** Relics and cursed descents are set aside while the prestige layers are reworked (their code stays). */
 export const RELICS_ON = false;
 export const CURSES_ON = false;
@@ -404,7 +403,8 @@ export type GameEvent =
   | { t: 'awaken'; stones: number }
   | { t: 'heart'; id: string; lv: number }
   /** `src`: dropped by a monster just killed, on a swept floor (no body to drop from), or by a goblin caught. */
-  | { t: 'card'; id: string; gold: boolean; count: number; first: boolean; src: 'kill' | 'sweep' | 'raid'; kill: number };
+  /** `first`: your first copy of the card at all; `newColor`: your first in this lap's color (and gold or not). */
+  | { t: 'card'; id: string; gold: boolean; lap: number; count: number; first: boolean; newColor: boolean; src: 'kill' | 'sweep' | 'raid'; kill: number; copies?: number };
 
 /** Every multiplier behind the damage, crit and gold numbers, kept apart for the stats page. */
 export interface Parts {
@@ -466,8 +466,6 @@ export interface OfflineSummary {
   seconds: number;
   gold: Decimal;
   kills: number;
-  /** Share of full speed: 1 when the tab stayed open, the offline rate when it was closed. */
-  pct: number;
   /** New deepest floor reached while away, if any. */
   floor?: number;
   /** Cards found while away (the same odds as at the keyboard; champions don't turn up, so no gold ones). */
@@ -494,6 +492,15 @@ export const isBossFloor = (f: number) => f % BOSS_EVERY === 0;
 const freshSeed = () => Math.floor(Math.random() * 2 ** 31);
 
 /** A number in [0, 1) fixed by two integers (mulberry32 on their mix): the same draw every time for the same pair. */
+/** A Poisson draw: how many of many rare, independent chances (mean `mean`) come up. */
+function poisson(mean: number) {
+  if (mean > 30) return Math.max(0, Math.round(mean + Math.sqrt(mean) * Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random())));
+  const limit = Math.exp(-mean);
+  let k = 0;
+  for (let p = Math.random(); p > limit; p *= Math.random()) k++;
+  return k;
+}
+
 function seeded(a: number, b: number) {
   let t = (a ^ Math.imul(b + 0x9e3779b9, 0x85ebca6b)) >>> 0;
   t = (t + 0x6d2b79f5) >>> 0;
@@ -613,7 +620,7 @@ export class Game {
     if (s.rainbowSeen === undefined) s.rainbowSeen = (s.rainbows ?? 0) > 0;
     // Renamed monsters (a card's id is its name): cards and kills pass to the new name. The Rotting Deep's floor-45
     // boss used to be the Bloated Ogre.
-    for (const [was, now] of [['bloated-ogre', 'sludge-walker'], ['bone-archer', 'skeleton-archer']]) {
+    for (const [was, now] of [['bloated-ogre', 'sludge-walker'], ['bone-archer', 'skeleton-archer'], ['hooded-bones', 'santa-skeleton']]) {
       const old = s.cards?.[was];
       if (old) {
         const card = (s.cards[now] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
@@ -635,6 +642,14 @@ export class Game {
         delete s.slainLaps[was];
       }
       if (s.dreamCards) s.dreamCards = s.dreamCards.map((key) => (key.startsWith(`${was}:`) ? now + key.slice(was.length) : key));
+    }
+    // Goblin cards used to come in every lap's color; they're plain only now, so later copies move to the plain page.
+    for (const id of [GOBLIN_CARD, RAINBOW_CARD]) {
+      const card = s.cards?.[id];
+      if (!card) continue;
+      card.n = card.n.map((_, lap) => (lap ? 0 : card.n.reduce((a, b) => a + b, 0)));
+      card.gold = card.gold.map((_, lap) => (lap ? 0 : card.gold.reduce((a, b) => a + b, 0)));
+      if (s.dreamCards) s.dreamCards = [...new Set(s.dreamCards.map((key) => (key.startsWith(`${id}:`) ? key.replace(/:\d+:/, ':0:') : key)))];
     }
     // Companion milestone upgrades were renumbered (new levels, no end). The levels both lists share carry over;
     // the old 150/250/300/400 ones are gone.
@@ -730,10 +745,6 @@ export class Game {
   }
 
   /** Share of full speed the party fights at while you're away. */
-  offlineSpeed() {
-    return 0.25;
-  }
-
   /** A reward for how many times you've awakened. */
   /** Auto-buy opens with your first ascent, when there's a whole shop to buy back. */
   autoUpgOpen() {
@@ -1391,7 +1402,7 @@ export class Game {
     return this.dps().times(SWEEP_SECONDS).gte(floorHp(this.s.floor).times(this.floorLeft() * toughest * TRASH));
   }
 
-  /** Testing only (the ?quick button, local and on the playtest site): win this floor as if you'd fought it, the
+  /** Testing only (the ?quick button, local only): win this floor as if you'd fought it, the
    *  monsters left (or its boss) killed for all they'd pay, and go on to the next. */
   devClearFloor() {
     const s = this.s;
@@ -2163,10 +2174,13 @@ export class Game {
     const kill = this.cardKill(id);
     if (first && gold) c.goldAt = kill;
     else if (first) c.at = kill;
-    const lap = Math.min(lapOf(this.s.floor), CORRUPTION.length - 1);
+    const laps = CARD_BY_ID.get(id)!.laps;
+    const here = Math.min(lapOf(this.s.floor), CORRUPTION.length - 1);
+    const lap = laps.includes(here) ? here : laps[0];
+    const newColor = (gold ? c.gold : c.n)[lap] === 0;
     (gold ? c.gold : c.n)[lap]++;
     this.unseen(id, lap, gold);
-    this.events.push({ t: 'card', id, gold, count: this.cardCount(id), first, src, kill });
+    this.events.push({ t: 'card', id, gold, lap, count: this.cardCount(id), first, newColor, src, kill });
   }
 
   private unseen(id: string, lap: number, gold: boolean) {
@@ -2211,12 +2225,22 @@ export class Game {
     return CARDS.filter((c) => this.cardCount(c.id) > 0).length;
   }
 
+  /** Versions of cards you have, each color plain and gold counted apart; and how many there are to find. */
+  cardVersions() {
+    return CARDS.reduce((sum, c) => sum + c.laps.filter((lap) => this.s.cards[c.id]?.n[lap]).length + (c.gold ? c.laps.filter((lap) => this.s.cards[c.id]?.gold[lap]).length : 0), 0);
+  }
+
+  cardVersionsTotal() {
+    return CARDS.reduce((sum, c) => sum + c.laps.length * (c.gold ? 2 : 1), 0);
+  }
+
   // ---------- trading with the brothers ----------
 
-  /** Plain copies beyond the first: the ones you can trade away (gold copies are never traded). */
+  /** Plain copies beyond the first of each color: the ones you can trade away (gold copies are never traded, and a
+   *  trade never takes the last of a color out of the binder). */
   spareCards(id: string) {
     const c = this.s.cards[id];
-    return c ? Math.max(0, c.n.reduce((a, b) => a + b, 0) - 1) : 0;
+    return c ? c.n.reduce((a, n) => a + Math.max(0, n - 1), 0) : 0;
   }
 
   /** The cards a trade can hand over: ones from zones you've reached (and their later-lap newcomers once you've been that deep). */
@@ -2255,7 +2279,7 @@ export class Game {
     return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, spot);
   }
 
-  /** Hand over these copies (an id twice means two copies), taken from whichever lap you have most of. */
+  /** Hand over these copies (an id twice means two copies), taken from whichever color you have most of. */
   private takeSpares(give: string[]) {
     const want = new Map<string, number>();
     for (const id of give) want.set(id, (want.get(id) ?? 0) + 1);
@@ -2290,7 +2314,7 @@ export class Game {
     (gold ? c.gold : c.n)[lap]++;
     this.unseen(id, lap, gold);
     this.checkTrophies();
-    return { id, gold, first };
+    return { id, gold, lap, first };
   }
 
   goldCardsFound() {
@@ -2546,29 +2570,90 @@ export class Game {
    * Buffs, bosses and treasure don't happen while you're gone.
    */
   applyOffline(seconds: number): OfflineSummary {
-    const secs = Math.min(seconds, OFFLINE_CAP);
-    const pct = this.offlineSpeed();
-    this.s.buffs = this.s.buffs.filter((b) => (b.t -= secs) > 0);
-    for (const id in this.s.cooldowns) if ((this.s.cooldowns[id] -= secs) <= 0) delete this.s.cooldowns[id];
+    this.s.buffs = this.s.buffs.filter((b) => (b.t -= seconds) > 0);
+    for (const id in this.s.cooldowns) if ((this.s.cooldowns[id] -= seconds) <= 0) delete this.s.cooldowns[id];
     this.invalidate();
-    const f = isBossFloor(this.s.floor) ? Math.max(1, this.s.floor - 1) : this.s.floor;
     // Away counts as idle: the Sleeper and the Patient work through it.
     const sleeper = 1 + 0.25 * this.legendLv('sleeper');
+    const before = this.events.length;
+    const deepest = this.s.maxFloor;
+    const goldBefore = this.s.runGold;
+    const killsBefore = this.s.kills;
+    const secs = this.pushAway(seconds, sleeper);
+    if (isBossFloor(this.s.floor)) this.enterFloor(Math.max(1, this.s.floor - 1));
+    const f = this.s.floor;
     const perSec = Math.min(1 / SPAWN_GAP, this.baseDps().times(sleeper).div(floorHp(f).times(TRASH)).toNumber());
-    const kills = Math.floor(perSec * secs * pct);
-    const gold = floorGold(f).times(kills * TRASH * this.c.gold * (1 + 0.5 * this.legendLv('patient')));
-    this.earn(gold);
+    const kills = Math.floor(perSec * secs);
+    const farmed = floorGold(f).times(kills * TRASH * this.c.gold * (1 + 0.5 * this.legendLv('patient')));
+    this.earn(farmed);
     this.s.kills += kills;
     // Every kill counts toward its monster's card, and rolls for it, as it would have at the keyboard.
-    const before = this.events.length;
     // Every kill's overkill while away: the party's damage per kill against one monster's health.
     const overkill = perSec > 0 ? this.baseDps().times(sleeper).div(floorHp(f).times(TRASH * perSec)).toNumber() : 1;
-    for (let k = 0; k < kills; k++) this.rollCard(this.slay(pickMonster(f), f), false, 'sweep', false, overkill);
+    this.awayKills(kills, f, overkill);
     const cards = this.events.slice(before).filter((e): e is Extract<GameEvent, { t: 'card' }> => e.t === 'card');
-    this.s.playTime += secs;
-    this.s.runTime += secs;
+    this.s.playTime += seconds;
+    this.s.runTime += seconds;
     this.checkTrophies();
-    return { seconds: secs, gold, kills, pct, cards };
+    const gold = new Decimal(this.s.runGold).minus(goldBefore);
+    return { seconds, gold, kills: this.s.kills - killsBefore, floor: this.s.maxFloor > deepest ? this.s.maxFloor : undefined, cards };
+  }
+
+  /** Away with auto-advance on, the party pushes on as it would at the keyboard: a floor takes the time its kills need,
+   *  and a boss falls if the party beats its clock. The first boss it can't beat sends it back a floor to farm, with
+   *  auto-advance off (as a lost fight does). Returns the time left to farm. */
+  private pushAway(secs: number, sleeper: number) {
+    const s = this.s;
+    const dps = this.baseDps().times(sleeper);
+    for (let floors = 0; secs > 0 && s.auto && !this.demoOver() && floors < 10_000; floors++) {
+      const f = s.floor;
+      if (!this.bossFloor()) {
+        const perSec = Math.min(1 / SPAWN_GAP, dps.div(floorHp(f).times(TRASH)).toNumber());
+        const need = Math.max(0, this.killsNeeded() - s.floorKills) / perSec;
+        if (!(need <= secs)) return secs;
+        secs -= need;
+        this.sweep();
+      } else {
+        if (!this.monsters.some((m) => m.boss)) this.spawnBoss();
+        const boss = this.monsters.find((m) => m.boss)!;
+        const hit = dps.times(boss.mods.includes('armored') ? 1 - this.armor() : 1);
+        const net = hit.minus(boss.mods.includes('regen') ? boss.max.times(this.regen()) : 0);
+        const need = net.gt(0) ? boss.hp.div(net).toNumber() : Infinity;
+        if (need > this.bossTimeMax) {
+          s.auto = false;
+          this.enterFloor(Math.max(1, f - 1));
+          return secs;
+        }
+        secs -= need;
+        // (A splitting boss takes a few: each half has to die too.)
+        for (let k = 0; k < 8 && s.floor === f; k++) {
+          const half = this.monsters.find((m) => m.boss);
+          if (half) this.kill(half, 'dps');
+        }
+      }
+      this.bankAllDrops();
+      if (s.floor === f) return secs;
+    }
+    return secs;
+  }
+
+  /** Kills while away, in bulk: each monster takes its share of the floor's mix (as pickMonster picks them), and its
+   *  card drops as often as that many single rolls would give, drawn at once so a month away loads as fast as a minute. */
+  private awayKills(kills: number, floor: number, overkill: number) {
+    const featured = featuredFor(floor);
+    const band = bandFor(floor);
+    const lap = Math.min(lapOf(floor), CORRUPTION.length - 1);
+    let odds = CARD_ODDS.monster / ((1 + 2 * legendShare(this.legendLv('collector'))) * this.overkillMult(overkill));
+    if (this.debugCards) odds = Math.max(1, odds / 500);
+    for (const def of new Set([featured, ...band])) {
+      const share = (def.name === featured.name ? 0.5 : 0) + (0.5 * band.filter((d) => d.name === def.name).length) / band.length;
+      const n = Math.round(kills * share);
+      if (!n) continue;
+      const id = cardId(def.name);
+      this.s.slain[id] = (this.s.slain[id] ?? 0) + n;
+      if (lap) (this.s.slainLaps[id] ??= CORRUPTION.map(() => 0))[lap] += n;
+      for (let k = poisson(n / odds); k > 0; k--) this.giveCard(id, false, 'sweep');
+    }
   }
 
 }

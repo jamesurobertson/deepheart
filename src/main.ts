@@ -10,7 +10,7 @@ import { FELL_HIT, Scene } from './render/scene.ts';
 import { Ui } from './ui/ui.ts';
 import { setAtlas } from './ui/px.ts';
 import { Sfx, type Track } from './audio/sfx.ts';
-import { CARDS, CORRUPTION, UPGRADES, lapOf, zoneOf } from './game/data.ts';
+import { CARDS, CORRUPTION, LEGENDS, UPGRADES, lapOf, zoneOf } from './game/data.ts';
 import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
 import { TitleMenu } from './ui/menu.ts';
 
@@ -22,7 +22,7 @@ declare global {
 }
 
 const params = new URLSearchParams(location.search);
-// ?slot=name keeps a separate save (handy for testing without touching your run).
+// ?slot=name (dev only) keeps a separate save (handy for testing without touching your run).
 /** Where the site is served from ('./' in builds), so asset URLs work in a subfolder. */
 const BASE = import.meta.env.BASE_URL;
 // ?state=awaken (dev only) plays in its own slot, so the test save never touches yours.
@@ -33,10 +33,14 @@ const PLAYTEST = location.pathname.startsWith('/dev-deepheart/');
 // ?sim=300 (dev only): play from where a nonstop player first reaches floor 300, in its own slot. It's built the first
 // time (the pacing bot plays it out, a few seconds); &fresh builds it again.
 const SIM_FLOOR = import.meta.env.DEV ? Number(params.get('sim')) || 0 : 0;
-// ?quick (dev build and the playtest site only): its own save, with a Next floor button (or N) that wins the floor
+// ?quick (dev only): its own save, with a Next floor button (or N) that wins the floor
 // you're on for everything it'd pay; &fresh starts it over.
-const QUICK = (import.meta.env.DEV || PLAYTEST) && params.has('quick');
-const SLOT = params.get('slot') ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (SIM_FLOOR ? `sim-${SIM_FLOOR}` : null) ?? (QUICK ? 'quick' : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
+const QUICK = import.meta.env.DEV && params.has('quick');
+// ?timeaway=100&floor=50 (dev only): your own save comes back from 100 hours away on floor 50 (or the floor you're on;
+// never past your deepest), and keeps it: every refresh pays another 100 hours.
+const AWAY_HOURS = import.meta.env.DEV ? Number(params.get('timeaway')) || 0 : 0;
+const AWAY_FLOOR = Number(params.get('floor') ?? params.get('level')) || 0;
+const SLOT = (import.meta.env.DEV ? params.get('slot') : null) ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (SIM_FLOOR ? `sim-${SIM_FLOOR}` : null) ?? (QUICK ? 'quick' : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
 const SAVE_KEY = 'deepheart-save' + (SLOT ? `:${SLOT}` : '');
 // The game opens on its main menu once a visit: a refresh after you've started playing (or the menu's own New Game,
 // which wipes the save and reloads) goes straight back in, as do test runs (?slot=, ?state=) and ?menu=0. Closing the
@@ -49,9 +53,9 @@ const inGame = () => {
     return false;
   }
 };
-const SKIP_MENU = params.get('menu') === '0' || (import.meta.env.DEV && (params.has('slot') || !!TEST_STATE || !!SIM_FLOOR)) || QUICK || inGame();
+const SKIP_MENU = (import.meta.env.DEV && (params.get('menu') === '0' || params.has('slot') || !!TEST_STATE || !!SIM_FLOOR || !!AWAY_HOURS)) || QUICK || inGame();
 const STEP = 1 / 30;
-/** Away (tab hidden or closed) longer than this counts as offline: paid at the offline rate, with a summary. Shorter is played out at full speed. */
+/** Away (tab hidden or closed) longer than this is paid in one go, with a summary. Shorter is played out frame by frame. */
 const OFFLINE_AFTER = 60;
 // ?speed=10 runs the sim faster for playtesting (dev build only).
 const SPEED = import.meta.env.DEV ? Math.max(1, Number(params.get('speed')) || 1) : 1;
@@ -192,6 +196,10 @@ async function boot() {
       game.goFloor(deepest);
       scene.rebuild(game);
     }
+    if (AWAY_HOURS && AWAY_FLOOR) {
+      game.goFloor(Math.min(AWAY_FLOOR, game.s.maxFloor));
+      scene.rebuild(game);
+    }
     // ?state=lv1000: every companion at level 1000 with every trait, on the deepest floor that party clears in about 20s.
     if (TEST_STATE === 'lv1000') {
       const s = game.s;
@@ -205,6 +213,24 @@ async function boot() {
       Object.assign(s, { maxFloor: f, bestFloor: Math.max(s.bestFloor, f), bestCleared: Math.max(s.bestCleared, f - 1), auto: false, revealed: s.owned.length });
       game.goFloor(f);
       scene.rebuild(game);
+    }
+    // ?state=all: every card in every color (gold too, where there is one) and every Legend at level 25 (or its max),
+    // a few ascents in at floor 200. Rebuilt on every load.
+    if (TEST_STATE === 'all') {
+      const s = game.s;
+      s.cards = {};
+      for (const c of CARDS) {
+        const n = CORRUPTION.map((_, lap) => (c.laps.includes(lap) ? 1 : 0));
+        s.cards[c.id] = { n, gold: c.gold ? [...n] : CORRUPTION.map(() => 0), at: Date.now() };
+      }
+      s.legends = Object.fromEntries(LEGENDS.map((d) => [d.id, Math.min(25, d.maxLv ?? 25)]));
+      s.legendOffer = [];
+      Object.assign(s, { descents: 5, souls: 5000, maxFloor: 200, bestFloor: Math.max(s.bestFloor, 200), bestCleared: Math.max(s.bestCleared, 199), auto: true });
+      s.owned = s.owned.map((n) => Math.max(n, 900));
+      game.invalidate();
+      game.goFloor(200);
+      scene.rebuild(game);
+      save();
     }
     // ?state=awaken: deep enough to Awaken for the first time, with a binder full of cards (lots of spares to trade,
     // a few gold, a handful new since you last woke), or none with &cards=0. ?state=reawaken: the same, having awakened once already.
@@ -280,7 +306,7 @@ async function boot() {
   const dream = import.meta.env.DEV ? params.get('dream') : null;
   if (dream) ui.playDream(dream === 'first');
 
-  /** Time away: short breaks play out at full speed; longer ones pay the offline rate and say so. */
+  /** Time away: short breaks play out frame by frame; longer ones are paid in one go and say so. */
   /** Drop what happened while away, except gold being banked: coins still lying on screen have to fly up. */
   const flushAway = () => {
     const banked = game.events.filter((ev) => ev.t === 'bank');
@@ -299,6 +325,8 @@ async function boot() {
     game.bankAllDrops();
     const o = game.applyOffline(seconds);
     flushAway();
+    // The party may have pushed on while you were gone.
+    scene.rebuild(game);
     if (o.gold.gt(0)) ui.showOffline(o);
     save();
   };
@@ -318,6 +346,7 @@ async function boot() {
       const gone = (Date.now() - saved.lastSave) / 1000;
       if (gone > 5) catchUp(gone);
     }
+    if (AWAY_HOURS) catchUp(AWAY_HOURS * 3600);
     if (game.demoOver()) ui.showDemoEnd();
   };
 

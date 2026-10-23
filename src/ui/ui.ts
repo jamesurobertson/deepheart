@@ -1,4 +1,4 @@
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, FIRST_OFFER, OFFER_SIZE, RESPEC_REFUND, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TUNE, bossSouls, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -307,7 +307,7 @@ export class Ui {
         <span class="gen-ico">${charFit(c.sprite, 40)}</span>
         <span class="gen-mid"><b class="gen-name"></b><span class="gen-cost"></span><span class="traits"></span></span>
         <span class="gen-right"><b class="gen-lv"></b><small class="gen-dps"></small></span>
-        <span class="gen-hero" data-hero="${i}" data-tip="hero:${i}">${G.star()}</span>`;
+        <span class="gen-hero" data-hero="${i}" data-tip="hero:${i}">${G.heroStar()}</span>`;
       this.el.gens.appendChild(row);
       this.rows.push(row);
       this.rowCache.push('');
@@ -1349,7 +1349,9 @@ export class Ui {
       if (!bar) {
         bar = document.createElement('div');
         bar.className = `hp ${m.boss ? 'boss' : ''}`;
-        bar.innerHTML = `<i></i>${m.mods.length ? `<span class="hp-mods">${modChips(m.mods)}</span>` : ''}`;
+        const souls = m.boss && m.champ && g.s.floor >= TUNE.goldBossFrom && g.s.goldBosses[g.s.floor] ? bossSouls(g.s.floor) : 0;
+        const chips = (souls ? `<em class="mod soul-chip" style="--mc:var(--soul)">${G.soul(1)} ${souls} soul${souls === 1 ? '' : 's'}</em>` : '') + modChips(m.mods);
+        bar.innerHTML = `<i></i>${chips ? `<span class="hp-mods">${chips}</span>` : ''}`;
         this.el.bars.appendChild(bar);
         this.bars.set(m.id, bar);
       }
@@ -1466,7 +1468,8 @@ export class Ui {
       this.floorKey = key;
       this.el.floorN.textContent = `Floor ${s.floor}`;
       const mods = boss ? g.bossMods() : [];
-      if (mods.length) this.el.floorSub.innerHTML = `Boss ${modChips(mods)}`;
+      // Two tags fit; the rest show as a count (hover for them all).
+      if (mods.length) this.el.floorSub.innerHTML = `Boss ${modChips(mods.slice(0, mods.length > 2 ? 1 : 2))}${mods.length > 2 ? `<em class="mod more" style="--mc:var(--dim)">+${mods.length - 1}</em>` : ''}`;
       else this.el.floorSub.textContent = boss ? 'Boss' : zoneName(s.floor).replace(/^The /, '');
       this.el.floorBox.classList.toggle('is-boss', boss);
       (this.el.down as HTMLButtonElement).disabled = s.floor <= 1;
@@ -1891,7 +1894,7 @@ export class Ui {
             : state === 'rampage' ? `<b>Rampage is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
             : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it, or press U'}</small></b>`
-              : state === 'champ' ? `<b>A champion!<small>Tougher and drops gold cards!</small></b>`
+              : state === 'champ' ? this.champHint()
               : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
@@ -1917,6 +1920,17 @@ export class Ui {
     this.el.hint.classList.toggle('point-down', above);
     if (rect) this.el.hint.style.transform = above ? `translate(${rect.left + rect.width / 2}px, ${rect.top - 6}px)` : `translate(${rect.left - 12}px, ${rect.top + rect.height / 2}px)`;
     this.el.hint.style.visibility = visible ? 'visible' : 'hidden';
+  }
+
+  /** The first champion's hint: a champion boss from floor 100 also pays souls. */
+  private champHint() {
+    const g = this.game;
+    const champ = g.monsters.find((m) => m.champ);
+    if (champ?.boss && g.s.floor >= TUNE.goldBossFrom) {
+      const n = bossSouls(g.s.floor);
+      return `<b>A champion boss!<small>Beat it for ${n} soul${n === 1 ? '' : 's'}. It might drop a gold card.</small></b>`;
+    }
+    return champ?.boss ? '<b>A champion boss!<small>Tougher, and it might drop a gold card</small></b>' : '<b>A champion!<small>Tougher and drops gold cards!</small></b>';
   }
 
   /** Who the star tip suggests trying as your hero: the first companion you have who isn't your hero already. */
@@ -2070,6 +2084,7 @@ export class Ui {
       if (!lv) return `${head}<p class="tt-f">Not found yet. ${d.rarity === 3 ? 'Legendary relics mostly turn up deep down.' : 'Keep killing bosses.'}</p>`;
       return `${head}<p class="tt-d">${esc(relicText(d, lv))}</p><p class="tt-gain">Next level: ${esc(relicText(d, lv + 1))}</p><p class="tt-f">“${esc(d.flavor)}”</p>`;
     }
+    if (kind === 'note') return `<p class="tt-d">${esc(key.slice(5))}</p>`;
     if (kind === 'souls') {
       return `<div class="tt-h"><b>How souls work</b></div>
         <p class="tt-d">You get them when you ascend:</p>
@@ -2121,9 +2136,9 @@ export class Ui {
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it.'}</p>`;
     if (kind === 'dock') {
       const text: Record<string, string> = {
-        trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length} (each gives +1% damage) and ${g.cardsFound()} monster card${g.cardsFound() === 1 ? '' : 's'}.`,
+        trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length}. Cards ${g.cardVersions()}/${g.cardVersionsTotal()}.`,
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
-        abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at the floor ${g.ascendFloor()} boss.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
+        abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${g.ascendFloor()}.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
         stats: 'Your numbers, and where every bonus comes from.',
         room: 'Your room: the binder, and Dan and Victor to trade with.',
         settings: 'Sound, visuals and saves.',
@@ -2253,7 +2268,7 @@ export class Ui {
         ${mult > 1 ? `<div class="as-row"><span>Soul bonus</span><b>×${+mult.toFixed(2)}</b></div>` : ''}
       </div>`;
     if (!g.descendOpen()) {
-      return `${activeLine}<div class="ascend">${rows}<div class="as-go locked"><small>The way up opens at the floor ${g.ascendFloor()} boss</small>
+      return `${activeLine}<div class="ascend">${rows}<div class="as-go locked"><small>The way up opens at floor ${g.ascendFloor()}</small>
         <span class="as-floor">Floor ${fmt(g.s.maxFloor)} / ${g.ascendFloor()}</span>
         <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / g.ascendFloor()) * 100)}%"></i></div></div></div>`;
     }
@@ -2273,7 +2288,8 @@ export class Ui {
     const offer = g.legendOffer();
     if (!g.legendsOpen()) {
       const stirring = g.canDescend();
-      const peds = offer.map((id) => {
+      // No offer is rolled until Legends open; the first one always holds these three.
+      const peds = FIRST_OFFER.map((id) => {
         const d = LEGEND_BY_ID.get(id)!;
         const fig = stirring ? charFit(d.sprite, 84, 92) : silhouette(d.sprite, 84, '#0b0710');
         return `<div class="pedestal shade${stirring ? ' stirring' : ''}"><span class="spirit">${WISPS}</span><span class="ped-fig">${fig}</span><span class="ped-stone"></span></div>`;
@@ -2499,73 +2515,81 @@ export class Ui {
     const p = b.parts;
     const x = (v: number | Decimal) => (new Decimal(v).gte(1000) ? `×${fmt(v)}` : `×${Math.round(new Decimal(v).toNumber() * 100) / 100}`);
     const pc = (v: number) => `${Math.round(v * 1000) / 10}%`;
-    const row = (label: string, value: string, note = '', off = false) => `<tr class="${off ? 'off' : ''}"><th>${label}${note ? `<small>${note}</small>` : ''}</th><td>${value}</td></tr>`;
-    const mul = (label: string, v: number | Decimal, note: string, how = '') => {
+    // A row is a label and a value; how it's made up shows on hover. Sources doing nothing yet (×1, or locked) gather
+    // in one faint line under their panel.
+    type Row = { label: string; value: string; note?: string; off?: boolean };
+    const row = (label: string, value: string, note = '', off = false): Row => ({ label, value, note, off });
+    const mul = (label: string, v: number | Decimal, note: string, how = ''): Row => {
       const one = new Decimal(v).eq(1);
       return row(label, x(v), one && how ? how : note, one);
     };
-    const total = (label: string, value: string) => `<tr class="tot"><th>${label}</th><td>${value}</td></tr>`;
-    const table = (title: string, rows: string) => `<section class="bd"><h3>${title}</h3><table>${rows}</table></section>`;
+    const panel = (title: string, big: string, unit: string, rows: (Row | null)[], bigNote = '') => {
+      const live = rows.filter((r): r is Row => !!r && !r.off);
+      const idle = rows.filter((r): r is Row => !!r && !!r.off);
+      const tr = (r: Row) => `<tr${r.note ? ` data-tip="note:${esc(r.note)}"` : ''}><th>${r.label}</th><td>${r.value}</td></tr>`;
+      return `<section class="st"><header><h3>${title}</h3><b${bigNote ? ` data-tip="note:${esc(bigNote)}"` : ''}>${big}${unit ? `<small>${unit}</small>` : ''}</b></header>
+        <table>${live.map(tr).join('')}</table>
+        ${idle.length ? `<p class="st-off">Not active: ${idle.map((r) => `<span${r.note ? ` data-tip="note:${esc(r.note)}"` : ''}>${r.label}</span>`).join(' · ')}</p>` : ''}</section>`;
+    };
     const relicName = (id: string) => RELIC_BY_ID.get(id)!.name;
-    // Relic rows only while relics are in the game.
-    const relicMul = (label: string, v: number | Decimal, note: string, how = '') => (RELICS_ON ? mul(label, v, note, how) : '');
+    const relicMul = (label: string, v: number | Decimal, note: string, how = '') => (RELICS_ON ? mul(label, v, note, how) : null);
     const baseSum = b.baseComp.reduce((a, v) => a + v, 0);
     const buffNames = (k: 'dps' | 'click' | 'gold') => g.s.buffs.filter((u) => u[k] > 1).map((u) => `${u.name} ×${u[k]}`).join(', ');
-    const allRows = (lead: string) =>
-      mul(`${lead}Trophies`, p.trophies, `${g.s.trophies.length} trophies`) +
-      mul(`${lead}Souls`, p.souls, `${fmt(g.soulsFree())} kept, ${soulPct(1)} each${g.legendLv('hungry') ? ` + the Hungry Dark ${g.legendLv('hungry')}` : ''}`, 'Ascend to earn souls') +
-      relicMul(`${lead}${relicName('shard')}`, p.shard, 'Legendary relic', 'A legendary relic') +
-      mul(`${lead}Heart of Fury`, p.fury, `level ${g.heartLv('fury')}`, 'A Heart power (awaken the Heart)');
+    const allRows = [
+      mul('Trophies', p.trophies, `${g.s.trophies.length} trophies`),
+      mul('Souls', p.souls, `${fmt(g.soulsFree())} kept, ${soulPct(1)} each${g.legendLv('hungry') ? ` + the Hungry Dark ${g.legendLv('hungry')}` : ''}`, 'Ascend to earn souls'),
+      relicMul(relicName('shard'), p.shard, 'Legendary relic', 'A legendary relic'),
+      ...(AWAKEN_ON ? [mul('Heart of Fury', p.fury, `level ${g.heartLv('fury')}`, 'A Heart power')] : []),
+    ];
 
-    const dps = table('Party damage per second',
-      row('Companions', fmt(baseSum), 'levels × traits × Heartmarks (see Companions)') +
-      allRows('') +
-      relicMul(relicName('banner'), p.banner, 'Relic', 'A relic') +
-      mul('Party traits', p.party, 'companion traits that lift everyone', 'Some companion traits lift everyone') +
-      mul('Buffs right now', b.buffDps, buffNames('dps'), 'Rampage, Bloodlust…') +
-      total('Damage per second', fmt(g.dps())));
+    const dps = panel('Party damage', fmt(g.dps()), '/sec', [
+      row('Companions', fmt(baseSum), 'levels × traits × Heartmarks'),
+      ...allRows,
+      relicMul(relicName('banner'), p.banner, 'Relic', 'A relic'),
+      mul('Party traits', p.party, 'companion traits that lift everyone', 'Some companion traits lift everyone'),
+      mul('Buffs', b.buffDps, buffNames('dps'), 'Rampage, Bloodlust'),
+    ]);
 
-    const click = table('Click damage',
-      row('Base', '1') +
-      relicMul(relicName('whet'), p.whet, 'Relic', 'A relic') +
-      row('All-damage bonuses', x(b.all), 'the same trophies, souls and fury as above') +
-      row('+ Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion traits` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`) +
-      mul('The Fist', 1 + 0.2 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Legend') +
-      mul('Buffs right now', b.buffClick, buffNames('click'), 'Frenzy…') +
-      total('Per click', fmt(g.clickDamage())) +
-      row('During Rampage', x(g.feverMult()), "your party's damage while a Rampage runs"));
+    const click = panel('Click damage', fmt(g.clickDamage()), '/click', [
+      row('Base', '1'),
+      relicMul(relicName('whet'), p.whet, 'Relic', 'A relic'),
+      row('All-damage bonuses', x(b.all), 'trophies, souls and fury'),
+      row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion traits` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`),
+      mul('The Fist', 1 + 0.2 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Legend'),
+      mul('Buffs', b.buffClick, buffNames('click'), 'Frenzy'),
+      row('During Rampage', x(g.feverMult())),
+    ]);
 
-    const crit = table('Critical hits',
-      row('Chance', pc(g.critChance()), g.abilityUnlocked('crit') ? `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} companions` : ''}${p.critRelic ? ` + ${pc(p.critRelic)} ${relicName('hawk')}` : ''}` : `locked: unlocked by the ${COMPS[ABILITY_BY_ID.get('crit')!.comp].name}`, !g.abilityUnlocked('crit')) +
-      row('Damage', x(g.critMult()), `×${p.critMultBase} base${p.critMultUpg ? ` + ${p.critMultUpg} companions` : ''}${p.critMultRelic > 1 ? ` × ${p.critMultRelic} ${relicName('razor')}` : ''}`) +
-      row('Cleave', g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? `clicks also hit every other monster: 10% base${p.cleaveRelic ? ` + ${pc(p.cleaveRelic)} ${relicName('cleaver')}` : ''}${p.cleaveUpg > 1 ? `, ${x(p.cleaveUpg)} from upgrades` : ''}` : g.abilityUnlocked('cleave') ? 'only while the Cleave skill runs' : `locked: unlocked by the ${COMPS[ABILITY_BY_ID.get('cleave')!.comp].name}`, !g.cleave()));
+    const critNote = g.abilityUnlocked('crit') ? `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} companions` : ''}${p.critRelic ? ` + ${pc(p.critRelic)} ${relicName('hawk')}` : ''}` : `Unlocked by the ${COMPS[ABILITY_BY_ID.get('crit')!.comp].name}`;
+    const crit = panel('Critical hits', g.abilityUnlocked('crit') ? pc(g.critChance()) : '—', g.abilityUnlocked('crit') ? 'chance' : '', [
+      row('Damage', x(g.critMult()), `×${p.critMultBase} base${p.critMultUpg ? ` + ${p.critMultUpg} companions` : ''}${p.critMultRelic > 1 ? ` × ${p.critMultRelic} ${relicName('razor')}` : ''}`),
+      row('Cleave', g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? `10% base${p.cleaveRelic ? ` + ${pc(p.cleaveRelic)} ${relicName('cleaver')}` : ''}${p.cleaveUpg > 1 ? `, ${x(p.cleaveUpg)} from upgrades` : ''}` : g.abilityUnlocked('cleave') ? 'While the Cleave skill runs' : `Unlocked by the ${COMPS[ABILITY_BY_ID.get('cleave')!.comp].name}`, !g.cleave()),
+    ], critNote);
 
-    const goldT = table('Gold',
-      mul('Companion traits', p.goldUpg, 'gold traits', 'Some companion traits add gold') +
-      mul('The Hoard', 1 + 0.05 * g.legendLv('hoard'), `level ${g.legendLv('hoard')}`, 'A Legend') +
-      relicMul(relicName('purse'), p.goldRelic, 'Relic', 'A relic') +
-      mul('Buffs right now', b.buffGold, buffNames('gold'), 'Gold Rush') +
-      total('Gold from monsters', x(g.goldMult())));
+    const goldT = panel('Gold', x(g.goldMult()), '', [
+      mul('Companion traits', p.goldUpg, 'gold traits', 'Some companion traits add gold'),
+      mul('The Hoard', 1 + 0.05 * g.legendLv('hoard'), `level ${g.legendLv('hoard')}`, 'A Legend'),
+      relicMul(relicName('purse'), p.goldRelic, 'Relic', 'A relic'),
+      mul('Buffs', b.buffGold, buffNames('gold'), 'Gold Rush'),
+    ]);
 
     const baseTime = 30;
     const glass = Math.min(30, 3 * g.relic('time')) + Math.round(g.bossTimeBonus());
-    const boss = table('Bosses',
-      mul('Damage to bosses', p.boss, 'companion traits', 'Some companion traits hit bosses harder') +
-      relicMul(`Damage to bosses (${relicName('slayer')})`, 1 + g.relic('boss'), 'Relic', 'A relic') +
-      row('Time to beat a boss', `${baseTime + glass}s`, `${baseTime}s${glass ? ` + ${glass}s` : ''} · Enraged halves it, Giant adds half`) +
-      row('Armored blocks', pc(g.armor()), `of companion damage${g.relic('pierce') ? ` (${relicName('pick')} helps)` : ''}`) +
-      row('Regenerating heals', `${pc(g.regen())}/s`, g.relic('rot') ? `${relicName('rot')} helps` : 'of its health') +
-      row('Modifier strength', pc(g.modBite()), 'how hard Armored and Regenerating bite'));
+    const boss = panel('Bosses', `${baseTime + glass}s`, 'timer', [
+      mul('Damage to bosses', p.boss, 'companion traits', 'Some companion traits hit bosses harder'),
+      relicMul(`Damage to bosses (${relicName('slayer')})`, 1 + g.relic('boss'), 'Relic', 'A relic'),
+      row('Armored blocks', pc(g.armor()), `of companion damage${g.relic('pierce') ? ` (${relicName('pick')} helps)` : ''}`),
+      row('Regenerating heals', `${pc(g.regen())}/s`, g.relic('rot') ? `${relicName('rot')} helps` : 'of its health'),
+      row('Modifier strength', pc(g.modBite()), 'how hard Armored and Regenerating bite'),
+    ]);
 
-    const offline = g.offlineSpeed();
-    const souls = table('Souls and the Heart',
-      row('Souls', fmt(g.s.souls), `${fmt(g.soulsFree())} unspent`) +
-      row('An ascent now pays', fmt(g.pendingSouls()), `${fmt(Math.floor(g.runLevels() / TUNE.levelsPerSoul))} from levels, ${fmt(g.s.bossSouls)} from champion bosses`) +
-      mul('Soul gain', g.soulGainMult(), `${g.relic('souls') ? `${relicName('cage')} ` : ''}${g.heartLv('siphon') ? `Soul Siphon ${g.heartLv('siphon')}` : ''}`.trim(), 'Soul Siphon (Heart)') +
-      row('Heartstones', fmt(g.s.stones), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`) +
-      row('Speed while away', pc(offline), 'of full speed'));
-
-    return `<div class="bd-grid">${dps}${click}${crit}${goldT}${boss}${souls}</div>`;
+    const souls = panel('Souls', fmt(g.s.souls), '', [
+      row('Unspent', fmt(g.soulsFree())),
+      row('An ascent now pays', fmt(g.pendingSouls()), `${fmt(Math.floor(g.runLevels() / TUNE.levelsPerSoul))} from levels, ${fmt(g.s.bossSouls)} from champion bosses`),
+      mul('Soul gain', g.soulGainMult(), `${g.relic('souls') ? `${relicName('cage')} ` : ''}${g.heartLv('siphon') ? `Soul Siphon ${g.heartLv('siphon')}` : ''}`.trim(), 'Soul Siphon'),
+      ...(AWAKEN_ON ? [row('Heartstones', fmt(g.s.stones), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`)] : []),
+    ]);
+    return `<div class="st-grid">${dps}${click}${crit}${goldT}${boss}${souls}</div>`;
   }
 
   private partyHtml(): string {
@@ -2701,7 +2725,7 @@ export class Ui {
   }
 
   private showCard(ev: Extract<Drop, { t: 'card' }>) {
-    if (this.modal !== 'cards' && ev.first) this.newCards++;
+    if (this.modal !== 'cards' && ev.newColor) this.newCards++;
     this.cardQueue.push(ev);
     if (this.cardQueue.length === 1) this.revealCard();
   }
@@ -2713,7 +2737,7 @@ export class Ui {
     if (!ev) return;
     const d = CARD_BY_ID.get(ev.id)!;
     const el = document.createElement('div');
-    el.className = `card-reveal${ev.gold ? ' gold' : ''}${ev.first || ev.gold ? '' : ' dupe'}`;
+    el.className = `card-reveal${ev.gold ? ' gold' : ''}${ev.newColor || ev.gold ? '' : ' dupe'}`;
     el.style.setProperty('--rc', ev.gold ? CARD_FRAME.gold : CARD_FRAME[d.kind]);
     const mid = this.scene.centerScreen();
     el.style.left = `${mid.x}px`;
@@ -2722,11 +2746,11 @@ export class Ui {
     const to = dock.getBoundingClientRect();
     el.style.setProperty('--tx', `${to.left + to.width / 2 - mid.x}px`);
     el.style.setProperty('--ty', `${to.top + to.height / 2 - mid.y}px`);
-    const head = ev.gold ? (ev.first ? 'New gold card!' : 'Gold card!') : ev.first ? 'New card!' : 'Card';
+    const head = ev.gold ? (ev.newColor ? 'New gold card!' : 'Gold card!') : ev.newColor ? 'New card!' : 'Card';
     const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
-      <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96)}</div></div></div>
-      <div class="cr-text"><small>${head}</small><b>${esc(d.name)} Card</b>${line}<span class="cr-tap">${this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
+      <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96, ev.lap)}</div></div></div>
+      <div class="cr-text"><small>${head}</small><b>${esc(cardName(d.name, ev.lap))} Card${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
     this.el.loot.parentElement!.appendChild(el);
     // The sound lands with the flip.
     setTimeout(() => this.hooks.sound(ev.gold || d.kind !== 'monster' ? 'drop4' : 'drop3', { vol: 0.8 }), 380);
@@ -3032,32 +3056,42 @@ export class Ui {
     this.modal = 'offline';
     this.el.modalWrap.hidden = false;
     this.el.modal.className = 'modal pnl m-offline';
-    const pace = o.pct < 1 ? ` at ${Math.round(o.pct * 100)}% speed` : '';
     const kills = `${fmt(o.kills)} monster${o.kills === 1 ? '' : 's'}`;
     this.el.modal.innerHTML = `<header class="m-head"><h2>Welcome back</h2></header>
       <div class="offline">
         <p>You were away for <b>${duration(o.seconds)}</b>.</p>
-        <p>Your party kept fighting${pace}, killed <b>${kills}</b>${o.floor ? ` and reached <b>floor ${o.floor}</b>` : ''}, and looted</p>
+        <p>Your party kept fighting, killed <b>${kills}</b>${o.floor ? ` and reached <b>floor ${o.floor}</b>` : ''}, and looted</p>
         <div class="offline-v">${sprite('coin', 5)}<b>${fmt(o.gold)}</b></div>
         <p class="muted">gold</p>
         ${o.cards.length ? `<p>and found <b>${o.cards.length === 1 ? 'a card' : `${o.cards.length} cards`}</b></p><div class="offline-cards">${this.offlineCardsHtml(o.cards)}</div>` : ''}
         <button class="btn primary big" data-act="close">Collect</button>
       </div>`;
-    // Collecting plays the reveal for each card that's new to you (repeats are just counted here).
-    this.offlineCards = o.cards.filter((c) => c.first);
+    // Collecting spins each card once, with how many came.
+    this.offlineCards = this.groupCards(o.cards);
   }
 
-  /** Cards found while away, one per kind with how many came, new ones first. */
-  private offlineCardsHtml(cards: Extract<Drop, { t: 'card' }>[]) {
-    const groups = new Map<string, { n: number; first: boolean }>();
-    for (const c of cards) {
-      const group = groups.get(c.id) ?? { n: 0, first: false };
-      group.n++;
-      group.first ||= c.first;
-      groups.set(c.id, group);
+  /** Cards found while away as one per card, color and gold-or-not, carrying how many came; new ones first. */
+  private groupCards(cards: Extract<Drop, { t: 'card' }>[]) {
+    const groups = new Map<string, (typeof cards)[number]>();
+    for (const card of cards) {
+      const key = `${card.id}:${card.lap}:${card.gold}`;
+      const group = groups.get(key);
+      if (!group) groups.set(key, { ...card, copies: 1 });
+      else {
+        group.copies = (group.copies ?? 1) + 1;
+        group.first ||= card.first;
+        group.newColor ||= card.newColor;
+        group.kill = Math.min(group.kill, card.kill);
+      }
     }
-    return [...groups].sort((a, b) => Number(b[1].first) - Number(a[1].first)).map(([id, { n, first }]) =>
-      `<span class="oc${first ? ' new' : ''}">${cardFace(CARD_BY_ID.get(id)!, 'got', false, 32)}${n > 1 ? `<b class="oc-n">×${n}</b>` : ''}${first ? '<em class="oc-new">New</em>' : ''}</span>`).join('');
+    return [...groups.values()].sort((a, b) => Number(b.newColor) - Number(a.newColor));
+  }
+
+  private offlineCardsHtml(cards: Extract<Drop, { t: 'card' }>[]) {
+    return this.groupCards(cards).map((card) => {
+      const n = card.copies ?? 1;
+      return `<span class="oc${card.newColor ? ' new' : ''}">${cardFace(CARD_BY_ID.get(card.id)!, 'got', card.gold, 32, card.lap)}${n > 1 ? `<b class="oc-n">×${n}</b>` : ''}${card.newColor ? '<em class="oc-new">New</em>' : ''}</span>`;
+    }).join('');
   }
 
 }

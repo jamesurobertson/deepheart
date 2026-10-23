@@ -122,7 +122,7 @@ export const ZONES: ZoneDef[] = [
     name: 'The Bone Crypts', tiles: 'crypt',
     band: [m('skelet', 'Skeleton'), m('tiny_zombie', 'Rotling'), m('skelet', 'Skeleton Archer', 0.9, 0xe8d49a), m('necromancer', 'Grave Priest', 0.9), m('rm_zombie', 'Ghoul', 1.1)],
     mid: m('ef_golem', 'Bone Golem', 1, 0xd8d0c0), boss: m('necromancer', 'The Lich', 1, 0xb0a0ff),
-    lap: [m('cr_skeleton', 'Grave Walker'), m('cr_blue_wraith', 'Pale Wraith'), m('cr_frost_skeleton', 'Hooded Bones', 0.9, 0xd0c8ff)],
+    lap: [m('cr_skeleton', 'Grave Walker'), m('cr_blue_wraith', 'Pale Wraith'), m('cr_frost_skeleton', 'Santa Skeleton', 0.9, 0xd0c8ff)],
   },
   {
     name: 'The Overgrown Warrens', tiles: 'jungle',
@@ -787,9 +787,9 @@ function buildCards(): CardDef[] {
       add(z.boss, 'boss', i, lap, `Floor ${a + 10} boss`, i * 10 + 1);
     });
   });
-  const everywhere = CORRUPTION.map((_, lap) => lap);
-  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: CORRUPTION.map(() => []), laps: everywhere, floor: 1, gold: false });
-  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: CORRUPTION.map(() => []), laps: everywhere, floor: 1, gold: false });
+  // The goblins come in one color only: their cards live on the plain page, whatever lap they're caught on.
+  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: CORRUPTION.map(() => []), laps: [0], floor: 1, gold: false });
+  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: CORRUPTION.map(() => []), laps: [0], floor: 1, gold: false });
   return [...out.values()];
 }
 

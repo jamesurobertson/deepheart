@@ -64,18 +64,21 @@ export class PixelSprite {
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <map_fragment>', `#include <map_fragment>
           float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-          vec3 gold = mix(vec3(0.16, 0.05, 0.004), vec3(0.89, 0.53, 0.08), smoothstep(0.0, 0.3, lum));
-          diffuseColor.rgb = mix(gold, vec3(1.0, 0.87, 0.46), smoothstep(0.3, 0.75, lum));`)
+          vec3 gold = mix(vec3(0.12, 0.035, 0.0), vec3(0.8, 0.42, 0.03), smoothstep(0.0, 0.3, lum));
+          diffuseColor.rgb = mix(gold, vec3(1.0, 0.72, 0.18), smoothstep(0.3, 0.8, lum));`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-          totalEmissiveRadiance += diffuseColor.rgb * 0.35;`);
+          totalEmissiveRadiance += diffuseColor.rgb * 0.15;`);
     };
     mat.customProgramCacheKey = () => 'gilded';
     mat.needsUpdate = true;
+    this.gilded = true;
   }
+  private gilded = false;
 
-  /** White silhouette flash (0..1) for hits. */
+  /** Silhouette flash (0..1) for hits: white, or a warm glint on gold so a champion under fire stays gold. */
   set flash(v: number) {
-    this.mesh.material.emissive.setScalar(v);
+    if (this.gilded) this.mesh.material.emissive.setRGB(v * 0.5, v * 0.32, v * 0.05);
+    else this.mesh.material.emissive.setScalar(v);
   }
 
   private show(i: number) {

@@ -54,7 +54,7 @@ export const CARD_W = 22;
 export const CARD_H = 30;
 
 /** The card as it lies on the floor: a dark face with the monster on it, in a frame of its color. */
-export function cardTexture(atlas: Atlas, card: CardDef, gold: boolean): THREE.CanvasTexture {
+export function cardTexture(atlas: Atlas, card: CardDef, gold: boolean, lap = 0): THREE.CanvasTexture {
   // Drawn at 4× so a portrait that has to shrink to fit still reads as pixels.
   const S = 4;
   const c = document.createElement('canvas');
@@ -72,7 +72,7 @@ export function cardTexture(atlas: Atlas, card: CardDef, gold: boolean): THREE.C
   // The name plate: a dark bar along the bottom.
   g.fillStyle = '#140e18';
   g.fillRect(3 * S, c.height - 5 * S, c.width - 6 * S, 2 * S);
-  const p = portrait(atlas, card);
+  const p = portrait(atlas, card, lap);
   const box = { w: CARD_W - 8, h: CARD_H - 13 };
   const k = Math.min(1, box.w / p.width, box.h / p.height) * S;
   const w = Math.round(p.width * k);

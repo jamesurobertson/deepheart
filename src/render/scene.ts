@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { Dazzle } from './dazzle.ts';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import type { Atlas, Rect } from './atlas.ts';
@@ -11,7 +12,7 @@ import { GradeShader, tiltShift } from './post.ts';
 import { buildStairwell, stairPoint } from './stairwell.ts';
 import { CARD_FRAME, CARD_H, CARD_W, cardBackTexture, cardTexture } from './cards.ts';
 import { CARD_BY_ID, COMPS, RELIC_BY_ID, ZONES, corruptionOf, tilesFor, zoneOf, type Attack, type CompDef, type Tiles } from '../game/data.ts';
-import { VAULT_LENGTH, type Game, type GameEvent, type Monster, type VaultChest } from '../game/game.ts';
+import { TUNE, VAULT_LENGTH, type Game, type GameEvent, type Monster, type VaultChest } from '../game/game.ts';
 
 const WALL_Z = -6;
 const STAIRS = new THREE.Vector3(7.5, 0, -4);
@@ -150,6 +151,8 @@ interface MonView {
   glow: 'champ' | null;
   /** A champion's gold ring at its feet. */
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial> | null;
+  /** A champion's gold aura, motes and glints. */
+  dazzle: Dazzle | null;
 }
 
 interface CompView {
@@ -859,7 +862,7 @@ export class Scene {
       if (!def) return;
       tier = ev.gold ? 3 : ['monster', 'mid', 'boss', 'goblin'].indexOf(def.kind);
       color = new THREE.Color(ev.gold ? CARD_FRAME.gold : CARD_FRAME[def.kind]);
-      const map = cardTexture(this.atlas, def, ev.gold);
+      const map = cardTexture(this.atlas, def, ev.gold, ev.lap);
       // Lit by its own picture as well as the room, so the frame keeps its color in the dungeon's warm gloom.
       const face = (tex: THREE.Texture) => new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.6, color: 0x999999 });
       const geo = new THREE.PlaneGeometry(CARD_W / CARD_H, 1);
@@ -1419,7 +1422,8 @@ export class Scene {
     if (emerge && m.boss && !m.half) scale *= 1.5;
     if (m.mods.includes('giant')) scale *= 1.3;
     if (m.half) scale *= 0.7;
-    if (m.champ) scale *= m.boss ? 1.12 : 1.35;
+    // A champion boss is comically big, stopping short of the top of the screen (~6.5 units).
+    if (m.champ) scale = m.boss ? Math.max(scale, Math.min(scale * 1.8, 6.5 / h)) : scale * 1.35;
     inner.scale.setScalar(scale);
     const tint = new THREE.Color(m.def.tint ?? 0xffffff);
     // Modifiers show on the body: steel-grey armour, a red rage, a sickly green regrowth.
@@ -1444,6 +1448,8 @@ export class Scene {
       ring.position.y = 0.03;
       body.add(ring);
     }
+    const dazzle = m.champ ? new Dazzle((run[0].w / 16) * scale, h * scale, m.boss, m.boss && this.lastFloor >= TUNE.goldBossFrom) : null;
+    if (dazzle) body.add(dazzle.group);
     // It comes up through the floor, which stays broken open under it. A boss brings more of itself: smaller
     // tentacles out of grates around the great one.
     const extras: PixelSprite[] = [];
@@ -1471,7 +1477,7 @@ export class Scene {
       body.add(mesh);
       body.scale.setScalar(1);
     }
-    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: emerge ? 1 : 0, rise: emerge ? 1 : 0, fly: m.def.move === 'fly', extras, glow: m.champ ? 'champ' : null, ring });
+    this.mons.set(m.id, { id: m.id, scale, height: h * scale, spotX: m.x, spotZ: m.z, blood: bloodOf(m.def.sprite), body, inner, sprite, idle, run, target: new THREE.Vector3(m.x * this.squeeze, 0, m.z * this.deep), boss: m.boss, big: !!m.def.big || m.boss, flash: 0, squash: 0, knock: 0, hopY: 0, hopV: 0, dead: -1, born: emerge ? 1 : 0, rise: emerge ? 1 : 0, fly: m.def.move === 'fly', extras, glow: m.champ ? 'champ' : null, ring, dazzle });
     const from = emerge ? body.position : STAIRS;
     if (this.settings.particles) {
       if (emerge) this.fx.burst(from.clone().setY(0.3), '#7ad04a', m.boss ? 40 : 14, m.boss ? 5 : 3, 0.1, 10);
@@ -1490,6 +1496,7 @@ export class Scene {
     for (const extra of v.extras) extra.dispose();
     v.ring?.geometry.dispose();
     v.ring?.material.dispose();
+    v.dazzle?.dispose();
     this.mons.delete(v.id);
   }
 
@@ -1536,8 +1543,10 @@ export class Scene {
           v.ring.material.opacity = 0.7 + Math.sin(this.time * 2.5 + v.id) * 0.1;
           v.ring.scale.setScalar(1 + Math.sin(this.time * 2.5 + v.id) * 0.04);
         }
-        if (v.glow === 'champ' && this.settings.particles && Math.random() < dt * 8) {
-          this.fx.burst(p.clone().setY(v.height * (0.3 + Math.random() * 0.6)), '#ffd070', 1, 1.5, 0.06, 2, true);
+        if (v.dazzle) {
+          v.dazzle.group.visible = this.settings.particles && v.dead < 0;
+          v.dazzle.group.position.set(v.inner.position.x, v.inner.position.y, 0);
+          if (v.dazzle.group.visible) v.dazzle.update(this.time + v.id);
         }
       }
       const base = v.scale;

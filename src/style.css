@@ -1040,6 +1040,7 @@ body.compact .cur { width: auto; height: auto; aspect-ratio: 1; }
   display: inline-block; font: 400 10px/1 'Silkscreen'; font-style: normal; text-transform: uppercase; letter-spacing: 1px;
   color: var(--mc); padding: 2px 4px 3px; background: rgba(10, 5, 8, 0.85); box-shadow: 0 0 0 1px var(--ink), inset 0 0 0 1px color-mix(in srgb, var(--mc) 55%, transparent);
 }
+.soul-chip { display: inline-flex; align-items: center; gap: 3px; }
 .floor-sub .mod { margin-left: 4px; font-size: 9px; padding: 1px 3px 2px; }
 .hp-mods { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 3px; white-space: nowrap; }
 .mods-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; color: var(--dim); }
@@ -1142,6 +1143,21 @@ body.phone .badge.hot, body.phone .badge.new { animation: none; }
 
 /* ---------- stats: where every number comes from ---------- */
 
+/* Stats: a panel per topic, its headline number big in the header, then label/value rows (how each is made up shows
+   on hover). */
+.st-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+.st { padding: 10px 12px 8px; background: rgba(0, 0, 0, 0.22); box-shadow: inset 0 0 0 2px #2d2224; }
+.st header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 8px; margin-bottom: 4px; border-bottom: 2px solid #3b2b2e; }
+.modal .st h3 { margin: 0; font: 400 11px/1 'Silkscreen'; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+.st header b { font: 400 30px/1 'Jersey 10'; color: #fff; text-shadow: var(--shadow); white-space: nowrap; }
+.st header small { margin-left: 3px; font-size: 16px; color: var(--dim); text-shadow: none; }
+.st table { width: 100%; border-collapse: collapse; }
+.st th { text-align: left; font: 400 14px/1.2 var(--f-text); color: var(--dim); padding: 3px 8px 3px 0; }
+.st td { text-align: right; font: 400 19px/1 'Jersey 10'; color: var(--gold-hi); padding: 3px 0; white-space: nowrap; }
+.st tr[data-tip] { cursor: help; }
+.st tr[data-tip]:hover th { color: var(--text); }
+.st-off { margin: 6px 0 0; font-size: 12px; color: var(--faint); }
+.st-off span[data-tip] { cursor: help; }
 .bd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 4px 18px; }
 .bd h3 { margin: 10px 0 6px; }
 .bd table { width: 100%; border-collapse: collapse; }
