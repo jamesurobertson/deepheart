@@ -5,7 +5,7 @@ import {
   CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, levelMult, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
   LEGENDS, LEGEND_BY_ID, FIRST_OFFER, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost,
   type AbilityId, type MilestoneId, type LegendId,
-  type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
+  type Attack, type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
 export const SAVE_VERSION = 2;
@@ -98,6 +98,15 @@ export const VICTOR_GIVES = 10;
 const CARD_ODDS = { monster: 100_000, boss: 25_000, champ: 10_000, champBoss: 1_000, goblin: 1_000, rainbow: 100 };
 /** Party damage is shown as numbers in batches this many seconds apart. */
 const DPS_SHOWN_EVERY = 0.35;
+/** A companion swings every SWING_GAP to SWING_GAP + SWING_SPREAD seconds, spending the damage it banked since. */
+const SWING_GAP = 0.8;
+const SWING_SPREAD = 0.9;
+/** Seconds from a swing to its blow landing, by how the companion attacks (the scene times its animation to match):
+ *  a dash to the target, a wind-up and a shot's flight, or a rune's charge. */
+export const HIT_DELAY: Record<Attack, number> = {
+  slash: 0.5, arrow: 0.75, fire: 1.3, dark: 1.45, bolt: 0.14, storm: 0.14, rune: 0.7,
+  knife: 0.62, spear: 0.75, bomb: 1.4, orb: 1.2, ice: 0.75, flask: 1.4, bat: 1.5, skull: 1.2, light: 0.62,
+};
 /** Seconds before the boss of a floor you're farming climbs back up. */
 const BOSS_RESPAWN = 2.5;
 /** Seconds from the boss timer running out (the party knocked flat, getting up, running for it) to falling back a
@@ -178,6 +187,8 @@ export interface Settings {
   muted: boolean;
   music: boolean;
   particles: boolean;
+  /** Show every companion's attacks, or only your hero's. */
+  partyAttacks: boolean;
   shake: boolean;
   numbers: boolean;
   notation: 'short' | 'sci';
@@ -281,6 +292,10 @@ export interface SaveState {
   awakens: number;
   /** Has the first wake-up (the dungeon was a dream) played? */
   dreamSeen: boolean;
+  /** You've beaten a champion boss for souls (until then, the first one you meet is pointed out). */
+  soulBossDone: boolean;
+  /** Your first Heartmark has been pointed out. */
+  markTipSeen: boolean;
   /** Cards you've got (found, traded or dug up) but not yet seen in the binder, as `id:lap:gold`; they slam in when you look. */
   dreamCards: string[];
   /** Trades made with the brothers. */
@@ -332,8 +347,8 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, dreamCards: [], trades: 0, stashes: [], brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
-    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, soulBossDone: false, markTipSeen: false, dreamCards: [], trades: 0, stashes: [], brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
+    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, partyAttacks: true, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
 
@@ -370,6 +385,7 @@ export type HitKind = 'click' | 'crit' | 'dps' | 'cleave' | 'auto' | 'autoCrit' 
 
 export type GameEvent =
   | { t: 'hit'; id: number; amount: Decimal; kind: HitKind; x?: number; y?: number }
+  | { t: 'swing'; comp: number; id: number; delay: number }
   | { t: 'click'; crit: boolean; x: number; y: number }
   | { t: 'spawn'; id: number }
   | { t: 'kill'; id: number; gold: Decimal; boss: boolean; by: HitKind; champ?: boolean }
@@ -442,6 +458,8 @@ export interface Parts {
 interface Computed {
   dps: Decimal;
   perComp: Decimal[];
+  /** Each companion's share of the party's damage (0–1). */
+  shares: number[];
   /** Per companion before the all-damage bonuses. */
   baseComp: number[];
   parts: Parts;
@@ -533,6 +551,14 @@ export class Game {
   s: SaveState;
   events: GameEvent[] = [];
   monsters: Monster[] = [];
+  /** The party's damage dealt so far while there was something to fight, each companion's mark on it at its last
+   *  swing, seconds to its next swing, and the blows on their way. */
+  private dealt = new Decimal(0);
+  private swungAt: Decimal[] = COMPS.map(() => new Decimal(0));
+  private swingT: number[] = COMPS.map(() => Math.random() * SWING_SPREAD);
+  private blows: { id: number; amount: Decimal; t: number }[] = [];
+  /** What your hero is attacking (set by the scene each frame), or null: its blows go to the front monster then. */
+  heroTarget: number | null = null;
   raid: Raid | null = null;
   /** Seconds left to beat the boss, when one is up. */
   bossTime = 0;
@@ -621,6 +647,7 @@ export class Game {
     // Before Rainbow Hauls, every rainbow goblin caught opened the vault.
     if (s.rainbows === undefined) s.rainbows = s.vaults ?? 0;
     if (s.rainbowSeen === undefined) s.rainbowSeen = (s.rainbows ?? 0) > 0;
+    if (s.soulBossDone === undefined) s.soulBossDone = (s.descents ?? 0) > 0 || (s.bossSouls ?? 0) > 0;
     // Renamed monsters (a card's id is its name): cards and kills pass to the new name. The Rotting Deep's floor-45
     // boss used to be the Bloated Ogre.
     for (const [was, now] of [['bloated-ogre', 'sludge-walker'], ['bone-archer', 'skeleton-archer'], ['hooded-bones', 'santa-skeleton']]) {
@@ -893,9 +920,10 @@ export class Game {
     const baseComp = COMPS.map((c, i) => c.dps * s.owned[i] * levelMult(s.owned[i]) * tier[i] * (1 + MARK_POWER * s.marks[i]));
     const perComp = baseComp.map((b) => all.times(b * parts.party * parts.banner));
     const dps = perComp.reduce((a, b) => a.plus(b), new Decimal(0));
-    const click = all.times(whet * blades).plus(dps.times(parts.clickDps)).times(1 + 0.2 * this.legendLv('fist'));
+    const shares = perComp.map((d) => (dps.gt(0) ? d.div(dps).toNumber() : 0));
+    const click = all.times(whet * blades).plus(dps.times(parts.clickDps)).times(1 + 0.1 * this.legendLv('fist'));
     this.cache = {
-      dps, perComp, baseComp, parts, all, click,
+      dps, perComp, shares, baseComp, parts, all, click,
       crit: this.abilityUnlocked('crit') ? parts.critBase + parts.critUpg + parts.critRelic : 0,
       critMult: (parts.critMultBase + parts.critMultUpg) * parts.critMultRelic * (1 + 0.15 * this.legendLv('needle')),
       cleave: this.abilityUnlocked('cleave') && this.s.buffs.some((b) => b.id === 'cleave') ? (CLEAVE_BASE + parts.cleaveRelic) * parts.cleaveUpg : 0,
@@ -1057,6 +1085,7 @@ export class Game {
     // Stepping off the deepest floor keeps its kills, and coming back to it picks them up again (its monsters respawn).
     if (s.floor === s.maxFloor && !isBossFloor(s.floor)) s.peakKills = s.floorKills;
     s.floor = f;
+    this.blows = [];
     s.floorKills = f === s.maxFloor && !isBossFloor(f) ? Math.min(s.peakKills, this.killsNeeded()) : 0;
     this.monsters = [];
     this.spawnT = 0.3;
@@ -1378,6 +1407,7 @@ export class Game {
       let souls: number | undefined;
       if (m.champ && this.s.floor >= TUNE.goldBossFrom && this.s.goldBosses[this.s.floor]) {
         souls = bossSouls(this.s.floor);
+        this.s.soulBossDone = true;
         this.s.bossSouls += souls;
         this.s.goldBosses[this.s.floor] = false;
       }
@@ -1463,6 +1493,46 @@ export class Game {
       s.peakKills = 0;
       s.bestFloor = Math.max(s.bestFloor, s.maxFloor);
       this.checkCurse();
+    }
+  }
+
+  /** The party's damage, dealt in blows: while there's a monster to fight, the party's damage piles up, and each
+   *  companion swings now and then for its share of what piled up since its last swing (at the front monster mostly; for
+   *  your hero, what it's attacking). The blow lands HIT_DELAY later, and what the target doesn't need goes on down
+   *  the line, so the party deals exactly its damage per second, in visible hits. */
+  private companionsFight(dt: number) {
+    const focus = this.focus();
+    const dps = this.dps();
+    if (focus && dps.gt(0)) {
+      this.dealt = this.dealt.plus(dps.times(dt));
+      const hero = this.heroIndex();
+      const arrived = this.monsters.filter((m) => m.arrive <= 0);
+      for (let i = 0; i < COMPS.length; i++) {
+        const share = this.c.shares[i];
+        if (!share || (this.swingT[i] -= dt) > 0) continue;
+        this.swingT[i] = SWING_GAP + Math.random() * SWING_SPREAD;
+        // (Capped at a few seconds' worth, for a companion just hired or back from the hero's side.)
+        const amount = Decimal.min(this.dealt.minus(this.swungAt[i]), dps.times(SWING_GAP + SWING_SPREAD + 1)).times(share);
+        this.swungAt[i] = this.dealt;
+        const pointed = i === hero && this.heroTarget !== null ? this.monster(this.heroTarget) : undefined;
+        const target = pointed ?? (Math.random() < 0.7 || arrived.length < 2 ? focus : arrived[Math.floor(Math.random() * arrived.length)]);
+        const delay = HIT_DELAY[COMPS[i].attack];
+        this.blows.push({ id: target.id, amount, t: delay });
+        this.events.push({ t: 'swing', comp: i, id: target.id, delay });
+      }
+    }
+    if (!this.blows.length) return;
+    for (const blow of this.blows) blow.t -= dt;
+    const landed = this.blows.filter((blow) => blow.t <= 0);
+    if (!landed.length) return;
+    this.blows = this.blows.filter((blow) => blow.t > 0);
+    for (const blow of landed) {
+      let left = blow.amount;
+      let m = this.monster(blow.id) ?? this.focus();
+      for (let k = 0; k < 20 && m && left.gt(0); k++) {
+        left = this.damage(m, left, 'dps');
+        m = this.focus();
+      }
     }
   }
 
@@ -1797,6 +1867,7 @@ export class Game {
     s.owned = COMPS.map(() => 0);
     s.upgrades = [];
     s.buffs = [];
+    s.cooldowns = {};
     s.fervor = 0;
     // Cooldowns keep running through a reset: ascending isn't a way to have every skill back at once.
     this.stash = [];
@@ -2446,14 +2517,8 @@ export class Game {
     this.sweepT -= dt;
     if (!vault && this.sweepT <= 0 && this.canSweep()) this.sweep();
 
-    // Companions chew through monsters front to back; overkill carries over.
     for (const m of this.monsters) m.arrive -= dt;
-    let dmg = this.dps().times(dt);
-    for (let k = 0; k < 20 && dmg.gt(0); k++) {
-      const m = this.focus();
-      if (!m) break;
-      dmg = this.damage(m, dmg, 'dps');
-    }
+    this.companionsFight(dt);
 
     // Boss timer.
     if (!vault && this.bossFloor() && this.bossTime > 0) {

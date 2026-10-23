@@ -42,6 +42,8 @@ const MAX_COINS = 24;
 const RARE_NEWS = 0.15;
 /** The star tip waits until the pointer comes back onto a monster at least this long after someone to switch to is hired. */
 const STAR_WAIT_MS = 1000;
+/** How long your first Heartmark is pointed out. */
+const MARK_TIP_MS = 8000;
 /** How close your hero or the cursor has to come to a coin to pick it up (px). */
 const COIN_REACH = 52;
 /** Coins start leaning toward whoever's collecting from this far out (px). */
@@ -812,6 +814,7 @@ export class Ui {
         break;
       case 'music':
       case 'particles':
+      case 'partyAttacks':
       case 'shake':
       case 'numbers':
       case 'blood':
@@ -1097,7 +1100,7 @@ export class Ui {
         this.rowCache[ev.comp] = '';
         if (ev.from !== undefined) this.rowCache[ev.from] = '';
         if (ev.moved) this.toast(`A Heartmark moves to the <b>${esc(COMPS[ev.comp].name)}</b>`, COMPS[ev.comp].sprite);
-        else this.toast(`<b>Heartmark!</b> The ${esc(COMPS[ev.comp].name)} deals +${MARK_POWER * 100}% damage, until you awaken`, COMPS[ev.comp].sprite, 'trophy');
+        else this.toast(`<b>Heartmark!</b> The ${esc(COMPS[ev.comp].name)} deals +${MARK_POWER * 100}% damage`, COMPS[ev.comp].sprite, 'trophy');
         break;
     }
   }
@@ -1834,6 +1837,10 @@ export class Ui {
     else if (g.abilityUnlocked('blade') && !g.s.bladeSeen) state = 'blade';
     // The first champion: pointed out until one is slain.
     else if (g.s.champions === 0 && g.monsters.some((m) => m.champ)) state = 'champ';
+    // The first champion boss that pays souls, too: by then you've usually met a champion, but not this.
+    else if (!g.s.soulBossDone && g.s.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.champ && m.boss)) state = 'champ';
+    // Your first Heartmark: pointed out on its companion's row for a few seconds.
+    else if (!g.s.markTipSeen && g.marksTotal() > 0) state = 'mark';
     else if (g.raid && g.s.raids === 0) state = 'raid';
     // Meeting your hero: first on the field, then (once there's someone to switch to) the star that picks one.
     else if (g.s.heroTips === 0 && g.heroIndex() >= 0) state = 'hero';
@@ -1862,13 +1869,18 @@ export class Ui {
       if (shown > 8_000) g.s.bladeSeen = true;
     } else if (state === 'rampage') {
       this.pointAt(this.el.abilities.querySelector('[data-ability="rampage"]'));
+    } else if (state === 'mark') {
+      const row = this.rows[this.markRow()];
+      this.pointAt(row?.querySelector('.marks') ?? row);
+      if (this.hintState === 'mark' && performance.now() - this.tourAt > MARK_TIP_MS) g.s.markTipSeen = true;
     } else if (state === 'upgrade') {
       this.pointAt(this.rows[upgradeRow].querySelector('.trait.buy'));
     }
     if (state === 'champ') {
-      const champ = g.monsters.find((m) => m.champ);
+      const champ = g.monsters.find((m) => m.champ && m.boss) ?? g.monsters.find((m) => m.champ);
       const s = champ && this.scene.screenOf(champ.id);
-      if (s) this.el.hint.style.transform = `translate(${s.x}px, ${s.y + s.h + 16}px)`;
+      // (A champion boss can stand taller than the screen: keep the hint on it.)
+      if (s) this.el.hint.style.transform = `translate(${s.x}px, ${Math.min(s.y + s.h + 16, innerHeight - 120)}px)`;
       this.el.hint.style.visibility = s ? 'visible' : 'hidden';
     }
     if (state === 'click') {
@@ -1880,7 +1892,7 @@ export class Ui {
     }
     if (state === this.hintState) return;
     this.hintState = state;
-    const pointing = ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'blade'].includes(state);
+    const pointing = ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'blade', 'mark'].includes(state);
     this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ';
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero');
@@ -1895,6 +1907,7 @@ export class Ui {
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
             : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it, or press U'}</small></b>`
               : state === 'champ' ? this.champHint()
+              : state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
               : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
@@ -1922,10 +1935,16 @@ export class Ui {
     this.el.hint.style.visibility = visible ? 'visible' : 'hidden';
   }
 
+  /** The companion holding the most Heartmarks (where the first one is pointed out). */
+  private markRow() {
+    const marks = this.game.s.marks;
+    return marks.indexOf(Math.max(...marks));
+  }
+
   /** The first champion's hint: a champion boss from floor 100 also pays souls. */
   private champHint() {
     const g = this.game;
-    const champ = g.monsters.find((m) => m.champ);
+    const champ = g.monsters.find((m) => m.champ && m.boss) ?? g.monsters.find((m) => m.champ);
     if (champ?.boss && g.s.floor >= TUNE.goldBossFrom) {
       const n = bossSouls(g.s.floor);
       return `<b>A champion boss!<small>Beat it for ${n} soul${n === 1 ? '' : 's'}. It might drop a gold card.</small></b>`;
@@ -2227,7 +2246,7 @@ export class Ui {
         <div class="set">
           <label>Effects volume <input type="range" min="0" max="100" value="${Math.round(s.sfxVol * 100)}" data-set="sfxVol"></label>
           <label>Music volume <input type="range" min="0" max="100" value="${Math.round(s.musicVol * 100)}" data-set="musicVol"></label>
-          <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
+          <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('partyAttacks', s.partyAttacks, 'Companion attacks')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
           <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button></div>
           <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
           <div class="cursors">${CURSORS.map((c) => {
@@ -2555,7 +2574,7 @@ export class Ui {
       relicMul(relicName('whet'), p.whet, 'Relic', 'A relic'),
       row('All-damage bonuses', x(b.all), 'trophies, souls and fury'),
       row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion traits` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`),
-      mul('The Fist', 1 + 0.2 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Legend'),
+      mul('The Fist', 1 + 0.1 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Legend'),
       mul('Buffs', b.buffClick, buffNames('click'), 'Frenzy'),
       row('During Rampage', x(g.feverMult())),
     ]);
@@ -2969,10 +2988,9 @@ export class Ui {
     this.modal = 'confirm';
     this.modalKey = 'confirm';
     this.el.modal.className = 'modal pnl m-confirm';
-    this.el.modal.innerHTML = `<header class="m-head"><h2>Ascend?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
+    this.el.modal.innerHTML = `<header class="m-head"><h2>Ascend for ${G.soul()} ${fmt(pending)} soul${pending === 1 ? '' : 's'}?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
       <div class="confirm">
-        <p>Leave it all behind for <b>${G.soul()} ${fmt(pending)} soul${pending === 1 ? '' : 's'}</b>: ${soulPct(pending)} damage.</p>
-        <p>Souls stay until you awaken.</p>
+        <p>${soulPct(pending)} damage. Gold, companions and floor reset.</p>
         ${this.curseChoice ? `<p class="omen">The next descent is cursed: ${esc(CURSE_BY_ID.get(this.curseChoice)!.name)}. ${esc(CURSE_BY_ID.get(this.curseChoice)!.rule)}</p>` : ''}
         <div class="set-row"><button class="btn" data-act="abyssBack">Not yet</button><button class="btn primary big" data-act="descendGo">Ascend</button></div>
       </div>`;

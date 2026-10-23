@@ -179,6 +179,8 @@ interface CompAct {
   phase: 'windup' | 'dash' | 'strike' | 'back';
   t: number;
   target: number;
+  /** Seconds until the blow lands in the game: the dash or the shot is paced to land then. */
+  eta: number;
 }
 
 interface Shot {
@@ -287,7 +289,26 @@ function glowTexture(): THREE.Texture {
   return new THREE.CanvasTexture(c);
 }
 
-const SHOT_COLOR: Record<Attack, number> = { arrow: 0xffe6b0, bolt: 0x9fe6ff, storm: 0xc9a6ff, slash: 0xffffff, fire: 0xff8a3a, rune: 0x7dffb0, dark: 0xb46aff };
+const SHOT_COLOR: Record<Attack, number> = {
+  arrow: 0xffe6b0, bolt: 0x9fe6ff, storm: 0xc9a6ff, slash: 0xffffff, fire: 0xff8a3a, rune: 0x7dffb0, dark: 0xb46aff,
+  knife: 0xdfe8f0, spear: 0xe8d8b0, bomb: 0xffb040, orb: 0x7ab8ff, ice: 0xaee8ff, flask: 0x8aff6a, bat: 0xe0506a, skull: 0xc8b8ff, light: 0xfff0a0,
+};
+/** How each shot flies: its sprite (a still frame, or an animated spell or creature), how high it arcs, how fast it
+ *  spins (turns a second), and whether a soft glow rides with it. */
+const SHOTS: Partial<Record<Attack, { sprite: string; anim?: boolean; arc: number; spin?: number; point?: boolean; glow?: boolean; size?: number }>> = {
+  arrow: { sprite: 'weapon_arrow', arc: 0.7, point: true },
+  spear: { sprite: 'weapon_spear', arc: 0.5, point: true, size: 0.9 },
+  knife: { sprite: 'weapon_knife', arc: 0.4, spin: 3 },
+  bomb: { sprite: 'bomb', arc: 2.2, spin: 1 },
+  flask: { sprite: 'flask_green', arc: 2, spin: 1.2 },
+  skull: { sprite: 'skull', arc: 0.4, spin: 1.5, glow: true },
+  bat: { sprite: 'sw_bat_idle', anim: true, arc: 0.3, size: 0.7 },
+  fire: { sprite: 'spell_fireball', anim: true, arc: 0.6, glow: true, size: 1.1 },
+  dark: { sprite: 'spell_darkness_bolt', anim: true, arc: 0.3, glow: true },
+  orb: { sprite: 'spell_magic_orb', anim: true, arc: 0.3, glow: true },
+  ice: { sprite: 'spell_ice_lance', anim: true, arc: 0.15, glow: true },
+  light: { sprite: 'spell_light_bolt', anim: true, arc: 0.1, glow: true },
+};
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 const BONE = '#b8ae9e';
@@ -345,6 +366,8 @@ export class Scene {
   private heroVel = new THREE.Vector3();
   /** Seconds the hero keeps facing what it just attacked before turning back to where it's walking. */
   private heroFace = 0;
+  /** Your hero's swings from the game, until their blows land (`fired`: a ranged hero's shot is already away). */
+  private heroSwings: { t: number; fired: boolean }[] = [];
   private heroComp = -1;
   private raycaster = new THREE.Raycaster();
   private shots: Shot[] = [];
@@ -375,7 +398,7 @@ export class Scene {
   private deep = 1;
   private look = LOOK.clone();
   private camBase = new THREE.Vector3();
-  settings = { particles: true, shake: true, blood: true, cinematics: true };
+  settings = { particles: true, partyAttacks: true, shake: true, blood: true, cinematics: true };
   /** Zone-change interlude: the party leaves, descends a spiral staircase, arrives somewhere new. */
   /** A pause (the loot card is up) before the staircase starts. */
   private hold: { zone: number; t: number } | null = null;
@@ -1021,17 +1044,13 @@ export class Scene {
           p.add(d.multiplyScalar(Math.min(1, dt * 3)));
           moving = true;
         }
-        c.cd -= dt * haste;
-        if (c.cd <= 0 && targets.length && game.dps().gt(0)) {
-          const t = Math.random() < 0.6 && focus ? focus : targets[Math.floor(Math.random() * targets.length)];
-          c.act = def.attack === 'slash' ? { kind: 'slash', phase: 'dash', t: 0, target: t.id } : { kind: def.attack, phase: 'windup', t: 0.14, target: t.id };
-        }
       } else if (a.phase === 'windup') {
-        a.t -= dt * haste;
+        a.t -= dt;
+        a.eta -= dt;
         c.stretch = -1;
         if (a.t <= 0) {
           c.stretch = 1;
-          this.fire(c, a.kind, a.target);
+          this.fire(c, a.kind, a.target, a.eta);
           this.endAct(c);
         }
       } else if (a.phase === 'dash') {
@@ -1046,7 +1065,9 @@ export class Scene {
           const dest = at.clone().add(new THREE.Vector3(def.big ? -1.5 : -0.9, 0, 0.05));
           const d = dest.sub(p);
           const len = d.length();
-          const step = 15 * haste * dt;
+          // Fast enough to arrive as the blow lands.
+          a.eta -= dt;
+          const step = Math.max(15 * haste, len / Math.max(dt, a.eta)) * dt;
           if (len <= step) {
             p.add(d);
             a.phase = 'strike';
@@ -1203,6 +1224,18 @@ export class Scene {
     c.inner.position.set(x + (Math.sin(angle) * h) / 2, middle - (Math.cos(angle) * h) / 2, c.inner.position.z);
   }
 
+  /** A companion's swing from the game: dash in or wind up and shoot at its target, timed to land as the blow does. */
+  private swing(comp: number, id: number, delay: number, game: Game) {
+    if (comp === game.heroIndex()) {
+      this.heroSwings.push({ t: delay, fired: false });
+      return;
+    }
+    const c = this.party.find((view) => view.comp === comp);
+    if (!c || !c.body.visible || !this.settings.partyAttacks) return;
+    const kind = COMPS[comp].attack;
+    c.act = kind === 'slash' ? { kind, phase: 'dash', t: 0, target: id, eta: delay } : { kind, phase: 'windup', t: Math.min(0.14, delay), target: id, eta: delay };
+  }
+
   private endAct(c: CompView) {
     c.act = null;
     c.cd = 0.8 + Math.random() * 0.9;
@@ -1214,9 +1247,11 @@ export class Scene {
     if (!v) return;
     const big = COMPS[c.comp].big;
     const at = v.body.position.clone().setY(v.height * 0.45);
+    // Struck from the right (a hero on that side), the swing and its spark come from the right.
+    const fromRight = c.body.position.x > v.body.position.x;
     c.stretch = 1;
-    this.fx.swipe(at, 0xfff0d8, big ? 1.5 : 0.95, Math.PI * (0.6 + Math.random() * 0.5));
-    this.fx.star(at.clone().setX(at.x - 0.2), 0xffffff, big ? 1.1 : 0.7);
+    this.fx.swipe(at, 0xfff0d8, big ? 1.5 : 0.95, Math.PI * (0.6 + Math.random() * 0.5), undefined, fromRight);
+    this.fx.star(at.clone().setX(at.x + (fromRight ? 0.2 : -0.2)), 0xffffff, big ? 1.1 : 0.7);
     // (The blow still lands on one that died a moment ago, so a swing is never wasted on thin air.)
     if (v.dead < 0) {
       this.react(v, big ? 0.6 : 0.3);
@@ -1230,7 +1265,7 @@ export class Scene {
   }
 
   /** A ranged companion lets loose. */
-  private fire(c: CompView, kind: Attack, id: number) {
+  private fire(c: CompView, kind: Attack, id: number, eta?: number) {
     let view = this.mons.get(id);
     // Its target died during the wind-up (all the time on floors you badly outclass): shoot at another instead.
     if (!view || view.dead >= 0) {
@@ -1267,29 +1302,29 @@ export class Scene {
         const v = this.mons.get(id);
         const at = (v && v.dead < 0 ? v.body.position : foot).clone();
         this.impact({ mesh: new THREE.Object3D(), from, to: at.setY(0.6), target: id, t: 1, dur: 0, arc: 0, kind: 'rune' });
-      }, view.boss ? 2 : 1.1);
+      }, view.boss ? 2 : 1.1, eta === undefined ? undefined : Math.max(0.05, eta));
       return;
     }
-    let mesh: THREE.Object3D;
-    if (kind === 'arrow') {
-      const s = new PixelSprite(this.atlas.texture, this.atlas.size, [this.atlas.rect('weapon_arrow')], { anchor: 'center' });
-      s.mesh.rotation.z = -Math.PI / 2;
-      mesh = new THREE.Group().add(s.mesh);
-    } else {
-      // Fireball / darkness bolt: DevWizard's animated pixel spell over a soft glow.
-      const spell = new PixelSprite(this.atlas.texture, this.atlas.size, this.atlas.anim(kind === 'fire' ? 'spell_fireball' : 'spell_darkness_bolt'), { fps: 14, anchor: 'center' });
-      spell.mesh.scale.setScalar(kind === 'fire' ? 1.1 : 1);
-      spell.mesh.material.emissive.setScalar(0.6);
+    const look = SHOTS[kind] ?? SHOTS.dark!;
+    const frames = look.anim ? this.atlas.anim(look.sprite) : kind === 'bomb' ? [0, 1, 2].map((k) => this.atlas.rect(`bomb_f${k}`)) : [this.atlas.rect(look.sprite)];
+    const sprite = new PixelSprite(this.atlas.texture, this.atlas.size, frames, { fps: kind === 'bat' ? 16 : 14, anchor: 'center' });
+    sprite.mesh.scale.multiplyScalar(look.size ?? 1);
+    // Arrows and spears are drawn point up: laid on their side to fly point first.
+    if (look.point) sprite.mesh.rotation.z = -Math.PI / 2;
+    if (look.glow) sprite.mesh.material.emissive.setScalar(0.6);
+    const mesh = new THREE.Group().add(sprite.mesh);
+    mesh.userData.spell = sprite;
+    if (look.glow) {
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(SHOT_COLOR[kind]).multiplyScalar(1.2), transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
       halo.scale.setScalar(1.2);
-      mesh = new THREE.Group().add(halo, spell.mesh);
-      mesh.userData.spell = spell;
+      mesh.add(halo);
+      mesh.userData.halo = halo;
     }
     mesh.position.copy(from);
     this.scene.add(mesh);
     const dist = from.distanceTo(to);
     const speed = kind === 'arrow' ? 24 : kind === 'fire' ? 12 : 10;
-    this.shots.push({ mesh, from, to, target: id, t: 0, dur: dist / speed, arc: kind === 'arrow' ? 0.7 : kind === 'fire' ? 0.6 : 0.3, kind });
+    this.shots.push({ mesh, from, to, target: id, t: 0, dur: eta === undefined ? dist / speed : Math.max(0.05, eta), arc: look.arc, kind });
   }
 
   private updateShots(dt: number) {
@@ -1308,14 +1343,21 @@ export class Scene {
         s.mesh.position.y += Math.sin(t * Math.PI * 5) * r;
         s.mesh.position.z += Math.cos(t * Math.PI * 5) * r;
       }
-      if (s.kind === 'arrow') s.mesh.rotation.z = Math.atan2(Math.cos(t * Math.PI) * s.arc * Math.PI, s.from.distanceTo(s.to));
+      // Point the way it flies: shot leftward (a hero standing right of its target), it's mirrored.
+      const dir = s.to.x < s.from.x ? -1 : 1;
+      s.mesh.scale.x = dir;
+      const look = SHOTS[s.kind];
+      if (look?.point) s.mesh.rotation.z = dir * Math.atan2(Math.cos(t * Math.PI) * s.arc * Math.PI, s.from.distanceTo(s.to));
+      if (look?.spin) (s.mesh.userData.spell as PixelSprite).mesh.rotation.z -= look.spin * Math.PI * 2 * dt;
+      // A bat flaps its way in, bobbing.
+      if (s.kind === 'bat') s.mesh.position.y += Math.sin(t * Math.PI * 6) * 0.25;
+      (s.mesh.userData.spell as PixelSprite | undefined)?.update(dt);
+      (s.mesh.userData.halo as THREE.Sprite | undefined)?.scale.setScalar(1.2 * (0.9 + Math.sin(this.time * 30) * 0.12));
       if (s.kind === 'fire' || s.kind === 'dark') {
-        // Comet trail of fading copies, plus embers / sparks.
+        // Comet trail of fading copies.
         const tex = spellTextures();
         this.fx.afterimage(s.mesh.position, s.kind === 'fire' ? tex.fire : tex.void, s.kind === 'fire' ? 0xb05a20 : 0x8050c0, s.kind === 'fire' ? 0.55 : 0.5, 0.18);
-        (s.mesh.userData.spell as PixelSprite | undefined)?.update(dt);
-        s.mesh.children[0].scale.setScalar(1.2 * (0.9 + Math.sin(this.time * 30) * 0.12));
-      }
+      } else if (look?.glow && this.settings.particles && Math.random() < 0.5) this.fx.burst(s.mesh.position.clone(), hex(SHOT_COLOR[s.kind]), 1, 0.4, 0.05, 0, true);
       if (this.settings.particles) {
         if (s.kind === 'fire' && Math.random() < 0.6) this.fx.burst(s.mesh.position.clone(), '#ffb040', 1, 1, 0.06, -2, true);
         else if (s.kind === 'dark' && Math.random() < 0.6) {
@@ -1341,7 +1383,7 @@ export class Scene {
     const at = s.to.clone();
     if (v && v.dead < 0) {
       this.react(v, s.kind === 'fire' ? 0.35 : 0.2);
-      if (s.kind === 'arrow' || s.kind === 'dark') this.bleed(v, at, 2, false);
+      if (['arrow', 'dark', 'knife', 'spear', 'bat'].includes(s.kind)) this.bleed(v, at, 2, false);
     }
     const col = SHOT_COLOR[s.kind];
     const parts = this.settings.particles;
@@ -1378,6 +1420,50 @@ export class Scene {
           this.fx.burst(at.clone().setY(0.2), '#b8f5d2', 10, 4, 0.06, 6, true);
           this.fx.burst(at.clone().setY(0.1), '#8a8078', 12, 4.5, 0.09, 16);
         }
+        break;
+      case 'bomb':
+        // A bang: flash, a ring of fire on the floor, smoke and sparks, and a jolt.
+        this.fx.star(at, 0xfff0c0, 1.5, 0.2);
+        this.fx.ring(at.clone().setY(0), col, 2.2, 0.35);
+        this.fx.light(at, col, 22, 0.25, 8);
+        this.addShake(0.08);
+        if (parts) {
+          this.fx.burst(at, '#ffd060', 12, 4, 0.07, 6, true);
+          this.fx.burst(at, '#6a6060', 10, 2.5, 0.1, -1);
+        }
+        break;
+      case 'flask':
+        // Glass breaks and the brew splashes out green.
+        this.fx.ring(at.clone().setY(0), col, 1.6, 0.4);
+        this.fx.aura(at, col, 0.8, 0.3);
+        if (parts) {
+          this.fx.burst(at, '#9aff7a', 14, 3, 0.06, 10, true);
+          this.fx.burst(at, '#d8f0ff', 5, 2.5, 0.04, 12);
+        }
+        break;
+      case 'ice':
+        // The lance shatters into shards.
+        this.fx.star(at, 0xe8faff, 1.1, 0.16);
+        this.fx.light(at, col, 12, 0.2, 6);
+        if (parts) this.fx.burst(at, '#c8f4ff', 12, 3.5, 0.06, 10, true);
+        break;
+      case 'orb':
+        this.fx.aura(at, col, 0.9, 0.25);
+        this.fx.star(at, 0xd0e6ff, 1, 0.16);
+        this.fx.light(at, col, 12, 0.2, 6);
+        if (parts) this.fx.burst(at, '#9cc8ff', 10, 2.8, 0.06, 1, true);
+        break;
+      case 'light':
+        // A shaft of light where it lands.
+        this.fx.pillar(at.clone().setY(0), 0xffe08a, 2.6, 0.3);
+        this.fx.star(at, 0xffffff, 1.2, 0.18);
+        this.fx.light(at, col, 16, 0.25, 7);
+        if (parts) this.fx.burst(at, '#fff4c0', 10, 3, 0.05, 2, true);
+        break;
+      case 'skull':
+        this.fx.aura(at, col, 0.8, 0.25);
+        this.fx.light(at, 0x9a70ff, 10, 0.2, 6);
+        if (parts) this.fx.burst(at, '#a890d8', 10, 2.5, 0.06, 2, true);
         break;
       default:
         this.fx.star(at, 0xffffff, 0.6);
@@ -1738,6 +1824,9 @@ export class Scene {
 
   handle(ev: GameEvent, game: Game) {
     switch (ev.t) {
+      case 'swing':
+        this.swing(ev.comp, ev.id, ev.delay, game);
+        break;
       case 'hit': {
         const v = this.mons.get(ev.id);
         if (!v || v.dead >= 0 || ev.kind === 'dps') break;
@@ -2323,19 +2412,25 @@ export class Scene {
     // The monster you're pointing at first, if it's in reach; otherwise the nearest one that is.
     const pointed = aim ? pointedAt(aim.x, aim.y) : undefined;
     const target = pointed && inReach(pointed) ? pointed : live.filter(inReach).sort((a, b) => a.body.position.distanceTo(p) - b.body.position.distanceTo(p))[0];
-    c.cd -= dt * (1 + this.fever);
-    if (target && c.cd <= 0 && game.dps().gt(0)) {
-      c.cd = 0.8 + Math.random() * 0.9;
+    game.heroTarget = target?.id ?? null;
+    for (const swing of this.heroSwings) swing.t -= dt;
+    const due = this.heroSwings.find((swing) => swing.t <= 0);
+    this.heroSwings = this.heroSwings.filter((swing) => swing.t > 0);
+    // A melee hero strikes as the blow lands; a ranged one lets fly at once, its shot timed to land with it.
+    const ranged = this.heroSwings.find((swing) => !melee && !swing.fired);
+    if (ranged && target) {
+      ranged.fired = true;
+      c.sprite.flip = target.body.position.x < p.x;
+      this.heroFace = 0.35;
+      c.stretch = 0.6;
+      this.fire(c, def.attack, target.id, ranged.t);
+    }
+    if (due && melee && target) {
       const left = target.body.position.x < p.x;
       c.sprite.flip = left;
       this.heroFace = 0.35;
-      if (melee) {
-        c.inner.position.x = (left ? -1 : 1) * 0.25;
-        this.strike(c, target.id);
-      } else {
-        c.stretch = 0.6;
-        this.fire(c, def.attack, target.id);
-      }
+      c.inner.position.x = (left ? -1 : 1) * 0.25;
+      this.strike(c, target.id);
     }
     // Face the way they're walking, except just after an attack, when they keep facing what they hit.
     if (this.heroFace <= 0 && Math.abs(this.heroVel.x) > 0.5) c.sprite.flip = this.heroVel.x < 0;

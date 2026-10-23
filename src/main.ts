@@ -106,6 +106,7 @@ async function boot() {
     sfx.musicOn = s.music;
     sfx.setVolumes(s.sfxVol, s.musicVol);
     scene.settings.particles = s.particles;
+    scene.settings.partyAttacks = s.partyAttacks;
     scene.settings.shake = s.shake;
     scene.settings.blood = s.blood;
     scene.settings.cinematics = s.cinematics;

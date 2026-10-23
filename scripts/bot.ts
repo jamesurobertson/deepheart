@@ -40,7 +40,7 @@ const OLD_PREF: Record<'active' | 'idle', LegendId[]> = {
   idle: ['sleeper', 'patient', 'hoard', 'thinning', 'hourglass', 'wither', 'soulcaller', 'haggler', 'lure', 'goblinking', 'restless', 'lingering', 'collector', 'ronin', 'hungry', 'needle', 'fist', 'unbroken'],
 };
 const OLD_WORTH: Record<'active' | 'idle', Partial<Record<LegendId, number>>> = {
-  active: { fist: 0.15, unbroken: 0.1, needle: 0.08, hoard: 0.04, goblinking: 0.01 },
+  active: { fist: 0.075, unbroken: 0.1, needle: 0.08, hoard: 0.04, goblinking: 0.01 },
   idle: { sleeper: 0.25, patient: 0.4, hoard: 0.04, goblinking: 0.01 },
 };
 

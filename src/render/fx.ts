@@ -58,6 +58,8 @@ interface Swipe {
   max: number;
   from: number;
   sweep: number;
+  /** 1, or -1 for a swing from the right. */
+  side: number;
 }
 
 interface Shard {
@@ -488,7 +490,8 @@ export class Fx {
    * A sword swipe: a bright crescent that sweeps through `at`, head leading, tail fading.
    * `angle` is where the sweep starts (radians); crits pass `size` bigger.
    */
-  swipe(at: THREE.Vector3, color: THREE.ColorRepresentation, size = 1.1, angle = Math.random() * Math.PI * 2, dur = 0.16) {
+  /** `mirror`: swung from the right (the arc and its sweep flipped left to right). */
+  swipe(at: THREE.Vector3, color: THREE.ColorRepresentation, size = 1.1, angle = Math.random() * Math.PI * 2, dur = 0.16, mirror = false) {
     const arc = 2.3;
     const mesh = new THREE.Mesh(
       crescent(size, arc),
@@ -500,7 +503,10 @@ export class Fx {
     mesh.rotation.z = angle - arc / 2;
     mesh.renderOrder = 5;
     this.scene.add(mesh);
-    this.swipes.push({ mesh, life: dur, max: dur, from: mesh.rotation.z - 0.9, sweep: 1.3 });
+    const side = mirror ? -1 : 1;
+    mesh.rotation.z *= side;
+    mesh.scale.x = side;
+    this.swipes.push({ mesh, life: dur, max: dur, from: angle - arc / 2 - 0.9, sweep: 1.3, side });
   }
 
   /**
@@ -894,8 +900,9 @@ export class Fx {
       const k = 1 - Math.max(0, w.life) / w.max;
       // Fast out, eased: the swing snaps through, then the trail lingers and fades.
       const e = 1 - (1 - k) ** 3;
-      w.mesh.rotation.z = w.from + w.sweep * e;
+      w.mesh.rotation.z = w.side * (w.from + w.sweep * e);
       w.mesh.scale.setScalar(0.85 + 0.3 * e);
+      w.mesh.scale.x *= w.side;
       w.mesh.material.opacity = k < 0.45 ? 1 : Math.max(0, 1 - (k - 0.45) / 0.55);
       if (w.life <= 0) {
         this.scene.remove(w.mesh);

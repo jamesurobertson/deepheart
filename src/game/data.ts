@@ -12,7 +12,7 @@ export interface Icon {
   tier?: number;
 }
 
-export type Attack = 'arrow' | 'bolt' | 'storm' | 'slash' | 'fire' | 'rune' | 'dark';
+export type Attack = 'arrow' | 'bolt' | 'storm' | 'slash' | 'fire' | 'rune' | 'dark' | 'knife' | 'spear' | 'bomb' | 'orb' | 'ice' | 'flask' | 'bat' | 'skull' | 'light';
 
 export interface CompDef {
   id: string;
@@ -46,24 +46,24 @@ export const COMPS: CompDef[] = [
   c('ranger', 'Ranger', 'elf_f', 40, 4, 'arrow', 'Never misses. Well, rarely. Well, sometimes.'),
   c('brawler', 'Dwarf Brawler', 'dwarf_m', 250, 12, 'slash', 'Came for the gold. Stayed for the punching.'),
   c('apprentice', 'Apprentice', 'wizzard_m', 2000, 50, 'bolt', 'Knows exactly one spell. It is lightning. It is enough.'),
-  c('hunter', 'Lizard Hunter', 'lizard_m', 12_000, 150, 'arrow', 'Can smell a monster through three floors of stone.'),
+  c('hunter', 'Lizard Hunter', 'lizard_m', 12_000, 150, 'spear', 'Can smell a monster through three floors of stone.'),
   c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 80_000, 4600, 'slash', 'Her shield has killed more monsters than her sword.'),
-  c('thief', 'Shadow Thief', 'cr_green_thief', 6e5, 27000, 'arrow', 'Throws knives. Takes them back. Takes your purse too, then gives it back.'),
+  c('thief', 'Shadow Thief', 'cr_green_thief', 6e5, 27000, 'knife', 'Throws knives. Takes them back. Takes your purse too, then gives it back.'),
   c('dancer', 'Blade Dancer', 'elf_m', 4e6, 72000, 'slash', 'Fights like it is a performance. The monsters do not clap.'),
-  c('corsair', 'Corsair Captain', 'cr_pirate_captain', 3e7, 4.2e5, 'arrow', 'Sailed the underground sea. There is an underground sea. Do not ask.'),
+  c('corsair', 'Corsair Captain', 'cr_pirate_captain', 3e7, 4.2e5, 'bomb', 'Sailed the underground sea. There is an underground sea. Do not ask.'),
   c('runesmith', 'Runesmith', 'dwarf_f', 2e8, 1.1e6, 'rune', 'Carves runes into the floor. The floor explodes.'),
   c('paladin', 'Paladin', 'cr_gold_knight', 1.5e9, 1.3e7, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
   c('stormcaller', 'Stormcaller', 'wizzard_f', 1e10, 3.4e7, 'storm', 'Brought her own weather. Down here, of all places.'),
   c('venomblade', 'Venomblade', 'lizard_f', 7e10, 3.8e8, 'dark', 'Every blade is poisoned. Every single one. She has a lot.'),
-  c('doctor', 'Plague Doctor', 'doc', 5e11, 1.1e9, 'dark', 'Treats monsters with a strict regimen of dying.'),
-  c('frostimp', 'Frost Oni', 'sm_oni_blue', 4e12, 6.6e9, 'storm', 'Followed you up from the Frozen Vault. Will not leave. Brings its own blizzard and a very big club.'),
+  c('doctor', 'Plague Doctor', 'doc', 5e11, 1.1e9, 'flask', 'Treats monsters with a strict regimen of dying.'),
+  c('frostimp', 'Frost Oni', 'sm_oni_blue', 4e12, 6.6e9, 'ice', 'Followed you up from the Frozen Vault. Will not leave. Brings its own blizzard and a very big club.'),
   c('hollow', 'Hollow Knight', 'pumpkin_dude', 2.5e13, 3.3e10, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.'),
   c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 2e14, 2e11, 'dark', 'Broke every vow but one: never stop swinging.'),
-  c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2.5e11, 'bolt', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
-  c('wraith', 'The Count', 'rm_dracula', 2e19, 3.2e15, 'dark', 'Came down for the dark. Stayed for the company.', 95),
-  c('necro', 'Turncoat Necromancer', 'necromancer', 6e22, 6.4e17, 'dark', 'Used to raise these monsters. Now it lowers them.', 130),
+  c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2.5e11, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
+  c('wraith', 'The Count', 'rm_dracula', 2e19, 3.2e15, 'bat', 'Came down for the dark. Stayed for the company.', 95),
+  c('necro', 'Turncoat Necromancer', 'necromancer', 6e22, 6.4e17, 'skull', 'Used to raise these monsters. Now it lowers them.', 130),
   c('king', 'Exiled King', 'sd_king', 1.5e24, 2e19, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 190),
-  c('angel', 'Fallen Angel', 'angel', 1e28, 1.5e22, 'fire', 'Fell from somewhere bright. Landed swinging.', 240),
+  c('angel', 'Fallen Angel', 'angel', 1e28, 1.5e22, 'light', 'Fell from somewhere bright. Landed swinging.', 240),
   c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 3e29, 1.1e24, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 300, true),
   c('demon', 'Bound Demon', 'big_demon', 1e32, 1.8e25, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 370, true),
 ];
@@ -297,7 +297,7 @@ export const levelMult = (level: number) => {
 
 /** Each companion level costs this much more than the last. */
 export const COST_GROWTH = 1.07;
-/** What each companion's traits do, in order: own (×2 to them), party (+50% to every companion), click (+3% of party
+/** What each companion's traits do, in order: own (×2 to them), party (+50% to every companion), click (+1% of party
  *  damage per click), gold (+50%), boss (+25% to bosses), blade (Phantom Blade +1/s), crit2/crit3 (+2/3% crit chance),
  *  critx1/critx2 (+1×/+2× crit damage), cleave25/cleave50 (Cleave +25%/+50%), fevfill (Rampage fills 25% faster),
  *  fevdur (Rampage lasts 50% longer), fevpow (Rampage +1 on both tiers), or skill (unlocks the ability listed in
@@ -409,7 +409,7 @@ function traitEffect(kind: string, comp: number): { effect: Effect; desc: string
   const num = Number(kind.replace(/\D+/g, ''));
   if (kind === 'own') return { effect: { t: 'comp', comp, mult: 2 }, desc: `${COMPS[comp].name} deals ×2 damage.` };
   if (kind === 'party') return { effect: { t: 'party', mult: 1.5 }, desc: 'Every companion deals +50% damage.' };
-  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.03 }, desc: "Attacks also deal +3% of your party's damage." };
+  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.01 }, desc: "Attacks also deal +1% of your party's damage." };
   if (kind === 'gold') return { effect: { t: 'gold', pct: 0.5 }, desc: 'Monsters drop +50% gold.' };
   if (kind === 'boss') return { effect: { t: 'boss', pct: 0.25 }, desc: '+25% damage to bosses.' };
   if (kind === 'blade') return { effect: { t: 'auto', add: 1 }, desc: 'Phantom Blade +1/s.' };
@@ -672,7 +672,7 @@ const o = (d: LegendDef) => d;
 
 export const LEGENDS: LegendDef[] = [
   o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Party damage while idle', value: per(0.25) }),
-  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Your attacks and the Phantom Blade', value: per(0.2) }),
+  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Your attacks and the Phantom Blade', value: per(0.1) }),
   o({ id: 'needle', name: 'The Needle', kind: 'power', sprite: 'sd_executioner', what: 'Critical hit damage', value: per(0.15) }),
   o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'sd_mountain_king', what: 'All gold', value: per(0.05) }),
   o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'sm_sohei', what: 'Gold while idle', value: per(0.5) }),
