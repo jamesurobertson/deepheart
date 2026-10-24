@@ -2338,7 +2338,7 @@ export class Ui {
         <div class="legend-panel">
           <div class="tt-h"><b>${esc(pick.name)}</b><span class="tt-own">${KIND_NAME[pick.kind]}</span></div>
           ${legendDetail(pick, 0)}
-          <div class="set-row"><button class="btn primary" data-act="summon" ${free >= price ? '' : 'disabled'}>Summon ${esc(pick.name.replace(/^The /, 'the '))}</button></div>
+          <div class="set-row"><button class="btn primary" data-act="summon" ${free >= price ? '' : 'disabled'}>Summon ${esc(pick.name)}</button></div>
         </div>`
       : '<p class="muted">Every Legend has joined you.</p>';
     const owned = LEGENDS.filter((d) => g.legendLv(d.id) > 0);
