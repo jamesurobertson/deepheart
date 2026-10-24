@@ -2397,9 +2397,9 @@ export class Ui {
   }
 
   private flare(card: HTMLElement) {
-    card.classList.remove('pop');
+    card.classList.remove('flaring');
     void card.offsetWidth;
-    card.classList.add('pop');
+    card.classList.add('flaring');
     const sparks = document.createElement('div');
     sparks.className = 'sparks';
     for (let k = 0; k < 14; k++) {

@@ -787,16 +787,16 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .lc-max { color: var(--gold); }
 .lc-respec { display: flex; justify-content: flex-end; margin-top: 10px; }
 .lc-respec .btn { color: var(--dim); }
-.lcard.pop { animation: pop 0.45s ease-out; }
+.lcard.flaring { animation: pop 0.45s ease-out; }
 @keyframes pop { 30% { transform: scale(1.025); filter: brightness(1.35); } }
-.lcard.pop .lc-val { animation: valpop 0.6s ease-out; }
+.lcard.flaring .lc-val { animation: valpop 0.6s ease-out; }
 @keyframes valpop { 0% { color: #fff; transform: translateY(-3px); } }
-.lcard.pop .lc-fig .px { animation: materialize 0.7s ease-out; }
+.lcard.flaring .lc-fig .px { animation: materialize 0.7s ease-out; }
 .sparks { position: absolute; inset: 0; pointer-events: none; }
 .sparks i { position: absolute; left: 54px; top: 66px; width: 4px; height: 4px; background: var(--soul); box-shadow: 0 0 6px var(--soul); animation: spark 0.7s ease-out forwards; }
 @keyframes spark { to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .pedestal .ped-fig, .pedestal .px, .pedestal .ped-stone, .spirit::before, .legend-await p, .lcard.pop, .lcard.pop .lc-val, .lcard.pop .px, .sparks i { animation: none !important; }
+  .pedestal .ped-fig, .pedestal .px, .pedestal .ped-stone, .spirit::before, .legend-await p, .lcard.flaring, .lcard.flaring .lc-val, .lcard.flaring .px, .sparks i { animation: none !important; }
   .spirit i { animation: none; opacity: 0.6; translate: 0 calc(var(--s) * -60px); }
 }
 .gen-name .marks { display: inline-flex; align-items: center; gap: 2px; font: 400 15px/1 'Jersey 10'; color: var(--ess); vertical-align: middle; }
