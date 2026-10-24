@@ -2556,12 +2556,7 @@ export class Game {
       this.healShown.set(m.id, (this.healShown.get(m.id) ?? new Decimal(0)).plus(heal));
     }
 
-    // Auto-buy: rebuy what you've bought before (new upgrades stay yours to find).
-    this.rebuyT -= dt;
-    if (this.rebuyT <= 0) {
-      this.rebuyT = REBUY_GAP;
-      if (s.settings.autoUpg && this.autoUpgOpen()) this.buyAllUpgs(true);
-    }
+    this.autoBuy(dt);
 
     // Phantom Blade.
     // Attacking by hand while held down, then the Phantom Blade on its own.
@@ -2645,6 +2640,15 @@ export class Game {
   /** Time passing while the fight is paused (the stairs between zones, the title menu): skill cooldowns still run. */
   passTime(seconds: number) {
     for (const id in this.s.cooldowns) if ((this.s.cooldowns[id] -= seconds) <= 0) delete this.s.cooldowns[id];
+    this.autoBuy(seconds);
+  }
+
+  /** Rebuy what you've bought before (new upgrades stay yours to find). */
+  private autoBuy(dt: number) {
+    this.rebuyT -= dt;
+    if (this.rebuyT > 0) return;
+    this.rebuyT = REBUY_GAP;
+    if (this.s.settings.autoUpg && this.autoUpgOpen()) this.buyAllUpgs(true);
   }
 
   /**
