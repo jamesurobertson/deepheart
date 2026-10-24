@@ -872,7 +872,7 @@ export class Ui {
       case 'respec':
         if (!this.respecArmed) {
           this.respecArmed = true;
-          el.textContent = 'Really let every Spirit go?';
+          el.textContent = 'Really respec?';
           setTimeout(() => {
             this.respecArmed = false;
             if (el.isConnected) this.renderModal();
@@ -2356,12 +2356,9 @@ export class Ui {
         <div class="lc-next">${next}</div>
       </div>`;
     }).join('');
-    const respec = owned.length
-      ? `<div class="lc-respec"><button class="btn small" data-act="respec">Respec: let them all go for ${G.soul(1.2)} ${fmt(Math.floor(g.s.legendSpent * RESPEC_REFUND))}</button></div>`
-      : '';
+    const respec = `<button class="btn small lc-respec" data-act="respec">Respec · ${G.soul(1.2)} +${fmt(Math.floor(g.s.legendSpent * RESPEC_REFUND))}</button>`;
     return `${summon}
-      ${owned.length ? `<div class="lc-head"><h3>Your Spirits</h3><small>${owned.length} · ${G.soul(1.2)} ${fmt(free)} to spend</small></div><div class="lcards">${cards}</div>` : ''}
-      ${respec}`;
+      ${owned.length ? `<div class="lc-head"><h3>Your Spirits</h3><small>${owned.length} · ${G.soul(1.2)} ${fmt(free)} to spend</small>${respec}</div><div class="lcards">${cards}</div>` : ''}`;
   }
 
   /** Until then, ticks leave the open panel alone, so an animation in it plays out. */

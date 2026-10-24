@@ -785,8 +785,7 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .lc-next { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; padding-top: 8px; border-top: 2px solid #3b2b2e; font-size: 13px; color: var(--text); }
 .lc-next .btn { margin-left: auto; }
 .lc-max { color: var(--gold); }
-.lc-respec { display: flex; justify-content: flex-end; margin-top: 10px; }
-.lc-respec .btn { color: var(--dim); }
+.lc-head .lc-respec { margin-left: auto; align-self: center; color: var(--dim); }
 .lcard.flaring { animation: pop 0.45s ease-out; }
 @keyframes pop { 30% { transform: scale(1.025); filter: brightness(1.35); } }
 .lcard.flaring .lc-val { animation: valpop 0.6s ease-out; }
