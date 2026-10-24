@@ -1,4 +1,4 @@
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, FIRST_OFFER, OFFER_SIZE, RESPEC_REFUND, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TUNE, bossSouls, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -2065,7 +2065,7 @@ export class Ui {
           : fever ? (next ? `×${fmt(g.feverMult())}. Keep attacking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
             : a.kind === 'charge' && g.s.fervor < 1 ? `${Math.floor(g.s.fervor * 100)}% charged.`
               : cd > 0 ? `Ready again in ${duration(cd)}.` : `Ready. Click to use it${key}.`;
-      const timing = a.kind === 'button' ? `<ul class="tt-l"><li>Lasts ${a.dur}s · cooldown ${duration(a.cooldown ?? 0)}</li></ul>` : '';
+      const timing = a.kind === 'button' ? `<ul class="tt-l"><li>Lasts ${+g.abilityDuration(a.id).toFixed(1)}s · cooldown ${duration(a.cooldown ?? 0)}</li></ul>` : '';
       return `<div class="tt-h"><b>${esc(a.name)}</b><span class="tt-own">${a.kind === 'passive' ? 'always on' : this.touch ? 'ability' : `key ${abilityKey(a.id)}`}</span></div>
         <p class="tt-d">${esc(g.abilityText(a.id))}</p>${timing}<p class="tt-f">${status}</p>`;
     }
@@ -2271,7 +2271,7 @@ export class Ui {
           <p class="muted">Copy your save code to move it to another browser.</p>
           <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
           <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
-          ${document.body.classList.contains('at-menu') ? '' : '<div class="set-row"><button class="btn" data-act="mainMenu">Main menu</button></div>'}
+          <div class="set-row"><a class="btn" href="wiki/" target="_blank" rel="noopener">Wiki</a>${document.body.classList.contains('at-menu') ? '' : '<button class="btn" data-act="mainMenu">Main menu</button>'}</div>
         </div>`;
     }
     if (soft && (html === this.modalKey || performance.now() < this.modalHold)) return;
@@ -2320,8 +2320,8 @@ export class Ui {
     const offer = g.legendOffer();
     if (!g.legendsOpen()) {
       const stirring = g.canDescend();
-      // No offer is rolled until Legends open; the first one always holds these three.
-      const peds = FIRST_OFFER.map((id) => {
+      // No offer is rolled until Legends open: show the one that will be.
+      const peds = g.previewOffer().map((id) => {
         const d = LEGEND_BY_ID.get(id)!;
         const fig = stirring ? charFit(d.sprite, 84, 92) : silhouette(d.sprite, 84, '#0b0710');
         return `<div class="pedestal shade${stirring ? ' stirring' : ''}"><span class="spirit">${WISPS}</span><span class="ped-fig">${fig}</span><span class="ped-stone"></span></div>`;

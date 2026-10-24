@@ -116,7 +116,7 @@ export const ZONES: ZoneDef[] = [
     name: 'The Upper Halls', tiles: 'halls',
     band: [m('goblin', 'Goblin', 0.9), m('tiny_zombie', 'Rotling'), m('imp', 'Imp', 0.8), m('tiny_slug', 'Slug', 1.2), m('ef_bandit', 'Deserter')],
     mid: m('ef_bear', 'Cave Bear'), boss: m('ogre', 'Ogre Chieftain'),
-    lap: [m('cr_crimson_wraith', 'Crimson Wraith'), m('cr_plague_crow', 'Plague Crow', 0.9), m('sd_knight_heavy', 'Fallen Knight', 1.2)],
+    lap: [m('cr_crimson_wraith', 'Crimson Wraith'), m('cr_plague_crow', 'Plague Crow', 0.9), m('knight_f', 'Fallen Knight', 1.2)],
   },
   {
     name: 'The Bone Crypts', tiles: 'crypt',
@@ -152,7 +152,7 @@ export const ZONES: ZoneDef[] = [
     name: 'The Demon Gate', tiles: 'halls',
     band: [m('chort', 'Chort'), m('wogol', 'Wogol', 1.1), m('imp', 'Imp', 0.8), m('masked_orc', 'Cultist', 1.2, 0xff8a8a)],
     mid: m('ogre', 'Hellfire Ogre', 1, 0xff9070), boss: m('sm_oni_red', 'Pit Lord'),
-    lap: [m('sd_knight_elite', 'Gilded Zealot', 1.2), m('sd_knight_heavy', 'Fallen Knight', 1.2), m('cr_king', 'Damned King', 1.1)],
+    lap: [m('sd_knight_elite', 'Gilded Zealot', 1.2), m('knight_f', 'Fallen Knight', 1.2), m('cr_king', 'Damned King', 1.1)],
   },
   {
     name: 'The Frozen Vault', tiles: 'halls',
@@ -461,11 +461,11 @@ export interface AbilityDef {
  *  Cooldowns are uneven (8, 12, 20, 25 and 30 minutes) so they drift apart: lining them all up costs real waiting. */
 export const ABILITIES: AbilityDef[] = [
   { id: 'blade', name: 'Phantom Blade', desc: 'Attacks the front monster for you, once a second.', kind: 'passive', comp: compIndex('squire'), trait: 0 },
-  { id: 'flurry', name: 'Flurry', desc: 'Clicks for you, 10 times a second, for 30s.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 8 * 60 },
+  { id: 'flurry', name: 'Flurry', desc: 'Clicks for you, 10 times a second.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 8 * 60 },
   { id: 'crit', name: 'Critical Hits', desc: 'Your clicks and Phantom Blade can land critical hits: a 3% chance for ×2 damage. Sharp-eyed companions raise both.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
-  { id: 'rampage', name: 'Rampage', desc: 'Charged by attacking. ×2 damage for 10s.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
+  { id: 'rampage', name: 'Rampage', desc: 'Charged by attacking. Your party deals ×2 damage for 10s.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
   { id: 'cleave', name: 'Cleave', desc: 'Your clicks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 12 * 60 },
-  { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold for 30 seconds.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 25 * 60 },
+  { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 25 * 60 },
   { id: 'drums', name: 'War Drums', desc: '+50% crit chance.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 20 * 60 },
   { id: 'legion', name: 'Phantom Legion', desc: 'A Phantom Blade for every monster.', kind: 'button', comp: compIndex('stormcaller'), trait: 4, dur: 30, cooldown: 30 * 60 },
 ];
@@ -626,10 +626,11 @@ const fmtN = (n: number) => (Math.round(n * 100) / 100).toString();
 
 export type LegendId =
   | 'sleeper' | 'fist' | 'needle' | 'hoard' | 'patient' | 'goblinking' | 'unbroken'
-  | 'hourglass' | 'wither' | 'thinning' | 'haggler' | 'restless' | 'lingering' | 'soulcaller' | 'lure' | 'collector' | 'ronin'
+  | 'hourglass' | 'wither' | 'thinning' | 'haggler' | 'restless' | 'soulcaller' | 'lure' | 'collector' | 'ronin'
+  | 'lingering' | 'whirl' | 'headsman' | 'magpie' | 'drummer' | 'host'
   | 'hungry';
 
-/** Power grows steadily (level n costs n souls), utility steeply (2^n, and its effect has a cap), the sink costs 1. */
+/** Power grows steadily (level n costs n souls), utility steeply (2^n; most close in on a cap), the sink costs 1. */
 export type LegendKind = 'power' | 'utility' | 'sink';
 
 export interface LegendDef {
@@ -645,6 +646,8 @@ export interface LegendDef {
   note?: string;
   /** The level that ends it (only the Thinning has one). */
   maxLv?: number;
+  /** The ability it makes last longer, by this many seconds a level. */
+  lengthens?: { ability: AbilityId; secs: number };
 }
 
 /** Utility effects close in on their cap: this share of it at level L is 1 − 0.9^L. */
@@ -658,7 +661,7 @@ export function legendCost(def: LegendDef, lv: number) {
 }
 
 /** Souls to summon your next Legend, by how many you have; a reroll of the offer costs a third of it. */
-export const SUMMON_COST = [1, 2, 4, 8, 16, 35, 70, 125, 250, 500, 800, 1200, 1700, 2200, 2750, 3400, 4100, 5000];
+export const SUMMON_COST = [1, 2, 4, 8, 16, 35, 70, 125, 250, 500, 800, 1200, 1700, 2200, 2750, 3400, 4100, 5000, 6000, 7500, 10_000, 12_500, 16_000];
 export const summonCost = (owned: number) => SUMMON_COST[Math.min(owned, SUMMON_COST.length - 1)];
 export const rerollCost = (owned: number) => Math.ceil(summonCost(owned) / 3);
 /** Legends offered at a time, and the share of souls a respec gives back. */
@@ -669,6 +672,7 @@ const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
 const per = (k: number) => (lv: number) => `+${Math.round(k * lv * 100)}%`;
 const share = (cap: number, show: (n: number) => string) => (lv: number) => show(cap * legendShare(lv));
 const o = (d: LegendDef) => d;
+const longer = (ability: AbilityId, secs: number) => ({ lengthens: { ability, secs }, value: (lv: number) => `+${secs * lv}s` });
 
 export const LEGENDS: LegendDef[] = [
   o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Party damage while idle', value: per(0.25) }),
@@ -683,16 +687,19 @@ export const LEGENDS: LegendDef[] = [
   o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${Math.min(10, lv)}`, maxLv: 10 }),
   o({ id: 'haggler', name: 'The Haggler', kind: 'utility', sprite: 'sm_merchant', what: 'Companion level costs', value: (lv) => `−${pct(1 - 0.95 ** lv)}` }),
   o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'sm_kabuki', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`) }),
-  o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'sm_geisha', what: 'How long abilities and Rampage last', value: share(1, (n) => `+${pct(n)}`) }),
   o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Increased chance a boss is a champion boss (starting on floor 100)', value: share(0.75, (n) => pct(0.25 + n)) }),
   o({ id: 'lure', name: 'The Lure', kind: 'utility', sprite: 'chest_mimic_open', what: 'How often treasure goblins come', value: share(2, (n) => `+${pct(n)}`) }),
   o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'sd_princess', what: 'Card drop chance', value: share(2, (n) => `+${pct(n)}`) }),
   o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance on overkill kills', value: (lv) => `up to ×${1 + lv}`, note: "A kill that deals N× a monster's health has N× the chance to drop its card (gold cards too), up to the cap. Swept floors and time away count." }),
+  o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'sm_geisha', what: 'How long Rampage lasts', ...longer('rampage', 1) }),
+  o({ id: 'whirl', name: 'The Whirl', kind: 'utility', sprite: 'ef_ranger', what: 'How long Flurry lasts', ...longer('flurry', 2) }),
+  o({ id: 'headsman', name: 'The Headsman', kind: 'utility', sprite: 'sd_knight_heavy', what: 'How long Cleave lasts', ...longer('cleave', 4) }),
+  o({ id: 'magpie', name: 'The Magpie', kind: 'utility', sprite: 'sd_merchant', what: 'How long Treasure Sense lasts', ...longer('treasure', 2) }),
+  o({ id: 'drummer', name: 'The Drummer', kind: 'utility', sprite: 'cr_nutcracker', what: 'How long War Drums last', ...longer('drums', 2) }),
+  o({ id: 'host', name: 'The Host', kind: 'utility', sprite: 'ef_tallcleric', what: 'How long Phantom Legion lasts', ...longer('legion', 2) }),
   o({ id: 'hungry', name: 'The Hungry Dark', kind: 'sink', sprite: 'sm_oni_king', what: 'All damage, for every soul fed to it', value: (lv) => `+${lv * 11}%`, note: 'A soul you keep gives +10%. One fed here gives +11%, but you can only get it back with a respec.' }),
 ];
 export const LEGEND_BY_ID = new Map(LEGENDS.map((d) => [d.id, d]));
-/** Your first offer always includes these, so the first pick is a good one. */
-export const FIRST_OFFER: LegendId[] = ['sleeper', 'fist', 'hoard'];
 
 // ---------- the heart (second prestige) ----------
 

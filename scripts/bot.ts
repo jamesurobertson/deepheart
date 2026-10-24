@@ -36,8 +36,8 @@ export interface Profile {
 /** Legends in the order each kind of player wants them, and what a level of each power one is worth to them (the
  *  share of all damage it adds, roughly). */
 const OLD_PREF: Record<'active' | 'idle', LegendId[]> = {
-  active: ['fist', 'unbroken', 'hoard', 'needle', 'thinning', 'hourglass', 'wither', 'soulcaller', 'restless', 'lingering', 'haggler', 'lure', 'goblinking', 'collector', 'ronin', 'hungry', 'sleeper', 'patient'],
-  idle: ['sleeper', 'patient', 'hoard', 'thinning', 'hourglass', 'wither', 'soulcaller', 'haggler', 'lure', 'goblinking', 'restless', 'lingering', 'collector', 'ronin', 'hungry', 'needle', 'fist', 'unbroken'],
+  active: ['fist', 'unbroken', 'hoard', 'needle', 'thinning', 'hourglass', 'wither', 'soulcaller', 'restless', 'lingering', 'haggler', 'lure', 'goblinking', 'collector', 'ronin', 'hungry', 'sleeper', 'patient', 'whirl', 'headsman', 'magpie', 'drummer', 'host'],
+  idle: ['sleeper', 'patient', 'hoard', 'thinning', 'hourglass', 'wither', 'soulcaller', 'haggler', 'lure', 'goblinking', 'restless', 'lingering', 'collector', 'ronin', 'hungry', 'needle', 'fist', 'unbroken', 'whirl', 'headsman', 'magpie', 'drummer', 'host'],
 };
 const OLD_WORTH: Record<'active' | 'idle', Partial<Record<LegendId, number>>> = {
   active: { fist: 0.075, unbroken: 0.1, needle: 0.08, hoard: 0.04, goblinking: 0.01 },

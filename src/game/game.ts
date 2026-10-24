@@ -3,7 +3,7 @@ import Decimal from 'break_infinity.js';
 import {
   CARD_BY_ID, AWAKEN_MILESTONES, COST_GROWTH, FURY, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, HEART_BY_ID, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, featuredFor, modsFor, pickMonster,
   CARDS, CORRUPTION, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, levelMult, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
-  LEGENDS, LEGEND_BY_ID, FIRST_OFFER, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost,
+  LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost,
   type AbilityId, type MilestoneId, type LegendId,
   type Attack, type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
@@ -20,82 +20,82 @@ export const FLOOR_KILLS = 20;
 /** Seconds without attacking by hand before you count as idle (the Sleeper, the Patient), and before a streak breaks
  *  (the Unbroken). */
 export const IDLE_AFTER = 60;
-const STREAK_GAP = 2;
+export const STREAK_GAP = 2;
 /** The Unbroken counts a streak up to this many attacks (about 7 minutes of holding attack). */
 export const STREAK_CAP = 2000;
 /** Heartmarks: the first time ever you beat each 10th floor past this one's boss, a random companion gets one (+50%
  *  damage each, until you awaken). Moving one to a random companion, or to the one you choose, costs souls. */
-const MARK_FROM = 100;
+export const MARK_FROM = 100;
 export const MARK_POWER = 0.5;
 export const MARK_REROLL = 1;
 export const MARK_MOVE = 10;
 /** A boss guards every Nth floor. */
 export const BOSS_EVERY = 5;
-const BOSS_TIME = 30;
+export const BOSS_TIME = 30;
 /** Monsters on the field at once (more with upgrades). */
-const MAX_ON = 10;
-const SPAWN_GAP = 0.12;
+export const MAX_ON = 10;
+export const SPAWN_GAP = 0.12;
 /** A party that could wipe the rest of a floor within this many seconds clears it in one sweep. */
-const SWEEP_SECONDS = 1;
+export const SWEEP_SECONDS = 1;
 /** Seconds between swept floors, so a blitz through old floors still reads as one. */
 const SWEEP_GAP = 0.6;
 /** Seconds a kill's gold lies on the floor before it flies to the bank by itself (your hero or the cursor grabs it sooner). */
-const GOLD_WAIT = 6;
+export const GOLD_WAIT = 6;
 /** Most piles of gold on the floor at once: past this the oldest is banked straight away. */
-const MAX_DROPS = 40;
+export const MAX_DROPS = 40;
 /** Base cleave once the Dwarf Brawler's Cleave is unlocked. */
-const CLEAVE_BASE = 0.1;
+export const CLEAVE_BASE = 0.1;
 /** Abilities stay unlocked once found (true), or are earned again every run with their traits (false). */
 const ABILITIES_KEEP = false;
 /** Seconds between auto-buy's shopping trips. */
-const REBUY_GAP = 0.5;
+export const REBUY_GAP = 0.5;
 /** Ordinary monsters are a fraction of a floor's base health: many small kills. */
 export const TRASH = 0.4;
 /** Every click deals this share of your companions' damage, before upgrades. */
-const CLICK_DPS = 0.05;
+export const CLICK_DPS = 0.05;
 /** Seconds between treasure goblins: rare enough to be a treat, not the engine of the game. */
-const RAID_MIN = 180;
-const RAID_MAX = 420;
-const RAID_STAY = 10;
+export const RAID_MIN = 180;
+export const RAID_MAX = 420;
+export const RAID_STAY = 10;
 /** Attacks by hand (a click, a tap, holding either down, or holding Space) land at most this often; extra clicks
  *  are ignored, so clicking frantically (or with an auto-clicker) gains nothing over holding the button. */
 export const MANUAL_RATE = 5;
 /** The Phantom Blade (the Squire's first trait) attacks on its own this many times a second before upgrades. */
-const AUTO_BASE = 1;
+export const AUTO_BASE = 1;
 /** A new companion is revealed once the gold earned this run reaches this share of their price. */
-const REVEAL_AT = 0.7;
-const FEVER_TIME = 10;
+export const REVEAL_AT = 0.7;
+export const FEVER_TIME = 10;
 /** Clicks a second the Squire's Flurry makes for you. */
-const FLURRY_RATE = 10;
+export const FLURRY_RATE = 10;
 /** Attacks by hand that fill the Rampage meter (about a minute of holding): a charge you save for a boss, not one
  *  that's back before the last has worn off (at 60 it was up 60% of the time). */
-const FEVER_CLICKS = 300;
+export const FEVER_CLICKS = 300;
 /** Attacks during a Rampage that push it to its top tier, and each tier's multiplier on all your damage (the
  *  Unstoppable upgrade and the Blood Drum add to both). */
-const RAMPAGE_STEPS = [20];
-const RAMPAGE_TIERS = [2, 3];
-const DRUMS_CRIT = 0.5;
-const RAMPAGE_EXTEND = 3;
+export const RAMPAGE_STEPS = [20];
+export const RAMPAGE_TIERS = [2, 3];
+export const DRUMS_CRIT = 0.5;
+export const RAMPAGE_EXTEND = 3;
 /** A clutch kill (boss beaten in its last CLUTCH_SECONDS) is worth this many times its gold. */
-const CLUTCH_GOLD = 1.5;
+export const CLUTCH_GOLD = 1.5;
 /** Any monster that climbs the stairs has this chance of being a champion: tougher, glowing, and worth as much gold
  *  as ten ordinary monsters. */
-const CHAMP_CHANCE = 0.01;
+export const CHAMP_CHANCE = 0.01;
 /** Champions start turning up once you reach this floor (and everywhere after it). */
-const CHAMP_FLOOR = 31;
-const CHAMP_HP = 6;
-const CHAMP_GOLD = 10;
+export const CHAMP_FLOOR = 31;
+export const CHAMP_HP = 6;
+export const CHAMP_GOLD = 10;
 /** A boss on a floor you've beaten before is now and then a champion (so farming a boss floor has a jackpot):
  *  tougher, more gold, and the only source of gold boss cards. */
-const CHAMP_BOSS_CHANCE = 1 / 20;
-const CHAMP_BOSS_HP = 3;
-const CHAMP_BOSS_GOLD = 10;
+export const CHAMP_BOSS_CHANCE = 1 / 20;
+export const CHAMP_BOSS_HP = 3;
+export const CHAMP_BOSS_GOLD = 10;
 /** Card drops: 1 in this many kills (or catches). A 12-hour absence is ~170k kills, so ordinary cards sit at 0.001%;
  *  rainbow goblins are rare enough on their own to keep 1%, the best odds anything gets. */
 /** How many spares each brother wants for one card. */
 export const DAN_GIVES = 5;
 export const VICTOR_GIVES = 10;
-const CARD_ODDS = { monster: 100_000, boss: 25_000, champ: 10_000, champBoss: 1_000, goblin: 1_000, rainbow: 100 };
+export const CARD_ODDS = { monster: 100_000, boss: 25_000, champ: 10_000, champBoss: 1_000, goblin: 1_000, rainbow: 100 };
 /** Party damage is shown as numbers in batches this many seconds apart. */
 const DPS_SHOWN_EVERY = 0.35;
 /** A companion swings every SWING_GAP to SWING_GAP + SWING_SPREAD seconds, spending the damage it banked since. */
@@ -108,36 +108,36 @@ export const HIT_DELAY: Record<Attack, number> = {
   knife: 0.62, spear: 0.75, bomb: 1.4, orb: 1.2, ice: 0.75, flask: 1.4, bat: 1.5, skull: 1.2, light: 0.62,
 };
 /** Seconds before the boss of a floor you're farming climbs back up. */
-const BOSS_RESPAWN = 2.5;
+export const BOSS_RESPAWN = 2.5;
 /** Seconds from the boss timer running out (the party knocked flat, getting up, running for it) to falling back a
  *  floor. */
 export const DOWNED_SECONDS = 3.4;
 /** And on the floor above, seconds for the party to run back in before its monsters come. */
-const REGROUP_SECONDS = 1.8;
+export const REGROUP_SECONDS = 1.8;
 /** Share of treasure goblins that are rainbow goblins. Catching one opens the Rainbow Vault a quarter of the time
  *  (always the first time); otherwise it drops a Rainbow Haul of RAINBOW_HAUL times a goblin's plunder. */
-const RAINBOW_CHANCE = 1 / 8;
-const VAULT_CHANCE = 0.25;
-const RAINBOW_HAUL = 3;
+export const RAINBOW_CHANCE = 1 / 8;
+export const VAULT_CHANCE = 0.25;
+export const RAINBOW_HAUL = 3;
 /** Chests in the vault (spread down a long hall that scrolls), how many of them are Rainbow Chests (2 or 3), and what a
  *  Rainbow Chest holds next to an ordinary one. There's no clock: you leave through the exit portal when you like. */
-const VAULT_CHESTS = 40;
+export const VAULT_CHESTS = 40;
 /** How far down the hall the chests go (in the floor's units; the fight's floor is about -9 to 9). */
 export const VAULT_LENGTH = 62;
 const RAINBOW_CHEST_WEIGHT = 10;
 /** Everything in the vault together, in a floor's monster gold: about what its old room of hoarders paid. */
-const VAULT_PAY = 800;
+export const VAULT_PAY = 800;
 /** Opening every chest before time runs out adds this share of the vault's worth. */
-const VAULT_ALL_BONUS = 0.2;
+export const VAULT_ALL_BONUS = 0.2;
 /** Loose coins scattered down the vault's hall (run over them), and the share of the vault's worth they hold together. */
-const VAULT_COINS = 140;
-const VAULT_COIN_SHARE = 0.15;
+export const VAULT_COINS = 140;
+export const VAULT_COIN_SHARE = 0.15;
 /** Treasure goblins loose in the vault (and 1 or 2 rainbow ones), worth this much of an ordinary chest each: gold only. */
-const VAULT_GOBLINS = 12;
+export const VAULT_GOBLINS = 12;
 const VAULT_GOBLIN_CHESTS = 0.5;
 const VAULT_RAINBOW_GOBLIN_CHESTS = 6;
-const BASE_CRIT = 0.03;
-const BASE_CRIT_MULT = 2;
+export const BASE_CRIT = 0.03;
+export const BASE_CRIT_MULT = 2;
 /** Relics and cursed descents are set aside while the prestige layers are reworked (their code stays). */
 export const RELICS_ON = false;
 export const CURSES_ON = false;
@@ -769,7 +769,7 @@ export class Game {
     const a = ABILITY_BY_ID.get(id);
     if (id === 'rampage') return this.unleashRampage();
     if (!a || a.kind !== 'button' || !this.abilityUnlocked(id) || this.abilityCooldown(id) > 0) return false;
-    const dur = (a.dur ?? 0) * (1 + legendShare(this.legendLv('lingering')));
+    const dur = this.abilityDuration(id);
     const buff: Buff = { id, name: a.name, t: dur, dur, dps: 1, click: 1, gold: 1 };
     if (id === 'treasure') buff.gold = 3;
     this.addBuff(buff);
@@ -1009,7 +1009,7 @@ export class Game {
     if (id === 'crit') return `Your clicks and Phantom Blade can land critical hits: a ${pct(p.critBase + p.critUpg + p.critRelic)} chance for ×${+((p.critMultBase + p.critMultUpg) * p.critMultRelic).toFixed(2)} damage.`;
     if (id === 'blade') return `Attacks the front monster for you, ${this.c.autoBase === 1 ? 'once' : `${+this.c.autoBase.toFixed(1)} times`} a second.`;
     if (id === 'cleave') return `Your clicks also hit every other monster for ${pct((CLEAVE_BASE + p.cleaveRelic) * p.cleaveUpg)} damage.`;
-    if (id === 'rampage') return `Charged by attacking. ×${+this.feverMult(0).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
+    if (id === 'rampage') return `Charged by attacking. Your party deals ×${+this.feverMult(0).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
     return ABILITY_BY_ID.get(id)!.desc;
   }
 
@@ -1017,7 +1017,7 @@ export class Game {
     return this.c.gold * this.buffMult('gold') * (this.idle() ? 1 + 0.5 * this.legendLv('patient') : 1);
   }
 
-  /** A running Rampage's multiplier on all your damage. */
+  /** A running Rampage's multiplier on your party's damage. */
   feverMult(tier = this.rampageTier) {
     return RAMPAGE_TIERS[tier] + this.rampageBonus();
   }
@@ -1643,9 +1643,20 @@ export class Game {
 
   /** Seconds a Rampage lasts (before attacking through it adds a little). */
   rampageDuration() {
-    let dur = FEVER_TIME * (1 + legendShare(this.legendLv('lingering')));
+    let dur = FEVER_TIME;
     for (const e of this.effects()) if (e.t === 'fever' && e.dur) dur *= e.dur;
-    return dur;
+    return dur + this.spiritSeconds('rampage');
+  }
+
+  /** Seconds a button ability lasts. */
+  abilityDuration(id: AbilityId) {
+    return (ABILITY_BY_ID.get(id)?.dur ?? 0) + this.spiritSeconds(id);
+  }
+
+  /** Seconds the Spirit that lengthens this ability adds to it. */
+  private spiritSeconds(id: AbilityId) {
+    const spirit = LEGENDS.find((d) => d.lengthens?.ability === id);
+    return spirit ? spirit.lengthens!.secs * this.legendLv(spirit.id) : 0;
   }
 
   private startFever() {
@@ -1926,24 +1937,28 @@ export class Game {
     return rerollCost(this.legendsOwned());
   }
 
-  /** Three Legends you don't have yet (your very first offer always holds the Sleeper, the Fist and the Hoard). */
-  private rollOffer() {
+  /** Three Legends you don't have yet, rolled from the save's seed so a reload can't fish for a better offer. */
+  private pickOffer(roll: number): LegendId[] {
     const s = this.s;
-    const left = LEGENDS.filter((d) => !(d.id in s.legends)).map((d) => d.id as string);
-    if (this.legendsOwned() === 0 && s.spentSouls === 0) {
-      s.legendOffer = FIRST_OFFER.filter((id) => left.includes(id));
-      return;
-    }
+    const left = LEGENDS.filter((d) => !(d.id in s.legends)).map((d) => d.id);
     // A reroll shows as many new faces as it can.
     const fresh = left.filter((id) => !s.legendOffer.includes(id));
     const pool = fresh.length >= OFFER_SIZE ? fresh : left;
-    const roll = s.legendRolls++;
-    const pick: string[] = [];
+    const pick: LegendId[] = [];
     for (let k = 0; pick.length < Math.min(OFFER_SIZE, pool.length); k++) {
       const id = pool[Math.floor(seeded(s.legendSeed, roll * 64 + k) * pool.length)];
       if (!pick.includes(id)) pick.push(id);
     }
-    s.legendOffer = pick;
+    return pick;
+  }
+
+  private rollOffer() {
+    this.s.legendOffer = this.pickOffer(this.s.legendRolls++);
+  }
+
+  /** The first offer, before Legends open: what the circle will hold once they do. */
+  previewOffer(): LegendId[] {
+    return this.s.legendOffer.length ? (this.s.legendOffer as LegendId[]) : this.pickOffer(this.s.legendRolls);
   }
 
   /** The Legends on offer right now (rolled the first time you look). */
