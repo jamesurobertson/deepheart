@@ -1,4 +1,4 @@
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, FIRST_OFFER, OFFER_SIZE, RESPEC_REFUND, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, FIRST_OFFER, OFFER_SIZE, RESPEC_REFUND, summonCost, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TUNE, bossSouls, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -2116,6 +2116,17 @@ export class Ui {
         <li>Champion bosses (from floor ${TUNE.goldBossFrom}) drop souls the first time you beat them each run, more the deeper they are.</li></ul>
         <p class="tt-d">Each soul you keep adds ${soulPct(1)} damage. Or spend them on Spirits.</p>`;
     }
+    if (kind === 'summon') {
+      const owned = g.legendsOwned();
+      const next = Array.from({ length: Math.min(4, LEGENDS.length - owned - 1) }, (_, k) => fmt(summonCost(owned + 1 + k)));
+      return `<div class="tt-h"><b>Summon cost</b></div><p class="tt-d">Each Spirit costs about double the last.</p>
+        ${next.length ? `<p class="tt-f">Then: ${next.map((n) => `${G.soul(1.2)} ${n}`).join(' · ')}</p>` : ''}`;
+    }
+    if (kind === 'respec') {
+      const back = Math.floor(g.s.legendSpent * RESPEC_REFUND);
+      return `<div class="tt-h"><b>Respec</b></div><p class="tt-d">Every Spirit leaves. You get back ${RESPEC_REFUND * 100}% of the souls spent on them.</p>
+        <p class="tt-f">Spent ${G.soul(1.2)} ${fmt(g.s.legendSpent)} · back ${G.soul(1.2)} ${fmt(back)}</p>`;
+    }
     if (kind === 'legend') {
       const d = LEGEND_BY_ID.get(id as LegendId)!;
       const lv = g.legendLv(d.id);
@@ -2332,7 +2343,7 @@ export class Ui {
       return `<button class="pedestal ${id === this.legendPick ? 'on' : 'ghost'}" data-pick="${id}"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 72, 96)}</span><span class="ped-stone"></span><b>${esc(d.name)}</b></button>`;
     }).join('');
     const summon = pick
-      ? `<p class="legend-warn">Summon a Spirit for <b>${G.soul(2)} ${fmt(price)} soul${price === 1 ? '' : 's'}</b>. Every soul you spend gives up ${soulPct(1)} damage.</p>
+      ? `<p class="legend-warn">Summon a Spirit for <b class="tip-dots" data-tip="summon">${G.soul(2)} ${fmt(price)} soul${price === 1 ? '' : 's'}</b>. Every soul you spend gives up ${soulPct(1)} damage.</p>
         <div class="pedestals">${pedestals}</div>
         ${LEGENDS.length - g.legendsOwned() > OFFER_SIZE ? `<div class="legend-reroll"><button class="btn" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>Reroll all three · ${G.soul(1.5)} ${fmt(g.rerollPrice())}</button></div>` : ''}
         <div class="legend-panel">
@@ -2356,9 +2367,9 @@ export class Ui {
         <div class="lc-next">${next}</div>
       </div>`;
     }).join('');
-    const respec = `<button class="btn small lc-respec" data-act="respec">Respec · ${G.soul(1.2)} +${fmt(Math.floor(g.s.legendSpent * RESPEC_REFUND))}</button>`;
+    const respec = `<button class="btn small lc-respec" data-act="respec" data-tip="respec">Respec · ${G.soul(1.2)} +${fmt(Math.floor(g.s.legendSpent * RESPEC_REFUND))}</button>`;
     return `${summon}
-      ${owned.length ? `<div class="lc-head"><h3>Your Spirits</h3><small>${owned.length} · ${G.soul(1.2)} ${fmt(free)} to spend</small>${respec}</div><div class="lcards">${cards}</div>` : ''}`;
+      ${owned.length ? `<div class="lc-head"><h3>Your Spirits</h3><small>${owned.length}</small>${respec}</div><div class="lcards">${cards}</div>` : ''}`;
   }
 
   /** Until then, ticks leave the open panel alone, so an animation in it plays out. */

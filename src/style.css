@@ -700,6 +700,8 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 /* Summoning: three Spirits on stone pedestals. Not yours yet, a Spirit is a ghost; the picked one materializes. */
 .legend-warn { margin: 4px 0 10px; text-align: center; font: 700 17px/1.3 var(--f-text); color: var(--soul); }
 .legend-warn b { color: var(--text); white-space: nowrap; }
+/* Square soul-purple dots under text with a tooltip. */
+.tip-dots { padding-bottom: 3px; background: linear-gradient(to right, var(--soul) 2px, transparent 2px) 0 100% / 5px 2px repeat-x; cursor: help; }
 .pedestals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
 .pedestal { position: relative; display: grid; justify-items: center; align-content: end; gap: 0; padding: 6px 4px 8px; background: none; border: 0; cursor: pointer; }
 .ped-fig { position: relative; z-index: 1; display: grid; place-items: end center; height: 100px; margin-bottom: -10px; transition: transform 0.15s; }
