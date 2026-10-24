@@ -2124,7 +2124,7 @@ export class Ui {
     if (kind === 'mark') {
       const i = Number(id);
       const n = g.s.marks[i];
-      return `<div class="tt-h"><b>${n} Heartmark${n === 1 ? '' : 's'}</b></div><p class="tt-d">The ${esc(COMPS[i].name)} deals +${n * MARK_POWER * 100}% damage, until you awaken.</p><p class="tt-f">Move Heartmarks in Ascend → Heartmarks.</p>`;
+      return `<div class="tt-h"><b>${n} Heartmark${n === 1 ? '' : 's'}</b></div><p class="tt-d">The ${esc(COMPS[i].name)} deals +${n * MARK_POWER * 100}% damage.</p>`;
     }
     if (kind === 'heart') {
       const h = HEART_BY_ID.get(id)!;
@@ -2372,6 +2372,8 @@ export class Ui {
     const peds = this.el.modal.querySelector('.pedestals');
     if (!peds || matchMedia('(prefers-reduced-motion: reduce)').matches) return this.renderModal();
     this.hooks.sound('descend', { vol: 0.35, rate: 1.4 });
+    // (The last reroll's arrive outranks the vanish: clear it, or every reroll after the first skips the warp.)
+    peds.classList.remove('arrive');
     peds.classList.add('vanish');
     this.modalHold = performance.now() + 1400;
     setTimeout(() => {

@@ -720,7 +720,7 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .pedestal.materialize .px { animation: materialize 0.6s ease-out; }
 @keyframes materialize { 0% { filter: grayscale(1) sepia(1) hue-rotate(215deg) saturate(2.6) brightness(2.2) drop-shadow(0 0 14px #fff); opacity: 0.85; } 100% { filter: none; opacity: 1; } }
 /* A reroll: the old spirits burst away; the new ones rise off their stones in a column of light, one after another. */
-.pedestals.vanish .ped-fig { animation: vanish 0.38s ease-in forwards; }
+.pedestals.vanish .pedestal .ped-fig { animation: vanish 0.38s ease-in forwards; }
 .pedestals.vanish .pedestal b { transition: opacity 0.3s; opacity: 0; }
 @keyframes vanish { to { opacity: 0; transform: translateY(-46px) scale(0.6, 1.4); filter: brightness(3) blur(2px); } }
 .pedestals.arrive .pedestal:nth-child(2) { --d: 0.14s; }
