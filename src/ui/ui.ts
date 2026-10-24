@@ -2351,10 +2351,10 @@ export class Ui {
       const lv = g.legendLv(d.id);
       const cost = g.legendLevelCost(d.id);
       const next = g.legendMaxed(d.id)
-        ? '<span class="lc-max">Max level</span>'
-        : `<span>Next: ${esc(d.value(lv + 1))}</span><button class="btn primary" data-legend="${d.id}" ${free >= cost ? '' : 'disabled'}>Level up · ${G.soul(1.5)} ${fmt(cost)}</button>`;
+        ? `<span class="lc-max" data-tip="legend:${d.id}">Max level</span>`
+        : `<span>Next: ${esc(d.value(lv + 1))}</span><span class="lc-up" data-tip="legend:${d.id}" data-legend="${d.id}"><button class="btn primary" ${free >= cost ? '' : 'disabled'}>Level up · ${G.soul(1.5)} ${fmt(cost)}</button></span>`;
       return `<div class="lcard" data-card="${d.id}">
-        <div class="lc-fig" data-tip="legend:${d.id}"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 88, 96)}</span><span class="ped-stone"></span></div>
+        <div class="lc-fig"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 88, 96)}</span><span class="ped-stone"></span></div>
         <div class="lc-nm"><b>${esc(d.name)}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
         <div class="lc-val">${esc(d.value(lv))}</div>
         <div class="lc-what">${esc(d.what)}</div>

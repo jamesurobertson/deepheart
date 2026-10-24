@@ -1279,8 +1279,6 @@ export class Game {
     if (this.curseActive('mending') && !mods.includes('regen')) mods.push('regen');
     const bite = this.modBite();
     const giant = mods.includes('giant');
-    // Zone bosses from floor 30 on are the walls; the first two just teach you what a boss is, and the rest before the
-    // floor-30 boss are a little softer so the first wall is that one.
     const zone = this.s.floor % 10 === 0 && this.s.floor >= DESCEND_FLOOR ? TUNE.zoneBoss : 1;
     const first = this.s.floor <= 10 ? 0.5 : this.s.floor < DESCEND_FLOOR ? 0.5 : 1;
     const champ = this.goldBoss(this.s.floor);
@@ -1884,7 +1882,6 @@ export class Game {
     s.buffs = [];
     s.cooldowns = {};
     s.fervor = 0;
-    // Cooldowns keep running through a reset: ascending isn't a way to have every skill back at once.
     this.stash = [];
     this.vaultOn = false;
     this.vault = null;

@@ -783,7 +783,9 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .lc-val { font: 400 32px/1 'Jersey 10'; color: var(--soul); text-shadow: 0 0 14px rgba(179, 140, 255, 0.45); }
 .lc-what { font-size: 13px; color: var(--dim); }
 .lc-next { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; padding-top: 8px; border-top: 2px solid #3b2b2e; font-size: 13px; color: var(--text); }
-.lc-next .btn { margin-left: auto; }
+.lc-next .lc-up { margin-left: auto; }
+/* A greyed-out Level up still shows its tooltip: the hover goes to the wrapper. */
+.lc-up .btn:disabled { pointer-events: none; }
 .lc-max { color: var(--gold); }
 .lc-head .lc-respec { margin-left: auto; align-self: center; color: var(--dim); }
 .lcard.flaring { animation: pop 0.45s ease-out; }
@@ -1593,3 +1595,6 @@ body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticke
 @media (orientation: portrait) {
   .mm-panel { width: 100%; justify-content: flex-start; padding-top: calc(28px + var(--safe-t)); background: linear-gradient(180deg, rgba(8, 4, 6, 0.95) 50%, rgba(8, 4, 6, 0) 64%); }
 }
+
+/* Numbers that change in place keep their width (Jersey has tabular digits; after the `font` shorthands, which reset them). */
+.ab-time, .bank-v, .rate b, .buff-t small, .floor-bar span, .floor-n, .gen-cost, .gen-lv, .gen-dps, .as-total, .stats dd, .bd td, .lc-val, .lc-lv span { font-variant-numeric: tabular-nums; }

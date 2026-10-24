@@ -205,3 +205,11 @@ tr.sep td { background: var(--panel-hi); color: var(--dim); font: 400 11px/1.3 v
 }
 .cx-out .tbl { margin-bottom: 10px; }
 .cx-out th, .cx-out td { padding: 5px 8px; font-size: 15px; }
+.cx-start { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; }
+.cx-start > span { margin-right: 6px; color: var(--faint); font: 400 11px/1 var(--f-label); letter-spacing: 1px; text-transform: uppercase; }
+.cx-seg { padding: 5px 12px; background: var(--panel); color: var(--dim); border: 2px solid var(--line-hi); font: 400 16px/1.1 var(--f-text); cursor: pointer; }
+.cx-seg:hover:not(:disabled) { color: var(--text); border-color: var(--soul); }
+.cx-seg.on { color: var(--gold-hi); border-color: var(--gold); background: var(--panel-hi); }
+.cx-seg:disabled { opacity: 0.4; cursor: default; }
+.cx-start .cx-btn { margin-left: auto; }
+.cx-paste { margin: 0 0 10px; }

@@ -48,7 +48,7 @@ interface Scenario {
 }
 
 /** Seconds, readable from a blink to an age. */
-const time = (t: number) => (t === Infinity ? 'Never' : t < 0.1 ? 'under 0.1s' : t < 1000 ? `${+t.toFixed(1)}s` : `${fmt(t)}s`);
+const time = (t: number) => (t === Infinity ? 'Never' : t < 0.1 ? 'under 0.1s' : t < 1000 ? `${+t.toFixed(1)}s` : t < 86_400 ? `${+(t / 60).toFixed(0)} min` : 'over a day');
 
 const buff = (id: Buff['id'], dps = 1, click = 1, gold = 1): Buff => ({ id, name: id, t: 999, dur: 999, dps, click, gold });
 
@@ -102,7 +102,7 @@ const delta = (now: Decimal | number, was: Decimal | number) => {
   return ` <span class="cx-d ${r > 1 ? 'up' : 'down'}">${text}</span>`;
 };
 
-const body = () => `<p class="lede">Try out a build. The calculator starts from your save in this browser, if there is one, and runs the game's own math on whatever you change.</p>
+const body = () => `<p class="lede">Try out a build. Start from your save, a new game or a save code, change anything, and see what it does. It runs the game's own math.</p>
   <div class="cx-src"></div>
   <div class="cx">
     <div class="cx-in"></div>
@@ -122,12 +122,25 @@ function mount(root: HTMLElement) {
   const traitsOwned = (s: SaveState, i: number) => traitIds(i).filter((u) => s.upgrades.includes(u.id)).length;
   const soulsKept = (s: SaveState) => Math.max(0, s.souls - s.spentSouls);
 
+  type Start = 'save' | 'new' | 'code';
+  let start: Start = found ? 'save' : 'new';
+  let codeSave: SaveState | null = null;
+
   function showSource() {
-    src.innerHTML = `<p>${found ? 'Using your save from this browser.' : 'No save found in this browser: starting from a new game.'}
-      <button class="cx-btn" data-act="reset">Back to ${found ? 'my save' : 'a new game'}</button>
-      <button class="cx-btn" data-act="clear">Empty party</button></p>
-      <details><summary>Load a save code</summary><p>Copy your save from Options → Export in the game and paste it here.</p>
-      <textarea class="cx-code" rows="3" spellcheck="false"></textarea><button class="cx-btn" data-act="code">Load</button> <span class="cx-msg"></span></details>`;
+    const opt = (k: Start, label: string, off = false) => `<button class="cx-seg${start === k ? ' on' : ''}" data-start="${k}"${off ? ' disabled' : ''}>${label}</button>`;
+    src.innerHTML = `<div class="cx-start"><span>Start from</span>
+        ${opt('save', 'My save', !found)}${opt('new', 'New game')}${opt('code', 'Save code')}
+        <button class="cx-btn" data-act="reset">Undo my changes</button></div>
+      ${start === 'code' ? `<div class="cx-paste"><p>Copy your save from Options in the game and paste it here.</p>
+        <textarea class="cx-code" rows="3" spellcheck="false"></textarea><button class="cx-btn" data-act="code">Load</button> <span class="cx-msg">${codeSave ? 'Loaded.' : ''}</span></div>` : ''}
+      ${found ? '' : '<p class="muted">No save in this browser yet.</p>'}
+      <p class="muted">Results show how far your changes move each number from where you started.</p>`;
+  }
+
+  function startFrom(k: Start) {
+    start = k;
+    base = k === 'save' && found ? found : k === 'code' && codeSave ? codeSave : clone(newSave());
+    edit = clone(base);
   }
 
   function showInputs() {
@@ -231,18 +244,20 @@ function mount(root: HTMLElement) {
   }
 
   src.addEventListener('click', (e) => {
-    const act = (e.target as HTMLElement).closest<HTMLElement>('[data-act]')?.dataset.act;
-    if (act === 'reset') edit = clone(base);
-    else if (act === 'clear') {
-      edit.owned = edit.owned.map(() => 0);
-      edit.upgrades = [];
-    } else if (act === 'code') {
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-start], [data-act]');
+    if (!el) return;
+    if (el.dataset.start) startFrom(el.dataset.start as Start);
+    else if (el.dataset.act === 'reset') edit = clone(base);
+    else if (el.dataset.act === 'code') {
       const loaded = decodeSave(src.querySelector<HTMLTextAreaElement>('.cx-code')!.value);
-      src.querySelector('.cx-msg')!.textContent = loaded ? 'Loaded.' : 'That code didn\'t work.';
-      if (!loaded) return;
-      base = loaded;
-      edit = clone(base);
-    } else return;
+      if (!loaded) {
+        src.querySelector('.cx-msg')!.textContent = 'That code didn\'t work.';
+        return;
+      }
+      codeSave = loaded;
+      startFrom('code');
+    }
+    showSource();
     showInputs();
     showResults();
   });
