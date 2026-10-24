@@ -32,7 +32,7 @@ const navbox = () => {
 
 const home: Page = {
   id: 'home', group: 'Start here', title: 'Deepheart Wiki', summary: 'Every system in Deepheart, with the numbers behind it.',
-  body: () => `<p class="lede">Everything in Deepheart and the numbers behind it. Search with the box at the top, or press <code>/</code>.</p>${navbox()}`,
+  body: () => `<p class="lede">Search with the box at the top, or press <code>/</code>.</p>${navbox()}`,
 };
 
 export const PAGES: Page[] = [home, ...OTHER_PAGES.slice(0, 1), CALCULATOR, ...DUNGEON_PAGES, ...PARTY_PAGES, ...SOUL_PAGES, ...SPIRIT_PAGES, ...COLLECTION_PAGES, ...OTHER_PAGES.slice(1)];

@@ -117,14 +117,14 @@ const goblinsBody = () => `<p class="lede">Now and then a treasure goblin runs a
   <p>Goblins start once you've made a few kills. After that one comes every ${secs(RAID_MIN)} to ${secs(RAID_MAX)}, and it takes ${RAID_STAY} seconds to cross the floor. ${link('spirit-lure', 'The Lure')} brings them up to three times as often.</p>
   ${h2('What a goblin drops')}
   ${table(['Reward', 'Chance', 'What you get'], [
-    ['<b>Plunder</b>', '40%', 'A pile of gold: 10 to 20 times the floor\'s gold (about 25 to 50 kills\' worth)'],
+    ['<b>Plunder</b>', '30%', 'A pile of gold: 10 to 20 times the floor\'s gold (about 25 to 50 kills\' worth)'],
     ['<b>Bloodlust</b>', '25%', 'Your party deals ×7 damage for 7 seconds'],
-    ['<b>Frenzy</b>', '20%', 'Your attacks deal ×77 damage for 10 seconds'],
-    ['<b>Gold Rush</b>', '15%', 'All gold ×7 for 30 seconds'],
+    ['<b>Frenzy</b>', '20%', 'Your attacks deal ×77 damage for 7 seconds'],
+    ['<b>Gold Rush</b>', '25%', 'All gold ×7 for 30 seconds'],
   ])}
   <p>Every goblin you catch can also drop its card. ${link('spirit-goblinking', 'The Wish')} boosts goblin gold.</p>
   ${h2('Rainbow goblins')}
-  <p>After your first catch, ${pct(RAINBOW_CHANCE, 1)} of goblins are rainbow goblins. Catching one opens the Rainbow Vault: always the first time, and after that with a ${pct(VAULT_CHANCE, 0)} chance. Otherwise it drops a Rainbow Haul of ${RAINBOW_HAUL * 10} to ${RAINBOW_HAUL * 20} times the floor's gold.</p>
+  <p>After your first catch, ${pct(RAINBOW_CHANCE, 1)} of goblins are rainbow goblins. Catching one opens the Rainbow Vault ${pct(VAULT_CHANCE, 0)} of the time. Otherwise it drops a Rainbow Haul of ${RAINBOW_HAUL * 10} to ${RAINBOW_HAUL * 20} times the floor's gold.</p>
   ${h2('The Rainbow Vault')}
   <p>A hall of treasure away from the fight. Choose which companion goes in; the floor waits for you, and the boss timer stops. There's no timer inside. Leave by the portal at the end.</p>
   ${table(['Inside', 'Worth'], [

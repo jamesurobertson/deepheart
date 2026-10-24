@@ -655,8 +655,8 @@ export class Game {
     if (s.autoTipSeen === undefined) s.autoTipSeen = (s.descents ?? 0) > 1;
     if (s.soulBossDone === undefined) s.soulBossDone = (s.descents ?? 0) > 0 || (s.bossSouls ?? 0) > 0;
     // Renamed monsters (a card's id is its name): cards and kills pass to the new name. The Rotting Deep's floor-45
-    // boss used to be the Bloated Ogre.
-    for (const [was, now] of [['bloated-ogre', 'sludge-walker'], ['bone-archer', 'skeleton-archer'], ['hooded-bones', 'santa-skeleton']]) {
+    // boss used to be the Bloated Ogre; the Frozen Vault's Frost Imp became the Frost Oni when the two swapped places.
+    for (const [was, now] of [['bloated-ogre', 'sludge-walker'], ['bone-archer', 'skeleton-archer'], ['hooded-bones', 'santa-skeleton'], ['frost-imp', 'frost-oni']]) {
       const old = s.cards?.[was];
       if (old) {
         const card = (s.cards[now] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
@@ -1750,7 +1750,7 @@ export class Game {
     this.s.raids++;
     if (r.rainbow) this.s.rainbows++;
     if (this.cardRoll(r.rainbow ? CARD_ODDS.rainbow : CARD_ODDS.goblin)) this.giveCard(r.rainbow ? RAINBOW_CARD : GOBLIN_CARD, false, 'raid');
-    if (r.rainbow && (this.s.vaults === 0 || this.debugRainbow || Math.random() < VAULT_CHANCE)) {
+    if (r.rainbow && (this.debugRainbow || Math.random() < VAULT_CHANCE)) {
       this.events.push({ t: 'raidCatch', id: r.id, reward: 'vault' });
       // The gold on the floor doesn't wait out the slow motion: it all flies up to the bank.
       this.bankAllDrops('sweep');
@@ -1795,9 +1795,9 @@ export class Game {
 
   private rollReward(): RaidReward {
     const r = Math.random();
-    if (r < 0.4) return 'plunder';
-    if (r < 0.65) return 'bloodlust';
-    if (r < 0.85) return 'heartstorm';
+    if (r < 0.3) return 'plunder';
+    if (r < 0.55) return 'bloodlust';
+    if (r < 0.75) return 'heartstorm';
     return 'horde';
   }
 
@@ -1805,7 +1805,7 @@ export class Game {
     const b = (id: Buff['id'], name: string, t: number, dps: number, click: number, gold: number): Buff => ({ id, name, t: t * effect, dur: t * effect, dps, click, gold });
     switch (reward) {
       case 'bloodlust': return b('bloodlust', 'Bloodlust', 7, 7, 1, 1);
-      case 'heartstorm': return b('heartstorm', 'Frenzy', 10, 1, 77, 1);
+      case 'heartstorm': return b('heartstorm', 'Frenzy', 7, 1, 77, 1);
       case 'soulstorm': return b('soulstorm', 'Soul Storm', 6, 666, 666, 1);
       default: return b('horde', 'Gold Rush', 30, 1, 1, 7);
     }
@@ -1821,8 +1821,8 @@ export class Game {
     const from = Math.random() < 0.5 ? -1 : 1;
     // Your first goblin is always an ordinary one; rainbows only turn up once you know what to do with a goblin.
     const rainbow = this.debugRainbow || (this.s.raids > 0 && Math.random() < RAINBOW_CHANCE);
-    // The first rainbow goblin lingers, so it's caught (and the vault seen) rather than missed.
-    const stay = rainbow && this.s.vaults === 0 ? RAID_STAY * 1.8 : RAID_STAY;
+    // The first rainbow goblin lingers, so it's caught rather than missed.
+    const stay = rainbow && this.s.rainbows === 0 ? RAID_STAY * 1.8 : RAID_STAY;
     this.raid = { id: this.seq++, from, t: 0, stay, rainbow };
     if (rainbow) this.s.rainbowSeen = true;
     this.events.push({ t: 'raidSpawn', id: this.raid.id, from, rainbow });

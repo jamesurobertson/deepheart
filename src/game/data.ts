@@ -56,7 +56,7 @@ export const COMPS: CompDef[] = [
   c('stormcaller', 'Stormcaller', 'wizzard_f', 1e10, 3.4e7, 'storm', 'Brought her own weather. Down here, of all places.'),
   c('venomblade', 'Venomblade', 'lizard_f', 7e10, 3.8e8, 'dark', 'Every blade is poisoned. Every single one. She has a lot.'),
   c('doctor', 'Plague Doctor', 'doc', 5e11, 1.1e9, 'flask', 'Treats monsters with a strict regimen of dying.'),
-  c('frostimp', 'Frost Oni', 'sm_oni_blue', 4e12, 6.6e9, 'ice', 'Followed you up from the Frozen Vault. Will not leave. Brings its own blizzard and a very big club.'),
+  c('frostimp', 'Frost Imp', 'cr_frost_imp', 4e12, 6.6e9, 'ice', 'Followed you up from the Frozen Vault. Will not leave. Brings its own blizzard.'),
   c('hollow', 'Hollow Knight', 'pumpkin_dude', 2.5e13, 3.3e10, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.'),
   c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 2e14, 2e11, 'dark', 'Broke every vow but one: never stop swinging.'),
   c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2.5e11, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
@@ -158,7 +158,7 @@ export const ZONES: ZoneDef[] = [
     name: 'The Frozen Vault', tiles: 'halls',
     band: [m('ice_zombie', 'Frost Husk', 1.2), m('skelet', 'Frozen Skeleton', 1, 0xb0e0ff), m('ef_wolf', 'Frost Wolf', 1, 0xd0f0ff), m('necromancer', 'Rime Witch', 0.9, 0xa0d8ff)],
     mid: m('ef_golem', 'Ice Golem', 1, 0xa8e0ff), boss: m('ef_troll', 'Frost Troll', 1, 0xa8d8ff),
-    lap: [m('cr_frost_imp', 'Frost Imp', 0.9), m('cr_snowman', 'Snow Brute', 1.2), m('cr_ice_ghost', 'Rime Ghost'), m('cr_nutcracker', 'Tin Soldier')],
+    lap: [m('sm_oni_blue', 'Frost Oni', 0.9), m('cr_snowman', 'Snow Brute', 1.2), m('cr_ice_ghost', 'Rime Ghost'), m('cr_nutcracker', 'Tin Soldier')],
   },
 ];
 
