@@ -81,7 +81,7 @@ function legendDetail(d: LegendDef, lv: number): string {
     ${d.note ? `<p class="od-note">${esc(d.note)}</p>` : ''}`;
 }
 
-/** The figures behind a sleeping Legend's pedestal: a few soul wisps, placed by index so a re-render draws the same ones. */
+/** The figures behind a Spirit's pedestal: a few soul wisps, placed by index so a re-render draws the same ones. */
 const WISPS = Array.from({ length: 7 }, (_, k) =>
   `<i style="--x:${10 + ((k * 37) % 80)}%;--d:${(2.4 + ((k * 13) % 22) / 10).toFixed(1)}s;--w:${-((k * 29) % 40) / 10}s;--s:${(0.6 + ((k * 7) % 8) / 10).toFixed(1)}"></i>`).join('');
 
@@ -872,7 +872,7 @@ export class Ui {
       case 'respec':
         if (!this.respecArmed) {
           this.respecArmed = true;
-          el.textContent = 'Really let every Legend go?';
+          el.textContent = 'Really let every Spirit go?';
           setTimeout(() => {
             this.respecArmed = false;
             if (el.isConnected) this.renderModal();
@@ -2114,7 +2114,7 @@ export class Ui {
         <p class="tt-d">You get them when you ascend:</p>
         <ul class="tt-l"><li>1 soul for every ${fmt(TUNE.levelsPerSoul)} companion levels you bought this run.</li>
         <li>Champion bosses (from floor ${TUNE.goldBossFrom}) drop souls the first time you beat them each run, more the deeper they are.</li></ul>
-        <p class="tt-d">Each soul you keep adds ${soulPct(1)} damage. Or spend them on Legends.</p>`;
+        <p class="tt-d">Each soul you keep adds ${soulPct(1)} damage. Or spend them on Spirits.</p>`;
     }
     if (kind === 'legend') {
       const d = LEGEND_BY_ID.get(id as LegendId)!;
@@ -2321,7 +2321,7 @@ export class Ui {
         const fig = stirring ? charFit(d.sprite, 84, 92) : silhouette(d.sprite, 84, '#0b0710');
         return `<div class="pedestal shade${stirring ? ' stirring' : ''}"><span class="spirit">${WISPS}</span><span class="ped-fig">${fig}</span><span class="ped-stone"></span></div>`;
       }).join('');
-      return `<div class="legend-await"><div class="pedestals">${peds}</div><p>Legends await after you ascend</p></div>`;
+      return `<div class="legend-await"><div class="pedestals">${peds}</div><p>Spirits await after you ascend</p></div>`;
     }
     const free = g.soulsFree();
     const price = g.summonPrice();
@@ -2329,10 +2329,10 @@ export class Ui {
     const pick = this.legendPick ? LEGEND_BY_ID.get(this.legendPick)! : null;
     const pedestals = offer.map((id) => {
       const d = LEGEND_BY_ID.get(id)!;
-      return `<button class="pedestal ${id === this.legendPick ? 'on' : 'ghost'}" data-pick="${id}"><span class="ped-fig">${charFit(d.sprite, 72, 96)}</span><span class="ped-stone"></span><b>${esc(d.name)}</b></button>`;
+      return `<button class="pedestal ${id === this.legendPick ? 'on' : 'ghost'}" data-pick="${id}"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 72, 96)}</span><span class="ped-stone"></span><b>${esc(d.name)}</b></button>`;
     }).join('');
     const summon = pick
-      ? `<p class="legend-warn">Summon a Legend for <b>${G.soul(2)} ${fmt(price)} soul${price === 1 ? '' : 's'}</b>. Every soul you spend gives up ${soulPct(1)} damage.</p>
+      ? `<p class="legend-warn">Summon a Spirit for <b>${G.soul(2)} ${fmt(price)} soul${price === 1 ? '' : 's'}</b>. Every soul you spend gives up ${soulPct(1)} damage.</p>
         <div class="pedestals">${pedestals}</div>
         ${LEGENDS.length - g.legendsOwned() > OFFER_SIZE ? `<div class="legend-reroll"><button class="btn" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>Reroll all three · ${G.soul(1.5)} ${fmt(g.rerollPrice())}</button></div>` : ''}
         <div class="legend-panel">
@@ -2340,7 +2340,7 @@ export class Ui {
           ${legendDetail(pick, 0)}
           <div class="set-row"><button class="btn primary" data-act="summon" ${free >= price ? '' : 'disabled'}>Summon ${esc(pick.name)}</button></div>
         </div>`
-      : '<p class="muted">Every Legend has joined you.</p>';
+      : '<p class="muted">Every Spirit has joined you.</p>';
     const owned = LEGENDS.filter((d) => g.legendLv(d.id) > 0);
     const cards = owned.map((d) => {
       const lv = g.legendLv(d.id);
@@ -2349,7 +2349,7 @@ export class Ui {
         ? '<span class="lc-max">Max level</span>'
         : `<span>Next: ${esc(d.value(lv + 1))}</span><button class="btn primary" data-legend="${d.id}" ${free >= cost ? '' : 'disabled'}>Level up · ${G.soul(1.5)} ${fmt(cost)}</button>`;
       return `<div class="lcard" data-card="${d.id}">
-        <div class="lc-fig" data-tip="legend:${d.id}"><span class="ped-fig">${charFit(d.sprite, 88, 96)}</span><span class="ped-stone"></span></div>
+        <div class="lc-fig" data-tip="legend:${d.id}"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 88, 96)}</span><span class="ped-stone"></span></div>
         <div class="lc-nm"><b>${esc(d.name)}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
         <div class="lc-val">${esc(d.value(lv))}</div>
         <div class="lc-what">${esc(d.what)}</div>
@@ -2360,7 +2360,7 @@ export class Ui {
       ? `<div class="lc-respec"><button class="btn small" data-act="respec">Respec: let them all go for ${G.soul(1.2)} ${fmt(Math.floor(g.s.legendSpent * RESPEC_REFUND))}</button></div>`
       : '';
     return `${summon}
-      ${owned.length ? `<div class="lc-head"><h3>Your Legends</h3><small>${owned.length} · ${G.soul(1.2)} ${fmt(free)} to spend</small></div><div class="lcards">${cards}</div>` : ''}
+      ${owned.length ? `<div class="lc-head"><h3>Your Spirits</h3><small>${owned.length} · ${G.soul(1.2)} ${fmt(free)} to spend</small></div><div class="lcards">${cards}</div>` : ''}
       ${respec}`;
   }
 
@@ -2383,26 +2383,17 @@ export class Ui {
     }, 380);
   }
 
-  /** A Legend just summoned or levelled: bring its card into view, then let it flare once the scroll settles. */
+  /** A Spirit just summoned or levelled: jump its card into view, then let it flare. */
   private flareLegend(id: LegendId) {
     const card = this.el.modal.querySelector<HTMLElement>(`[data-card="${id}"]`);
     if (!card) return;
     const box = card.getBoundingClientRect();
     const view = this.el.modal.getBoundingClientRect();
-    if (box.top >= view.top && box.bottom <= view.bottom) return this.flare(card);
-    // Only the panel scrolls (scrollIntoView would also shift the game's own clipped layers sideways).
-    const by = box.top < view.top ? box.top - view.top - 12 : box.bottom - view.bottom + 12;
-    this.el.modal.scrollBy({ top: by, behavior: 'smooth' });
-    let done = false;
-    const go = () => {
-      if (done) return;
-      done = true;
-      this.el.modal.removeEventListener('scrollend', go);
-      if (card.isConnected) this.flare(card);
-    };
-    this.el.modal.addEventListener('scrollend', go);
-    // Browsers without scrollend still flare, a beat later.
-    setTimeout(go, 900);
+    // Only the panel scrolls (scrollIntoView would also shift the game's own clipped layers sideways). Not smoothly:
+    // a flare during a smooth scroll can leave the card painted where it was.
+    if (box.top < view.top) this.el.modal.scrollTop += box.top - view.top - 12;
+    else if (box.bottom > view.bottom) this.el.modal.scrollTop += box.bottom - view.bottom + 12;
+    this.flare(card);
   }
 
   private flare(card: HTMLElement) {
@@ -2586,7 +2577,7 @@ export class Ui {
       relicMul(relicName('whet'), p.whet, 'Relic', 'A relic'),
       row('All-damage bonuses', x(b.all), 'trophies, souls and fury'),
       row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion traits` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`),
-      mul('The Fist', 1 + 0.1 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Legend'),
+      mul('The Fist', 1 + 0.1 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Spirit'),
       mul('Buffs', b.buffClick, buffNames('click'), 'Frenzy'),
       row('During Rampage', x(g.feverMult())),
     ]);
@@ -2599,7 +2590,7 @@ export class Ui {
 
     const goldT = panel('Gold', x(g.goldMult()), '', [
       mul('Companion traits', p.goldUpg, 'gold traits', 'Some companion traits add gold'),
-      mul('The Hoard', 1 + 0.05 * g.legendLv('hoard'), `level ${g.legendLv('hoard')}`, 'A Legend'),
+      mul('The Hoard', 1 + 0.05 * g.legendLv('hoard'), `level ${g.legendLv('hoard')}`, 'A Spirit'),
       relicMul(relicName('purse'), p.goldRelic, 'Relic', 'A relic'),
       mul('Buffs', b.buffGold, buffNames('gold'), 'Gold Rush'),
     ]);
@@ -2657,7 +2648,7 @@ export class Ui {
     if (!g.marksTotal() && !AWAKEN_ON) return '';
     const hot = g.canAwaken() ? ' hot' : '';
     return `<nav class="tabs">
-      <button class="tab ${on === 'abyss' ? 'on' : ''}" data-open="abyss">Legends</button>
+      <button class="tab ${on === 'abyss' ? 'on' : ''}" data-open="abyss">Spirits</button>
       ${g.marksTotal() ? `<button class="tab ${on === 'marks' ? 'on' : ''}" data-open="marks">${G.heart()} Heartmarks ${g.marksTotal()}</button>` : ''}
       ${AWAKEN_ON ? `<button class="tab ${on === 'heart' ? 'on' : ''}${hot}" data-open="heart">${G.heart()} Awaken</button>` : ''}
     </nav>`;
