@@ -1,3 +1,4 @@
+import { morph } from './morph.ts';
 import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
@@ -28,7 +29,13 @@ export interface UiHooks {
 
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
 const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', soulstorm: 'Soul Storm!', vault: 'Rainbow Vault!', rainbow: 'Rainbow Haul!' };
+/** Writes text only when it changed: rewriting the same text still costs the page a relayout. */
+const setText = (el: Element, text: string) => {
+  if (el.textContent !== text) el.textContent = text;
+};
 const MAX_POPS = 90;
+const MAX_POPS_LOW = 30;
+const GRAPHICS_NAME = { auto: 'Auto', high: 'High', low: 'Low' } as const;
 /** Hits on one monster less than this many seconds apart are a streak; from the ARC_FROM-th hit of a streak on, its
  *  numbers arc out of the monster away from your hero, each landing a little further out, fanning into a rainbow. */
 const STREAK_GAP = 0.25;
@@ -825,6 +832,11 @@ export class Ui {
         this.hooks.settings();
         this.renderModal();
         break;
+      case 'graphics':
+        s.graphics = s.graphics === 'auto' ? 'high' : s.graphics === 'high' ? 'low' : 'auto';
+        this.hooks.settings();
+        this.renderModal();
+        break;
       case 'notation':
         s.notation = s.notation === 'short' ? 'sci' : 'short';
         setNotation(s.notation);
@@ -1153,7 +1165,7 @@ export class Ui {
 
   /** A pop element, new or the oldest one recycled (stopping any arc it was flying). */
   private takePop() {
-    const el = this.pops.length >= MAX_POPS ? this.pops.shift()! : document.createElement('div');
+    const el = this.pops.length >= (this.scene.quality === 'low' ? MAX_POPS_LOW : MAX_POPS) ? this.pops.shift()! : document.createElement('div');
     el.getAnimations().forEach((a) => a.cancel());
     return el;
   }
@@ -1327,7 +1339,6 @@ export class Ui {
     this.sweepCoins([feet, this.coinPointer].filter((p) => p !== null));
     if (g.vault && this.coinPointer && !this.modal) this.scene.sweepVaultCoins(this.coinPointer.x, this.coinPointer.y, g);
     if (this.keys.size) this.keyedAt = performance.now();
-    this.scene.heroBlocked = [this.el.dock.getBoundingClientRect()];
     const input = this.scene.heroInput;
     input.aim = !this.modal && !this.mouseStale ? this.heroAim : null;
     input.keys = { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), z: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
@@ -1339,7 +1350,7 @@ export class Ui {
     const inFlight = this.flights.reduce((sum, flight) => sum.plus(flight.share), new Decimal(0));
     const bank = Decimal.max(0, g.s.gold.minus(inFlight));
     this.shown = bank.lt(this.shown) || bank.minus(this.shown).lt(1) ? bank : this.shown.plus(bank.minus(this.shown).times(Math.min(1, dt * 10)));
-    this.el.bank.textContent = fmt(this.shown);
+    setText(this.el.bank, fmt(this.shown));
 
     // Health bars over bosses, and over monsters once they've been hit.
     const seen = new Set<number>();
@@ -1401,15 +1412,17 @@ export class Ui {
       // The knife is tiny, so it gets drawn a size up.
       this.el.bladeIn.innerHTML = sprite(blade, blade === 'weapon_knife' ? 3 : 2);
     }
-    this.el.dps.textContent = fmt(g.dpsTotal());
-    this.el.click.textContent = fmt(g.clickTotal());
+    // Measured here, not every frame: reading layout each frame makes the browser redo it.
+    this.scene.heroBlocked = [this.el.dock.getBoundingClientRect()];
+    setText(this.el.dps, fmt(g.dpsTotal()));
+    setText(this.el.click, fmt(g.clickTotal()));
     this.el.rate.classList.toggle('boosted', g.s.buffs.some((b) => b.id !== 'fever'));
     // The streak only matters with the Unbroken: shown while one runs, fading out once it breaks.
     const unbroken = g.legendLv('unbroken');
     this.el.streak.classList.toggle('on', unbroken > 0 && g.streak > 1);
     if (unbroken > 0 && g.streak > 1) {
-      this.el.streakV.textContent = fmt(g.streak);
-      this.el.streakB.textContent = `+${+(0.01 * unbroken * g.streak).toFixed(1)}%`;
+      setText(this.el.streakV, fmt(g.streak));
+      setText(this.el.streakB, `+${+(0.01 * unbroken * g.streak).toFixed(1)}%`);
     }
 
     this.renderFloor();
@@ -1428,7 +1441,7 @@ export class Ui {
     this.renderAbilities();
     this.renderRows();
     this.renderShopActs();
-    this.el.shopSub.textContent = `${g.s.owned.filter((n) => n > 0).length} companions · ${g.s.upgrades.length} traits`;
+    setText(this.el.shopSub, `${g.s.owned.filter((n) => n > 0).length} companions · ${g.s.upgrades.length} traits`);
     if (document.body.classList.contains('compact')) {
       const hud = this.el.floorBox.getBoundingClientRect();
       if (Math.abs(Math.round(hud.bottom + 4) - this.hudTop) > 6) this.layout();
@@ -1437,7 +1450,7 @@ export class Ui {
     const pending = g.pendingSouls();
     const ab = this.el.abyssBadge;
     ab.hidden = pending < 1;
-    ab.textContent = fmt(pending);
+    setText(ab, fmt(pending));
     // Worth it at +50% souls: the genre's rule of thumb for a reset.
     ab.classList.toggle('hot', g.canDescend() && pending >= g.s.souls / 2);
 
@@ -1449,10 +1462,10 @@ export class Ui {
     rb.hidden = this.newRelics < 1;
     // After the reveal, the kid's room is always a button away.
     this.el.roomBtn.hidden = !g.s.dreamSeen;
-    rb.textContent = `+${this.newRelics}`;
+    setText(rb, `+${this.newRelics}`);
     const cb = this.el.cardBadge;
     cb.hidden = this.newCards < 1;
-    cb.textContent = `+${this.newCards}`;
+    setText(cb, `+${this.newCards}`);
     this.el.bladeRate.hidden = !g.abilityUnlocked('blade');
     const rate = `${perSec(g.autoRate())}/s`;
     const rateEl = this.el.bladeRate.lastElementChild!;
@@ -1476,16 +1489,16 @@ export class Ui {
     const key = `${s.floor}|${s.maxFloor}|${s.auto}|${boss}|${page}|${owned}`;
     if (key !== this.floorKey) {
       this.floorKey = key;
-      this.el.floorN.textContent = `Floor ${s.floor}`;
+      setText(this.el.floorN, `Floor ${s.floor}`);
       const mods = boss ? g.bossMods() : [];
       // Two tags fit; the rest show as a count (hover for them all).
       if (mods.length) this.el.floorSub.innerHTML = `Boss ${modChips(mods.slice(0, mods.length > 2 ? 1 : 2))}${mods.length > 2 ? `<em class="mod more" style="--mc:var(--dim)">+${mods.length - 1}</em>` : ''}`;
-      else this.el.floorSub.textContent = boss ? 'Boss' : zoneName(s.floor).replace(/^The /, '');
+      else setText(this.el.floorSub, boss ? 'Boss' : zoneName(s.floor).replace(/^The /, ''));
       this.el.floorBox.classList.toggle('is-boss', boss);
       (this.el.down as HTMLButtonElement).disabled = s.floor <= 1;
       (this.el.up as HTMLButtonElement).disabled = s.floor >= s.maxFloor;
       this.el.auto.classList.toggle('on', s.auto);
-      this.el.auto.textContent = s.auto ? 'Auto: on' : 'Auto: off';
+      setText(this.el.auto, s.auto ? 'Auto: on' : 'Auto: off');
       // Five rooms on a winding corridor, each page ending on a boss. Drawn twice: an island in the corner on wide
       // screens, inside the floor box on narrow ones (CSS picks).
       const first = page * MAP_ROOMS + 1;
@@ -1521,24 +1534,24 @@ export class Ui {
     if (boss && g.inVault()) {
       // The boss steps aside for the vault; its clock is frozen.
       this.el.floorBar.style.width = `${g.bossTimeMax ? (Math.max(0, g.bossTime) / g.bossTimeMax) * 100 : 100}%`;
-      this.el.floorBarT.textContent = 'Boss waits';
+      setText(this.el.floorBarT, 'Boss waits');
       this.el.floorBox.classList.remove('urgent');
     } else if (boss && !g.monsters.some((m) => m.boss)) {
       // Farming a boss floor: the next one is on its way up.
       this.el.floorBar.style.width = '0%';
-      this.el.floorBarT.textContent = 'Next boss coming…';
+      setText(this.el.floorBarT, 'Next boss coming…');
       this.el.floorBox.classList.remove('urgent');
     } else if (boss) {
       // The bar is the clock: it drains steadily. (The boss's health is the bar over its head.)
       const left = Math.max(0, g.bossTime);
       this.el.floorBar.style.width = `${(left / g.bossTimeMax) * 100}%`;
-      this.el.floorBarT.textContent = `${left.toFixed(1)}s`;
+      setText(this.el.floorBarT, `${left.toFixed(1)}s`);
       this.el.floorBox.classList.toggle('urgent', g.bossTime < 8);
     } else {
       const need = g.killsNeeded();
       const k = Math.min(need, s.floorKills);
       this.el.floorBar.style.width = `${(k / need) * 100}%`;
-      this.el.floorBarT.textContent = s.floorKills >= need ? 'Cleared' : `${k} / ${need}`;
+      setText(this.el.floorBarT, s.floorKills >= need ? 'Cleared' : `${k} / ${need}`);
       this.el.floorBox.classList.remove('urgent');
     }
   }
@@ -2268,7 +2281,8 @@ export class Ui {
           <label>Effects volume <input type="range" min="0" max="100" value="${Math.round(s.sfxVol * 100)}" data-set="sfxVol"></label>
           <label>Music volume <input type="range" min="0" max="100" value="${Math.round(s.musicVol * 100)}" data-set="musicVol"></label>
           <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('calm', s.calm, 'Reduce flashing')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
-          <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button></div>
+          <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button>
+          <button class="btn toggle" data-act="graphics">Graphics: ${GRAPHICS_NAME[s.graphics]}</button></div>
           <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
           <div class="cursors">${CURSORS.map((c) => {
             const open = this.cursorOpen(c.id);
@@ -2285,7 +2299,9 @@ export class Ui {
     if (soft && (html === this.modalKey || performance.now() < this.modalHold)) return;
     this.modalKey = html;
     this.el.modal.className = `modal pnl m-${name}`;
-    this.el.modal.innerHTML = html;
+    // A tick's refresh changes only what moved; a click (or a new panel) builds it fresh.
+    if (soft) morph(this.el.modal, html);
+    else this.el.modal.innerHTML = html;
   }
 
   /** The Ascend strip atop the window: where this run's souls come from (companion levels, with the way to the next

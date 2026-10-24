@@ -348,6 +348,8 @@ const dummy = new THREE.Object3D();
 
 /** Short-lived world effects: chunky pixel bursts, loot beams, lightning. */
 export class Fx {
+  /** Particles per burst, as a share of the full count (lower on low graphics). */
+  scale = 1;
   private scene: THREE.Scene;
   private parts: Particle[] = [];
   private beams: Beam[] = [];
@@ -684,6 +686,7 @@ export class Fx {
 
   /** Square "pixel" debris, the way sprites shatter in pixel games. */
   burst(at: THREE.Vector3, color: THREE.ColorRepresentation, n = 14, speed = 3.2, size = 0.09, gravity = 12, glow = false) {
+    n = Math.max(1, Math.round(n * this.scale));
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true });
     if (glow) (mat.color as THREE.Color).multiplyScalar(2.2);
     const mesh = new THREE.InstancedMesh(CUBE, mat, n);

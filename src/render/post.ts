@@ -24,6 +24,8 @@ export function tiltShift() {
       void main() {
         float d = max(0.0, abs(vUv.y - focus) - band) / (1.0 - band);
         vec2 o = step * d * amount;
+        // Inside the sharp band there's nothing to blur: one read instead of five.
+        if (d * amount <= 0.0) { gl_FragColor = texture2D(tDiffuse, vUv); return; }
         vec4 s = texture2D(tDiffuse, vUv) * 0.2270;
         s += (texture2D(tDiffuse, vUv + o * 1.38) + texture2D(tDiffuse, vUv - o * 1.38)) * 0.3162;
         s += (texture2D(tDiffuse, vUv + o * 3.23) + texture2D(tDiffuse, vUv - o * 3.23)) * 0.0703;
