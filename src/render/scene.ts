@@ -802,8 +802,8 @@ export class Scene {
   syncParty(game: Game, instant = false) {
     for (let i = 0; i < COMPS.length; i++) {
       const has = this.party.find((p) => p.comp === i);
-      if (game.s.owned[i] > 0 && !has) this.addComp(i, instant);
-      if (game.s.owned[i] === 0 && has) {
+      if (game.inParty(i) && !has) this.addComp(i, instant);
+      if (!game.inParty(i) && has) {
         this.scene.remove(has.body);
         has.sprite.dispose();
         this.party.splice(this.party.indexOf(has), 1);
@@ -1842,6 +1842,11 @@ export class Scene {
 
   handle(ev: GameEvent, game: Game) {
     switch (ev.t) {
+      case 'keep':
+        // (The Keep is the UI's own top-down map; down here the floor just empties and waits.)
+        this.collectAllLoot(true);
+        this.syncParty(game, true);
+        break;
       case 'swing':
         this.swing(ev.comp, ev.id, ev.delay, game);
         break;

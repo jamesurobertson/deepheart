@@ -298,6 +298,10 @@ export interface SaveState {
   markTipSeen: boolean;
   /** Auto-buy has been pointed out (after your first ascent). */
   autoTipSeen: boolean;
+  /** The party is up in the Keep: nothing happens below until they come back down, time away included. */
+  inKeep: boolean;
+  /** Companions you've ever hired, as how far down the list you've got (they wait for you in the Keep). */
+  met: number;
   /** Cards you've got (found, traded or dug up) but not yet seen in the binder, as `id:lap:gold`; they slam in when you look. */
   dreamCards: string[];
   /** Trades made with the brothers. */
@@ -349,7 +353,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, dreamCards: [], trades: 0, stashes: [], brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, met: 0, dreamCards: [], trades: 0, stashes: [], brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true },
   };
 }
@@ -388,6 +392,7 @@ export type HitKind = 'click' | 'crit' | 'dps' | 'cleave' | 'auto' | 'autoCrit' 
 export type GameEvent =
   | { t: 'hit'; id: number; amount: Decimal; kind: HitKind; x?: number; y?: number }
   | { t: 'swing'; comp: number; id: number; delay: number }
+  | { t: 'keep'; on: boolean }
   | { t: 'click'; crit: boolean; x: number; y: number }
   | { t: 'spawn'; id: number }
   | { t: 'kill'; id: number; gold: Decimal; boss: boolean; by: HitKind; champ?: boolean }
@@ -650,6 +655,7 @@ export class Game {
     if (s.rainbows === undefined) s.rainbows = s.vaults ?? 0;
     if (s.rainbowSeen === undefined) s.rainbowSeen = (s.rainbows ?? 0) > 0;
     // Anyone past their second ascent has met auto-buy already.
+    if (s.met === undefined) s.met = s.owned.reduce((last, n, i) => (n > 0 ? i + 1 : last), 0);
     if (s.autoTipSeen === undefined) s.autoTipSeen = (s.descents ?? 0) > 1;
     if (s.soulBossDone === undefined) s.soulBossDone = (s.descents ?? 0) > 0 || (s.bossSouls ?? 0) > 0;
     // Renamed monsters (a card's id is its name): cards and kills pass to the new name. The Rotting Deep's floor-45
@@ -1074,6 +1080,11 @@ export class Game {
     return u.cost * curse;
   }
 
+  /** Who stands in the party: those hired, and up in the Keep everyone you've met. */
+  inParty(i: number) {
+    return this.s.owned[i] > 0 || (this.s.inKeep && i < this.s.met && this.compUnlocked(i));
+  }
+
   compUnlocked(i: number) {
     if (DEMO && i >= DEMO_COMPANIONS) return false;
     return this.s.bestFloor >= COMPS[i].floor && this.s.awakens >= (COMPS[i].heart ?? 0);
@@ -1105,6 +1116,28 @@ export class Game {
   /** The demo's last boss is beaten: the game stops here (the stairs play out, then the end screen). */
   demoOver() {
     return DEMO && this.s.bestCleared >= DEMO_LAST_FLOOR;
+  }
+
+  /** Up to the Keep, the castle above the dungeon: the floor empties, and nothing happens below until you're back. */
+  enterKeep() {
+    if (this.s.inKeep || this.vault) return false;
+    this.bankAllDrops();
+    this.raid = null;
+    this.s.inKeep = true;
+    this.enterFloor(this.s.floor, true);
+    this.monsters = [];
+    this.bossTime = 0;
+    this.events.push({ t: 'keep', on: true });
+    return true;
+  }
+
+  /** Back down to the floor you left (on it fresh: its monsters come again, a boss fight starts over). */
+  leaveKeep() {
+    if (!this.s.inKeep) return false;
+    this.s.inKeep = false;
+    this.enterFloor(this.s.floor, true);
+    this.events.push({ t: 'keep', on: false });
+    return true;
   }
 
   /** Go to a floor you've unlocked. */
@@ -1584,6 +1617,8 @@ export class Game {
    *  first hire, or when you've chosen to go without). */
   heroIndex() {
     if (this.vault) return this.vault.hero;
+    // Up in the Keep someone always walks for you, even fresh from an ascent with nobody hired yet.
+    if (this.s.inKeep) return this.s.hero >= 0 && this.inParty(this.s.hero) ? this.s.hero : COMPS.findIndex((_, i) => this.inParty(i));
     if (this.s.hero < 0) return -1;
     if (this.s.owned[this.s.hero] > 0) return this.s.hero;
     return this.s.owned.findIndex((n) => n > 0);
@@ -1675,6 +1710,7 @@ export class Game {
     if (this.s.gold.lt(cost)) return false;
     this.s.gold = this.s.gold.minus(cost);
     this.s.owned[i] += n;
+    this.s.met = Math.max(this.s.met, i + 1);
     this.invalidate();
     this.events.push({ t: 'buyComp', comp: i, n });
     return true;
@@ -2489,6 +2525,7 @@ export class Game {
 
   update(dt: number) {
     const s = this.s;
+    if (s.inKeep) return;
     s.playTime += dt;
     this.sinceAttack += dt;
     if (this.sinceAttack > STREAK_GAP) this.streak = 0;

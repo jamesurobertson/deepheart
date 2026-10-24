@@ -316,6 +316,11 @@ async function boot() {
   };
   const catchUp = (seconds: number) => {
     if (game.demoOver() || atMenu) return;
+    // Up in the Keep nothing happens below, however long you're gone.
+    if (game.s.inKeep) {
+      if (seconds > OFFLINE_AFTER) ui.showKeepAway(seconds);
+      return;
+    }
     if (seconds <= OFFLINE_AFTER) {
       for (let t = 0; t < seconds && !game.demoOver(); t += 0.2) game.update(0.2);
       flushAway();
@@ -379,7 +384,7 @@ async function boot() {
     const gap = (now - lastTick) / 1000;
     lastTick = now;
     // Hidden tabs (and the dungeon while you're in the room) are paused; the time is settled when you come back.
-    if (document.hidden || inRoomSince) return;
+    if (document.hidden || inRoomSince || game.s.inKeep) return;
     // A long gap while visible means the computer slept.
     if (gap > OFFLINE_AFTER) return catchUp(gap);
     // The zone interlude pauses the fight (nothing is lost; it just waits). The end of the demo stops it for good.

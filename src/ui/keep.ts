@@ -1,0 +1,516 @@
+import type { Rect } from '../render/atlas.ts';
+import { COMPS, LEGENDS, LEGEND_BY_ID, type LegendId } from '../game/data.ts';
+import type { Game } from '../game/game.ts';
+import { spriteFrames, uiAtlas } from './px.ts';
+
+/**
+ * The Keep, the castle above the dungeon: a top-down map in the dungeon's own tiles. You come up the stairs in the
+ * Entrance and walk the rooms with your party trailing behind. Walk up to the shrine, a trader, the treasury's great
+ * chest or the stairs and its label lights up with a key to press to use it.
+ */
+
+/** A place to use: the stairs, a trader, the treasury's chest, a Legend on offer in the shrine (`offer:<id>`) or one of
+ *  yours in the Great Hall (`legend:<id>`). */
+export type KeepStation = 'stairs' | 'dan' | 'victor' | 'album' | `offer:${LegendId}` | `legend:${LegendId}`;
+
+/** Floor rectangles (x, y, w, h) for the rooms and the halls between them; the walls grow around them. */
+const ROOMS: [number, number, number, number][] = [[3, 7, 8, 6], [16, 2, 15, 10], [1, 16, 9, 8], [12, 15, 22, 9], [36, 16, 9, 8], [19, 27, 9, 6]];
+const HALLS: [number, number, number, number][] = [[22, 12, 3, 3], [10, 19, 2, 2], [34, 19, 2, 2], [5, 13, 2, 3], [22, 24, 2, 3]];
+const W = 47;
+const H = 35;
+
+/** Things in the rooms: [sprite, x, y, how]: standing on the cell (and in the way), 'flat' on the floor, 'wall' hung
+ *  on a wall face, 'soul' a wall piece run soul-purple. */
+type Thing = [string, number, number, ('flat' | 'wall' | 'soul')?];
+const THINGS: Thing[] = [
+  ['wall_banner_blue', 17, 1, 'soul'], ['wall_banner_blue', 20, 1, 'soul'], ['wall_banner_blue', 26, 1, 'soul'], ['wall_banner_blue', 29, 1, 'soul'],
+  ...[15, 19, 27, 31].flatMap((x): Thing[] => [['column', x, 17], ['column', x, 22]]),
+  ...([[13, 'red'], [17, 'blue'], [28, 'blue'], [32, 'red']] as const).map(([x, c]): Thing => [`wall_banner_${c}`, x, 14, 'wall']),
+  ['wall_banner_green', 2, 15, 'wall'], ['wall_banner_green', 8, 15, 'wall'],
+  ['crate', 2, 20], ['crate', 4, 20], ['flask_big_red', 3, 20], ['flask_big_blue', 2, 21], ['flask_big_green', 4, 21],
+  ['chest_full_open', 6, 20], ['chest_full_open', 8, 20], ['coin', 7, 20, 'flat'], ['coin', 7, 21, 'flat'],
+  ['wall_banner_yellow', 38, 15, 'wall'], ['wall_banner_yellow', 42, 15, 'wall'],
+  ['chest_full_open', 40, 19], ['chest_full_open', 37, 22], ['chest_full_open', 43, 22],
+  ...[[39, 20], [41, 20], [40, 21], [38, 18], [42, 18], [39, 22], [41, 22]].map(([x, y]): Thing => ['coin', x, y, 'flat']),
+  ['crate', 4, 8], ['crate', 5, 8], ['crate', 10, 8], ['crate', 10, 12], ['skull', 7, 12, 'flat'], ['skull', 8, 10, 'flat'], ['chest_mimic_open', 4, 12],
+  ['doors_frame_left', 21, 26, 'wall'], ['doors_leaf_open', 22, 26, 'wall'], ['doors_frame_right', 24, 26, 'wall'], ['doors_frame_top', 22, 24, 'wall'],
+  ['floor_stairs', 22, 30, 'flat'], ['floor_stairs', 23, 30, 'flat'], ['floor_stairs', 24, 30, 'flat'],
+];
+const PEOPLE: { id: 'dan' | 'victor'; sprite: string; x: number; y: number }[] = [{ id: 'dan', sprite: 'ef_elf_m', x: 3, y: 18 }, { id: 'victor', sprite: 'victor', x: 7, y: 18 }];
+/** What each station is, where it's used from (cells you stand on) and where its label floats. */
+const STATIONS: { id: KeepStation; label: string; cells: [number, number][]; tag: [number, number] }[] = [
+  { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 16.6] },
+  { id: 'victor', label: 'Victor', cells: [[6, 18], [7, 19], [8, 18], [7, 17]], tag: [7, 16.6] },
+  { id: 'album', label: 'Collection', cells: [[39, 19], [41, 19], [40, 18], [40, 20]], tag: [40, 17.4] },
+  { id: 'stairs', label: 'Way down', cells: [[22, 30], [23, 30], [24, 30]], tag: [23, 31.6] },
+];
+/** Where you arrive: on the stairs, facing up into the Entrance. */
+const ARRIVE: [number, number] = [23, 29];
+const SPEED = 5.5;
+/** The reroll's beat, the same as the Legends menu's (its vanish and arrive animations): seconds the old offer takes to
+ *  warp out, each new spirit to rise in, and between one rising and the next. */
+const WARP = 0.38;
+const RISE = 0.6;
+const STAGGER = 0.14;
+/** The menu's arrive easing, cubic-bezier(0.2, 1.5, 0.4, 1): a quick rise that overshoots and settles. */
+const overshoot = (t: number) => 1 + 2.4 * (t - 1) ** 3 + 1.4 * (t - 1) ** 2;
+/** The shrine: the Legends on offer float here as spirits, big, side by side (their feet on these cells); with none on
+ *  offer, a soul-purple obelisk stands in the middle. */
+const SHRINE: [number, number] = [23, 8];
+const SPIRITS: [number, number][] = [[18, 9], [23, 9], [28, 9]];
+/** Where the Legends you've summoned hang out in the Great Hall, in the order they're listed: spread about the room,
+ *  clear of the columns and the ways through. */
+const GUARDS: [number, number][] = [
+  [13, 16], [17, 16], [29, 16], [33, 16], [14, 18], [20, 18], [26, 18], [32, 18], [13, 21],
+  [17, 21], [29, 21], [33, 21], [14, 23], [19, 23], [27, 23], [32, 23], [20, 16], [26, 16],
+];
+/** The trail keeps a point every this many cells the hero walks. */
+const TRAIL_STEP = 0.08;
+/** The way the party winds round the Entrance when you arrive (the hero first). */
+const ENTRANCE_WIND: [number, number][] = [[23.5, 29.5], [23.5, 31.6], [19.6, 31.6], [19.6, 32.4], [27.4, 32.4], [27.4, 31], [25.6, 31], [25.6, 28], [27.4, 28], [27.4, 27.4], [19.6, 27.4], [19.6, 29.5], [21.4, 29.5]];
+/** Cells along the hero's trail between one follower and the next. */
+const GAP = 0.9;
+
+/** Which tile shows where: '.' floor, '#' wall, ' ' nothing. Every wall shows a cap line where it meets the floor;
+ *  a wall with floor below it shows a brick face, one beside the floor a thin edge. */
+function autotile(cells: string[][]) {
+  const at = (x: number, y: number) => cells[y]?.[x] ?? ' ';
+  const floor = (x: number, y: number) => at(x, y) === '.';
+  const layers: { x: number; y: number; name: string }[][] = [[], [], []];
+  const put = (layer: number, x: number, y: number, name: string) => layers[layer].push({ x, y, name });
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (floor(x, y)) {
+      put(0, x, y, 'floor');
+      continue;
+    }
+    if (at(x, y) !== '#') continue;
+    const fb = floor(x, y + 1), fa = floor(x, y - 1), fl = floor(x - 1, y), fr = floor(x + 1, y);
+    if (fb) {
+      put(1, x, y, fl && !fr ? 'wall_left' : fr && !fl ? 'wall_right' : 'wall_mid');
+      put(2, x, y - 1, 'wall_top_mid');
+    } else if (fa) {
+      // The far side of a room's south wall: its cap along the last floor row, its outer face below.
+      put(1, x, y, 'wall_mid');
+      put(2, x, y - 1, 'wall_top_mid');
+    } else if (fr || floor(x + 1, y + 1) || floor(x + 1, y - 1)) put(2, x, y, 'wall_edge_mid_right');
+    else if (fl || floor(x - 1, y + 1) || floor(x - 1, y - 1)) put(2, x, y, 'wall_edge_mid_left');
+  }
+  return layers;
+}
+
+export class KeepView {
+  readonly canvas = document.createElement('canvas');
+  private g: CanvasRenderingContext2D;
+  private game: Game;
+  private cells: string[][];
+  private tiles: ReturnType<typeof autotile>;
+  private blocked = new Set<string>();
+  /** The hero (cell units, feet at the point), the trail it leaves, a path to walk when you click, the camera. */
+  private hero = { x: ARRIVE[0] + 0.5, y: ARRIVE[1] + 0.5, left: false, moving: false };
+  private trail: { x: number; y: number }[] = [];
+  private path: { x: number; y: number }[] = [];
+  private cam = { x: 0, y: 0 };
+  /** Where each of your party is standing and which way they face (they run to their places, never jump). */
+  private party = new Map<number, { idx: number; x: number; y: number; left: boolean; running: boolean }>();
+  private zoom = 3;
+  private time = 0;
+  /** The station your hero is standing at, ready to use. */
+  near: KeepStation | null = null;
+  /** The offered Legend picked in the Legends menu: it stays lit, wherever you stand, until you next move. */
+  pinned: KeepStation | null = null;
+
+  constructor(game: Game, host: HTMLElement) {
+    this.game = game;
+    this.canvas.className = 'keep-view';
+    host.prepend(this.canvas);
+    this.g = this.canvas.getContext('2d')!;
+    this.cells = Array.from({ length: H }, () => Array(W).fill(' '));
+    for (const [x0, y0, w, h] of [...ROOMS, ...HALLS]) for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) this.cells[y][x] = '.';
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (this.cells[y][x] === '.') continue;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (this.cells[y + dy]?.[x + dx] === '.') this.cells[y][x] = '#';
+    }
+    this.tiles = autotile(this.cells);
+    for (const [, x, y, how] of THINGS) if (!how) this.blocked.add(`${x},${y}`);
+    for (const [x, y] of [SHRINE, ...SPIRITS]) this.blocked.add(`${x},${y}`);
+    for (const p of PEOPLE) this.blocked.add(`${p.x},${p.y}`);
+    // Everyone comes up the stairs: the party starts wound round the Entrance behind you, as if they'd walked it.
+    for (let k = 0; k < ENTRANCE_WIND.length - 1; k++) {
+      const [ax, ay] = ENTRANCE_WIND[k], [bx, by] = ENTRANCE_WIND[k + 1];
+      const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / TRAIL_STEP);
+      for (let i = 0; i < steps; i++) this.trail.push({ x: ax + ((bx - ax) * i) / steps, y: ay + ((by - ay) * i) / steps });
+    }
+    this.canvas.addEventListener('pointerdown', this.onPointer);
+    this.cam = { x: this.hero.x, y: this.hero.y };
+  }
+
+  destroy() {
+    this.canvas.removeEventListener('pointerdown', this.onPointer);
+    this.canvas.remove();
+  }
+
+  private walkable(x: number, y: number) {
+    const cx = Math.floor(x), cy = Math.floor(y);
+    return this.cells[cy]?.[cx] === '.' && !this.blocked.has(`${cx},${cy}`) && !this.guarded.has(`${cx},${cy}`);
+  }
+
+  /** The Legends you've summoned and where each stands (their cells are in the way, like anything standing). */
+  private guards() {
+    return LEGENDS.filter((d) => this.game.legendLv(d.id) > 0).slice(0, GUARDS.length).map((d, k) => ({ d, at: GUARDS[k] }));
+  }
+  private guarded = new Set<string>();
+  /** How far each offered spirit has come into its own colors (by sprite), and its flash as it does. */
+  private lit = new Map<string, { amt: number; flash: number }>();
+  /** The offer last drawn, the one before it (warping out) and when it changed. */
+  private offerKey: string | null = null;
+  private offerOld: LegendId[] = [];
+  private offerAt = -99;
+
+  /** Click (or tap) a spot: walk there by the shortest way round. */
+  private onPointer = (e: PointerEvent) => {
+    const r = this.canvas.getBoundingClientRect();
+    const tx = Math.floor(this.cam.x + (e.clientX - r.left - r.width / 2) / (16 * this.zoom));
+    const ty = Math.floor(this.cam.y + (e.clientY - r.top - r.height / 2) / (16 * this.zoom));
+    // Clicking a trader, a chest or the fountain walks you up to it.
+    const station = this.stations().find((st) => st.cells.some(([x, y]) => Math.abs(x - tx) <= 1 && Math.abs(y - ty) <= 1));
+    if (station && !this.walkable(tx + 0.5, ty + 0.5)) this.walkTo(station.id);
+    else this.path = this.route(Math.floor(this.hero.x), Math.floor(this.hero.y), tx, ty);
+  };
+
+  /** Walk up to a station, to whichever of its spots is the shortest way. */
+  walkTo(id: KeepStation) {
+    const st = this.stations().find((s) => s.id === id);
+    if (!st) return;
+    const from = [Math.floor(this.hero.x), Math.floor(this.hero.y)] as const;
+    const routes = st.cells.map(([x, y]) => (x === from[0] && y === from[1] ? [] : this.route(from[0], from[1], x, y))).filter((r, k) => r.length || (st.cells[k][0] === from[0] && st.cells[k][1] === from[1]));
+    this.path = routes.sort((a, b) => a.length - b.length)[0] ?? [];
+  }
+
+  /** Breadth-first search over the floor, around anything standing in the way. */
+  private route(sx: number, sy: number, tx: number, ty: number) {
+    if (!this.walkable(tx + 0.5, ty + 0.5)) return [];
+    const prev = new Map<string, string | null>([[`${sx},${sy}`, null]]);
+    const queue: [number, number][] = [[sx, sy]];
+    while (queue.length) {
+      const [x, y] = queue.shift()!;
+      if (x === tx && y === ty) break;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const key = `${x + dx},${y + dy}`;
+        if (prev.has(key) || !this.walkable(x + dx + 0.5, y + dy + 0.5)) continue;
+        prev.set(key, `${x},${y}`);
+        queue.push([x + dx, y + dy]);
+      }
+    }
+    const path: { x: number; y: number }[] = [];
+    for (let key: string | null | undefined = `${tx},${ty}`; key && prev.has(key); key = prev.get(key)) {
+      const [x, y] = key.split(',').map(Number);
+      path.unshift({ x: x + 0.5, y: y + 0.5 });
+    }
+    return path.slice(1);
+  }
+
+  /** One frame: walk (keys first, else the clicked path), drag the trail, use stations, draw. */
+  frame(dt: number, keys: { x: number; y: number }, w: number, h: number) {
+    this.time += dt;
+    this.guarded = new Set(this.guards().map(({ at }) => `${at[0]},${at[1]}`));
+    const hero = this.hero;
+    let vx = keys.x, vy = keys.y;
+    if (vx || vy) this.path = [];
+    else if (this.path.length) {
+      const next = this.path[0];
+      vx = next.x - hero.x;
+      vy = next.y - hero.y;
+      if (Math.hypot(vx, vy) < 0.12) this.path.shift();
+    }
+    const len = Math.hypot(vx, vy);
+    hero.moving = len > 0.01;
+    if (hero.moving) this.pinned = null;
+    if (hero.moving) {
+      const step = Math.min(len, SPEED * dt) / len;
+      const nx = hero.x + vx * step, ny = hero.y + vy * step;
+      // Slide along walls: each axis on its own.
+      if (this.walkable(nx, hero.y)) hero.x = nx;
+      if (this.walkable(hero.x, ny)) hero.y = ny;
+      if (vx) hero.left = vx < 0;
+      const last = this.trail[0];
+      if (Math.hypot(hero.x - last.x, hero.y - last.y) > TRAIL_STEP) {
+        this.trail.unshift({ x: hero.x, y: hero.y });
+        this.trail.length = Math.min(this.trail.length, 900);
+        // Everyone's place along the trail moves back one with it, so they stay where they stand.
+        for (const at of this.party.values()) at.idx += 1;
+      }
+    }
+    const cx = Math.floor(hero.x), cy = Math.floor(hero.y);
+    this.near = this.stations().find((st) => st.cells.some(([x, y]) => x === cx && y === cy))?.id ?? null;
+    this.draw(dt, w, h);
+  }
+
+  /** Every station right now: the fixed ones, each Legend on offer in the shrine and each of yours where it stands
+   *  (used from the cells beside and in front of it; named just below it). */
+  private stations(): typeof STATIONS {
+    const figure = (id: KeepStation, label: string, [x, y]: [number, number]) => ({ id, label, cells: [[x - 1, y], [x + 1, y], [x, y + 1], [x - 1, y + 1], [x + 1, y + 1]] as [number, number][], tag: [x, y + 1.55] as [number, number] });
+    const offer = this.game.legendOffer().slice(0, SPIRITS.length).map((id, k) => figure(`offer:${id}`, LEGEND_BY_ID.get(id)!.name, SPIRITS[k]));
+    const mine = this.guards().map(({ d, at }) => ({ ...figure(`legend:${d.id}`, d.name, at), tag: [at[0], at[1] + 1.3] as [number, number] }));
+    return [...STATIONS, ...offer, ...mine];
+  }
+
+  /** A point along the trail, `idx` steps back from the hero (in between two points, part of the way). */
+  private along(idx: number) {
+    if (idx <= 0) return this.hero;
+    const head = [this.hero, ...this.trail];
+    const i = Math.min(Math.floor(idx), head.length - 2);
+    const a = head[i], b = head[i + 1], f = Math.min(1, idx - i);
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+  }
+
+  /** Where each station's label goes on screen. */
+  /** A Legend's name hangs just below its feet; your own Legends in the hall only show theirs when you're at them. */
+  labels(): { id: KeepStation; label: string; x: number; y: number; below: boolean; shown: boolean }[] {
+    const r = this.canvas.getBoundingClientRect();
+    const s = 16 * this.zoom;
+    return this.stations().map((st) => {
+      const below = st.id.includes(':');
+      const [tx, ty] = below ? [st.tag[0], st.tag[1] - 0.45] : st.tag;
+      // (Yours in the hall: their name shows when you can use them, with the key.)
+      const shown = !st.id.startsWith('legend:') || this.near === st.id;
+      return { id: st.id, label: st.label, x: r.left + r.width / 2 + (tx + 0.5 - this.cam.x) * s, y: r.top + r.height / 2 + (ty - this.cam.y) * s, below, shown };
+    });
+  }
+
+  private draw(dt: number, w: number, h: number) {
+    const c = this.canvas;
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+      c.width = Math.round(w * dpr);
+      c.height = Math.round(h * dpr);
+      c.style.width = `${w}px`;
+      c.style.height = `${h}px`;
+    }
+    // About 20 cells across, in whole pixels.
+    this.zoom = Math.max(2, Math.round(w / (20 * 16)));
+    const g = this.g;
+    const atlas = uiAtlas();
+    if (!atlas) return;
+    const img = atlas.texture.image as CanvasImageSource;
+    const s = 16 * this.zoom;
+    // The camera eases after the hero, kept inside the castle.
+    const halfW = w / 2 / s, halfH = h / 2 / s;
+    // (It can show some dark past the castle's edges: more above, where the gold counter sits.)
+    const want = { x: Math.max(halfW - 1.5, Math.min(W + 1.5 - halfW, this.hero.x)), y: Math.max(halfH - 3.5, Math.min(H + 1.5 - halfH, this.hero.y)) };
+    if (W + 3 < halfW * 2) want.x = W / 2;
+    if (H + 5 < halfH * 2) want.y = H / 2 - 1;
+    this.cam.x += (want.x - this.cam.x) * Math.min(1, dt * 6);
+    this.cam.y += (want.y - this.cam.y) * Math.min(1, dt * 6);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = '#100c0d';
+    g.fillRect(0, 0, c.width, c.height);
+    // World to screen: one atlas pixel is `zoom` screen pixels; the camera sits in the middle of the view.
+    g.setTransform(dpr * this.zoom, 0, 0, dpr * this.zoom, Math.round(dpr * (w / 2 - this.cam.x * s)), Math.round(dpr * (h / 2 - this.cam.y * s)));
+    const rect = (name: string, frame = 0): Rect | null => {
+      if (!atlas.has(name)) return null;
+      const anim = atlas.anim(name);
+      const frames = anim.length ? anim : [atlas.rect(name)];
+      return frames[frame % frames.length];
+    };
+    const tile = (r: Rect | null, x: number, y: number) => r && g.drawImage(img, r.x, r.y, r.w, r.h, x * 16, y * 16, r.w, r.h);
+    const stand = (src: CanvasImageSource, r: Rect, x: number, feet: number, left = false) => {
+      const px = Math.round(x * 16 - r.w / 2), py = Math.round(feet * 16 - r.h);
+      if (left) {
+        g.save();
+        g.translate(px + r.w, py);
+        g.scale(-1, 1);
+        g.drawImage(src, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+        g.restore();
+      } else g.drawImage(src, r.x, r.y, r.w, r.h, px, py, r.w, r.h);
+    };
+    const tick = Math.floor(this.time * 6);
+    const worn = (x: number, y: number) => {
+      const f = Math.abs(Math.sin((y * W + x) * 12.9898) * 43758.5453) % 1;
+      return f < 0.78 ? 1 : 2 + Math.floor(((f - 0.78) / 0.22) * 7);
+    };
+    for (const t of this.tiles[0]) tile(atlas.rect(`floor_${worn(t.x, t.y)}`), t.x, t.y);
+    for (const t of this.tiles[1]) tile(atlas.rect(t.name), t.x, t.y);
+    for (const t of this.tiles[2]) tile(atlas.rect(t.name), t.x, t.y);
+    for (const [name, x, y, how] of THINGS) {
+      if (how === 'flat') tile(rect(name, tick), x, y);
+      else if (how === 'wall' || how === 'soul') {
+        if (how === 'soul') g.filter = 'hue-rotate(55deg) saturate(1.4) brightness(1.1)';
+        tile(rect(name, tick), x, y);
+        g.filter = 'none';
+      }
+    }
+    // Everything standing, back to front: things, Dan and Victor, then your party (the hero leading).
+    const standing: { y: number; draw: () => void }[] = [];
+    for (const [name, x, y, how] of THINGS) {
+      if (how) continue;
+      const r = rect(name, name.startsWith('chest') ? 2 : 0);
+      if (r) standing.push({ y: y + 1, draw: () => stand(img, r, x + 0.5, y + 1) });
+    }
+    const shadow = (x: number, y: number, rx: number) => {
+      g.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      g.beginPath();
+      g.ellipse(x * 16, y * 16 - 0.5, rx, rx * 0.4, 0, 0, Math.PI * 2);
+      g.fill();
+    };
+    // A Legend in spirit form, big and floating over a soft purple shadow (on offer in the shrine, or yours about the Keep).
+    // An offered one you're standing at comes into its own colors in a flash, and fades back when you step away.
+    const spirit = (sprite: string, [x, y]: [number, number], k: number, scale = 2, id?: KeepStation, fx?: { dy: number; alpha: number; sy: number; flash: number }) => {
+      const src = spriteFrames(sprite);
+      if (!src) return;
+      const r = src.frames[(tick + k) % src.frames.length];
+      const bob = Math.sin(this.time * 1.6 + k * 2) * 0.12;
+      const lit = this.lit.get(sprite) ?? { amt: 0, flash: 0 };
+      const want = id && (this.pinned ?? this.near) === id ? 1 : 0;
+      if (want && lit.amt === 0) lit.flash = 1;
+      lit.amt = want ? Math.min(1, lit.amt + dt * 5) : Math.max(0, lit.amt - dt * 2.5);
+      lit.flash = Math.max(0, lit.flash - dt * 2.5);
+      this.lit.set(sprite, lit);
+      standing.push({ y: y + 1, draw: () => {
+        g.fillStyle = 'rgba(120, 80, 220, 0.3)';
+        g.beginPath();
+        g.ellipse((x + 0.5) * 16, (y + 1) * 16 - 1, 9, 3.5, 0, 0, Math.PI * 2);
+        g.fill();
+        g.save();
+        const sy = fx?.sy ?? 1;
+        g.translate(Math.round((x + 0.5) * 16 - (r.w * scale) / 2), Math.round((y + 0.6 + bob + (fx?.dy ?? 0)) * 16 - r.h * scale * sy));
+        g.scale(scale, scale * sy);
+        if (lit.amt < 1) {
+          g.globalAlpha = 0.86 * (1 - lit.amt) * (fx?.alpha ?? 1);
+          g.filter = `grayscale(1) sepia(1) hue-rotate(215deg) saturate(2.6) brightness(${1.15 + (fx?.flash ?? 0) * 1.8}) drop-shadow(0 0 3px rgba(179, 140, 255, 0.9))`;
+          g.drawImage(src.img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+        }
+        if (lit.amt > 0) {
+          g.globalAlpha = lit.amt;
+          g.filter = `brightness(${1 + lit.flash * 1.6}) drop-shadow(0 0 ${2 + lit.flash * 6}px rgba(255, 240, 255, ${0.4 + lit.flash * 0.6}))`;
+          g.drawImage(src.img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+        }
+        g.restore();
+      } });
+    };
+    // Yours hang out in the Great Hall, as themselves.
+    this.guards().forEach(({ d, at }, k) => {
+      const src = spriteFrames(d.sprite);
+      if (!src) return;
+      const r = src.frames[(tick + k) % src.frames.length];
+      standing.push({ y: at[1] + 1, draw: () => {
+        shadow(at[0] + 0.5, at[1] + 1, 6);
+        stand(src.img, r, at[0] + 0.5, at[1] + 1, at[0] > 23);
+        // Soul sparkles drifting up around them and in front of them.
+        for (let w = 0; w < 7; w++) {
+          const t = (this.time * 0.35 + w / 7 + k * 0.17) % 1;
+          const big = w % 3 === 0;
+          g.fillStyle = big ? '#e2d2ff' : '#b38cff';
+          g.globalAlpha = Math.sin(t * Math.PI) * (big ? 0.85 : 0.6);
+          g.fillRect(Math.round((at[0] + 0.5) * 16 + ((w * 5) % 15) - 7 + Math.sin(this.time * 1.5 + w + k) * 2), Math.round((at[1] + 1) * 16 + 1 - t * 28), big ? 2 : 1, big ? 2 : 1);
+        }
+        g.globalAlpha = 1;
+      } });
+    });
+    // A new offer (a reroll, or a summon): the old spirits warp up and away, then the new ones rise in one by one in a
+    // column of light, as the menu shows them.
+    const offer = this.game.legendOffer();
+    const key = offer.join(',');
+    if (this.offerKey !== key) {
+      if (this.offerKey !== null) {
+        this.offerOld = this.offerKey ? this.offerKey.split(',') as LegendId[] : [];
+        // (Timed on the real clock, as the menu's animations are, so the two stay in step.)
+        this.offerAt = performance.now() / 1000;
+      }
+      this.offerKey = key;
+    }
+    const since = performance.now() / 1000 - this.offerAt;
+    if (since < WARP) {
+      const p = since / WARP;
+      const e = p * p;
+      this.offerOld.slice(0, SPIRITS.length).forEach((id, k) => spirit(LEGEND_BY_ID.get(id)!.sprite, SPIRITS[k], k, 2, undefined, { dy: -e * 2.9, alpha: 1 - e, sy: 1 + e * 0.4, flash: e }));
+    }
+    if (offer.length) {
+      offer.slice(0, SPIRITS.length).forEach((id, k) => {
+        const t = (since - WARP - k * STAGGER) / RISE;
+        if (t < 0) return;
+        const [x, y] = SPIRITS[k];
+        if (t < 1) {
+          standing.push({ y: y + 1.01, draw: () => {
+            const beam = g.createLinearGradient(0, (y + 1) * 16, 0, (y - 4) * 16);
+            beam.addColorStop(0, `rgba(214, 190, 255, ${0.7 * (1 - t)})`);
+            beam.addColorStop(1, 'rgba(179, 140, 255, 0)');
+            g.fillStyle = beam;
+            g.fillRect((x + 0.5) * 16 - 12, (y - 4) * 16, 24, 5 * 16);
+          } });
+        }
+        const fx = t < 1 ? { dy: (1 - overshoot(t)) * 1.6, alpha: Math.min(1, t / 0.6), sy: 0.2 + 0.8 * overshoot(t), flash: Math.max(0, 1 - t * 1.6) } : undefined;
+        spirit(LEGEND_BY_ID.get(id)!.sprite, SPIRITS[k], k, 2, `offer:${id}`, fx);
+      });
+    } else {
+      const column = atlas.rect('column');
+      standing.push({ y: SHRINE[1] + 1, draw: () => {
+        g.filter = 'hue-rotate(250deg) saturate(2.2) brightness(1.25)';
+        stand(img, column, SHRINE[0] + 0.5, SHRINE[1] + 1);
+        g.filter = 'none';
+      } });
+    }
+    // Wisps rising across the shrine.
+    standing.push({ y: SHRINE[1] + 1.5, draw: () => {
+      for (let k = 0; k < 26; k++) {
+        const t = (this.time * 0.45 + k / 26) % 1;
+        const big = k % 4 === 0;
+        g.fillStyle = big ? '#efe4ff' : '#c9a6ff';
+        g.globalAlpha = Math.sin(t * Math.PI) * (big ? 0.95 : 0.7);
+        g.fillRect(Math.round((16.5 + ((k * 4.7) % 13)) * 16 + Math.sin(this.time * 2 + k) * 2), Math.round((SHRINE[1] + 3.2) * 16 - t * 90), big ? 2 : 1, big ? 2 : 1);
+      }
+      g.globalAlpha = 1;
+    } });
+    for (const p of PEOPLE) {
+      const src = spriteFrames(p.sprite);
+      if (!src) continue;
+      const r = src.frames[tick % src.frames.length];
+      standing.push({ y: p.y + 1, draw: () => (shadow(p.x + 0.5, p.y + 1, 6), stand(src.img, r, p.x + 0.5, p.y + 1, true)) });
+    }
+    // Your party: each has a place along your trail (the hero at its head) and runs there along the trail itself, so
+    // a new hero runs up the line to the front and the old one drops back into it, never through a wall.
+    const g0 = this.game;
+    const heroIndex = g0.heroIndex();
+    const followers = COMPS.map((_, i) => i).filter((i) => g0.inParty(i) && i !== heroIndex);
+    const places = new Map<number, number>(followers.map((i, k) => [i, ((k + 1) * GAP) / TRAIL_STEP]));
+    if (heroIndex >= 0) places.set(heroIndex, 0);
+    for (const [i, want] of places) {
+      let at = this.party.get(i);
+      if (!at) this.party.set(i, (at = { idx: want, x: 0, y: 0, left: false, running: false }));
+      const gap = want - at.idx;
+      at.running = Math.abs(gap) > 0.6;
+      // (Running to catch up: quicker the further there is to go.)
+      at.idx += Math.sign(gap) * Math.min(Math.abs(gap), ((SPEED * (Math.abs(gap) > 20 ? 1.8 : 1.15)) / TRAIL_STEP) * dt);
+      const was = at.x;
+      const p = this.along(at.idx);
+      at.x = p.x;
+      at.y = p.y;
+      if (Math.abs(at.x - was) > 0.002) at.left = at.x < was;
+    }
+    for (const i of this.party.keys()) if (!places.has(i)) this.party.delete(i);
+    for (const [i, at] of this.party) {
+      const hero = i === heroIndex;
+      const src = (at.running || (hero && this.hero.moving) ? spriteFrames(`${COMPS[i].sprite}_run`) : null) ?? spriteFrames(COMPS[i].sprite);
+      if (!src) continue;
+      const r = src.frames[(tick + i) % src.frames.length];
+      standing.push({ y: at.y, draw: () => {
+        if (hero) {
+          g.strokeStyle = 'rgba(255, 224, 138, 0.9)';
+          g.lineWidth = 1;
+          g.beginPath();
+          g.ellipse(at.x * 16, at.y * 16 - 0.5, 7, 3, 0, 0, Math.PI * 2);
+          g.stroke();
+        } else shadow(at.x, at.y, 5);
+        stand(src.img, r, at.x, at.y, hero && !at.running ? this.hero.left : at.left);
+      } });
+    }
+    standing.sort((a, b) => a.y - b.y).forEach((s2) => s2.draw());
+    // The shrine's glow.
+    const cx = (SHRINE[0] + 0.5) * 16, cy = (SHRINE[1] - 0.8) * 16;
+    const glow = g.createRadialGradient(cx, cy, 2, cx, cy, 70);
+    glow.addColorStop(0, `rgba(179, 140, 255, ${0.3 + 0.08 * Math.sin(this.time * 2)})`);
+    glow.addColorStop(1, 'rgba(179, 140, 255, 0)');
+    g.fillStyle = glow;
+    g.fillRect(cx - 70, cy - 70, 140, 140);
+  }
+}

@@ -720,7 +720,7 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .pedestal.materialize .px { animation: materialize 0.6s ease-out; }
 @keyframes materialize { 0% { filter: grayscale(1) sepia(1) hue-rotate(215deg) saturate(2.6) brightness(2.2) drop-shadow(0 0 14px #fff); opacity: 0.85; } 100% { filter: none; opacity: 1; } }
 /* A reroll: the old spirits burst away; the new ones rise off their stones in a column of light, one after another. */
-.pedestals.vanish .ped-fig { animation: vanish 0.38s ease-in forwards; }
+.pedestals.vanish .pedestal .ped-fig { animation: vanish 0.38s ease-in forwards; }
 .pedestals.vanish .pedestal b { transition: opacity 0.3s; opacity: 0; }
 @keyframes vanish { to { opacity: 0; transform: translateY(-46px) scale(0.6, 1.4); filter: brightness(3) blur(2px); } }
 .pedestals.arrive .pedestal:nth-child(2) { --d: 0.14s; }
@@ -1585,3 +1585,59 @@ body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticke
 @media (orientation: portrait) {
   .mm-panel { width: 100%; justify-content: flex-start; padding-top: calc(28px + var(--safe-t)); background: linear-gradient(180deg, rgba(8, 4, 6, 0.95) 50%, rgba(8, 4, 6, 0) 64%); }
 }
+
+/* ---------- the Keep ---------- */
+
+/* The Keep's top-down map, over the paused fight, under the HUD and panels. */
+.keep-view { position: fixed; left: 0; top: 0; z-index: 0; display: block; image-rendering: pixelated; cursor: pointer; touch-action: none; }
+
+/* Up in the Keep there's no fight: the floor, skills, Rampage and damage lines step aside. */
+body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .abilities, body.in-keep .fever, body.in-keep .buffs, body.in-keep .bars, body.in-keep .blade-rate { display: none !important; }
+.keep-labels { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+.keep-label { position: absolute; left: 0; top: 0; display: grid; justify-items: center; gap: 2px; translate: -50% -100%; padding: 0; background: none; border: 0; cursor: pointer; pointer-events: auto; }
+.keep-label[hidden] { display: none; }
+.keep-label b { padding: 4px 8px; font: 400 21px/1 'Jersey 10'; color: var(--gold-hi); background: rgba(20, 12, 14, 0.82); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #946a26; }
+.keep-label i { font-style: normal; font-size: 12px; color: var(--gold-hi); text-shadow: var(--outline); animation: hintbob 0.9s ease-in-out infinite; }
+.keep-label:hover b { color: #fff; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--gold-hi); }
+.keep-label.soul b { color: #e2d2ff; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--soul), 0 0 14px rgba(179, 140, 255, 0.5); }
+.keep-label.soul i { color: #e2d2ff; }
+/* Standing at it: the label lights up with the key that uses it. */
+.keep-label em { display: none; font: 400 11px/1 'Silkscreen'; font-style: normal; text-transform: uppercase; letter-spacing: 1px; padding: 3px 6px 4px; color: var(--ink); background: var(--gold-hi); box-shadow: 0 0 0 2px var(--ink), 0 2px 0 2px #855415; }
+.keep-label.near em { display: block; animation: hintbob 0.9s ease-in-out infinite; }
+.keep-label.near i { display: none; }
+/* Under a Legend's feet, pointing up at it (the arrow stays when the key shows, so the label doesn't jump). */
+.keep-label.below { translate: -50% 0; }
+.keep-label.below.near i { display: block; }
+.keep-label.near b { color: #fff; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--gold-hi), 0 0 14px rgba(255, 224, 138, 0.45); }
+.keep-label.soul.near b { box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--soul), 0 0 16px rgba(179, 140, 255, 0.7); }
+/* Trading in the Keep: over the game's own panels, and in their style (stone panel, dark insets, the game's buttons). */
+.tm-wrap.keep { z-index: 30; background: rgba(6, 3, 5, 0.66); }
+.keep .tm { color: var(--text); background: none; border: 6px solid transparent; border-image: var(--f-panel) 2 fill / 6px stretch; border-radius: 0; padding: 14px 16px 16px; font: 400 16px/1.3 var(--f-text); }
+.keep .tm-x { width: 32px; height: 32px; color: var(--text); background: none; border: 6px solid transparent; border-image: var(--f-btn) 2 fill / 6px stretch; border-radius: 0; font: 400 16px/1 'Jersey 10'; display: grid; place-items: center; }
+.keep .tm-face { filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.5)); }
+.keep .tm-bubble { background: rgba(0, 0, 0, 0.3); border: 0; border-radius: 0; box-shadow: inset 0 0 0 2px #3b2b2e; }
+.keep .tm-bubble::before { border-right-color: #3b2b2e; }
+.keep .tm-bubble::after { border-right-color: #1f1719; }
+.keep .tm-bubble b { font: 400 24px/1 'Jersey 10'; color: var(--gold-hi); }
+.keep .tm-say { color: var(--dim); }
+.keep .tm-rug { background: radial-gradient(ellipse at 50% 50%, rgba(242, 193, 78, 0.08), transparent 70%), rgba(0, 0, 0, 0.32); border: 0; border-radius: 0; box-shadow: inset 0 0 0 2px #5a3f2c; }
+.keep .tm-rug small, .keep .tm-hand small { color: var(--faint); }
+.keep .tm-slot { border: 2px dashed #5a3f2c; border-radius: 0; }
+.keep .tm-swap { color: var(--gold-hi); }
+.keep .tm-card, .keep .tm-big { box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px rgba(255, 255, 255, 0.25); }
+.keep .tm-back { box-shadow: 0 0 0 2px var(--ink); }
+.keep .tm-n { background: var(--ink); color: var(--gold-hi); }
+.keep .tm-target, .keep .tm-split { color: var(--text); background: rgba(0, 0, 0, 0.45); border: 0; border-radius: 0; box-shadow: inset 0 0 0 2px #3b2b2e; }
+.keep .tm-split b { color: var(--gold-hi); }
+.keep .tm-odds { color: var(--dim); }
+.keep .tm-hand { background: rgba(0, 0, 0, 0.25); border: 0; border-radius: 0; box-shadow: inset 0 0 0 2px #3b2b2e; }
+.keep .tm-none { color: var(--dim); }
+.keep .tm-btn { min-height: 38px; padding: 0 16px; color: var(--text); background: none; border: 6px solid transparent; border-image: var(--f-btn) 2 fill / 6px stretch; border-radius: 0; box-shadow: none; font: 400 20px/1 'Jersey 10' !important; }
+.keep .tm-btn.go { color: #2a1a08; border-image-source: var(--f-primary); }
+.keep .tm-btn:hover:not(:disabled) { border-image-source: var(--f-btn-hi); }
+.keep .tm-btn.go:hover:not(:disabled) { border-image-source: var(--f-primary); filter: brightness(1.08); }
+.keep .tm-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+.lcards.one { grid-template-columns: 1fr; margin-bottom: 10px; }
+/* A Legend's own panel (from the Keep): as wide as its card. */
+.modal.m-legend { width: min(400px, calc(100vw - 24px)); }
+.lcards.one .lc-nm b { display: none; }
