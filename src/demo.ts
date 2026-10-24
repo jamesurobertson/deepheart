@@ -10,3 +10,5 @@ export const DEMO_COMPANIONS = 8;
 export const DEMO_FIRST_CARD = { from: 1, by: 460 };
 /** Where the end screen sends you. A placeholder (a store search) until the Steam app and its page exist. */
 export const STEAM_URL = 'https://store.steampowered.com/search/?term=Deepheart';
+/** The wiki ships beside the game; the desktop app opens links in the browser, so it points at the published one. */
+export const WIKI_URL = typeof window !== 'undefined' && 'deepheart' in window ? 'https://jamesurobertson.github.io/deepheart/wiki/' : 'wiki/';

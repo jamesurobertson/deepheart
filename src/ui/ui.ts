@@ -8,7 +8,7 @@ import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, silhouette, sprite, spriteFit } from './px.ts';
 import type { BinderCard, BinderColor } from './binder.ts';
 import { TradeMat, type Brother } from './trade.ts';
-import { DEMO, DEMO_COMPANIONS, STEAM_URL } from '../demo.ts';
+import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
 import { playDream } from './dream.ts';
 import { STASHES } from './world.ts';
 
@@ -234,6 +234,7 @@ export class Ui {
       <div class="hud-top">
         <div class="bank"><span class="bank-ico">${sprite('coin', 5)}</span><b class="bank-v">0</b></div>
         <div class="rate"><span><b class="dps-v">0</b> <i class="long">damage/sec</i><i class="short">dps</i></span><span class="sep">·</span><span><b class="click-v">1</b> <i class="long">per click</i><i class="short">/click</i></span></div>
+        <div class="streak"><i>Streak</i> <b class="streak-v">0</b> <span class="sep">·</span> <b class="streak-b"></b></div>
         <div class="floor pnl">
           <button class="btn icon sm" data-act="floorDown" aria-label="Previous floor">${G.left()}</button>
           <div class="floor-mid">
@@ -290,7 +291,7 @@ export class Ui {
     const q = (sel: string) => root.querySelector(sel) as HTMLElement;
     this.floorMaps = [...root.querySelectorAll<HTMLElement>('.floor-map')];
     this.el = {
-      bank: q('.bank-v'), bankIco: q('.bank-ico'), dps: q('.dps-v'), click: q('.click-v'), rate: q('.rate'),
+      bank: q('.bank-v'), bankIco: q('.bank-ico'), dps: q('.dps-v'), click: q('.click-v'), rate: q('.rate'), streak: q('.streak'), streakV: q('.streak-v'), streakB: q('.streak-b'),
       floorN: q('.floor-n'), floorSub: q('.floor-sub'), floorBar: q('.floor-bar i'), floorBarT: q('.floor-bar span'), floorBox: q('.floor'),
       zonePrev: q('[data-act=zonePrev]'), zoneNext: q('[data-act=zoneNext]'), down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
       fever: q('.fever'), feverBar: q('.fever > i'), feverLabel: q('.fever > span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), vaultPick: q('.vault-pick'), vaultLeave: q('.vault-leave'), vaultFaces: q('.vp-faces'), heroMark: q('.hero-mark'), raid: q('.raid-mark'), exitMark: q('.exit-mark'),
@@ -1403,6 +1404,13 @@ export class Ui {
     this.el.dps.textContent = fmt(g.dpsTotal());
     this.el.click.textContent = fmt(g.clickTotal());
     this.el.rate.classList.toggle('boosted', g.s.buffs.some((b) => b.id !== 'fever'));
+    // The streak only matters with the Unbroken: shown while one runs, fading out once it breaks.
+    const unbroken = g.legendLv('unbroken');
+    this.el.streak.classList.toggle('on', unbroken > 0 && g.streak > 1);
+    if (unbroken > 0 && g.streak > 1) {
+      this.el.streakV.textContent = fmt(g.streak);
+      this.el.streakB.textContent = `+${+(0.01 * unbroken * g.streak).toFixed(1)}%`;
+    }
 
     this.renderFloor();
 
@@ -2271,7 +2279,7 @@ export class Ui {
           <p class="muted">Copy your save code to move it to another browser.</p>
           <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
           <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
-          <div class="set-row"><a class="btn" href="wiki/" target="_blank" rel="noopener">Wiki</a>${document.body.classList.contains('at-menu') ? '' : '<button class="btn" data-act="mainMenu">Main menu</button>'}</div>
+          <div class="set-row"><a class="btn" href="${WIKI_URL}" target="_blank" rel="noopener">Wiki</a>${document.body.classList.contains('at-menu') ? '' : '<button class="btn" data-act="mainMenu">Main menu</button>'}</div>
         </div>`;
     }
     if (soft && (html === this.modalKey || performance.now() < this.modalHold)) return;
