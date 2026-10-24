@@ -2424,7 +2424,7 @@ export class Ui {
         <td>${others ? `<button class="btn small" data-mark-here="${i}" ${free >= MARK_MOVE ? '' : 'disabled'}>Bring one here · ${G.soul(1.2)} ${MARK_MOVE}</button>` : ''}</td></tr>`;
     }).join('');
     return `<p class="muted bd-help">The first time you beat each 10th floor past ${100}, a random companion gets a Heartmark: +${MARK_POWER * 100}% damage each, until you awaken. Send one to someone at random, or bring one from someone else to the companion you choose.</p>
-      <section class="bd wide"><table><thead><tr><th>Companion</th><td>Marks</td><td>Damage</td><td></td><td></td></tr></thead>${rows}</table></section>`;
+      <section class="bd wide bd-marks"><table><thead><tr><th>Companion</th><td>Marks</td><td>Damage</td><td></td><td></td></tr></thead>${rows}</table></section>`;
   }
 
   /** The curse chosen for the next ascent (null: an ordinary descent). */
@@ -2513,7 +2513,8 @@ export class Ui {
     const lapTab = (l: number) => {
       const c = corruptionOf(l);
       const color = `#${(l ? c.tint : 0xc9b8a0).toString(16).padStart(6, '0')}`;
-      return `<button class="sub ${l === view ? 'on' : ''}" data-card-lap="${l}"><span class="sub-dot" style="--lc:${color}"></span>${l ? c.name : 'Plain'} <i>${tally(l)}</i></button>`;
+      const here = l === Math.min(lap, CORRUPTION.length - 1);
+      return `<button class="sub${l === view ? ' on' : ''}${here ? ' here' : ''}" data-card-lap="${l}">${here ? '<em class="sub-here"></em>' : ''}<span class="sub-dot" style="--lc:${color}"></span>${l ? c.name : 'Plain'} <i>${tally(l)}</i></button>`;
     };
     const bar = `<nav class="subbar">${Array.from({ length: lapsReached + 1 }, (_, l) => lapTab(l)).join('')}
       <span class="sub-toggle"><button class="sub ${gold ? '' : 'on'}" data-card-gold="0">Normal</button><button class="sub gold-tab ${gold ? 'on' : ''}" data-card-gold="1">★ Gold</button></span></nav>`;
