@@ -128,7 +128,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   border: 6px solid transparent;
   border-image: var(--f-btn) 2 fill / 6px stretch;
   font: 600 16px/1 var(--f-text); color: var(--text); text-shadow: var(--shadow);
-  white-space: nowrap;
+  white-space: nowrap; text-decoration: none;
 }
 .btn:hover:not(:disabled) { border-image-source: var(--f-btn-hi); }
 .btn:active:not(:disabled), .btn.on { border-image-source: var(--f-btn-down); transform: translateY(2px); }
@@ -1557,10 +1557,10 @@ body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticke
 .mm-stamped + .mm-tag { margin-top: 30px; }
 .mm-stamp { position: absolute; right: 2px; bottom: -30px; transform: rotate(-6deg); padding: 6px 12px 4px; background: #e8455f; color: #fff4f6; font: 400 20px/1 'Silkscreen', monospace; letter-spacing: 4px; box-shadow: 0 0 0 3px var(--ink), 0 5px 0 3px var(--ink); }
 .mm-list { display: flex; flex-direction: column; gap: 8px; }
-.mm-list button { display: flex; align-items: baseline; gap: 14px; padding: 4px 0; border: 0; background: none; cursor: pointer; text-align: left; font: 400 38px/1 'Jersey 10', monospace; color: #a8907c; }
-.mm-list button span { width: 18px; color: transparent; }
-.mm-list button:hover, .mm-list button:focus-visible { color: var(--gold-hi); outline: none; text-shadow: 0 0 18px rgba(255, 200, 90, 0.45); }
-.mm-list button:hover span, .mm-list button:focus-visible span { color: #ff5a7e; }
+.mm-list :is(button, a) { display: flex; text-decoration: none; align-items: baseline; gap: 14px; padding: 4px 0; border: 0; background: none; cursor: pointer; text-align: left; font: 400 38px/1 'Jersey 10', monospace; color: #a8907c; }
+.mm-list :is(button, a) span { width: 18px; color: transparent; }
+.mm-list :is(button, a):hover, .mm-list :is(button, a):focus-visible { color: var(--gold-hi); outline: none; text-shadow: 0 0 18px rgba(255, 200, 90, 0.45); }
+.mm-list :is(button, a):hover span, .mm-list :is(button, a):focus-visible span { color: #ff5a7e; }
 .mm-run { margin: -6px 0 8px 32px; font: 400 12px/1.2 'Silkscreen', monospace; letter-spacing: 1px; color: #8a7466; }
 .mm-btn { display: inline-flex; align-items: center; justify-content: center; width: 320px; max-width: 100%; min-height: 54px; box-sizing: border-box; padding: 6px 16px; border: 0; cursor: pointer; text-decoration: none;
   font: 400 28px/1 'Jersey 10', monospace; color: var(--text); background: #2a1a1c; box-shadow: inset 0 0 0 3px #6b4a33, 0 0 0 3px var(--ink), 0 6px 0 3px var(--ink); }
