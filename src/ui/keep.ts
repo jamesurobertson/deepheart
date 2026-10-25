@@ -64,16 +64,6 @@ const GUARDS: [number, number][] = [
   [17, 21], [29, 21], [33, 21], [14, 23], [19, 23], [27, 23], [32, 23], [20, 16], [26, 16],
   [16, 20], [30, 20], [21, 21], [25, 21], [30, 23],
 ];
-/** Hidden cards about the Keep: each spot gives one, once. Where they are is rolled from the save's own seed. */
-const STASH_COUNT = 8;
-/** A cheap, repeatable random number from a seed and an index (0 to 1). */
-const roll = (seed: number, k: number) => {
-  let t = (seed + k * 0x9e3779b9) >>> 0;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
-
 /** The trail keeps a point every this many cells the hero walks. */
 const TRAIL_STEP = 0.08;
 /** The way the party winds round the Entrance when you arrive (the hero first). */
@@ -133,9 +123,6 @@ export class KeepView {
   private goal: KeepStation | null = null;
   /** Called when you reach a station you clicked, or click the one you're at. */
   onUse: (id: KeepStation) => void = () => {};
-  /** Called when you step on a hidden card's spot you haven't found yet. */
-  onStash: (id: string) => void = () => {};
-  private stashes: { id: string; x: number; y: number }[] = [];
 
   constructor(game: Game, host: HTMLElement) {
     this.game = game;
@@ -158,7 +145,6 @@ export class KeepView {
       const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / TRAIL_STEP);
       for (let i = 0; i < steps; i++) this.trail.push({ x: ax + ((bx - ax) * i) / steps, y: ay + ((by - ay) * i) / steps });
     }
-    this.stashes = this.placeStashes();
     this.canvas.addEventListener('pointerdown', this.onPointer);
     this.canvas.addEventListener('pointermove', this.onHover);
     this.canvas.addEventListener('pointerleave', this.onLeave);
@@ -170,23 +156,6 @@ export class KeepView {
     this.canvas.removeEventListener('pointermove', this.onHover);
     this.canvas.removeEventListener('pointerleave', this.onLeave);
     this.canvas.remove();
-  }
-
-  /** Open floor cells away from the stations and the stairs, picked by the save's seed. */
-  private placeStashes() {
-    const near = new Set(STATIONS.flatMap((st) => st.cells.map(([x, y]) => `${x},${y}`)));
-    const open: [number, number][] = [];
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      if (this.cells[y][x] === '.' && !this.blocked.has(`${x},${y}`) && !near.has(`${x},${y}`) && Math.hypot(x - ARRIVE[0], y - ARRIVE[1]) > 3) open.push([x, y]);
-    }
-    const seed = this.game.s.legendSeed;
-    const picked: { id: string; x: number; y: number }[] = [];
-    for (let k = 0; picked.length < STASH_COUNT && k < 200; k++) {
-      const [x, y] = open[Math.floor(roll(seed, k) * open.length)];
-      if (picked.some((p) => Math.abs(p.x - x) + Math.abs(p.y - y) < 4)) continue;
-      picked.push({ id: `keep-${picked.length}`, x, y });
-    }
-    return picked;
   }
 
   private walkable(x: number, y: number) {
@@ -319,8 +288,6 @@ export class KeepView {
     }
     const cx = Math.floor(hero.x), cy = Math.floor(hero.y);
     this.near = this.stations().find((st) => st.cells.some(([x, y]) => x === cx && y === cy))?.id ?? null;
-    const stash = this.stashes.find((st) => st.x === cx && st.y === cy && !this.game.s.stashes.includes(st.id));
-    if (stash) this.onStash(stash.id);
     if (this.goal && !this.path.length) {
       const goal = this.goal;
       this.goal = null;
@@ -423,17 +390,6 @@ export class KeepView {
         tile(rect(name, tick), x, y);
         g.filter = 'none';
       }
-    }
-    // An unfound card catches the light now and then: a pixel's glint, gone in a blink.
-    for (const st of this.stashes) {
-      if (this.game.s.stashes.includes(st.id)) continue;
-      const t = (this.time + roll(this.game.s.legendSeed, 500 + Number(st.id.slice(5))) * 7) % 7;
-      if (t > 0.35) continue;
-      g.globalAlpha = Math.sin((t / 0.35) * Math.PI) * 0.8;
-      g.fillStyle = '#fff3c4';
-      g.fillRect(st.x * 16 + 9, st.y * 16 + 6, 1, 3);
-      g.fillRect(st.x * 16 + 8, st.y * 16 + 7, 3, 1);
-      g.globalAlpha = 1;
     }
     // Everything standing, back to front: things, Dan and Victor, then your party (the hero leading).
     const standing: { y: number; draw: () => void }[] = [];

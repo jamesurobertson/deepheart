@@ -1470,7 +1470,9 @@ body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticke
 /* ---------- the Keep ---------- */
 
 /* The Keep's top-down map, over the paused fight, under the HUD and panels. */
-.keep-view { position: fixed; left: 0; top: 0; z-index: 0; display: block; image-rendering: pixelated; cursor: pointer; touch-action: none; }
+.keep-view { position: fixed; left: 0; top: 0; z-index: 0; display: block; image-rendering: pixelated; cursor: pointer; touch-action: none; pointer-events: auto; }
+/* The dungeon waits out of sight below. */
+body.in-keep #stage { visibility: hidden; }
 
 /* Up in the Keep there's no fight: the floor, skills, Rampage and damage lines step aside. */
 body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .abilities, body.in-keep .fever, body.in-keep .buffs, body.in-keep .bars, body.in-keep .blade-rate { display: none !important; }

@@ -434,7 +434,7 @@ export type GameEvent =
   | { t: 'heart'; id: string; lv: number }
   /** `src`: dropped by a monster just killed, on a swept floor (no body to drop from), or by a goblin caught. */
   /** `first`: your first copy of the card at all; `newColor`: your first in this lap's color (and gold or not). */
-  | { t: 'card'; id: string; gold: boolean; lap: number; count: number; first: boolean; newColor: boolean; src: 'kill' | 'sweep' | 'raid'; kill: number; copies?: number; found?: string };
+  | { t: 'card'; id: string; gold: boolean; lap: number; count: number; first: boolean; newColor: boolean; src: 'kill' | 'sweep' | 'raid'; kill: number; copies?: number };
 
 /** Every multiplier behind the damage, crit and gold numbers, kept apart for the stats page. */
 export interface Parts {
@@ -2399,17 +2399,6 @@ export class Game {
     if (!pool.length || !this.takeSpares(give)) return null;
     this.s.trades++;
     return this.receive(pool[Math.floor(Math.random() * pool.length)].id, true, 'Victor');
-  }
-
-  /** A hidden card: each spot gives one once ever, one you don't have yet if there's any left to find. */
-  findStash(spot: string) {
-    if (this.s.stashes.includes(spot)) return null;
-    const reached = this.tradeable();
-    const missing = reached.filter((c) => !this.cardCount(c.id));
-    const pool = missing.length ? missing : reached;
-    if (!pool.length) return null;
-    this.s.stashes.push(spot);
-    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, spot);
   }
 
   /** Hand over these copies (an id twice means two copies), taken from whichever color you have most of. */

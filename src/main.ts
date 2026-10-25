@@ -459,7 +459,8 @@ async function boot() {
     const slowmo = freeze > 0 ? 0.1 : 1;
     freeze = Math.max(0, freeze - dt);
     timeScale = scene.timeScale(dt);
-    scene.update(dt * slowmo * timeScale, game);
+    // Up in the Keep the dungeon is hidden and paused: no need to draw it.
+    if (!game.s.inKeep) scene.update(dt * slowmo * timeScale, game);
     ui.frame(dt);
     slow -= dt;
     if (slow <= 0) {

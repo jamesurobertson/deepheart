@@ -1337,7 +1337,6 @@ export class Ui {
     if (g.s.inKeep && !this.keepView) {
       this.keepView = new KeepView(g, this.root);
       this.keepView.onUse = (id) => this.station(id);
-      this.keepView.onStash = (id) => this.foundStash(id);
     } else if (!g.s.inKeep && this.keepView) {
       this.keepView.destroy();
       this.keepView = null;
@@ -2859,7 +2858,7 @@ export class Ui {
     el.style.setProperty('--tx', `${to.left + to.width / 2 - mid.x}px`);
     el.style.setProperty('--ty', `${to.top + to.height / 2 - mid.y}px`);
     const head = ev.gold ? (ev.newColor ? 'New gold card!' : 'Gold card!') : ev.newColor ? 'New card!' : 'Card';
-    const line = ev.found ? `<em>${ev.found}</em>` : ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
+    const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
       <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96, ev.lap)}</div></div></div>
       <div class="cr-text"><small>${head}</small><b>${esc(cardName(d.name, ev.lap))} Card${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
@@ -2958,7 +2957,6 @@ export class Ui {
   }
 
   private viaLine(via: string, what = '') {
-    if (via.startsWith('keep-')) return `Found${what} in the Keep`;
     return via.startsWith(giftVia('')) ? `A gift from ${via.slice(giftVia('').length)}` : `Traded${what} from ${via}`;
   }
 
@@ -3138,16 +3136,6 @@ export class Ui {
     }
   }
   private trading = false;
-
-  /** A hidden card turned up underfoot in the Keep. */
-  private foundStash(id: string) {
-    const got = this.game.findStash(id);
-    if (!got) return;
-    this.hooks.sound('jackpot', { vol: 0.35 });
-    this.hooks.save();
-    const g = this.game;
-    this.showCard({ t: 'card', id: got.id, gold: false, lap: got.lap, count: g.cardCount(got.id), first: got.first, newColor: got.first, src: 'raid', kill: 0, found: 'Found in the Keep' });
-  }
 
   showOffline(o: OfflineSummary) {
     this.modal = 'offline';
