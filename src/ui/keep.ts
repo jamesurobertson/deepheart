@@ -37,8 +37,10 @@ const THINGS: Thing[] = [
   ['floor_stairs', 22, 30, 'flat'], ['floor_stairs', 23, 30, 'flat'], ['floor_stairs', 24, 30, 'flat'],
 ];
 const PEOPLE: { id: 'dan' | 'victor'; sprite: string; x: number; y: number }[] = [{ id: 'dan', sprite: 'ef_elf_m', x: 3, y: 18 }, { id: 'victor', sprite: 'victor', x: 7, y: 18 }];
-/** What each station is, where it's used from (cells you stand on) and where its label floats. */
-const STATIONS: { id: KeepStation; label: string; cells: [number, number][]; tag: [number, number] }[] = [
+/** What each station is, where it's used from (cells you stand on), where its label floats, and (spirits, which you
+ *  can walk through) the cells of its body that a click picks it by. */
+type Station = { id: KeepStation; label: string; cells: [number, number][]; tag: [number, number]; body?: [number, number][] };
+const STATIONS: Station[] = [
   { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 16.6] },
   { id: 'victor', label: 'Victor', cells: [[6, 18], [7, 19], [8, 18], [7, 17]], tag: [7, 16.6] },
   { id: 'stairs', label: 'Way down', cells: [[22, 30], [23, 30], [24, 30]], tag: [23, 31.6] },
@@ -46,6 +48,8 @@ const STATIONS: { id: KeepStation; label: string; cells: [number, number][]; tag
 /** Where you arrive: on the stairs, facing up into the Entrance. */
 const ARRIVE: [number, number] = [23, 29];
 const SPEED = 5.5;
+/** Milliseconds a click is held before the hero starts following the pointer. */
+const HOLD_AFTER = 220;
 /** The reroll's beat, the same as the Spirits menu's (its vanish and arrive animations): seconds the old offer takes to
  *  warp out, each new spirit to rise in, and between one rising and the next. */
 const WARP = 0.38;
@@ -121,6 +125,9 @@ export class KeepView {
   /** The station under the pointer, and the one you clicked and are walking to (used when you get there). */
   hover: KeepStation | null = null;
   private goal: KeepStation | null = null;
+  /** A held click: where the pointer is on screen (the camera moves under it), where it went down, when, and whether
+   *  the hero has started following it. */
+  private held: { x: number; y: number; x0: number; y0: number; at: number; following: boolean } | null = null;
   /** Called when you reach a station you clicked, or click the one you're at. */
   onUse: (id: KeepStation) => void = () => {};
 
@@ -137,7 +144,8 @@ export class KeepView {
     }
     this.tiles = autotile(this.cells);
     for (const [, x, y, how] of THINGS) if (!how) this.blocked.add(`${x},${y}`);
-    for (const [x, y] of [SHRINE, ...SPIRITS]) this.blocked.add(`${x},${y}`);
+    // The shrine's obelisk stands in the way; spirits don't (you walk right through them).
+    this.blocked.add(`${SHRINE[0]},${SHRINE[1]}`);
     for (const p of PEOPLE) this.blocked.add(`${p.x},${p.y}`);
     // Everyone comes up the stairs: the party starts wound round the Entrance behind you, as if they'd walked it.
     for (let k = 0; k < ENTRANCE_WIND.length - 1; k++) {
@@ -148,6 +156,8 @@ export class KeepView {
     this.canvas.addEventListener('pointerdown', this.onPointer);
     this.canvas.addEventListener('pointermove', this.onHover);
     this.canvas.addEventListener('pointerleave', this.onLeave);
+    this.canvas.addEventListener('pointerup', this.onRelease);
+    this.canvas.addEventListener('pointercancel', this.onRelease);
     this.cam = { x: this.hero.x, y: this.hero.y };
   }
 
@@ -155,19 +165,20 @@ export class KeepView {
     this.canvas.removeEventListener('pointerdown', this.onPointer);
     this.canvas.removeEventListener('pointermove', this.onHover);
     this.canvas.removeEventListener('pointerleave', this.onLeave);
+    this.canvas.removeEventListener('pointerup', this.onRelease);
+    this.canvas.removeEventListener('pointercancel', this.onRelease);
     this.canvas.remove();
   }
 
   private walkable(x: number, y: number) {
     const cx = Math.floor(x), cy = Math.floor(y);
-    return this.cells[cy]?.[cx] === '.' && !this.blocked.has(`${cx},${cy}`) && !this.guarded.has(`${cx},${cy}`);
+    return this.cells[cy]?.[cx] === '.' && !this.blocked.has(`${cx},${cy}`);
   }
 
-  /** The Spirits you've summoned and where each stands (their cells are in the way, like anything standing). */
+  /** The Spirits you've summoned and where each stands (you can walk through them). */
   private guards() {
     return LEGENDS.filter((d) => this.game.legendLv(d.id) > 0).slice(0, GUARDS.length).map((d, k) => ({ d, at: GUARDS[k] }));
   }
-  private guarded = new Set<string>();
   /** How far each offered spirit has come into its own colors (by sprite), and its flash as it does. */
   private lit = new Map<string, { amt: number; flash: number }>();
   /** The offer last drawn, the one before it (warping out) and when it changed. */
@@ -175,37 +186,57 @@ export class KeepView {
   private offerOld: LegendId[] = [];
   private offerAt = -99;
 
-  /** The cell under a pointer. */
-  private cellAt(e: PointerEvent) {
+  /** The point under a spot on screen, in cells. */
+  private pointAt(e: { clientX: number; clientY: number }) {
     const r = this.canvas.getBoundingClientRect();
-    return [Math.floor(this.cam.x + (e.clientX - r.left - r.width / 2) / (16 * this.zoom)), Math.floor(this.cam.y + (e.clientY - r.top - r.height / 2) / (16 * this.zoom))] as const;
+    return [this.cam.x + (e.clientX - r.left - r.width / 2) / (16 * this.zoom), this.cam.y + (e.clientY - r.top - r.height / 2) / (16 * this.zoom)] as const;
   }
 
-  /** The station a cell belongs to: the thing itself or a spot right beside it. */
+  /** The cell under a pointer. */
+  private cellAt(e: PointerEvent) {
+    const [x, y] = this.pointAt(e);
+    return [Math.floor(x), Math.floor(y)] as const;
+  }
+
+  /** The station a cell belongs to: a spirit's own body, or something solid with a spot to use it from beside it. */
   private stationAt(tx: number, ty: number) {
-    const st = this.stations().find((s) => s.cells.some(([x, y]) => Math.abs(x - tx) <= 1 && Math.abs(y - ty) <= 1));
+    const all = this.stations();
+    const body = all.find((s) => s.body?.some(([x, y]) => x === tx && y === ty));
+    if (body) return body.id;
+    const st = all.find((s) => s.cells.some(([x, y]) => Math.abs(x - tx) <= 1 && Math.abs(y - ty) <= 1));
     return st && !this.walkable(tx + 0.5, ty + 0.5) ? st.id : null;
   }
 
-  /** Click (or tap) a spot: walk there by the shortest way round. Click a station and you walk up and use it. */
+  /** Click (or tap) a spot: walk there by the shortest way round. Click a station and you walk up and use it. Hold
+   *  the button down and the hero follows the pointer, as in the dungeon. */
   private onPointer = (e: PointerEvent) => {
     const [tx, ty] = this.cellAt(e);
     const station = this.stationAt(tx, ty);
-    if (station) this.useOrWalk(station);
-    else {
-      this.goal = null;
-      this.path = this.route(Math.floor(this.hero.x), Math.floor(this.hero.y), tx, ty);
-    }
+    if (station) return this.useOrWalk(station);
+    this.goal = null;
+    this.path = this.route(Math.floor(this.hero.x), Math.floor(this.hero.y), tx, ty);
+    this.held = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, at: performance.now(), following: false };
+    this.canvas.setPointerCapture(e.pointerId);
   };
 
   private onHover = (e: PointerEvent) => {
     const [tx, ty] = this.cellAt(e);
     this.hover = this.stationAt(tx, ty);
-    this.canvas.style.cursor = this.hover ? 'pointer' : 'default';
+    if (!this.held) return;
+    this.held.x = e.clientX;
+    this.held.y = e.clientY;
+    // Dragging away from where you pressed starts following straight off.
+    if (Math.hypot(e.clientX - this.held.x0, e.clientY - this.held.y0) > 12) this.held.following = true;
   };
 
   private onLeave = () => {
     this.hover = null;
+  };
+
+  /** Letting go: a quick click keeps walking where you clicked; a hold stops where you are. */
+  private onRelease = () => {
+    if (this.held?.following) this.path = [];
+    this.held = null;
   };
 
   /** Use a station you're at, or walk up to it and use it when you get there. */
@@ -255,14 +286,21 @@ export class KeepView {
   /** One frame: walk (keys first, else the clicked path), drag the trail, use stations, draw. */
   frame(dt: number, keys: { x: number; y: number }, w: number, h: number) {
     this.time += dt;
-    this.guarded = new Set(this.guards().map(({ at }) => `${at[0]},${at[1]}`));
     const hero = this.hero;
     let vx = keys.x, vy = keys.y;
+    // A press held a moment becomes following, like a drag.
+    if (this.held && !this.held.following && performance.now() - this.held.at > HOLD_AFTER) this.held.following = true;
     if (vx || vy) {
       this.path = [];
       this.goal = null;
-    }
-    else if (this.path.length) {
+    } else if (this.held?.following) {
+      this.path = [];
+      const [tx, ty] = this.pointAt({ clientX: this.held.x, clientY: this.held.y });
+      vx = tx - hero.x;
+      vy = ty - hero.y;
+      // Close enough: stand still rather than jitter on the spot.
+      if (Math.hypot(vx, vy) < 0.3) vx = vy = 0;
+    } else if (this.path.length) {
       const next = this.path[0];
       vx = next.x - hero.x;
       vy = next.y - hero.y;
@@ -298,10 +336,15 @@ export class KeepView {
 
   /** Every station right now: the fixed ones, each Spirit on offer in the shrine and each of yours where it stands
    *  (used from the cells beside and in front of it; named just below it). */
-  private stations(): typeof STATIONS {
-    const figure = (id: KeepStation, label: string, [x, y]: [number, number]) => ({ id, label, cells: [[x - 1, y], [x + 1, y], [x, y + 1], [x - 1, y + 1], [x + 1, y + 1]] as [number, number][], tag: [x, y + 1.55] as [number, number] });
-    const offer = this.game.legendOffer().slice(0, SPIRITS.length).map((id, k) => figure(`offer:${id}`, LEGEND_BY_ID.get(id)!.name, SPIRITS[k]));
-    const mine = this.guards().map(({ d, at }) => ({ ...figure(`legend:${d.id}`, d.name, at), tag: [at[0], at[1] + 1.3] as [number, number] }));
+  private stations(): Station[] {
+    // A spirit is used from where it stands or right beside it; its body (it stands tall) is what you click.
+    const figure = (id: KeepStation, label: string, [x, y]: [number, number], tall: number): Station => ({
+      id, label, tag: [x, y + 1.55],
+      cells: [[x, y], [x - 1, y], [x + 1, y], [x, y + 1], [x - 1, y + 1], [x + 1, y + 1]],
+      body: Array.from({ length: tall }, (_, k) => [x, y - k] as [number, number]),
+    });
+    const offer = this.game.legendOffer().slice(0, SPIRITS.length).map((id, k) => figure(`offer:${id}`, LEGEND_BY_ID.get(id)!.name, SPIRITS[k], 3));
+    const mine = this.guards().map(({ d, at }) => ({ ...figure(`legend:${d.id}`, d.name, at, 2), tag: [at[0], at[1] + 1.3] as [number, number] }));
     return [...STATIONS, ...offer, ...mine];
   }
 

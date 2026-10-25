@@ -61,10 +61,11 @@ html, body {
   touch-action: manipulation;
 }
 body.grab #stage { cursor: pointer; }
-body.blade-on #stage { cursor: none; }
+/* With a mouse, the sprite cursor stands in for the system one everywhere. */
+body.blade-on, body.blade-on * { cursor: none !important; }
 
 /* The sword cursor: hilt sits just below-right of the pointer, tip toward it; clicks swing it. */
-.blade { position: fixed; left: 0; top: 0; z-index: 25; pointer-events: none; }
+.blade { position: fixed; left: 0; top: 0; z-index: 9999; pointer-events: none; }
 .blade-in { position: absolute; left: 4px; top: 4px; transform-origin: 50% 100%; transform: translate(-50%, -100%) translate(10px, 26px) rotate(-40deg); filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6)); }
 .blade-in .px { display: block; }
 .blade-in.swing { animation: swing 0.22s cubic-bezier(.2, .8, .3, 1); }

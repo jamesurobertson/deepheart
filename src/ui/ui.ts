@@ -499,8 +499,10 @@ export class Ui {
       const dock = this.el.dock.getBoundingClientRect();
       const overDock = e.clientX > dock.left - 10 && e.clientX < dock.right + 10 && e.clientY > dock.top - 10 && e.clientY < dock.bottom + 10;
       const field = e.pointerType === 'mouse' && !overDock && !t.closest('#ui button, #ui .shop, #ui .pnl, #ui .dock, #ui .modal-wrap') && !this.modal;
-      this.el.blade.hidden = !field;
-      document.body.classList.toggle('blade-on', field);
+      // A mouse always gets the sprite cursor, over menus and panels too; touch has none.
+      const mouse = e.pointerType === 'mouse';
+      this.el.blade.hidden = !mouse;
+      document.body.classList.toggle('blade-on', mouse);
       this.pointer = field ? { x: e.clientX, y: e.clientY } : null;
       if (field && this.scene.overMonster(e.clientX, e.clientY)) this.onMonsterAt = performance.now();
       this.coinPointer = { x: e.clientX, y: e.clientY };
@@ -522,7 +524,7 @@ export class Ui {
         this.game.hold.y = field ? e.clientY : -1;
         this.game.hold.id = field ? this.scene.pick(e.clientX, e.clientY) : null;
       }
-      if (field) this.el.blade.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+      if (mouse) this.el.blade.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
     });
     document.addEventListener('pointerleave', () => {
       this.coinPointer = null;
