@@ -6,6 +6,7 @@ let atlas: Atlas | null = null;
 export function setAtlas(a: Atlas) {
   atlas = a;
 }
+export const uiAtlas = () => atlas;
 
 function rectFor(name: string): Rect | null {
   if (!atlas) return null;

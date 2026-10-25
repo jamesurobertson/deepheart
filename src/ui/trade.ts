@@ -5,9 +5,9 @@ import { CARD_FRAME } from '../render/cards.ts';
 import { G, cardArt, charFit } from './px.ts';
 
 /**
- * Trading with the brothers, on the bedroom rug: your spares go down on your side, his card waits face down on his,
- * and you shake on it. Dan takes five for one card from the sets you gave him (more of a set, better its odds);
- * Victor takes ten for a gold card.
+ * Trading with Dan or Victor: your spares go down on your side, his card waits face down on his, and you shake on it.
+ * Dan takes five for one card from the sets you gave him (more of a set, better its odds); Victor takes ten for a gold
+ * card. In the Keep they're traders with their goods; in the waking world, the kid's older brothers on the rug.
  */
 
 export type Brother = 'dan' | 'victor';
@@ -20,7 +20,7 @@ const LINES: Record<Brother, Record<'hello' | 'first' | 'ready' | 'new' | 'dupe'
     hello: ["Five doubles, any sets. I'll pay you back from the same ones.", "Got doubles? I'm trying to finish a page.", "Mix 'em up if you like. I sort them anyway."],
     first: ['Ooh, {set}. Okay.', '{set}? I can work with that.'],
     ready: ['Five. Shake on it?', "That's five. Deal?"],
-    new: ["Nice! That one's rare-ish.", 'A new one for the binder!'],
+    new: ["Nice! That one's rare-ish.", 'A new one for the collection!'],
     dupe: ["Oh. You've got that one. Sorry!", 'Doubles happen. Bring it back next time.'],
     short: ['Come back with five doubles.'],
   },
@@ -30,7 +30,7 @@ const LINES: Record<Brother, Record<'hello' | 'first' | 'ready' | 'new' | 'dupe'
     ready: ['Ten. Fine. Deal?', "That's ten. Shake."],
     new: ["Don't get used to it.", "Shiny, isn't it."],
     dupe: ['No refunds. I did say.', 'Two the same? Lucky you. Sort of.'],
-    short: ["Ten spares, kid. Come back when you've got them."],
+    short: ["Ten spares. Come back when you've got them."],
   },
 };
 
@@ -45,6 +45,8 @@ export interface TradeOpts {
   sound: (name: SfxName, o?: { vol?: number; rate?: number }) => void;
   save: () => void;
   closed: () => void;
+  /** At their stalls in the Keep (in the game's own panel style, over its panels). */
+  keep?: boolean;
 }
 
 export class TradeMat {
@@ -57,7 +59,7 @@ export class TradeMat {
 
   constructor(o: TradeOpts) {
     this.o = o;
-    this.el.className = 'tm-wrap';
+    this.el.className = `tm-wrap${o.keep ? ' keep' : ''}`;
     this.el.addEventListener('pointerup', (e) => e.stopPropagation());
     this.el.addEventListener('click', this.onClick);
     addEventListener('keydown', this.onKey, true);

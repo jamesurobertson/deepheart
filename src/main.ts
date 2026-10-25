@@ -127,21 +127,9 @@ async function boot() {
     } catch { /* storage unavailable: play continues unsaved */ }
   };
 
-  /** When you went into the kid's room (0: you're in the dungeon). */
-  let inRoomSince = 0;
   const ui = new Ui(document.getElementById('ui')!, game, scene, {
     sound: (n, o) => sfx.play(n, o),
     save,
-    dreaming: (on, awayCounts) => {
-      // Time in the kid's room counts as time away: the dungeon waits, then catches up when you come back.
-      if (on) inRoomSince = Date.now();
-      else {
-        const away = (Date.now() - inRoomSince) / 1000;
-        inRoomSince = 0;
-        lastTick = Date.now();
-        if (awayCounts) catchUp(away);
-      }
-    },
     settings: () => {
       applySettings();
       save();
@@ -245,7 +233,7 @@ async function boot() {
     if (TEST_STATE === 'awaken' || TEST_STATE === 'reawaken') {
       const s = game.s;
       const again = TEST_STATE === 'reawaken';
-      Object.assign(s, { awakens: again ? 1 : 0, dreamSeen: again, brosMet: again, gifts: again ? ['Dan', 'Pip'] : [], talkedTo: again ? ['dan', 'victor'] : [], stones: again ? 1 : 0, souls: again ? 2e6 : 5e4, soulsLifetime: again ? 5e5 : 0 });
+      Object.assign(s, { awakens: again ? 1 : 0, stones: again ? 1 : 0, souls: again ? 2e6 : 5e4, soulsLifetime: again ? 5e5 : 0 });
       const depth = game.awakenFloor();
       Object.assign(s, { maxFloor: depth, bestFloor: Math.max(s.bestFloor, depth), cycleBest: depth, bestCleared: depth - 1, auto: true });
       s.owned = s.owned.map((n) => Math.max(n, 40 + depth * 4));
@@ -308,10 +296,6 @@ async function boot() {
       if (e.key.toLowerCase() === 'n' && !e.repeat && !(e.target as HTMLElement).closest('input, textarea')) next(e.shiftKey ? 10 : 1);
     });
   }
-  // Waking up: ?dream=first plays the whole reveal, ?dream=wake the short one (dev only). Saves that awakened before
-  // the reveal existed see it at their next awakening.
-  const dream = import.meta.env.DEV ? params.get('dream') : null;
-  if (dream) ui.playDream(dream === 'first');
 
   /** Time away: short breaks play out frame by frame; longer ones are paid in one go and say so. */
   /** Drop what happened while away, except gold being banked: coins still lying on screen have to fly up. */
@@ -322,6 +306,11 @@ async function boot() {
   };
   const catchUp = (seconds: number) => {
     if (game.demoOver() || atMenu) return;
+    // Up in the Keep nothing happens below, however long you're gone.
+    if (game.s.inKeep) {
+      if (seconds > OFFLINE_AFTER) ui.showKeepAway(seconds);
+      return;
+    }
     if (seconds <= OFFLINE_AFTER) {
       for (let t = 0; t < seconds && !game.demoOver(); t += 0.2) game.update(0.2);
       flushAway();
@@ -385,7 +374,7 @@ async function boot() {
     const gap = (now - lastTick) / 1000;
     lastTick = now;
     // Hidden tabs (and the dungeon while you're in the room) are paused; the time is settled when you come back.
-    if (document.hidden || inRoomSince) return;
+    if (document.hidden || game.s.inKeep) return;
     // A long gap while visible means the computer slept.
     if (gap > OFFLINE_AFTER) return catchUp(gap);
     // The zone interlude pauses the fight (nothing is lost; it just waits). The end of the demo stops it for good.
@@ -404,8 +393,7 @@ async function boot() {
       hiddenAt = Date.now();
       save();
     } else if (hiddenAt) {
-      // Hidden while in the room: leaving the room settles that time.
-      if (!inRoomSince) catchUp((Date.now() - hiddenAt) / 1000);
+      catchUp((Date.now() - hiddenAt) / 1000);
       hiddenAt = 0;
       lastTick = Date.now();
     }
@@ -479,7 +467,7 @@ async function boot() {
       ui.update();
     }
     // The kid's room has its own tune.
-    sfx.music(inRoomSince ? 'room' : trackFor(game));
+    sfx.music(trackFor(game));
   };
   ui.update();
   requestAnimationFrame(frame);

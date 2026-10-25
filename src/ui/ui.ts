@@ -1,17 +1,15 @@
 import { morph } from './morph.ts';
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, tilesFor, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TUNE, bossSouls, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
+import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, silhouette, sprite, spriteFit } from './px.ts';
-import type { BinderCard, BinderColor } from './binder.ts';
 import { TradeMat, type Brother } from './trade.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
-import { playDream } from './dream.ts';
-import { STASHES } from './world.ts';
 
 export interface UiHooks {
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
@@ -24,7 +22,6 @@ export interface UiHooks {
   mainMenu: () => void;
   /** You're in the kid's room (or back out of it): the dungeon waits. `awayCounts` settles the time spent like time
    *  away (not after an awakening, which starts the run over). */
-  dreaming: (on: boolean, awayCounts?: boolean) => void;
 }
 
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
@@ -263,6 +260,7 @@ export class Ui {
       <div class="hero-mark" hidden>▼</div>
       <div class="raid-mark" hidden><b>!</b></div>
       <div class="exit-mark" hidden><i>▲</i><b>Way out</b></div>
+      <div class="keep-labels"></div>
       <div class="letterbox" aria-hidden="true"></div>
       <div class="banner" hidden><b></b><span></span></div>
       <div class="loot" hidden></div>
@@ -271,7 +269,7 @@ export class Ui {
         <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy(3)}<span>Collection</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics"${RELICS_ON ? '' : ' hidden'}>${G.relic(3)}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>Ascend</span><em class="badge" hidden></em></button>
-        <button class="btn dock-b dock-room" data-act="room" data-tip="dock:room" hidden>${charFit('cr_beanie_kid', 26)}<span>Room</span></button>
+        <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden>${spriteFit('doors_leaf_closed', 26)}<span>Keep</span></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>Stats</span></button>
         <button class="btn dock-b dock-stat blade-rate" data-tip="dock:blade" tabindex="-1">${spriteFit('weapon_knife', 20, 'glyph')}<span>1/s</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu(3)}<span>Options</span></button>
@@ -304,7 +302,7 @@ export class Ui {
       fever: q('.fever'), feverBar: q('.fever > i'), feverLabel: q('.fever > span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), vaultPick: q('.vault-pick'), vaultLeave: q('.vault-leave'), vaultFaces: q('.vp-faces'), heroMark: q('.hero-mark'), raid: q('.raid-mark'), exitMark: q('.exit-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'),
       buyAll: q('.buy-all'), autoUpg: q('.auto-upg'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
-      blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), roomBtn: q('[data-act=room]'),
+      blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), keepBtn: q('[data-act=keep]'), keepLabels: q('.keep-labels'),
       relicBadge: q('[data-open=relics] .badge'), cardBadge: q('[data-open=trophies] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
     };
 
@@ -532,9 +530,18 @@ export class Ui {
       this.el.blade.hidden = true;
       document.body.classList.remove('blade-on');
     });
+    // In the Keep, Space, Enter or E uses whatever you're standing at.
+    addEventListener('keydown', (e) => {
+      const near = this.keepView?.near;
+      if (!near || this.modal || this.trading || e.repeat || !['Space', 'Enter', 'KeyE'].includes(e.code)) return;
+      if ((e.target as HTMLElement).closest('input, textarea')) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      this.station(near);
+    }, true);
     addEventListener('keydown', (e) => {
       this.inputAt = performance.now();
-      if ((e.target as HTMLElement).closest('input, textarea') || document.body.classList.contains('dreaming')) return;
+      if ((e.target as HTMLElement).closest('input, textarea')) return;
       if (e.key === 'Escape' && this.modal) this.closeModal();
       // U buys the cheapest companion trait you can afford.
       if (e.key.toLowerCase() === 'u' && !e.repeat && !this.modal) {
@@ -572,7 +579,7 @@ export class Ui {
     const dirOf = (e: KeyboardEvent) => ({ w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down', a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right' } as const)[e.key.toLowerCase() as 'w'];
     addEventListener('keydown', (e) => {
       const dir = dirOf(e);
-      if (!dir || this.modal || document.body.classList.contains('dreaming') || (e.target as HTMLElement).closest('input, textarea')) return;
+      if (!dir || this.modal || (e.target as HTMLElement).closest('input, textarea')) return;
       this.keys.add(dir);
       this.mouseStale = true;
       if (e.key.startsWith('Arrow')) e.preventDefault();
@@ -902,7 +909,7 @@ export class Ui {
         }
         break;
       case 'awaken': this.renderAwakenConfirm(); break;
-      case 'room': if (this.game.s.dreamSeen && !document.body.classList.contains('dreaming')) this.playDream(false, undefined, undefined, true); break;
+      case 'keep': this.toggleKeep(); break;
       case 'awakenGo': this.doAwaken(); break;
       case 'heartBack': this.modal = 'heart'; this.renderModal(); break;
       case 'descendGo': this.doDescend(); break;
@@ -1327,6 +1334,21 @@ export class Ui {
 
   frame(dt: number) {
     const g = this.game;
+    if (g.s.inKeep && !this.keepView) {
+      this.keepView = new KeepView(g, this.root);
+      this.keepView.onUse = (id) => this.station(id);
+      this.keepView.onStash = (id) => this.foundStash(id);
+    } else if (!g.s.inKeep && this.keepView) {
+      this.keepView.destroy();
+      this.keepView = null;
+    }
+    if (this.keepView) {
+      const keys = this.modal || this.trading ? { x: 0, y: 0 } : { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), y: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
+      // The Legend picked in the menu is the one lit in the shrine behind it.
+      if (this.modal === 'abyss' && this.legendPick) this.keepView.pinned = `offer:${this.legendPick}`;
+      this.keepView.frame(dt, keys, this.field.w, this.field.h);
+    }
+    this.keepLabelsFrame();
     // A held attack keeps to whatever is under the cursor, which changes as monsters move and die even when the mouse
     // doesn't.
     if (g.hold && g.hold.x >= 0) g.hold.id = this.scene.pick(g.hold.x, g.hold.y);
@@ -1345,8 +1367,9 @@ export class Ui {
     if (g.vault && this.coinPointer && !this.modal) this.scene.sweepVaultCoins(this.coinPointer.x, this.coinPointer.y, g);
     if (this.keys.size) this.keyedAt = performance.now();
     const input = this.scene.heroInput;
-    input.aim = !this.modal && !this.mouseStale ? this.heroAim : null;
-    input.keys = { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), z: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
+    // (Up in the Keep the keys and pointer walk you round its map instead.)
+    input.aim = !this.modal && !this.mouseStale && !g.s.inKeep ? this.heroAim : null;
+    input.keys = g.s.inKeep ? { x: 0, z: 0 } : { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), z: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
     input.stay = this.mouseStale && !this.keys.size && performance.now() - this.keyedAt < 4000;
     input.idle = performance.now() - this.inputAt > 20_000;
     // Gold still flying up to the bank isn't counted until its coin lands.
@@ -1465,8 +1488,12 @@ export class Ui {
     }
     const rb = this.el.relicBadge;
     rb.hidden = this.newRelics < 1;
-    // After the reveal, the kid's room is always a button away.
-    this.el.roomBtn.hidden = !g.s.dreamSeen;
+    // The Keep opens with your first ascent; from then on it's a button away (and the way back down, while you're there).
+    this.el.keepBtn.hidden = !g.legendsOpen() || g.inVault() || !!g.raid;
+    const keepText = g.s.inKeep ? 'Way down' : 'Keep';
+    const keepSpan = this.el.keepBtn.querySelector('span')!;
+    if (keepSpan.textContent !== keepText) keepSpan.textContent = keepText;
+    document.body.classList.toggle('in-keep', g.s.inKeep);
     setText(rb, `+${this.newRelics}`);
     const cb = this.el.cardBadge;
     cb.hidden = this.newCards < 1;
@@ -1477,7 +1504,7 @@ export class Ui {
     if (rateEl.textContent !== rate) rateEl.textContent = rate;
 
     this.hints();
-    if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'stats', 'party', 'records', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
+    if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'stats', 'party', 'records', 'ascents', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
     this.refreshTip();
   }
 
@@ -1887,7 +1914,7 @@ export class Ui {
     else if (g.s.fevers === 0 && g.rampageReady()) state = 'rampage';
     else if (starOpen && this.onMonsterAt > this.starFrom + STAR_WAIT_MS) state = 'star';
     // Hints point at the battlefield and shop, so they wait while a panel covers them.
-    if (this.modal) state = '';
+    if (this.modal || g.s.inKeep) state = '';
     if (state !== this.hintState) this.tourAt = performance.now();
     const shown = performance.now() - this.tourAt;
     // The words stay put at the top of the battlefield (a hero on the move is hard to read beside); a small marker
@@ -2209,9 +2236,9 @@ export class Ui {
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
         abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${g.ascendFloor()}.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
         stats: 'Your numbers, and where every bonus comes from.',
-        room: 'Your room: the binder, and Dan and Victor to trade with.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
+        keep: g.s.inKeep ? `Back to floor ${g.s.floor}` : 'The Keep',
         blade: `Phantom Blade: ${perSec(g.autoRate())} attack${g.autoRate() === 1 ? '' : 's'} a second.`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
@@ -2283,12 +2310,16 @@ export class Ui {
     } else if (name === 'abyss' || name === 'marks') {
       const sub = `${G.soul()} ${fmt(g.soulsFree())} souls kept · ${soulPct(g.soulsFree())} damage`;
       html = head('Ascend', sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
+    } else if (name === 'legend' && this.legendFocus) {
+      const d = LEGEND_BY_ID.get(this.legendFocus)!;
+      html = head(esc(d.name), `${G.soul()} ${fmt(g.soulsFree())} souls kept`) + `<div class="lcards one">${this.legendCard(d)}</div>
+        <div class="legend-panel">${legendDetail(d, g.legendLv(d.id))}</div>`;
     } else if (name === 'heart') {
       html = head('The Heart', g.s.awakens ? `${G.heart()} ${fmt(g.s.stones)} heartstones · ${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}` : '') + this.tabs('heart') + this.heartHtml();
     } else if (name === 'relics') {
       html = head('Relics', `${g.relicsFound()} / ${RELICS.length} found · ${g.s.equipped.length} / ${g.relicSlots()} slots`) + this.relicsHtml();
-    } else if (name === 'stats' || name === 'party' || name === 'records') {
-      html = head('Stats') + this.statTabs(name) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : this.recordsHtml());
+    } else if (name === 'stats' || name === 'party' || name === 'records' || name === 'ascents') {
+      html = head('Stats') + this.statTabs(name) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
     } else if (name === 'settings') {
       const s = g.s.settings;
       const tog = (act: string, on: boolean, label: string) => `<button class="btn toggle ${on ? 'on' : ''}" data-act="${act}">${label}: ${on ? 'On' : 'Off'}</button>`;
@@ -2387,20 +2418,7 @@ export class Ui {
         </div>`
       : '<p class="muted">Every Spirit has joined you.</p>';
     const owned = LEGENDS.filter((d) => g.legendLv(d.id) > 0);
-    const cards = owned.map((d) => {
-      const lv = g.legendLv(d.id);
-      const cost = g.legendLevelCost(d.id);
-      const next = g.legendMaxed(d.id)
-        ? `<span class="lc-max" data-tip="legend:${d.id}">Max level</span>`
-        : `<span>Next: ${esc(d.value(lv + 1))}</span><span class="lc-up" data-tip="legend:${d.id}" data-legend="${d.id}"><button class="btn primary" ${free >= cost ? '' : 'disabled'}>Level up · ${G.soul(1.5)} ${fmt(cost)}</button></span>`;
-      return `<div class="lcard" data-card="${d.id}">
-        <div class="lc-fig"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 88, 96)}</span><span class="ped-stone"></span></div>
-        <div class="lc-nm"><b>${esc(d.name)}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
-        <div class="lc-val">${esc(d.value(lv))}</div>
-        <div class="lc-what">${esc(d.what)}</div>
-        <div class="lc-next">${next}</div>
-      </div>`;
-    }).join('');
+    const cards = owned.map((d) => this.legendCard(d)).join('');
     const respec = `<button class="btn small lc-respec" data-act="respec" data-tip="respec">Respec · ${G.soul(1.2)} +${fmt(Math.floor(g.s.legendSpent * RESPEC_REFUND))}</button>`;
     return `${summon}
       ${owned.length ? `<div class="lc-head"><h3>Your Spirits</h3><small>${owned.length}</small>${respec}</div><div class="lcards">${cards}</div>` : ''}`;
@@ -2424,6 +2442,26 @@ export class Ui {
       this.hooks.sound('card', { vol: 0.45 });
     }, 380);
   }
+
+  /** One of your Spirits as a card: its figure, level, what it gives now and next, and its Level up button. */
+  private legendCard(d: LegendDef) {
+    const g = this.game;
+    const lv = g.legendLv(d.id);
+    const cost = g.legendLevelCost(d.id);
+    const next = g.legendMaxed(d.id)
+      ? `<span class="lc-max" data-tip="legend:${d.id}">Max level</span>`
+      : `<span>Next: ${esc(d.value(lv + 1))}</span><span class="lc-up" data-tip="legend:${d.id}" data-legend="${d.id}"><button class="btn primary" ${g.soulsFree() >= cost ? '' : 'disabled'}>Level up · ${G.soul(1.5)} ${fmt(cost)}</button></span>`;
+    return `<div class="lcard" data-card="${d.id}">
+      <div class="lc-fig"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 88, 96)}</span><span class="ped-stone"></span></div>
+      <div class="lc-nm"><b>${esc(d.name)}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
+      <div class="lc-val">${esc(d.value(lv))}</div>
+      <div class="lc-what">${esc(d.what)}</div>
+      <div class="lc-next">${next}</div>
+    </div>`;
+  }
+
+  /** The Spirit whose own panel is open (walked up to in the Keep). */
+  private legendFocus: LegendId | null = null;
 
   /** A Spirit just summoned or levelled: jump its card into view, then let it flare. */
   private flareLegend(id: LegendId) {
@@ -2518,8 +2556,8 @@ export class Ui {
   /** Cards that are new in the binder: found while you slept, or traded for since you last looked. */
 
   /** A brother's trade window, opened by talking to him in the waking world. */
-  openTrade(who: Brother, host: HTMLElement, closed: () => void) {
-    new TradeMat({ who, game: this.game, host, sound: this.hooks.sound, save: this.hooks.save, closed });
+  openTrade(who: Brother, host: HTMLElement, closed: () => void, keep = false) {
+    new TradeMat({ who, game: this.game, host, sound: this.hooks.sound, save: this.hooks.save, closed, keep });
   }
 
   /** Every monster's card, zone by zone: a dark silhouette until the card turns up. A zone's row
@@ -2570,7 +2608,15 @@ export class Ui {
 
   private statTabs(on: string) {
     const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
-    return `<nav class="tabs">${tab('stats', 'Bonuses')}${tab('party', 'Companions')}${tab('records', 'Records')}</nav>`;
+    return `<nav class="tabs">${tab('stats', 'Bonuses')}${tab('party', 'Companions')}${tab('records', 'Records')}${tab('ascents', 'Ascents')}</nav>`;
+  }
+
+  /** Every ascent so far: its run time, the deepest floor reached and the souls it paid. */
+  private ascentsHtml(): string {
+    const list = this.game.s.ascents;
+    const clock = (t: number) => [Math.floor(t / 3600), Math.floor((t % 3600) / 60), Math.floor(t % 60)].map((n, i) => (i ? String(n).padStart(2, '0') : String(n))).join(':');
+    const rows = list.map((a, i) => `<tr><th>${i + 1}</th><td>${clock(a.time)}</td><td>${fmt(a.floor)}</td><td>${G.soul(1.2)} ${fmt(a.souls)}</td></tr>`).reverse().join('');
+    return `<section class="bd wide bd-ascents"><table><thead><tr><th>Ascent</th><td>Time</td><td>Deepest floor</td><td>Souls</td></tr></thead>${rows || '<tr><th>No ascents yet.</th></tr>'}</table></section>`;
   }
 
   /** Where every number comes from: each multiplier on its own line, then the total. */
@@ -2813,7 +2859,7 @@ export class Ui {
     el.style.setProperty('--tx', `${to.left + to.width / 2 - mid.x}px`);
     el.style.setProperty('--ty', `${to.top + to.height / 2 - mid.y}px`);
     const head = ev.gold ? (ev.newColor ? 'New gold card!' : 'Gold card!') : ev.newColor ? 'New card!' : 'Card';
-    const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
+    const line = ev.found ? `<em>${ev.found}</em>` : ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
       <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96, ev.lap)}</div></div></div>
       <div class="cr-text"><small>${head}</small><b>${esc(cardName(d.name, ev.lap))} Card${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
@@ -2864,22 +2910,17 @@ export class Ui {
 
   private doAwaken() {
     const g = this.game;
-    this.descending = true;
     this.modal = null;
     this.el.modalWrap.hidden = true;
     this.hooks.sound('awaken', { vol: 0.9 });
-    // Going back to sleep is the awakening itself: the run resets once the kid's back in bed.
-    this.playDream(!g.s.dreamSeen, () => {
-      g.awaken();
-      this.shown = new Decimal(0);
-      this.rowCache.fill('');
-      this.floorKey = '';
-    }, () => {
-      this.descending = false;
-      this.hooks.sound('drop4', { vol: 0.7 });
-      // Straight to the shop for the new heartstones.
-      this.openModal('heart');
-    });
+    g.awaken();
+    this.shown = new Decimal(0);
+    this.rowCache.fill('');
+    this.floorKey = '';
+    this.hooks.save();
+    this.hooks.sound('drop4', { vol: 0.7 });
+    // Straight to the shop for the new heartstones.
+    this.openModal('heart');
   }
 
   /** The floor number turns into a box: type any floor you've reached and go there (going back turns Auto off). */
@@ -2916,116 +2957,9 @@ export class Ui {
     input.addEventListener('blur', () => finish(false));
   }
 
-  /** Waking up: the whole reveal the first time, a short wake-up after. `sleep` runs once the screen is black on the way
-   *  back down (the awakening itself). */
-  playDream(first: boolean, sleep?: () => void, done?: () => void, visit = false) {
-    const g = this.game;
-    const freshCount = g.s.dreamCards.length;
-    this.hideTip();
-    this.hooks.dreaming(true);
-    playDream({
-      first, visit, awakening: visit ? 0 : g.s.awakens + 1, found: g.cardsFound(), fresh: freshCount, sound: this.hooks.sound,
-      hero: COMPS[Math.max(0, g.heroIndex())],
-      figures: this.figures(),
-      binder: () => {
-        const fresh = new Map<string, string[]>();
-        for (const key of g.s.dreamCards) {
-          const [id, ...view] = key.split(':');
-          fresh.set(id, [...(fresh.get(id) ?? []), view.join(':')]);
-        }
-        return { cards: CARDS.map((c) => this.binderCard(c, fresh.get(c.id) ?? [])), colors: this.binderColors() };
-      },
-      seen: () => {
-        g.seeCards();
-        this.hooks.save();
-      },
-      hasNew: () => g.s.dreamCards.length > 0,
-      trade: (who, host, closed) => this.openTrade(who, host, closed),
-      stash: (spot) => {
-        const got = g.findStash(spot);
-        if (!got) return null;
-        this.hooks.save();
-        return CARD_BY_ID.get(got.id)!.name;
-      },
-      brosMet: g.s.brosMet,
-      meetBros: () => {
-        g.s.brosMet = true;
-        this.hooks.save();
-      },
-      gifts: [...g.s.gifts],
-      traded: () => g.s.trades > 0,
-      muted: () => g.s.settings.muted,
-      toggleSound: () => {
-        g.s.settings.muted = !g.s.settings.muted;
-        this.syncMute();
-        this.hooks.settings();
-      },
-      mainMenu: () => this.hooks.mainMenu(),
-      talkedTo: [...g.s.talkedTo],
-      talkTo: (who) => {
-        g.s.talkedTo.push(who);
-        this.hooks.save();
-      },
-      gift: (who) => {
-        const got = g.giftCard(who);
-        if (!got) return null;
-        this.hooks.save();
-        return CARD_BY_ID.get(got.id)!.name;
-      },
-      cover: () => {
-        g.wake();
-        this.hooks.save();
-      },
-      sleep: () => {
-        sleep?.();
-        this.hooks.save();
-      },
-      done: () => {
-        this.hooks.dreaming(false, !sleep);
-        done?.();
-      },
-    });
-  }
-
-  /** The action figures in the kid's room: the party you've hired (your hero's in his hand) and the zone's monsters. */
-  private figures() {
-    const g = this.game;
-    const hero = Math.max(0, g.heroIndex());
-    const party = COMPS.filter((_, i) => i !== hero && g.s.owned[i] > 0).map((c) => c.sprite);
-    const foes = [...new Set(bandFor(g.s.floor).map((d) => d.sprite))].slice(0, 2);
-    return { party: party.slice(0, 2), foes, shelf: party.slice(2, 8) };
-  }
-
-  /** A card as the binder shows it: its pocket, and everything on the back. */
-  private binderCard(c: (typeof CARDS)[number], fresh: string[]): BinderCard {
-    const g = this.game;
-    const own = g.s.cards[c.id];
-    const tiles = c.zone < 0 ? 'halls' : tilesFor(c.zone);
-    return {
-      def: c, kind: { monster: 'Monster', mid: 'Boss', boss: 'Zone boss', goblin: 'Goblin' }[c.kind], fresh,
-      floor: tiles === 'halls' ? 'floor_1' : `${tiles}_floor_1`,
-      where: c.where.map((places) => places.filter((w) => w.floor <= g.s.bestFloor).map((w) => w.text)),
-      n: own ? own.n : CORRUPTION.map(() => 0), gold: own ? own.gold : CORRUPTION.map(() => 0),
-      laps: c.laps, canGold: c.gold,
-      first: { plain: this.firstLine(own?.at, own?.via, c.kind === 'goblin'), gold: this.firstLine(own?.goldAt, own?.goldVia, false) },
-    };
-  }
-
-  /** How you got your first copy: the kill it dropped on, or the brother you traded it from. */
-  private firstLine(at: number | undefined, via: string | undefined, goblin: boolean) {
-    return at ? `First found on ${goblin ? 'catch' : 'kill'} #${fmt(at)}` : via ? this.viaLine(via) : '';
-  }
-
   private viaLine(via: string, what = '') {
-    const spot = STASHES.find((s) => s.id === via);
-    if (spot) return `Found${what} ${spot.found}`;
+    if (via.startsWith('keep-')) return `Found${what} in the Keep`;
     return via.startsWith(giftVia('')) ? `A gift from ${via.slice(giftVia('').length)}` : `Traded${what} from ${via}`;
-  }
-
-  /** The binders you have: plain, plus each lap's color once you've been that deep. */
-  private binderColors(): BinderColor[] {
-    const laps = lapOf(this.game.s.bestFloor);
-    return CORRUPTION.map((c, l) => ({ name: l ? c.name : 'Plain', tint: `#${(l ? c.tint : 0xc9b8a0).toString(16).padStart(6, '0')}`, from: l * ZONES.length * 10 + 1, reached: l <= laps }));
   }
 
   private renderDescendConfirm() {
@@ -3051,10 +2985,11 @@ export class Ui {
     c.hidden = false;
     c.className = 'curtain in';
     c.querySelector('b')!.textContent = `Ascent ${g.s.descents + 1}`;
-    c.querySelector('span')!.textContent = 'The deep remembers you.';
+    c.querySelector('span')!.textContent = 'The Keep';
     this.hooks.sound('descend', { vol: 0.8 });
     setTimeout(() => {
       g.descend(this.curseChoice);
+      g.enterKeep();
       this.curseChoice = null;
       this.shown = new Decimal(0);
       this.rowCache.fill('');
@@ -3065,8 +3000,6 @@ export class Ui {
       c.className = 'curtain out';
       this.descending = false;
       this.hooks.sound('drop4', { vol: 0.7 });
-      // Straight to the shop for the new souls.
-      this.openModal('abyss');
     }, 2600);
     setTimeout(() => (c.hidden = true), 3600);
   }
@@ -3115,6 +3048,105 @@ export class Ui {
     </div>`;
     el.querySelector('.de-menu')!.addEventListener('click', () => this.hooks.mainMenu());
     this.root.appendChild(el);
+  }
+
+  /** The Keep's labels over each thing you can use, clickable (walking up to it works too). */
+  private keepLabelsFrame() {
+    const host = this.el.keepLabels;
+    const labels = this.keepView?.labels() ?? null;
+    if (!labels) {
+      if (host.childElementCount) host.innerHTML = '';
+      return;
+    }
+    const ids = labels.map((l) => l.id).join(' ');
+    if (host.dataset.ids !== ids) {
+      host.dataset.ids = ids;
+      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}</b><em>Space</em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
+      // Clicking a label walks you over and uses it when you get there.
+      host.querySelectorAll<HTMLElement>('[data-station]').forEach((b) => b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.keepView?.useOrWalk(b.dataset.station as KeepStation);
+      }));
+    }
+    labels.forEach((l, i) => {
+      const el = host.children[i] as HTMLElement;
+      el.style.transform = `translate(${Math.round(l.x)}px, ${Math.round(l.y)}px)`;
+      el.hidden = !l.shown || l.x < -60 || l.x > this.field.w + 60;
+      el.classList.toggle('near', this.keepView?.near === l.id);
+      el.classList.toggle('hover', this.keepView?.hover === l.id);
+    });
+  }
+
+  /** Back after time away with the party up in the Keep: nothing happened below. */
+  showKeepAway(seconds: number) {
+    this.modal = 'offline';
+    this.el.modalWrap.hidden = false;
+    this.el.modal.className = 'modal pnl m-offline';
+    this.el.modal.innerHTML = `<header class="m-head"><h2>Welcome back</h2></header>
+      <div class="offline">
+        <p>You were away for <b>${duration(seconds)}</b>.</p>
+        <p>Your party was in the Keep.</p>
+        <button class="btn primary big" data-act="close">Okay</button>
+      </div>`;
+  }
+
+  /** Up to the Keep, or back down to the dungeon: a fade through the dark hallway between them. */
+  private toggleKeep() {
+    const g = this.game;
+    if (this.keepFading || this.descending) return;
+    const up = !g.s.inKeep;
+    if (up && (!g.legendsOpen() || g.inVault() || g.raid)) return;
+    this.keepFading = true;
+    this.closeModal();
+    const c = this.el.curtain;
+    c.hidden = false;
+    c.className = 'curtain in';
+    c.querySelector('b')!.textContent = up ? 'The Keep' : `Floor ${g.s.floor}`;
+    c.querySelector('span')!.textContent = '';
+    this.hooks.sound('descend', { vol: 0.5 });
+    setTimeout(() => {
+      if (up) g.enterKeep();
+      else g.leaveKeep();
+      this.floorKey = '';
+      this.hooks.save();
+    }, 700);
+    setTimeout(() => {
+      c.className = 'curtain out';
+      this.keepFading = false;
+    }, 1300);
+    setTimeout(() => (c.hidden = true), 2200);
+  }
+  private keepFading = false;
+  /** The Keep's top-down map, while you're up there. */
+  private keepView: KeepView | null = null;
+
+  /** Your hero walked up to something in the Keep. */
+  private station(id: KeepStation) {
+    if (this.modal || this.trading || this.keepFading) return;
+    this.hooks.sound('open', { vol: 0.4 });
+    if (id.startsWith('offer:')) {
+      // The one you're standing at is the one picked, ready to summon.
+      this.legendPick = id.slice(6) as LegendId;
+      this.openModal('abyss');
+    } else if (id.startsWith('legend:')) {
+      this.legendFocus = id.slice(7) as LegendId;
+      this.openModal('legend');
+    } else if (id === 'stairs') this.toggleKeep();
+    else if (id === 'dan' || id === 'victor') {
+      this.trading = true;
+      this.openTrade(id, this.root, () => (this.trading = false), true);
+    }
+  }
+  private trading = false;
+
+  /** A hidden card turned up underfoot in the Keep. */
+  private foundStash(id: string) {
+    const got = this.game.findStash(id);
+    if (!got) return;
+    this.hooks.sound('jackpot', { vol: 0.35 });
+    this.hooks.save();
+    const g = this.game;
+    this.showCard({ t: 'card', id: got.id, gold: false, lap: got.lap, count: g.cardCount(got.id), first: got.first, newColor: got.first, src: 'raid', kill: 0, found: 'Found in the Keep' });
   }
 
   showOffline(o: OfflineSummary) {
