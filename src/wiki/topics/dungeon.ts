@@ -18,6 +18,10 @@ function bossHp(f: number) {
   return floorHp(f).times(tough * (f < DESCEND_FLOOR ? 0.5 : 1));
 }
 
+/** How much health or gold rises from this floor to the next. */
+const hpGrowth = (f: number) => floorHp(f + 1).div(floorHp(f)).toNumber() - 1;
+const goldGrowth = (f: number) => floorGold(f + 1).div(floorGold(f)).toNumber() - 1;
+
 const SAMPLE_FLOORS = [1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 125, 150, 200, 250, 300, 400, 500];
 
 const floorsBody = () => `<p class="lede">The dungeon is a stack of floors. Each floor needs ${FLOOR_KILLS} kills to clear, every fifth floor is a boss, and every ten floors is a new zone.</p>
@@ -40,11 +44,8 @@ const floorsBody = () => `<p class="lede">The dungeon is a stack of floors. Each
   ]))}
   <p>Past the ${CORRUPTION[CORRUPTION.length - 1].name} lap the names keep the last color and add a numeral: II, III and so on.</p>
   ${h2('Monster health and gold')}
-  <p>Health grows ×${TUNE.hpBase} a floor up to floor ${TUNE.deepFrom}, then ×${TUNE.deepHp} a floor with a slow extra creep. Gold grows ×${TUNE.goldGrowth} a floor to ${TUNE.deepFrom}, then ×${TUNE.deepGold}. An ordinary monster has ${pct(TRASH, 0)} of the floor's health (each kind a little more or less), and a boss pays 20 monsters' worth of gold, a whole floor.</p>
-  <code class="formula">floor health (f ≤ 100) = 10 × (f − 1 + ${TUNE.hpBase}^(f − 1))
-floor health (f > 100) = floor health(100) × ${TUNE.deepHp}^n × e^(${TUNE.hpCreep} × n² / 200), n = f − 100
-floor gold (f ≤ 100)   = ${TUNE.goldGrowth}^(f − 1)
-floor gold (f > 100)   = floor gold(100) × ${TUNE.deepGold}^(f − 100)</code>
+  <p>Monster health grows about ${pct(hpGrowth(50), 0)} a floor up to floor ${TUNE.deepFrom} (a little faster over the first few floors). Past ${TUNE.deepFrom} it grows about ${pct(hpGrowth(101), 1)} a floor, and that creeps up the deeper you go: about ${pct(hpGrowth(200), 0)} by floor 200 and ${pct(hpGrowth(500), 0)} by floor 500.</p>
+  <p>Gold grows about ${pct(goldGrowth(50), 0)} a floor up to floor ${TUNE.deepFrom}, then ${pct(goldGrowth(101), 0)} a floor. An ordinary monster has ${pct(TRASH, 0)} of the floor's health (each kind a little more or less), and a boss pays 20 monsters' worth of gold, a whole floor.</p>
   ${table([{ h: 'Floor', cls: 'c' }, { h: 'Monster health', cls: 'num' }, { h: 'Boss health', cls: 'num' }, { h: 'Monster gold', cls: 'num' }, { h: 'Boss gold', cls: 'num' }],
     SAMPLE_FLOORS.map((f) => [`<b>${f}</b>`, fmt(floorHp(f).times(TRASH)), fmt(bossHp(f)), fmt(floorGold(f).times(TRASH)), fmt(floorGold(f).times(8))]))}
   <p class="muted">Before gold bonuses, Spirits and boss modifiers. Boss health is shown on every row for comparison; bosses only appear on floors ending in 5 or 0.</p>
@@ -89,7 +90,7 @@ const bossesBody = () => `<p class="lede">Every fifth floor is a boss fight agai
   ${h3('Floor 100 and deeper')}
   <p>From floor ${TUNE.goldBossFrom}, each boss is rolled once per run: ${pct(TUNE.goldBossChance, 0)} of them are champions (${link('spirit-soulcaller', 'the Soulcaller')} raises this), and floors 100, 110, 120, 130 and every 50th floor always are. They have normal health and time, and drop souls the first time you beat them each run. A champion you fail against stays a champion until you beat it.</p>
   ${h2('Souls from champion bosses')}
-  <code class="formula">souls = max(1, floor(((floor − 75) / 25)^1.3)), at least 2 on the sure floors</code>
+  <p>The deeper the boss, the more souls: at least 1, and at least 2 on the floors that are always champions.</p>
   ${splitTables([{ h: 'Floor', cls: 'c' }, { h: 'Souls', cls: 'num' }], [
     [100, 105, 110, 120, 125, 130, 135, 140, 150, 160].map((f) => [`<b>${f}</b>${GOLD_BOSS_SURE(f) ? ' <span class="muted">sure</span>' : ''}`, bossSouls(f)]),
     [175, 200, 225, 250, 275, 300, 350, 400, 450, 500].map((f) => [`<b>${f}</b>${GOLD_BOSS_SURE(f) ? ' <span class="muted">sure</span>' : ''}`, bossSouls(f)]),

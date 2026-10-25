@@ -182,7 +182,12 @@ body.compact .rate .short { display: inline; }
 .floor .btn.icon.sm { width: 34px; height: 34px; min-height: 0; }
 .floor-mid { width: 270px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .floor-name { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; white-space: nowrap; min-width: 0; }
-.floor-name .floor-sub { overflow: hidden; text-overflow: ellipsis; }
+.floor-name .floor-sub { overflow: hidden; }
+.floor-sub.tight { letter-spacing: 0; }
+.floor-sub.tighter { font-size: 9px; }
+.floor-sub.wrap { white-space: normal; line-height: 1.15; text-align: right; }
+/* A boss's tags move to the second line together. */
+.floor-sub .chips { display: inline-block; white-space: nowrap; }
 .floor-n { font: 700 18px/1 var(--f-text); color: var(--gold-hi); text-shadow: var(--shadow); }
 .floor-n { cursor: text; border-bottom: 1px dashed transparent; }
 .floor-n:hover { border-bottom-color: rgba(255, 224, 138, 0.6); }
@@ -904,7 +909,9 @@ body.compact .floor { margin-top: 4px; width: 100%; max-width: 460px; padding: 2
 body.compact .floor-mid { width: auto; flex: 1; min-width: 0; }
 body.compact .floor .btn.icon.sm { width: 38px; height: 38px; }
 body.compact .floor-n { font-size: 16px; white-space: nowrap; }
-body.compact .floor-sub { font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 6px; }
+body.compact .floor-sub { font-size: 9px; overflow: hidden; white-space: nowrap; margin-left: 6px; }
+body.compact .floor-sub.tighter { font-size: 8px; }
+body.compact .floor-sub.wrap { white-space: normal; }
 body.compact .floor .auto { min-width: 0; min-height: 38px; font-size: 13px; }
 body.compact .fever { width: 100%; max-width: 460px; height: 12px; margin-top: 2px; }
 body.compact .fever span { font-size: 9px; line-height: 12px; letter-spacing: 1px; }

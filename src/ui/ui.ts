@@ -343,7 +343,12 @@ export class Ui {
     this.syncMode();
     this.syncMute();
     this.layout();
-    addEventListener('resize', () => this.layout());
+    addEventListener('resize', () => {
+      this.layout();
+      this.fitFloorSub();
+    });
+    // Measured in the pixel font, so measure again once it's in.
+    document.fonts.ready.then(() => this.fitFloorSub());
     // The dock grows as buttons unlock (the Room one appears after the first awakening): keep the ticker clear of it.
     new ResizeObserver(() => this.layout()).observe(this.root.querySelector('.dock')!);
     setNotation(game.s.settings.notation);
@@ -1476,6 +1481,16 @@ export class Ui {
     this.refreshTip();
   }
 
+  /** The zone name always shows whole: tighter letters, then a size smaller, then (rarely) a second line. */
+  private fitFloorSub() {
+    const sub = this.el.floorSub;
+    sub.classList.remove('tight', 'tighter', 'wrap');
+    for (const step of ['tight', 'tighter', 'wrap']) {
+      if (sub.scrollWidth <= sub.clientWidth) return;
+      sub.classList.add(step);
+    }
+  }
+
   private renderFloor() {
     const g = this.game;
     const s = g.s;
@@ -1492,8 +1507,9 @@ export class Ui {
       setText(this.el.floorN, `Floor ${s.floor}`);
       const mods = boss ? g.bossMods() : [];
       // Two tags fit; the rest show as a count (hover for them all).
-      if (mods.length) this.el.floorSub.innerHTML = `Boss ${modChips(mods.slice(0, mods.length > 2 ? 1 : 2))}${mods.length > 2 ? `<em class="mod more" style="--mc:var(--dim)">+${mods.length - 1}</em>` : ''}`;
+      if (mods.length) this.el.floorSub.innerHTML = `Boss <span class="chips">${modChips(mods.slice(0, mods.length > 2 ? 1 : 2))}${mods.length > 2 ? `<em class="mod more" style="--mc:var(--dim)">+${mods.length - 1}</em>` : ''}</span>`;
       else setText(this.el.floorSub, boss ? 'Boss' : zoneName(s.floor).replace(/^The /, ''));
+      this.fitFloorSub();
       this.el.floorBox.classList.toggle('is-boss', boss);
       (this.el.down as HTMLButtonElement).disabled = s.floor <= 1;
       (this.el.up as HTMLButtonElement).disabled = s.floor >= s.maxFloor;
@@ -2650,10 +2666,10 @@ export class Ui {
     const rows = COMPS.map((c, i) => {
       const lv = g.s.owned[i];
       if (!lv) return '';
-      return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(p.tier[i])}</td><td>${g.s.marks[i] ? `${G.heart(1.2)} ${g.s.marks[i]}` : ''}</td><td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? g.compDps(i).div(total).times(100).toNumber().toFixed(1) : 0}%</td></tr>`;
+      return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(levelMult(lv))}</td><td>${x(p.tier[i])}</td><td>${g.s.marks[i] ? `${G.heart(1.2)} ${g.s.marks[i]}` : ''}</td><td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? g.compDps(i).div(total).times(100).toNumber().toFixed(1) : 0}%</td></tr>`;
     }).join('');
-    return `<p class="muted bd-help">Each companion: level × base damage × traits × Heartmarks, then every all-damage bonus (${x(b.all.times(p.banner))} right now) on top.</p>
-      <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Tiers</td><td>Marks</td><td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
+    return `<p class="muted bd-help">Each companion: level × base damage × milestones × traits × Heartmarks, then every all-damage bonus (${x(b.all.times(p.banner * p.party))} right now) on top.</p>
+      <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Milestones</td><td>Traits</td><td>Marks</td><td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
   }
 
   private recordsHtml(): string {

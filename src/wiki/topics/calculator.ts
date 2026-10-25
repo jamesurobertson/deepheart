@@ -1,10 +1,10 @@
 import Decimal from 'break_infinity.js';
-import { COMPS, LEGENDS, MODS, TROPHIES, UPGRADES, legendShare, modsFor, type LegendId } from '../../game/data.ts';
+import { COMPS, LEGENDS, TROPHIES, UPGRADES, type LegendId } from '../../game/data.ts';
 import {
-  BOSS_TIME, DESCEND_FLOOR, Game, MANUAL_RATE, SAVE_VERSION, STREAK_CAP, TRASH, TUNE, floorHp, newSave, type Buff, type SaveState,
+  Game, MANUAL_RATE, SAVE_VERSION, STREAK_CAP, TUNE, newSave, type Buff, type SaveState,
 } from '../../game/game.ts';
 import { fmt } from '../../game/format.ts';
-import { esc, h2, link } from '../kit.ts';
+import { esc, h2 } from '../kit.ts';
 import { spr } from '../sprites.ts';
 import type { Page } from '../pages.ts';
 
@@ -44,11 +44,7 @@ interface Scenario {
   treasure: boolean;
   goldRush: boolean;
   drums: boolean;
-  floor: number;
 }
-
-/** Seconds, readable from a blink to an age. */
-const time = (t: number) => (t === Infinity ? 'Never' : t < 0.1 ? 'under 0.1s' : t < 1000 ? `${+t.toFixed(1)}s` : t < 86_400 ? `${+(t / 60).toFixed(0)} min` : 'over a day');
 
 const buff = (id: Buff['id'], dps = 1, click = 1, gold = 1): Buff => ({ id, name: id, t: 999, dur: 999, dps, click, gold });
 
@@ -67,24 +63,6 @@ function build(save: SaveState, sc: Scenario) {
   game.streak = sc.idle ? 0 : sc.streak;
   game.invalidate();
   return game;
-}
-
-interface Fight { hp: Decimal; time: number; timer: number; mods: string[]; win: boolean }
-
-/** A boss on this floor against this game: its health, how long it takes, and the clock. */
-function fight(game: Game, sc: Scenario, f: number): Fight {
-  const mods = modsFor(f);
-  const tough = TUNE.bossHpFrom + (TUNE.bossHp - TUNE.bossHpFrom) * Math.min(1, (f - 1) / TUNE.bossRamp);
-  const wither = 1 - 0.5 * legendShare(game.legendLv('wither'));
-  const hp = floorHp(f).times(tough * (f < DESCEND_FLOOR ? 0.5 : 1) * (mods.includes('giant') ? 3 : 1) * wither);
-  const timer = (BOSS_TIME + game.bossTimeBonus()) * (mods.includes('enraged') ? 0.5 : 1) * (mods.includes('giant') ? 1.5 : 1);
-  const hit = game.clickDamage().times(1 + game.critChance() * (game.critMult() - 1));
-  const hand = sc.idle ? 0 : sc.rate;
-  const boss = game.breakdown().parts.boss;
-  const dps = game.dps().times(mods.includes('armored') ? 0.25 : 1).plus(hit.times(hand + game.autoRate())).times(boss);
-  const net = dps.minus(mods.includes('regen') ? hp.times(0.03) : 0);
-  const time = net.gt(0) ? hp.div(net).toNumber() : Infinity;
-  return { hp, time, timer, mods, win: time <= timer };
 }
 
 const delta = (now: Decimal | number, was: Decimal | number) => {
@@ -111,7 +89,7 @@ function mount(root: HTMLElement) {
   const found = loadSave();
   let base = found ?? clone(newSave());
   let edit = clone(base);
-  const sc: Scenario = { idle: false, streak: 0, rate: MANUAL_RATE, rampage: 0, bloodlust: false, frenzy: false, treasure: false, goldRush: false, drums: false, floor: Math.max(5, Math.ceil((base.maxFloor ?? 1) / 5) * 5) };
+  const sc: Scenario = { idle: false, streak: 0, rate: MANUAL_RATE, rampage: 0, bloodlust: false, frenzy: false, treasure: false, goldRush: false, drums: false };
 
   const traitsOwned = (s: SaveState, i: number) => traitIds(i).filter((u) => s.upgrades.includes(u.id)).length;
   const soulsKept = (s: SaveState) => Math.max(0, s.souls - s.spentSouls);
@@ -154,7 +132,6 @@ function mount(root: HTMLElement) {
       <div class="cx-sps">${spirits}</div>
       ${h2('Situation')}
       <div class="cx-row">
-        <label>Floor <input type="number" min="1" max="5000" step="1" data-sc="floor" value="${sc.floor}"></label>
         <label>Attacks a second <input type="number" min="0" max="${MANUAL_RATE}" step="1" data-sc="rate" value="${sc.rate}"></label>
         <label>Streak <input type="number" min="0" max="${STREAK_CAP}" step="1" data-sc="streak" value="${sc.streak}"></label>
         <label>Rampage <select data-sc="rampage"><option value="0">Off</option><option value="1"${sc.rampage === 1 ? ' selected' : ''}>First tier</option><option value="2"${sc.rampage === 2 ? ' selected' : ''}>Top tier</option></select></label>
@@ -166,7 +143,6 @@ function mount(root: HTMLElement) {
   function showResults() {
     const now = build(edit, sc);
     const was = build(base, sc);
-    const nowFight = fight(now, sc, sc.floor);
     const hit = now.clickDamage();
     const levels = edit.owned.reduce((a, b) => a + b, 0);
     const pending = Math.floor(levels / TUNE.levelsPerSoul) + (edit.bossSouls ?? 0);
@@ -183,19 +159,11 @@ function mount(root: HTMLElement) {
         ${stat('Boss damage', `×${+now.breakdown().parts.boss.toFixed(2)}`)}
         ${stat('Souls if you ascended', fmt(pending))}
       </div>
-      <h3>Floor ${sc.floor}</h3>
-      <div class="cx-stats">
-        ${stat('Monster health', fmt(floorHp(sc.floor).times(TRASH)))}
-        ${stat('Per monster', now.dps().gt(0) ? time(floorHp(sc.floor).times(TRASH).div(now.dps()).toNumber()) : '—')}
-        ${sc.floor % 5 === 0 ? `${stat('Boss health', fmt(nowFight.hp))}
-        ${stat('Modifiers', nowFight.mods.length ? nowFight.mods.map((id) => MODS.find((m) => m.id === id)!.name).join(', ') : 'None')}
-        ${stat('Boss takes', `${time(nowFight.time)} of ${+nowFight.timer.toFixed(1)}s`, ` <span class="cx-d ${nowFight.win ? 'up' : 'down'}">${nowFight.win ? 'Beaten' : 'Too slow'}</span>`)}` : `<p class="muted">Not a boss floor.</p>`}
-      </div>
       <h3>Who does the damage</h3>
       ${party.length ? `<div class="tbl"><table><thead><tr><th>Companion</th><th class="num">DPS</th><th class="num">Share</th></tr></thead><tbody>
         ${party.map((r) => `<tr><td><span class="who">${spr(r.c.sprite, 22)}${esc(r.c.name)}</span></td><td class="num">${fmt(r.dps)}</td><td class="num">${total.gt(0) ? `${(r.dps.div(total).toNumber() * 100).toFixed(1)}%` : '—'}</td></tr>`).join('')}
       </tbody></table></div>` : '<p class="muted">No one hired.</p>'}
-      <p class="muted">Boss times count your party, the Phantom Blade and your attacks with crits, against the boss's modifiers. See ${link('bosses', 'Bosses')}.</p>`;
+`;
     window.dispatchEvent(new Event('wiki:sprites'));
   }
 
@@ -220,7 +188,7 @@ function mount(root: HTMLElement) {
     else if ('trophies' in d) edit.trophies = TROPHIES.slice(0, Math.min(TROPHIES.length, num(el))).map((t) => t.id);
     else if (d.sc) {
       const k = d.sc as keyof Scenario;
-      (sc as unknown as Record<string, number | boolean>)[k] = el.type === 'checkbox' ? el.checked : k === 'floor' ? Math.max(1, num(el)) : num(el);
+      (sc as unknown as Record<string, number | boolean>)[k] = el.type === 'checkbox' ? el.checked : num(el);
     }
     showResults();
   });

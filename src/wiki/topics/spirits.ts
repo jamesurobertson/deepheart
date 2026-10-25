@@ -37,11 +37,13 @@ const CAP: Record<string, string> = {
   hourglass: '+30s', wither: '−50%', restless: '−75%', soulcaller: '100%', lure: '+200%', collector: '+200%', thinning: '−10 kills',
 };
 
-const costRule = (d: LegendDef) =>
-  d.kind === 'sink' ? '1 soul every level'
-    : d.kind === 'utility' ? '2<sup>n</sup> souls for level n'
-      : d.id === 'unbroken' ? 'n<sup>1.5</sup> souls for level n, rounded up'
-        : 'n souls for level n';
+/** A Spirit's level prices in words, with the first few as examples. */
+const costRule = (d: LegendDef) => {
+  if (d.kind === 'sink') return '1 soul every level';
+  const first = [1, 2, 3, 4].map((lv) => legendCost(d, lv)).join(', ');
+  const rule = d.kind === 'utility' ? 'double the level before' : d.id === 'unbroken' ? 'a little more each level' : 'one more soul each level';
+  return `${rule} (${first}, …)`;
+};
 
 /** Souls to take a Spirit from level 1 to `lv` (summoning it is level 1). */
 const totalTo = (d: LegendDef, lv: number) => range(1, lv - 1).reduce((sum, l) => sum + legendCost(d, l), 0);
@@ -72,7 +74,7 @@ function spiritPage(d: LegendDef): Page {
       ${d.note ? `<p class="note">${d.note}</p>` : ''}
       ${h2(`Leveling ${d.name}`)}
       <p>Summoning ${d.name} costs your current ${link('spirits', 'summon cost', 'Summoning')}. After that, each level costs ${costRule(d)}.
-      ${d.kind === 'utility' && CAP[d.id] && d.id !== 'thinning' ? `Its effect closes in on its cap: at level n it has 1 − 0.9<sup>n</sup> of it (${pct(legendShare(1), 0)} at level 1, ${pct(legendShare(10), 0)} at level 10, ${pct(legendShare(20), 0)} at level 20).` : ''}</p>
+      ${d.kind === 'utility' && CAP[d.id] && d.id !== 'thinning' ? `Its effect closes in on its cap: each level closes a tenth of the gap that's left (${pct(legendShare(1), 0)} of the cap at level 1, ${pct(legendShare(10), 0)} at level 10, ${pct(legendShare(20), 0)} at level 20).` : ''}</p>
       <p><b>Cost</b> is the souls for that level; <b>Total</b> is every soul spent past the summon to get there.</p>
       ${levelTables(d)}
       <div class="clear"></div>`,
@@ -95,8 +97,8 @@ const listBody = () => {
     ${h2('Leveling')}
     <p>Spirits come in three kinds, and each kind levels at its own price:</p>
     ${table(['Kind', 'Level cost', 'How the effect grows'], [
-      ['<span class="tag power">Power</span>', 'n souls for level n (the Unbroken: n<sup>1.5</sup>)', 'The same amount every level, with no cap.'],
-      ['<span class="tag utility">Utility</span>', '2<sup>n</sup> souls for level n', 'Most close in on a cap, with 1 − 0.9<sup>n</sup> of it at level n. The six that lengthen an ability add the same seconds every level instead.'],
+      ['<span class="tag power">Power</span>', 'One more soul each level (the Unbroken: a little more)', 'The same amount every level, with no cap.'],
+      ['<span class="tag utility">Utility</span>', 'Double the level before', 'Most close in on a cap: each level closes a tenth of the gap that\'s left. The six that lengthen an ability add the same seconds every level instead.'],
       ['<span class="tag sink">Sink</span>', '1 soul every level', 'The same amount every level, with no cap.'],
     ])}
     ${h2('All Spirits')}
