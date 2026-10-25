@@ -42,6 +42,7 @@ const CREDITS: { what: string; items: { name: string; by?: string; url: string }
       { name: 'Void Estate', by: 'Zane Little', url: 'https://opengameart.org/content/haunting-chiptune-loop-void-estate' },
       { name: 'Dark Forest Waltz', by: 'The Art Bros', url: 'https://opengameart.org/content/10-track-modern-chiptune-demo' },
       { name: 'Fields of Ice', by: 'Jonathan So', url: 'https://opengameart.org/content/fields-of-ice' },
+      { name: 'The Bard\'s Tale', by: 'RandomMind', url: 'https://opengameart.org/content/chiptune-medieval-the-bards-tale' },
     ],
   },
 ];

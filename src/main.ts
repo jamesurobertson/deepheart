@@ -468,7 +468,8 @@ async function boot() {
       ui.update();
     }
     // The kid's room has its own tune.
-    sfx.music(trackFor(game));
+    // The Keep always has its own tune.
+    sfx.music(game.s.inKeep ? 'keep' : trackFor(game));
   };
   ui.update();
   requestAnimationFrame(frame);
