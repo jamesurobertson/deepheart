@@ -338,6 +338,8 @@ export interface SaveState {
   slain: Record<string, number>;
   /** Of those, the ones slain in each later color (by lap; index 0 is unused, plain kills are the rest). */
   slainLaps: Record<string, number[]>;
+  /** Champions of each card's monster slain, by color (lap): the ones that can drop its gold card. */
+  champSlain: Record<string, number[]>;
   /** Hired the late six at their deep-floor prices (older saves are refunded and start them over). */
   latePrices?: boolean;
   /** Deepest floor reached since the last awakening (heartstones are paid for it). */
@@ -355,7 +357,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, latePrices: true,
+    relics: {}, equipped: [], bossBest: 0, heart: {}, stones: 0, awakens: 0, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, graphics: 'auto' },
   };
 }
@@ -633,6 +635,7 @@ export class Game {
     if (s.bestCleared === undefined) s.bestCleared = (s.bestFloor ?? 1) - 1;
     s.peakKills ??= 0;
     s.slainLaps ??= {};
+    s.champSlain ??= {};
     s.ascents ??= [];
     s.brosMet ??= (s.trades ?? 0) > 0;
     s.gifts ??= [];
@@ -1411,7 +1414,7 @@ export class Game {
     this.killAcc++;
     if (m.champ && !m.half) this.s.champions++;
     this.events.push({ t: 'kill', id: m.id, gold, boss: m.boss, by, champ: m.champ });
-    if (!m.boss) this.rollCard(this.slay(m.def), !!m.champ, 'kill', false, overkill);
+    if (!m.boss) this.rollCard(this.slay(m.def, this.s.floor, !!m.champ), !!m.champ, 'kill', false, overkill);
     if (m.boss && m.mods.includes('split') && !m.half) {
       // Two halves climb out of the body; the clock keeps running.
       const frac = 0.5 * this.modBite() + 0.25 * (1 - this.modBite());
@@ -1450,7 +1453,7 @@ export class Game {
       }
       this.events.push({ t: 'bossWin', floor: this.s.floor, first: firstClear, clutch, souls });
       if (this.s.floor > MARK_FROM && this.s.floor % 10 === 0 && this.s.floor > this.s.markBest) this.giveMark(this.s.floor);
-      this.rollCard(this.slay(m.def), !!m.champ, 'kill', true, overkill);
+      this.rollCard(this.slay(m.def, this.s.floor, !!m.champ), !!m.champ, 'kill', true, overkill);
       if (firstWin || this.debugRelics) this.rollRelic(this.s.floor);
       // The demo's last boss always leads down the stairs, where it ends.
       if (this.s.auto || this.demoOver()) this.enterFloor(this.s.floor + 1);
@@ -2257,12 +2260,18 @@ export class Game {
   // ---------- cards ----------
 
   /** Count a kill toward its card's tally; returns the card id. */
-  private slay(def: MonsterDef, floor = this.s.floor) {
+  private slay(def: MonsterDef, floor = this.s.floor, champ = false) {
     const id = cardId(def.name);
     this.s.slain[id] = (this.s.slain[id] ?? 0) + 1;
     const lap = Math.min(lapOf(floor), CORRUPTION.length - 1);
     if (lap) (this.s.slainLaps[id] ??= CORRUPTION.map(() => 0))[lap]++;
+    if (champ) (this.s.champSlain[id] ??= CORRUPTION.map(() => 0))[lap]++;
     return id;
+  }
+
+  /** Champions of this card's monster slain in one color (lap). */
+  champsSlainOn(id: string, lap: number) {
+    return this.s.champSlain[id]?.[lap] ?? 0;
   }
 
   /** Monsters of this card slain in one color (lap). */

@@ -2203,23 +2203,27 @@ export class Ui {
       const view = Math.min(this.cardLap, lapOf(g.s.bestFloor), CORRUPTION.length - 1);
       const onLap = Math.min(lapOf(g.s.floor), CORRUPTION.length - 1);
       const lap = inPanel ? view : c.laps.includes(onLap) ? onLap : c.laps[0];
-      const slain = inPanel ? g.slainOn(id, view) : g.s.slain[id] ?? 0;
-      const lines = c.where[lap].filter((w) => w.floor <= g.s.bestFloor).map((w) => `<li>${esc(w.text)}</li>`).join('');
+      const goldView = inPanel && this.cardGold;
+      const places = c.where[lap].filter((w) => w.floor <= g.s.bestFloor);
+      const lines = places.map((w) => `<li>${esc(w.zone)} · ${w.boss ? `floor ${w.from} boss` : `floors ${w.from}–${w.to}`}</li>`).join('');
+      const common = places.flatMap((w) => w.common);
+      const commonLine = common.length ? `<p class="tt-d">Most common on floor${common.length > 1 ? 's' : ''} ${common.length > 1 ? `${common.slice(0, -1).join(', ')} and ${common.at(-1)}` : common[0]}</p>` : '';
       // Until you've killed one, only where to find it: not its name.
-      if (!n && !g.cardMet(id)) return `<div class="tt-h"><b>???</b></div><p class="tt-d">Not met yet.</p><ul class="tt-l">${lines}</ul>`;
-      const what = { monster: 'monster card', mid: 'mid-boss card', boss: 'boss card', goblin: 'goblin card' }[c.kind];
+      if (!n && !g.cardMet(id)) return `<div class="tt-h"><b>???</b></div><ul class="tt-l">${lines}</ul>`;
+      const what = { monster: 'monster card', mid: 'boss card', boss: 'boss card', goblin: 'goblin card' }[c.kind];
       const own = g.s.cards[id];
-      const here = inPanel ? ((this.cardGold ? own?.gold : own?.n)?.[view] ?? 0) : n;
-      const gilt = inPanel ? this.cardGold : gilded;
-      const head = `<div class="tt-h"><b style="color:${gilt && here ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${inPanel && this.cardGold ? 'Gold ' : ''}${esc(cardName(c.name, inPanel ? view : 0))} Card</b><span class="tt-own">${here ? `×${here}${!inPanel && gilded ? ' · gold' : ''}` : what}</span></div>`;
+      const here = inPanel ? ((goldView ? own?.gold : own?.n)?.[view] ?? 0) : n;
+      const gilt = inPanel ? goldView : gilded;
+      const head = `<div class="tt-h"><b style="color:${gilt && here ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${goldView ? 'Gold ' : ''}${esc(cardName(c.name, inPanel ? view : 0))} Card</b><span class="tt-own">${here ? `×${here}` : what}</span></div>`;
       const unit = c.kind === 'goblin' ? 'catch' : 'kill';
-      // When it was first found (that's the plain copy, or the first gold one), only where that's what you're looking at.
-      const got = (at?: number, via?: string, what = 'your first') => (at ? `Got ${what} at ${unit} #${fmt(at)}` : via ? this.viaLine(via, ` ${what}`) : '');
-      const first = !inPanel ? [got(own?.at, own?.via), got(own?.goldAt, own?.goldVia, 'your first gold one')].filter(Boolean).join(' · ')
-        : here && view === 0 ? (this.cardGold ? got(own?.goldAt, own?.goldVia, 'your first gold one') : got(own?.at, own?.via)) : '';
+      // When the copy you're looking at was first found: the kill it dropped on, or where it came from.
+      const found = (at?: number, via?: string) => (at ? `Found on ${unit} #${fmt(at)}` : via ? this.viaLine(via) : '');
+      const first = goldView ? found(own?.goldAt, own?.goldVia) : here && (!inPanel || view === 0) ? found(own?.at, own?.via) : '';
       const caught = id === 'rainbow-goblin' ? g.s.rainbows : g.s.raids - g.s.rainbows;
-      const tally = `${first ? `<p class="tt-got">${first}</p>` : ''}<p class="tt-f">${c.kind === 'goblin' ? `Caught: ${fmt(caught)}` : `Slain: ${fmt(slain)}`}</p>`;
-      return `${head}<ul class="tt-l">${lines}</ul>${tally}`;
+      const tally = c.kind === 'goblin' ? `Caught ${fmt(caught)}`
+        : goldView ? `Champions slain ${fmt(g.champsSlainOn(id, view))}`
+          : `Slain ${fmt(inPanel ? g.slainOn(id, view) : g.s.slain[id] ?? 0)}`;
+      return `${head}<ul class="tt-l">${lines}</ul>${commonLine}${goldView ? '<p class="tt-d">Drops from champions</p>' : ''}${first ? `<p class="tt-got">${first}</p>` : ''}<p class="tt-f">${tally}</p>`;
     }
     if (kind === 'rel') {
       const d = RELIC_BY_ID.get(id)!;
@@ -3107,9 +3111,10 @@ export class Ui {
     input.addEventListener('blur', () => finish(false));
   }
 
-  private viaLine(via: string, what = '') {
-    return via.startsWith(giftVia('')) ? `A gift from ${via.slice(giftVia('').length)}` : `Traded${what} from ${via}`;
+  private viaLine(via: string) {
+    return via.startsWith(giftVia('')) ? `A gift from ${via.slice(giftVia('').length)}` : `Traded from ${via}`;
   }
+
 
   private renderDescendConfirm() {
     const g = this.game;

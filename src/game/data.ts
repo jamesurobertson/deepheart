@@ -746,7 +746,7 @@ export interface CardDef {
   zone: number;
   /** Where it turns up in each color (by lap), one line per place, with the first floor you see that place on (a
    *  place is only listed once you've been that deep). */
-  where: { text: string; floor: number }[][];
+  where: CardPlace[][];
   /** The colors (laps) it comes in: a zone's newcomers only from Corrupted on, and only two of its first crowd come back. */
   laps: number[];
   /** First floor of the first zone it turns up in: the card shows in the collection once you've reached that zone. */
@@ -766,20 +766,29 @@ export function cardId(name: string): string {
 export const GOBLIN_CARD = 'treasure-goblin';
 export const RAINBOW_CARD = 'rainbow-goblin';
 
-/** " · most on floors 2 and 7": the floors in a zone (from its first) where this monster is the one the floor is known for. */
-function mostOn(d: MonsterDef, first: number) {
-  const floors = Array.from({ length: 9 }, (_, k) => first + k).filter((f) => f % 5 && featuredFor(f).name === d.name);
-  if (!floors.length) return '';
-  return ` · most on floor${floors.length > 1 ? 's' : ''} ${floors.length > 1 ? `${floors.slice(0, -1).join(', ')} and ${floors.at(-1)}` : floors[0]}`;
+/** Where a card's monster turns up: a zone and its floors (a boss: its one floor), the floors where it's the one the
+ *  floor is known for (half the crowd), and the first floor you have to have seen for this place to be listed. */
+export interface CardPlace {
+  zone: string;
+  from: number;
+  to: number;
+  boss: boolean;
+  common: number[];
+  floor: number;
+}
+
+/** The floors in a zone (from its first) where this monster is the one the floor is known for. */
+function commonOn(d: MonsterDef, first: number) {
+  return Array.from({ length: 9 }, (_, k) => first + k).filter((f) => f % 5 && featuredFor(f).name === d.name);
 }
 
 function buildCards(): CardDef[] {
   const out = new Map<string, CardDef>();
-  const add = (d: MonsterDef, kind: CardKind, zone: number, lap: number, text: string, floor: number) => {
+  const add = (d: MonsterDef, kind: CardKind, zone: number, lap: number, place: Omit<CardPlace, 'floor'>, floor: number) => {
     const id = cardId(d.name);
     const card = out.get(id) ?? { id, name: d.name, sprite: d.sprite, tint: d.tint, kind, zone, where: CORRUPTION.map(() => []), laps: [], floor, gold: true };
     out.set(id, card);
-    card.where[lap].push({ text, floor });
+    card.where[lap].push({ ...place, floor });
     if (!card.laps.includes(lap)) card.laps.push(lap);
     card.floor = Math.min(card.floor, floor);
   };
@@ -788,10 +797,10 @@ function buildCards(): CardDef[] {
       const a = i * 10 + lap * ZONES.length * 10;
       // Places are listed once you've seen them on any lap: a zone from its plain floors, its newcomers from their first.
       const seen = i * 10 + (lap ? 1 : 0) * ZONES.length * 10 + 1;
-      const crowd = (d: MonsterDef) => add(d, 'monster', i, lap, `${zoneName(a + 1).replace(/^The /, '')}, floors ${a + 1}–${a + 9}${mostOn(d, a + 1)}`, seen);
-      bandFor(a + 1).forEach(crowd);
-      add(z.mid, 'mid', i, lap, `Floor ${a + 5} boss`, i * 10 + 1);
-      add(z.boss, 'boss', i, lap, `Floor ${a + 10} boss`, i * 10 + 1);
+      const zone = zoneName(a + 1).replace(/^The /, '');
+      bandFor(a + 1).forEach((d) => add(d, 'monster', i, lap, { zone, from: a + 1, to: a + 9, boss: false, common: commonOn(d, a + 1) }, seen));
+      add(z.mid, 'mid', i, lap, { zone, from: a + 5, to: a + 5, boss: true, common: [] }, i * 10 + 1);
+      add(z.boss, 'boss', i, lap, { zone, from: a + 10, to: a + 10, boss: true, common: [] }, i * 10 + 1);
     });
   });
   // The goblins come in one color only: their cards live on the plain page, whatever lap they're caught on.
