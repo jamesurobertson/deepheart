@@ -87,12 +87,6 @@ function fight(game: Game, sc: Scenario, f: number): Fight {
   return { hp, time, timer, mods, win: time <= timer };
 }
 
-/** The first boss floor this game can't beat in time. */
-function wall(game: Game, sc: Scenario) {
-  for (let f = 5; f <= 5000; f += 5) if (!fight(game, sc, f).win) return f;
-  return Infinity;
-}
-
 const delta = (now: Decimal | number, was: Decimal | number) => {
   const a = new Decimal(now);
   const b = new Decimal(was);
@@ -173,8 +167,6 @@ function mount(root: HTMLElement) {
     const now = build(edit, sc);
     const was = build(base, sc);
     const nowFight = fight(now, sc, sc.floor);
-    const wasWall = wall(was, sc);
-    const nowWall = wall(now, sc);
     const hit = now.clickDamage();
     const levels = edit.owned.reduce((a, b) => a + b, 0);
     const pending = Math.floor(levels / TUNE.levelsPerSoul) + (edit.bossSouls ?? 0);
@@ -183,13 +175,12 @@ function mount(root: HTMLElement) {
     const stat = (label: string, value: string, extra = '') => `<div class="cx-stat"><span>${label}</span><b>${value}${extra}</b></div>`;
     out.innerHTML = `
       <div class="cx-stats">
-        ${stat('Party damage / sec', fmt(now.dps()), delta(now.dps(), was.dps()))}
+        ${stat('Party DPS', fmt(now.dps()), delta(now.dps(), was.dps()))}
         ${stat('Attack damage', fmt(hit), delta(hit, was.clickDamage()))}
         ${stat('Crit', now.critChance() ? `${(now.critChance() * 100).toFixed(0)}% for ×${+now.critMult().toFixed(2)}` : 'Not unlocked')}
         ${stat('Phantom Blade', now.autoRate() ? `${+now.autoRate().toFixed(1)} a second` : 'Not unlocked')}
         ${stat('Gold', `×${fmt(now.goldMult())}`, delta(now.goldMult(), was.goldMult()))}
         ${stat('Boss damage', `×${+now.breakdown().parts.boss.toFixed(2)}`)}
-        ${stat('First boss you can\'t beat', nowWall === Infinity ? 'None by 5000' : `Floor ${nowWall}`, nowWall !== wasWall && wasWall !== Infinity ? ` <span class="cx-d ${nowWall > wasWall ? 'up' : 'down'}">was ${wasWall}</span>` : '')}
         ${stat('Souls if you ascended', fmt(pending))}
       </div>
       <h3>Floor ${sc.floor}</h3>
@@ -201,7 +192,7 @@ function mount(root: HTMLElement) {
         ${stat('Boss takes', `${time(nowFight.time)} of ${+nowFight.timer.toFixed(1)}s`, ` <span class="cx-d ${nowFight.win ? 'up' : 'down'}">${nowFight.win ? 'Beaten' : 'Too slow'}</span>`)}` : `<p class="muted">Not a boss floor.</p>`}
       </div>
       <h3>Who does the damage</h3>
-      ${party.length ? `<div class="tbl"><table><thead><tr><th>Companion</th><th class="num">Damage / sec</th><th class="num">Share</th></tr></thead><tbody>
+      ${party.length ? `<div class="tbl"><table><thead><tr><th>Companion</th><th class="num">DPS</th><th class="num">Share</th></tr></thead><tbody>
         ${party.map((r) => `<tr><td><span class="who">${spr(r.c.sprite, 22)}${esc(r.c.name)}</span></td><td class="num">${fmt(r.dps)}</td><td class="num">${total.gt(0) ? `${(r.dps.div(total).toNumber() * 100).toFixed(1)}%` : '—'}</td></tr>`).join('')}
       </tbody></table></div>` : '<p class="muted">No one hired.</p>'}
       <p class="muted">Boss times count your party, the Phantom Blade and your attacks with crits, against the boss's modifiers. See ${link('bosses', 'Bosses')}.</p>`;
