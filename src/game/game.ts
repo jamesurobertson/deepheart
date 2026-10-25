@@ -2371,9 +2371,10 @@ export class Game {
 
   /** Plain copies beyond the first of each color: the ones you can trade away (gold copies are never traded, and a
    *  trade never takes the last of a color out of the binder). */
-  spareCards(id: string) {
+  /** Plain copies of a card you could trade (gold ones are never traded). */
+  plainCards(id: string) {
     const c = this.s.cards[id];
-    return c ? c.n.reduce((a, n) => a + Math.max(0, n - 1), 0) : 0;
+    return c ? c.n.reduce((a, n) => a + n, 0) : 0;
   }
 
   /** The cards a trade can hand over: ones from zones you've reached (and their later-lap newcomers once you've been that deep). */
@@ -2381,31 +2382,31 @@ export class Game {
     return CARDS.filter((c) => c.kind !== 'goblin' && c.floor <= this.s.bestFloor && (zone === undefined || c.zone === zone));
   }
 
-  /** Dan: five spares from any sets for a random card from those same sets, each set as likely as its share of
+  /** Dan: five cards from any sets for a random card from those same sets, each set as likely as its share of
    *  what you gave (three Upper Halls and two Bone Crypts: 60% Upper Halls, 40% Bone Crypts). */
   tradeWithDan(give: string[]) {
     if (give.length !== DAN_GIVES || give.some((id) => (CARD_BY_ID.get(id)?.zone ?? -1) < 0)) return null;
     const zone = CARD_BY_ID.get(give[Math.floor(Math.random() * give.length)])!.zone;
     const pool = this.tradeable(zone);
-    if (!pool.length || !this.takeSpares(give)) return null;
+    if (!pool.length || !this.takeCards(give)) return null;
     this.s.trades++;
     return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, 'Dan');
   }
 
-  /** Victor: ten spares from anywhere for a random gold card. */
+  /** Victor: ten cards from anywhere for a random gold card. */
   tradeWithVictor(give: string[]) {
     if (give.length !== VICTOR_GIVES || give.some((id) => CARD_BY_ID.get(id)?.kind === 'goblin')) return null;
     const pool = this.tradeable().filter((c) => c.gold);
-    if (!pool.length || !this.takeSpares(give)) return null;
+    if (!pool.length || !this.takeCards(give)) return null;
     this.s.trades++;
     return this.receive(pool[Math.floor(Math.random() * pool.length)].id, true, 'Victor');
   }
 
   /** Hand over these copies (an id twice means two copies), taken from whichever color you have most of. */
-  private takeSpares(give: string[]) {
+  private takeCards(give: string[]) {
     const want = new Map<string, number>();
     for (const id of give) want.set(id, (want.get(id) ?? 0) + 1);
-    for (const [id, n] of want) if (this.spareCards(id) < n) return false;
+    for (const [id, n] of want) if (this.plainCards(id) < n) return false;
     for (const [id, n] of want) {
       const c = this.s.cards[id];
       for (let k = 0; k < n; k++) {

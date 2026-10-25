@@ -76,7 +76,7 @@ type Trader = 'dan' | 'victor';
 const TRADER_LINES: Record<Trader, Record<'hello' | 'short' | 'new' | 'dupe', string[]>> = {
   dan: {
     hello: ['Got any doubles?', 'Swap you?'],
-    short: ["Come back when you've got doubles."],
+    short: ['Come back with five cards.'],
     new: ["That one's new for you!", 'Nice, a new one.'],
     dupe: ['Ah, you had that one.', 'A double. Sorry!'],
   },
@@ -931,8 +931,9 @@ export class Ui {
         else if (act === 'tradeAgain') this.trade = { side: [], got: null, line: pickLine(TRADER_LINES[who][this.tradeHand().length ? 'hello' : 'short']) };
         else if (act === 'tradeGo') this.tradeGo(who);
         else {
+          // Auto-fill only uses doubles: never your last copy.
           while (this.trade.side.length < this.tradeNeed(who)) {
-            const most = this.tradeHand().sort((a, b) => b.n - a.n)[0];
+            const most = this.tradeHand().filter((h) => h.n > 1).sort((a, b) => b.n - a.n)[0];
             if (!most) break;
             this.tradePut(who, most.c.id);
           }
@@ -2372,7 +2373,7 @@ export class Ui {
       html = head('Stats') + this.statTabs(name) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
     } else if (name === 'dan' || name === 'victor') {
       const who = name as Trader;
-      html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${who === 'dan' ? 'Dan' : 'Victor'}`, who === 'dan' ? `${DAN_GIVES} spares for 1 card` : `${VICTOR_GIVES} spares for 1 gold card`) + this.tradeHtml(who);
+      html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${who === 'dan' ? 'Dan' : 'Victor'}`, who === 'dan' ? `Trade ${DAN_GIVES} cards for a random card` : `Trade ${VICTOR_GIVES} cards for 1 gold card`) + this.tradeHtml(who);
     } else if (name === 'settings') {
       const s = g.s.settings;
       const tog = (act: string, on: boolean, label: string) => `<button class="btn toggle ${on ? 'on' : ''}" data-act="${act}">${label}: ${on ? 'On' : 'Off'}</button>`;
@@ -2616,11 +2617,11 @@ export class Ui {
 
   private tradeNeed = (who: Trader) => (who === 'dan' ? DAN_GIVES : VICTOR_GIVES);
 
-  /** Your spares, less the ones already put down, by set and then by how many. */
+  /** Your plain cards, less the ones already put down, by set and then by how many. */
   private tradeHand() {
     const g = this.game;
     return g.tradeable()
-      .map((c) => ({ c, n: g.spareCards(c.id) - this.trade.side.filter((id) => id === c.id).length }))
+      .map((c) => ({ c, n: g.plainCards(c.id) - this.trade.side.filter((id) => id === c.id).length }))
       .filter((h) => h.n > 0)
       .sort((a, b) => a.c.zone - b.c.zone || b.n - a.n);
   }
@@ -2648,11 +2649,14 @@ export class Ui {
     const need = this.tradeNeed(who);
     const name = who === 'dan' ? 'Dan' : 'Victor';
     const { side, got, line } = this.trade;
-    const face = (id: string, attrs: string, extra = '') => {
+    const face = (id: string, attrs: string, extra = '', last = false) => {
       const c = CARD_BY_ID.get(id)!;
-      return `<button class="tr-card" ${attrs}>${cardFace(c, 'got', false, 40, c.laps[0])}${extra}</button>`;
+      return `<button class="tr-card${last ? ' last' : ''}" ${attrs}>${cardFace(c, 'got', false, 40, c.laps[0])}${extra}</button>`;
     };
-    const slots = Array.from({ length: need }, (_, k) => (side[k] ? face(side[k], `data-take="${side[k]}"`) : '<span class="tr-slot"></span>')).join('');
+    const g = this.game;
+    // A put-down card that's your last copy keeps its tag on the table.
+    const isLast = (id: string, k: number) => side.slice(0, k + 1).filter((x) => x === id).length === g.plainCards(id);
+    const slots = Array.from({ length: need }, (_, k) => (side[k] ? face(side[k], `data-take="${side[k]}"`, isLast(side[k], k) ? '<i class="tr-last">Last</i>' : '', isLast(side[k], k)) : '<span class="tr-slot"></span>')).join('');
     const pct = (v: number) => `${Math.round(v * 100)}%`;
     const odds = this.tradeOdds(who);
     const setName = (zone: number) => ZONES[zone].name.replace(/^The /, '');
@@ -2665,9 +2669,10 @@ export class Ui {
     const fresh = got || (who === 'dan' && !odds.split.length) ? '' : `<p class="tr-odds">${odds.fresh ? `${pct(odds.fresh)} chance it's new` : 'You have them all'}</p>`;
     const hand = this.tradeHand();
     const full = side.length >= need;
+    // Your last copy of a card can go too, marked so it's never given away by accident.
     const cards = hand.length
-      ? hand.map((h) => face(h.c.id, `data-put="${h.c.id}"${full ? ' disabled' : ''}`, `<i class="tr-n">×${h.n}</i>`)).join('')
-      : '<p class="muted">No spares.</p>';
+      ? hand.map((h) => face(h.c.id, `data-put="${h.c.id}"${full ? ' disabled' : ''}`, h.n === 1 ? '<i class="tr-last">Last</i>' : `<i class="tr-n">×${h.n}</i>`, h.n === 1)).join('')
+      : '<p class="muted">No cards.</p>';
     const buttons = got
       ? '<button class="btn" data-act="tradeAgain">Trade again</button><button class="btn primary" data-act="close">Done</button>'
       : `<button class="btn" data-act="${side.length ? 'tradeClear' : 'tradeAuto'}">${side.length ? 'Clear' : 'Auto-fill'}</button><button class="btn primary" data-act="tradeGo" ${full ? '' : 'disabled'}>Trade</button>`;
@@ -2677,7 +2682,7 @@ export class Ui {
         <span class="tr-swap">⇄</span>
         <div class="tr-side his"><h3>${name}'s</h3>${his}${from}${fresh}</div>
       </div>
-      <h3>Your spares</h3>
+      <h3>Your cards</h3>
       <div class="tr-hand">${cards}</div>
       <div class="set-row tr-foot">${buttons}</div>`;
   }

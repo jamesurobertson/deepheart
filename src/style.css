@@ -1433,6 +1433,8 @@ body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .a
 .tr-card { position: relative; display: block; width: 52px; padding: 0; background: none; border: 0; cursor: pointer; }
 .tr-card:hover:not(:disabled) .mcard { box-shadow: 0 0 0 2px var(--gold-hi), inset 0 0 0 1px rgba(255, 255, 255, 0.3); }
 .tr-card:disabled { opacity: 0.45; }
+.tr-last { position: absolute; right: -6px; top: -7px; padding: 2px 4px; font: 400 10px/1 'Silkscreen'; font-style: normal; text-transform: uppercase; color: #fff; background: var(--red, #d0524a); box-shadow: 0 0 0 2px var(--ink); }
+.tr-card.last .mcard { box-shadow: 0 0 0 2px #d0524a, inset 0 0 0 1px rgba(255, 255, 255, 0.3); }
 .tr-n { position: absolute; right: -4px; top: -6px; padding: 1px 4px; font: 400 14px/1 'Jersey 10'; font-style: normal; color: var(--gold-hi); background: var(--ink); }
 .tr-back, .tr-got { position: relative; display: grid; place-items: center; width: 72px; height: 100px; }
 .tr-back { color: var(--heart); background: #241a2c; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #4a3a40; }
