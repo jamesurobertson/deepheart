@@ -128,6 +128,8 @@ export class KeepView {
   /** A held click: where the pointer is on screen (the camera moves under it), where it went down, when, and whether
    *  the hero has started following it. */
   private held: { x: number; y: number; x0: number; y0: number; at: number; following: boolean } | null = null;
+  /** Moving with the keys (the labels then show which key uses a thing), rather than the mouse. */
+  keyed = false;
   /** Called when you reach a station you clicked, or click the one you're at. */
   onUse: (id: KeepStation) => void = () => {};
 
@@ -210,6 +212,7 @@ export class KeepView {
   /** Click (or tap) a spot: walk there by the shortest way round. Click a station and you walk up and use it. Hold
    *  the button down and the hero follows the pointer, as in the dungeon. */
   private onPointer = (e: PointerEvent) => {
+    this.keyed = false;
     const [tx, ty] = this.cellAt(e);
     const station = this.stationAt(tx, ty);
     if (station) return this.useOrWalk(station);
@@ -241,6 +244,7 @@ export class KeepView {
 
   /** Use a station you're at, or walk up to it and use it when you get there. */
   useOrWalk(id: KeepStation) {
+    this.keyed = false;
     if (this.near === id) {
       this.goal = null;
       this.path = [];
@@ -293,6 +297,7 @@ export class KeepView {
     if (vx || vy) {
       this.path = [];
       this.goal = null;
+      this.keyed = true;
     } else if (this.held?.following) {
       this.path = [];
       const [tx, ty] = this.pointAt({ clientX: this.held.x, clientY: this.held.y });

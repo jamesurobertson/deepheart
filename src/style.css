@@ -1407,8 +1407,8 @@ body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .a
 .keep-label.soul i { color: #e2d2ff; }
 /* Standing at it: the label lights up with the key that uses it. */
 .keep-label em { display: none; font: 400 11px/1 'Silkscreen'; font-style: normal; text-transform: uppercase; letter-spacing: 1px; padding: 3px 6px 4px; color: var(--ink); background: var(--gold-hi); box-shadow: 0 0 0 2px var(--ink), 0 2px 0 2px #855415; }
-.keep-label.near em { display: block; animation: hintbob 0.9s ease-in-out infinite; }
-.keep-label.near i { display: none; }
+.keep-label.near.keyed em { display: block; animation: hintbob 0.9s ease-in-out infinite; }
+.keep-label.near.keyed i { display: none; }
 /* Under a Legend's feet, pointing up at it (the arrow stays when the key shows, so the label doesn't jump). */
 .keep-label.below { translate: -50% 0; }
 .keep-label.below.near i { display: block; }

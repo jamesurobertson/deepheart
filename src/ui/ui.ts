@@ -3217,6 +3217,7 @@ export class Ui {
       el.style.transform = `translate(${Math.round(l.x)}px, ${Math.round(l.y)}px)`;
       el.hidden = !l.shown || l.x < -60 || l.x > this.field.w + 60;
       el.classList.toggle('near', this.keepView?.near === l.id);
+      el.classList.toggle('keyed', !!this.keepView?.keyed);
       el.classList.toggle('hover', this.keepView?.hover === l.id);
     });
   }
