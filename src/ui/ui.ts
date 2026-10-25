@@ -286,7 +286,7 @@ export class Ui {
         <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy(3)}<span>Collection</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics"${RELICS_ON ? '' : ' hidden'}>${G.relic(3)}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>Ascend</span><em class="badge" hidden></em></button>
-        <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden>${G.door(3)}<span>Keep</span></button>
+        <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden>${G.door(3)}<span>The Keep</span></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>Stats</span></button>
         <button class="btn dock-b dock-stat blade-rate" data-tip="dock:blade" tabindex="-1">${spriteFit('weapon_knife', 20, 'glyph')}<span>1/s</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu(3)}<span>Options</span></button>
@@ -1544,7 +1544,7 @@ export class Ui {
     // The Keep opens with your first ascent; from then on it's a button away (and the way back down, while you're there).
     this.el.keepBtn.hidden = !g.legendsOpen() || g.inVault() || !!g.raid;
     // Up in the Keep it's the way back down: steps instead of the door.
-    const keepText = g.s.inKeep ? 'Way down' : 'Keep';
+    const keepText = g.s.inKeep ? 'Way down' : 'The Keep';
     if (this.keepBtnText !== keepText) {
       this.keepBtnText = keepText;
       this.el.keepBtn.innerHTML = `${g.s.inKeep ? G.steps(3) : G.door(3)}<span>${keepText}</span>`;
@@ -3268,7 +3268,7 @@ export class Ui {
   }
   private keepFading = false;
   /** What the Keep button says now (it swaps its icon when this changes). */
-  private keepBtnText = 'Keep';
+  private keepBtnText = 'The Keep';
   /** The Keep's top-down map, while you're up there. */
   private keepView: KeepView | null = null;
 
