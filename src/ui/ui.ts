@@ -1543,8 +1543,8 @@ export class Ui {
     this.el.keepBtn.hidden = !g.legendsOpen() || g.inVault() || !!g.raid;
     // Up in the Keep it's the way back down: steps instead of the door.
     const keepText = g.s.inKeep ? 'Way down' : 'Keep';
-    if (this.el.keepBtn.dataset.mode !== keepText) {
-      this.el.keepBtn.dataset.mode = keepText;
+    if (this.keepBtnText !== keepText) {
+      this.keepBtnText = keepText;
       this.el.keepBtn.innerHTML = `${g.s.inKeep ? G.steps(3) : G.door(3)}<span>${keepText}</span>`;
     }
     document.body.classList.toggle('in-keep', g.s.inKeep);
@@ -3265,6 +3265,8 @@ export class Ui {
     setTimeout(() => (c.hidden = true), 2200);
   }
   private keepFading = false;
+  /** What the Keep button says now (it swaps its icon when this changes). */
+  private keepBtnText = 'Keep';
   /** The Keep's top-down map, while you're up there. */
   private keepView: KeepView | null = null;
 

@@ -1327,7 +1327,7 @@ body.demo-over .hint, body.demo-over .tip { display: none !important; }
 /* ---------- main menu ---------- */
 .title-menu { position: fixed; inset: 0; z-index: 19; display: flex; align-items: center; color: var(--text); font-family: 'Jersey 10', monospace; overflow: hidden; }
 /* The game's HUD waits behind the menu (Options' window still opens over it). */
-body.at-menu #ui > :not(.modal-wrap) { visibility: hidden; }
+body.at-menu #ui > :not(.modal-wrap, .blade) { visibility: hidden; }
 /* #ui is fixed (a layer of its own), so its windows only rise above the menu if it does. */
 body.at-menu #ui { z-index: 20; }
 body.at-menu #stage { visibility: hidden; }
@@ -1391,7 +1391,7 @@ body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticke
 /* ---------- the Keep ---------- */
 
 /* The Keep's top-down map, over the paused fight, under the HUD and panels. */
-.keep-view { position: fixed; left: 0; top: 0; z-index: 0; display: block; image-rendering: pixelated; cursor: pointer; touch-action: none; pointer-events: auto; }
+.keep-view { position: fixed; left: 0; top: 0; z-index: -1; display: block; image-rendering: pixelated; cursor: pointer; touch-action: none; pointer-events: auto; }
 /* The dungeon waits out of sight below. */
 body.in-keep #stage { visibility: hidden; }
 
