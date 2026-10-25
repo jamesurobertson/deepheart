@@ -2,6 +2,7 @@ import { COMPS, zoneName } from '../game/data.ts';
 import { duration } from '../game/format.ts';
 import type { Game } from '../game/game.ts';
 import { DEMO, STEAM_URL, WIKI_URL } from '../demo.ts';
+import { GAME_VERSION, olderVersion } from '../version.ts';
 import { G, spriteFrames } from './px.ts';
 
 export interface MenuHooks {
@@ -65,7 +66,7 @@ export class TitleMenu {
   private game: Game;
   private hasRun: boolean;
   private hooks: MenuHooks;
-  private view: 'main' | 'credits' | 'confirm' = 'main';
+  private view: 'main' | 'credits' | 'confirm' | 'old' = 'main';
   /** Up and down (or W and S) move through the menu, wrapping round; Enter or Space picks; Escape backs out. While the
    *  stairway has focus (it was clicked), the keys walk your hero there instead. No key reaches the game behind the
    *  menu (Space would attack, U buy an upgrade). */
@@ -136,18 +137,23 @@ export class TitleMenu {
   }
 
   private act(what: string | undefined) {
-    if (what === 'play') this.hooks.play();
+    // A save from an older version is offered a fresh start first.
+    if (what === 'play') this.hasRun && olderVersion(this.game.s.version) ? this.show('old') : this.hooks.play();
+    else if (what === 'keep') {
+      this.game.s.version = GAME_VERSION;
+      this.hooks.play();
+    }
     else if (what === 'new') this.hasRun ? this.show('confirm') : this.hooks.play();
     else if (what === 'restart') this.hooks.newGame();
     else if (what === 'options') this.hooks.options();
     else if (what === 'quit') this.hooks.quit?.();
-    else if (what === 'credits' || what === 'main' || what === 'confirm') this.show(what);
+    else if (what === 'credits' || what === 'main' || what === 'confirm' || what === 'old') this.show(what);
   }
 
-  private show(view: 'main' | 'credits' | 'confirm') {
+  private show(view: 'main' | 'credits' | 'confirm' | 'old') {
     this.view = view;
     const panel = this.el.querySelector<HTMLElement>('.mm-panel')!;
-    panel.innerHTML = view === 'credits' ? this.credits() : view === 'confirm' ? this.confirm() : this.mainMenu();
+    panel.innerHTML = view === 'credits' ? this.credits() : view === 'confirm' ? this.confirm() : view === 'old' ? this.oldSave() : this.mainMenu();
     panel.querySelector<HTMLElement>(view === 'credits' ? '[data-mm="main"]' : 'button, a')?.focus({ preventScroll: true });
   }
 
@@ -176,6 +182,17 @@ export class TitleMenu {
         <div class="mm-row">
           <button type="button" class="mm-btn danger" data-mm="restart">Start over</button>
           <button type="button" class="mm-btn" data-mm="main">Keep my run</button>
+        </div>
+      </div>`;
+  }
+
+  private oldSave() {
+    return `<div class="mm-head">${HEART}${LOGO}</div>
+      <div class="mm-confirm">
+        <p>This save is from an older version of Deepheart. Start fresh?</p>
+        <div class="mm-row">
+          <button type="button" class="mm-btn primary" data-mm="restart">Start over</button>
+          <button type="button" class="mm-btn" data-mm="keep">Keep playing</button>
         </div>
       </div>`;
   }

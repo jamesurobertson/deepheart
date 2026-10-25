@@ -516,10 +516,10 @@ export class Ui {
       const dock = this.el.dock.getBoundingClientRect();
       const overDock = e.clientX > dock.left - 10 && e.clientX < dock.right + 10 && e.clientY > dock.top - 10 && e.clientY < dock.bottom + 10;
       const field = e.pointerType === 'mouse' && !overDock && !t.closest('#ui button, #ui .shop, #ui .pnl, #ui .dock, #ui .modal-wrap') && !this.modal;
-      // A mouse gets the sprite cursor everywhere, menus and panels too, except the companion list (a plain cursor
-      // there); touch has none.
+      // A mouse gets the sprite cursor over the game, the dock and the Keep; the companion list and open panels keep a
+      // plain cursor. Touch has none.
       const mouse = e.pointerType === 'mouse';
-      const sprite = mouse && !t.closest('#ui .shop');
+      const sprite = mouse && !t.closest('#ui .shop, #ui .modal-wrap');
       this.el.blade.hidden = !sprite;
       document.body.classList.toggle('blade-on', sprite);
       this.pointer = field ? { x: e.clientX, y: e.clientY } : null;
