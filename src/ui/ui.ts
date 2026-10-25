@@ -2,13 +2,12 @@ import { morph } from './morph.ts';
 import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { AWAKEN_ON, CURSES_ON, DESCEND_FLOOR, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TUNE, bossSouls, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { AWAKEN_ON, CURSES_ON, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TUNE, bossSouls, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, silhouette, sprite, spriteFit } from './px.ts';
-import { TradeMat, type Brother } from './trade.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
 
 export interface UiHooks {
@@ -71,6 +70,24 @@ function cardFace(card: (typeof CARDS)[number], state: 'locked' | 'got', gilded 
 }
 
 const KIND_NAME = { power: 'Power', utility: 'Utility', sink: 'Sink' } as const;
+
+type Trader = 'dan' | 'victor';
+/** What Dan and Victor say: one picked at random. */
+const TRADER_LINES: Record<Trader, Record<'hello' | 'short' | 'new' | 'dupe', string[]>> = {
+  dan: {
+    hello: ['Got any doubles?', 'Swap you?'],
+    short: ["Come back when you've got doubles."],
+    new: ["That one's new for you!", 'Nice, a new one.'],
+    dupe: ['Ah, you had that one.', 'A double. Sorry!'],
+  },
+  victor: {
+    hello: ["Gold isn't cheap.", 'Ten. Not nine.'],
+    short: ['Come back with ten.'],
+    new: ["Don't get used to it.", 'Shiny, right?'],
+    dupe: ['No refunds.', 'You had that one. Not my problem.'],
+  },
+};
+const pickLine = (lines: string[]) => lines[Math.floor(Math.random() * lines.length)];
 
 /** A Legend in full: what it boosts and by how much now (level 1, if not summoned), the next four levels with their
  *  cost, and the rule worth knowing. */
@@ -535,7 +552,7 @@ export class Ui {
     // In the Keep, Space, Enter or E uses whatever you're standing at.
     addEventListener('keydown', (e) => {
       const near = this.keepView?.near;
-      if (!near || this.modal || this.trading || e.repeat || !['Space', 'Enter', 'KeyE'].includes(e.code)) return;
+      if (!near || this.modal || e.repeat || !['Space', 'Enter', 'KeyE'].includes(e.code)) return;
       if ((e.target as HTMLElement).closest('input, textarea')) return;
       e.preventDefault();
       e.stopImmediatePropagation();
@@ -690,6 +707,19 @@ export class Ui {
           this.refreshTip();
           this.flareLegend(id);
         } else this.deny(old);
+        return;
+      }
+      const put = t.closest<HTMLElement>('[data-put]');
+      if (put && (this.modal === 'dan' || this.modal === 'victor')) {
+        this.tradePut(this.modal, put.dataset.put!);
+        this.renderModal();
+        return;
+      }
+      const take = t.closest<HTMLElement>('[data-take]');
+      if (take) {
+        this.trade.side.splice(this.trade.side.lastIndexOf(take.dataset.take!), 1);
+        this.hooks.sound('click', { vol: 0.3 });
+        this.renderModal();
         return;
       }
       const pickEl = t.closest<HTMLElement>('[data-pick]');
@@ -890,6 +920,25 @@ export class Ui {
           this.renderModal();
           this.flareLegend(id);
         } else this.deny(el);
+        break;
+      }
+      case 'tradeAuto':
+      case 'tradeClear':
+      case 'tradeGo':
+      case 'tradeAgain': {
+        const who = this.modal as Trader;
+        if (act === 'tradeClear') this.trade.side = [];
+        else if (act === 'tradeAgain') this.trade = { side: [], got: null, line: pickLine(TRADER_LINES[who][this.tradeHand().length ? 'hello' : 'short']) };
+        else if (act === 'tradeGo') this.tradeGo(who);
+        else {
+          while (this.trade.side.length < this.tradeNeed(who)) {
+            const most = this.tradeHand().sort((a, b) => b.n - a.n)[0];
+            if (!most) break;
+            this.tradePut(who, most.c.id);
+          }
+          if (this.trade.side.length < this.tradeNeed(who)) this.trade.line = pickLine(TRADER_LINES[who].short);
+        }
+        this.renderModal();
         break;
       }
       case 'reroll':
@@ -1344,7 +1393,7 @@ export class Ui {
       this.keepView = null;
     }
     if (this.keepView) {
-      const keys = this.modal || this.trading ? { x: 0, y: 0 } : { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), y: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
+      const keys = this.modal ? { x: 0, y: 0 } : { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), y: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
       // The Legend picked in the menu is the one lit in the shrine behind it.
       if (this.modal === 'abyss' && this.legendPick) this.keepView.pinned = `offer:${this.legendPick}`;
       this.keepView.frame(dt, keys, this.field.w, this.field.h);
@@ -2321,6 +2370,9 @@ export class Ui {
       html = head('Relics', `${g.relicsFound()} / ${RELICS.length} found · ${g.s.equipped.length} / ${g.relicSlots()} slots`) + this.relicsHtml();
     } else if (name === 'stats' || name === 'party' || name === 'records' || name === 'ascents') {
       html = head('Stats') + this.statTabs(name) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
+    } else if (name === 'dan' || name === 'victor') {
+      const who = name as Trader;
+      html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${who === 'dan' ? 'Dan' : 'Victor'}`, who === 'dan' ? `${DAN_GIVES} spares for 1 card` : `${VICTOR_GIVES} spares for 1 gold card`) + this.tradeHtml(who);
     } else if (name === 'settings') {
       const s = g.s.settings;
       const tog = (act: string, on: boolean, label: string) => `<button class="btn toggle ${on ? 'on' : ''}" data-act="${act}">${label}: ${on ? 'On' : 'Off'}</button>`;
@@ -2554,11 +2606,98 @@ export class Ui {
     return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${this.newCards ? ` <em class="tab-new">+${this.newCards}</em>` : ''}`)}</nav>`;
   }
 
-  /** Cards that are new in the binder: found while you slept, or traded for since you last looked. */
+  /** Trading with Dan or Victor: the spares you've put down, the card you got last, and what he just said. */
+  private trade: { side: string[]; got: { id: string; gold: boolean; lap: number; first: boolean } | null; line: string } = { side: [], got: null, line: '' };
 
-  /** A brother's trade window, opened by talking to him in the waking world. */
-  openTrade(who: Brother, host: HTMLElement, closed: () => void, keep = false) {
-    new TradeMat({ who, game: this.game, host, sound: this.hooks.sound, save: this.hooks.save, closed, keep });
+  private openTrade(who: Trader) {
+    this.trade = { side: [], got: null, line: pickLine(TRADER_LINES[who][this.tradeHand().length ? 'hello' : 'short']) };
+    this.openModal(who);
+  }
+
+  private tradeNeed = (who: Trader) => (who === 'dan' ? DAN_GIVES : VICTOR_GIVES);
+
+  /** Your spares, less the ones already put down, by set and then by how many. */
+  private tradeHand() {
+    const g = this.game;
+    return g.tradeable()
+      .map((c) => ({ c, n: g.spareCards(c.id) - this.trade.side.filter((id) => id === c.id).length }))
+      .filter((h) => h.n > 0)
+      .sort((a, b) => a.c.zone - b.c.zone || b.n - a.n);
+  }
+
+  /** What his card could be, and the chance it's one you don't have: Dan's from the sets you put down (each as likely as
+   *  its share of them), Victor's from every gold card. */
+  private tradeOdds(who: Trader) {
+    const g = this.game;
+    if (who === 'victor') {
+      const pool = g.tradeable().filter((c) => c.gold);
+      return { split: [] as { zone: number; share: number }[], fresh: pool.length ? pool.filter((c) => !g.hasGoldCard(c.id)).length / pool.length : 0 };
+    }
+    const side = this.trade.side;
+    const count = new Map<number, number>();
+    for (const id of side) count.set(CARD_BY_ID.get(id)!.zone, (count.get(CARD_BY_ID.get(id)!.zone) ?? 0) + 1);
+    const split = [...count].map(([zone, n]) => ({ zone, share: n / side.length })).sort((a, b) => b.share - a.share);
+    const fresh = split.reduce((sum, { zone, share }) => {
+      const pool = g.tradeable(zone);
+      return sum + (pool.length ? (share * pool.filter((c) => !g.cardCount(c.id)).length) / pool.length : 0);
+    }, 0);
+    return { split, fresh };
+  }
+
+  private tradeHtml(who: Trader): string {
+    const need = this.tradeNeed(who);
+    const name = who === 'dan' ? 'Dan' : 'Victor';
+    const { side, got, line } = this.trade;
+    const face = (id: string, attrs: string, extra = '') => {
+      const c = CARD_BY_ID.get(id)!;
+      return `<button class="tr-card" ${attrs}>${cardFace(c, 'got', false, 40, c.laps[0])}${extra}</button>`;
+    };
+    const slots = Array.from({ length: need }, (_, k) => (side[k] ? face(side[k], `data-take="${side[k]}"`) : '<span class="tr-slot"></span>')).join('');
+    const pct = (v: number) => `${Math.round(v * 100)}%`;
+    const odds = this.tradeOdds(who);
+    const setName = (zone: number) => ZONES[zone].name.replace(/^The /, '');
+    const his = got
+      ? `<div class="tr-got">${cardFace(CARD_BY_ID.get(got.id)!, 'got', got.gold, 56, got.lap)}${got.first ? '<em class="tr-new">New</em>' : ''}</div>`
+      : `<div class="tr-back">${G.heart(3)}</div>`;
+    const from = got ? '' : who === 'victor'
+      ? '<p class="tr-from">Any gold card</p>'
+      : odds.split.length ? `<ul class="tr-from">${odds.split.map(({ zone, share }) => `<li><b>${pct(share)}</b> ${esc(setName(zone))}</li>`).join('')}</ul>` : '<p class="tr-from">From the sets you give</p>';
+    const fresh = got || (who === 'dan' && !odds.split.length) ? '' : `<p class="tr-odds">${odds.fresh ? `${pct(odds.fresh)} chance it's new` : 'You have them all'}</p>`;
+    const hand = this.tradeHand();
+    const full = side.length >= need;
+    const cards = hand.length
+      ? hand.map((h) => face(h.c.id, `data-put="${h.c.id}"${full ? ' disabled' : ''}`, `<i class="tr-n">×${h.n}</i>`)).join('')
+      : '<p class="muted">No spares.</p>';
+    const buttons = got
+      ? '<button class="btn" data-act="tradeAgain">Trade again</button><button class="btn primary" data-act="close">Done</button>'
+      : `<button class="btn" data-act="${side.length ? 'tradeClear' : 'tradeAuto'}">${side.length ? 'Clear' : 'Auto-fill'}</button><button class="btn primary" data-act="tradeGo" ${full ? '' : 'disabled'}>Trade</button>`;
+    return `<p class="tr-say">${esc(line)}</p>
+      <div class="tr-table">
+        <div class="tr-side"><h3>Yours <span class="muted">${side.length} / ${need}</span></h3><div class="tr-slots">${slots}</div></div>
+        <span class="tr-swap">⇄</span>
+        <div class="tr-side his"><h3>${name}'s</h3>${his}${from}${fresh}</div>
+      </div>
+      <h3>Your spares</h3>
+      <div class="tr-hand">${cards}</div>
+      <div class="set-row tr-foot">${buttons}</div>`;
+  }
+
+  /** Put a spare down, or the most common ones until the trade is full. */
+  private tradePut(who: Trader, id: string) {
+    if (this.trade.side.length >= this.tradeNeed(who)) return;
+    this.trade.got = null;
+    this.trade.side.push(id);
+    this.hooks.sound('card', { vol: 0.35, rate: 1.1 + this.trade.side.length * 0.03 });
+  }
+
+  private tradeGo(who: Trader) {
+    const g = this.game;
+    const got = who === 'dan' ? g.tradeWithDan(this.trade.side) : g.tradeWithVictor(this.trade.side);
+    if (!got) return;
+    this.trade = { side: [], got, line: pickLine(TRADER_LINES[who][got.first ? 'new' : 'dupe']) };
+    this.hooks.save();
+    this.hooks.sound(got.gold ? 'cardgold' : 'card', { vol: 0.8 });
+    if (got.first) this.hooks.sound('jackpot', { vol: 0.35 });
   }
 
   /** Every monster's card, zone by zone: a dark silhouette until the card turns up. A zone's row
@@ -3122,7 +3261,7 @@ export class Ui {
 
   /** Your hero walked up to something in the Keep. */
   private station(id: KeepStation) {
-    if (this.modal || this.trading || this.keepFading) return;
+    if (this.modal || this.keepFading) return;
     this.hooks.sound('open', { vol: 0.4 });
     if (id.startsWith('offer:')) {
       // The one you're standing at is the one picked, ready to summon.
@@ -3132,12 +3271,8 @@ export class Ui {
       this.legendFocus = id.slice(7) as LegendId;
       this.openModal('legend');
     } else if (id === 'stairs') this.toggleKeep();
-    else if (id === 'dan' || id === 'victor') {
-      this.trading = true;
-      this.openTrade(id, this.root, () => (this.trading = false), true);
-    }
+    else if (id === 'dan' || id === 'victor') this.openTrade(id);
   }
-  private trading = false;
 
   showOffline(o: OfflineSummary) {
     this.modal = 'offline';
