@@ -41,8 +41,8 @@ const PEOPLE: { id: 'dan' | 'victor'; sprite: string; x: number; y: number }[] =
  *  can walk through) the cells of its body that a click picks it by. */
 type Station = { id: KeepStation; label: string; cells: [number, number][]; tag: [number, number]; body?: [number, number][] };
 const STATIONS: Station[] = [
-  { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 16.6] },
-  { id: 'victor', label: 'Victor', cells: [[6, 18], [7, 19], [8, 18], [7, 17]], tag: [7, 16.6] },
+  { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 19.55], body: [[3, 18], [3, 17]] },
+  { id: 'victor', label: 'Victor', cells: [[6, 18], [7, 19], [8, 18], [7, 17]], tag: [7, 19.55], body: [[7, 18], [7, 17]] },
   { id: 'stairs', label: 'Way down', cells: [[22, 30], [23, 30], [24, 30]], tag: [23, 31.6] },
 ];
 /** Where you arrive: on the stairs, facing up into the Entrance. */
@@ -358,15 +358,17 @@ export class KeepView {
   }
 
   /** Where each station's label goes on screen. */
-  /** A Spirit's name hangs just below its feet; your own Spirits in the hall only show theirs when you're at them. */
+  /** A Spirit's name hangs just below its feet. Your own Spirits and the traders only show theirs when you're at them or
+   *  pointing at them. */
   labels(): { id: KeepStation; label: string; x: number; y: number; below: boolean; shown: boolean }[] {
     const r = this.canvas.getBoundingClientRect();
     const s = 16 * this.zoom;
     return this.stations().map((st) => {
-      const below = st.id.includes(':');
+      // Spirits and the traders are named under their feet; the stairs' sign hangs over them.
+      const below = st.id !== 'stairs';
       const [tx, ty] = below ? [st.tag[0], st.tag[1] - 0.45] : st.tag;
-      // (Yours in the hall: their name shows when you can use them, with the key.)
-      const shown = !st.id.startsWith('legend:') || this.near === st.id || this.hover === st.id;
+      // Only the stairs and the spirits on offer always show their names; the rest when you point at them or stand there.
+      const shown = st.id === 'stairs' || st.id.startsWith('offer:') || this.near === st.id || this.hover === st.id;
       return { id: st.id, label: st.label, x: r.left + r.width / 2 + (tx + 0.5 - this.cam.x) * s, y: r.top + r.height / 2 + (ty - this.cam.y) * s, below, shown };
     });
   }
