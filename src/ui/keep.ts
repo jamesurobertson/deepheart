@@ -13,9 +13,10 @@ import { spriteFrames, uiAtlas } from './px.ts';
  *  Hall (`legend:<id>`). */
 export type KeepStation = 'stairs' | 'dan' | 'victor' | `offer:${LegendId}` | `legend:${LegendId}`;
 
-/** Floor rectangles (x, y, w, h) for the rooms and the halls between them; the walls grow around them. */
-const ROOMS: [number, number, number, number][] = [[3, 7, 8, 6], [16, 2, 15, 10], [1, 16, 9, 8], [12, 15, 22, 9], [36, 16, 9, 8], [19, 27, 9, 6]];
-const HALLS: [number, number, number, number][] = [[22, 12, 3, 3], [10, 19, 2, 2], [34, 19, 2, 2], [5, 13, 2, 3], [22, 24, 2, 3]];
+/** Floor rectangles (x, y, w, h) for the rooms and the halls between them; the walls grow around them. The first room,
+ *  as big as the shrine's, stands empty for now. */
+const ROOMS: [number, number, number, number][] = [[1, 2, 13, 10], [16, 2, 15, 10], [1, 16, 9, 8], [12, 15, 22, 9], [36, 16, 9, 8], [19, 27, 9, 6]];
+const HALLS: [number, number, number, number][] = [[22, 12, 3, 3], [10, 19, 2, 2], [34, 19, 2, 2], [5, 12, 2, 4], [22, 24, 2, 3]];
 const W = 47;
 const H = 35;
 
@@ -32,7 +33,6 @@ const THINGS: Thing[] = [
   ['wall_banner_yellow', 38, 15, 'wall'], ['wall_banner_yellow', 42, 15, 'wall'],
   ['chest_full_open', 40, 19], ['chest_full_open', 37, 22], ['chest_full_open', 43, 22],
   ...[[39, 20], [41, 20], [40, 21], [38, 18], [42, 18], [39, 22], [41, 22]].map(([x, y]): Thing => ['coin', x, y, 'flat']),
-  ['crate', 4, 8], ['crate', 5, 8], ['crate', 10, 8], ['crate', 10, 12], ['skull', 7, 12, 'flat'], ['skull', 8, 10, 'flat'], ['chest_mimic_open', 4, 12],
   ['doors_frame_left', 21, 26, 'wall'], ['doors_leaf_open', 22, 26, 'wall'], ['doors_frame_right', 24, 26, 'wall'], ['doors_frame_top', 22, 24, 'wall'],
   ['floor_stairs', 22, 30, 'flat'], ['floor_stairs', 23, 30, 'flat'], ['floor_stairs', 24, 30, 'flat'],
 ];
