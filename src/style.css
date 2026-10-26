@@ -1340,7 +1340,7 @@ body.demo-over .hint, body.demo-over .tip { display: none !important; }
 /* ---------- main menu ---------- */
 .title-menu { position: fixed; inset: 0; z-index: 19; display: flex; align-items: center; color: var(--text); font-family: 'Jersey 10', monospace; overflow: hidden; }
 /* The game's HUD waits behind the menu (Options' window still opens over it). */
-body.at-menu #ui > :not(.modal-wrap, .blade) { visibility: hidden; }
+body.at-menu #ui > :not(.modal-wrap, .blade, .update-pill) { visibility: hidden; }
 /* #ui is fixed (a layer of its own), so its windows only rise above the menu if it does. */
 body.at-menu #ui { z-index: 20; }
 body.at-menu #stage { visibility: hidden; }
