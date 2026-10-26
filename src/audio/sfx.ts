@@ -177,6 +177,19 @@ export class Sfx {
     }).catch(() => {});
   }
 
+  /** Fade the music out (a scene plays in silence); the next music() call brings a track back in. */
+  hush() {
+    this.wanted = null;
+    if (!this.ctx || !this.current) return;
+    const now = this.ctx.currentTime;
+    const old = this.current;
+    old.gain.gain.cancelScheduledValues(now);
+    old.gain.gain.setValueAtTime(old.gain.gain.value, now);
+    old.gain.gain.linearRampToValueAtTime(0, now + FADE);
+    old.src.stop(now + FADE + 0.05);
+    this.current = null;
+  }
+
   /** Switch the looping background track, crossfading from whatever is playing. */
   music(name: Track) {
     this.wanted = name;

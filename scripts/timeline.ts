@@ -17,7 +17,7 @@ const ACTIVE = 2 * 60;
 /** Hours away after each of the day's three sessions. */
 const AWAY = [4, 4, 15];
 
-const CASUAL: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 1, ascendEager: true, ascendMin: 5, awakenRatio: 1, stall: 180, catchRate: 0.03, resetActive: 0, shopEvery: 5 };
+const CASUAL: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 1, ascendEager: true, ascendMin: 5, awakenRatio: 0.25, stall: 180, catchRate: 0.03, resetActive: 0, shopEvery: 5 };
 
 /** The longest quiet stretch allowed, by when it starts. */
 const quietLimit = (start: number) => (start < 10 * H ? 20 * 60 : start < 100 * H ? H : 3 * H);
@@ -58,6 +58,10 @@ const curve: [number, number][] = [];
 /** The first day in more detail: when the first run (before any ascent) reaches these floors, and the depth each hour. */
 const OPENING_FLOORS = [10, 20, 30, 50];
 const opening = new Map<number, number>();
+/** Every awakening: when, the depth it left, the bound souls it paid, and how long until that depth was reached again. */
+const cycles: { at: number; depth: number; bound: number; back: number | null }[] = [];
+/** Cards collected (every color, gold included) at the end of each 20-hour window. */
+const cardsAt: number[] = [];
 const hourly: number[] = [];
 
 const sim = new Sim(CASUAL, {
@@ -69,9 +73,10 @@ const sim = new Sim(CASUAL, {
     firstAscent ??= t;
     metAtFirstAscent ??= game.s.owned.filter((n) => n > 0).length;
   },
-  awaken(_stones, { t }) {
+  awaken(bound, { game, t }) {
     firstAwaken ??= t;
     ascentsToAwaken ??= sim.descents;
+    cycles.push({ at: t, depth: Math.max(game.s.cycleBest, game.s.maxFloor), bound, back: null });
   },
   tick({ game, t, dt }) {
     novelty.tick(game, t);
@@ -89,7 +94,12 @@ const sim = new Sim(CASUAL, {
     });
     if (allMet === null && met.size === COMPS.length) allMet = t;
     if (allCardsAt === null && game.s.bestFloor >= ALL_CARDS_FLOOR) allCardsAt = t;
-    if (crossed(20 * H)) windows.push(game.s.bestFloor);
+    if (crossed(20 * H)) {
+      windows.push(game.s.bestFloor);
+      cardsAt.push(game.cardVersions());
+    }
+    const open = cycles.at(-1);
+    if (open && open.back === null && game.s.cycleBest >= open.depth) open.back = t - open.at;
     if (crossed(10 * H)) curve.push([t, game.s.bestFloor]);
   },
 }, flag('--dt', 0.1));
@@ -100,7 +110,10 @@ let session = 0;
 while (sim.t < end) {
   sim.startSession(ACTIVE);
   sim.runUntil(Math.min(end, sim.t + SESSION));
-  if (sim.t < end) sim.away(AWAY[session % AWAY.length] * H);
+  if (sim.t < end) {
+    sim.sendTrips();
+    sim.away(AWAY[session % AWAY.length] * H);
+  }
   session++;
 }
 novelty.fresh(sim.t, 'end of run');
@@ -123,7 +136,13 @@ const ms: Milestone[] = [
   { name: 'All 24 companions met', window: '6h–10h', result: t(allMet), status: reach(allMet, 10 * H) ? 'REPORT' : within(allMet, 6 * H, 10 * H) },
   { name: 'Longest wait for a new companion', window: 'under 2h', result: allMet === null ? 'party not complete' : played(meetWait), status: allMet !== null && meetWait < 2 * H ? 'PASS' : reach(allMet, 10 * H) ? 'REPORT' : 'FAIL' },
   { name: `Every card can drop (floor ${ALL_CARDS_FLOOR})`, window: '5h–10h', result: t(allCardsAt), status: reach(allCardsAt, 10 * H) ? 'REPORT' : within(allCardsAt, 5 * H, 10 * H) },
-  { name: 'First awakening', window: '5h–10h', result: !AWAKEN_ON ? 'switched off' : firstAwaken === null ? t(firstAwaken) : `${t(firstAwaken)} (${ascentsToAwaken} ascents)`, status: !AWAKEN_ON || reach(firstAwaken, 10 * H) ? 'REPORT' : within(firstAwaken, 5 * H, 10 * H) },
+  { name: 'First awakening', window: '20h–26h', result: !AWAKEN_ON ? 'switched off' : firstAwaken === null ? t(firstAwaken) : `${t(firstAwaken)} (${ascentsToAwaken} ascents)`, status: !AWAKEN_ON || reach(firstAwaken, 26 * H) ? 'REPORT' : within(firstAwaken, 20 * H, 26 * H) },
+  (() => {
+    const done = cycles.filter((c) => c.back !== null);
+    const slowest = Math.max(0, ...done.map((c) => c.back!));
+    const never = cycles.filter((c, k) => c.back === null && k < cycles.length - 1).length;
+    return { name: 'Back to the last depth after awakening', window: 'under 45m', result: cycles.length ? `${done.map((c) => played(c.back!)).join(', ') || 'not yet'}${never ? `, ${never} never` : ''}` : 'no awakening', status: !cycles.length || (!done.length && cycles.length === 1) ? 'REPORT' : slowest <= 45 * 60 && !never ? 'PASS' : 'FAIL' } as Milestone;
+  })(),
   { name: 'Third layer opens', window: '100h–150h', result: 'not built yet', status: 'REPORT' },
 ];
 
@@ -150,6 +169,8 @@ for (const m of ms) console.log(`  ${m.status.padEnd(6)} ${m.name.padEnd(38)} ${
 console.log(`  info   first run reaches floor ${OPENING_FLOORS.map((f) => `${f} at ${t(opening.get(f) ?? null)}`).join(', ')}`);
 console.log(`  info   deepest floor every hour to 10h: ${hourly.map((f, i) => `${i + 1}h:${f}`).join(' ')}`);
 console.log(`  info   deepest floor every 10 played hours: ${curve.map(([s, f]) => `${Math.round(s / H)}h:${f}`).join(' ')}`);
+console.log(`  info   awakenings: ${cycles.map((c) => `${played(c.at)} at floor ${c.depth} for ${c.bound}`).join('; ') || 'none'}`);
+console.log(`  info   cards collected every 20 played hours: ${cardsAt.map((n, i) => `${(i + 1) * 20}h:${n}`).join(' ')}`);
 console.log(`  info   longest quiet stretches: ${longest.map(gapLine).join('; ')}`);
 console.log(`  (${Math.round((Date.now() - started) / 1000)}s)`);
 const failed = ms.filter((m) => m.status === 'FAIL').length;

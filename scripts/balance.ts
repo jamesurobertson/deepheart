@@ -49,7 +49,7 @@ const sim = new Sim(
       const h = Math.floor(t / 1800) / 2;
       if (h !== lastHour) {
         lastHour = h;
-        console.log(`--- ${h}h: floor ${game.s.floor}/${game.s.maxFloor}, dps ${fmt(game.dps())}, click ${fmt(game.clickDamage())}, gold ${fmt(game.s.gold)}, kills ${game.s.kills}, souls ${game.s.souls}, upg ${game.s.upgrades.length}/${UPGRADES.length}, trophies ${game.s.trophies.length}, relics ${game.relicsFound()} [${game.s.equipped.map((id) => id + game.relicLv(id)).join(' ')}], stones ${game.s.stones}, heart ${JSON.stringify(game.s.heart)}, lv ${game.s.owned.join(',')}`);
+        console.log(`--- ${h}h: floor ${game.s.floor}/${game.s.maxFloor}, dps ${fmt(game.dps())}, click ${fmt(game.clickDamage())}, gold ${fmt(game.s.gold)}, kills ${game.s.kills}, souls ${game.s.souls}, upg ${game.s.upgrades.length}/${UPGRADES.length}, trophies ${game.s.trophies.length}, relics ${game.relicsFound()} [${game.s.equipped.map((id) => id + game.relicLv(id)).join(' ')}], bound ${game.s.boundEarned}, ${JSON.stringify(game.s.bound)}, lv ${game.s.owned.join(',')}`);
       }
     },
   },

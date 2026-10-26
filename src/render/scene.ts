@@ -1934,6 +1934,8 @@ export class Scene {
       }
       case 'relic':
       case 'card': {
+        // A hunter's cards never touch this floor.
+        if (ev.t === 'card' && ev.src === 'trip') break;
         if (ev.t === 'relic') this.relicDropped = true;
         const at = this.dropSpot(ev);
         if (this.clutch) this.pendingLoot.push({ ev, at });

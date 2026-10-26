@@ -4,7 +4,7 @@
  */
 import Decimal from 'break_infinity.js';
 import { COST_GROWTH, Game, MANUAL_RATE, MARK_MOVE, newSave, TUNE, type GameEvent, type SaveState } from '../src/game/game.ts';
-import { ABILITIES, COMPS, HEART, LEGEND_BY_ID, UPG_BY_ID, type LegendId } from '../src/game/data.ts';
+import { ABILITIES, COMPS, LEGEND_BY_ID, UPG_BY_ID, type BoundId, type LegendId } from '../src/game/data.ts';
 
 export interface Profile {
   /** Attacks by hand per second while the player is active (the game caps it at MANUAL_RATE, i.e. holding the button). */
@@ -49,7 +49,7 @@ export interface SimHooks {
   /** The run has just stopped making progress (before the player decides what to do). */
   stall?: (sim: Sim) => void;
   descend?: (souls: number, sim: Sim) => void;
-  awaken?: (stones: number, sim: Sim) => void;
+  awaken?: (bound: number, sim: Sim) => void;
   tick?: (sim: Sim) => void;
 }
 
@@ -107,6 +107,10 @@ export class Sim {
   private lastMax = 0;
   private lastProgress = 0;
   private stallSeen = false;
+  /** The depth of the last awakening: the bot awakens again only once it's past it. */
+  private lastAwakenDepth = 0;
+  /** Played and away time together (ms): the clock expeditions run on. */
+  private clock = 0;
 
   readonly profile: Profile;
   private hooks: SimHooks;
@@ -116,6 +120,7 @@ export class Sim {
     this.hooks = hooks;
     this.dt = dt;
     this.activeUntil = profile.activeMin * 60;
+    this.game.now = () => this.clock;
   }
 
   /** Seconds played so far (time away doesn't count). */
@@ -134,6 +139,7 @@ export class Sim {
   away(seconds: number) {
     const { game } = this;
     game.bankAllDrops();
+    this.clock += seconds * 1000;
     game.applyOffline(seconds);
     for (const ev of game.events) this.hooks.event?.(ev, this);
     game.events.length = 0;
@@ -165,6 +171,7 @@ export class Sim {
 
   step() {
     const { game, profile, dt } = this;
+    this.clock += dt * 1000;
     if (this.active) {
       this.clickAcc += dt * profile.cps;
       while (this.clickAcc >= 1) {
@@ -211,16 +218,15 @@ export class Sim {
       this.afterReset();
       this.feedLegends();
     }
-    if (stalled && game.canAwaken() && game.pendingStones() >= Math.max(1, this.totalStones() * profile.awakenRatio)) {
-      const stones = game.pendingStones();
+    // Awaken once stalled with the payout worth a share of what's been earned so far (the first time, as soon as it opens).
+    if (stalled && game.canAwaken() && game.s.cycleBest >= this.lastAwakenDepth && game.pendingBound() >= Math.max(1, Math.ceil(game.s.boundEarned * profile.awakenRatio))) {
+      this.lastAwakenDepth = game.s.cycleBest;
+      const bound = game.pendingBound();
       this.awakens++;
-      this.hooks.awaken?.(stones, this);
-      game.awaken();
+      this.hooks.awaken?.(bound, this);
+      game.awaken(true);
       this.afterReset();
-      for (;;) {
-        const h = HEART.filter((x) => !game.heartMaxed(x.id)).sort((x, y) => game.heartCost(x.id) - game.heartCost(y.id))[0];
-        if (!h || !game.buyHeart(h.id)) break;
-      }
+      this.buyBound();
       this.equipRelics();
     }
     // Hooks see everything this step did, the bot's own purchases and prestiges included.
@@ -255,13 +261,31 @@ export class Sim {
     this.activeUntil = Math.max(this.activeUntil, this.t + (this.profile.resetActive ?? 300));
   }
 
-  totalStones() {
+  /** Spend every bound soul, as Clicker Heroes players do early on: the Pit Lord while a level costs at most half of
+   *  what's left, the rest on the Ogre Chieftain (raw damage speeds the start of every run). With plenty to spend, a
+   *  level in each of the Spirit boosters first. */
+  private buyBound() {
     const { game } = this;
-    return game.s.stones + HEART.reduce((a, h) => {
-      let c = 0;
-      for (let l = 0; l < game.heartLv(h.id); l++) c += game.heartCost(h.id, l);
-      return a + c;
-    }, 0);
+    while (game.boundPrice('pitlord') <= game.boundFree() / 2 && game.buyBound('pitlord'));
+    if (game.s.boundEarned >= 30) {
+      for (const id of ['lich', 'frost', 'golem', 'troll', 'ent', 'thing'] as BoundId[]) {
+        while (!game.boundMaxed(id) && game.boundPrice(id) <= game.boundFree() / 8 && game.buyBound(id));
+      }
+    }
+    while (game.buyBound('ogre'));
+  }
+
+  /** Before going away: everyone at the expedition level without an ability hunts the deepest floor they can sweep. */
+  sendTrips() {
+    const { game } = this;
+    const skilled = new Set(ABILITIES.map((a) => a.comp));
+    COMPS.forEach((_, i) => {
+      if (skilled.has(i) || !game.canSend(i)) return;
+      const dps = game.compDps(i);
+      let floor = game.s.bestFloor;
+      while (floor > 1 && (floor % 5 === 0 || game.tripRate(floor, dps) < 30)) floor--;
+      game.sendTrip(i, floor);
+    });
   }
 
   /** Attacks a second this player makes by hand right now. */

@@ -1,5 +1,5 @@
 /** The game's version, the same as the desktop release's tag (bump both together). */
-export const GAME_VERSION = '0.6.0';
+export const GAME_VERSION = '0.7.0';
 
 /** A save last played on an earlier minor version (or before saves were stamped): worth a fresh start. */
 export function olderVersion(saved: string | undefined) {

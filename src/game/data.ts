@@ -478,13 +478,6 @@ export const ABILITY_BY_UPGRADE = new Map(ABILITIES.map((a) => [abilityUpgrade(a
 export const isTraitId = (id: string) => /^m\d+_\d+$/.test(id);
 export const UPG_BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));
 
-// ---------- awakening rewards ----------
-
-/** Rewards for awakening: the first layer, automated. */
-export const AWAKEN_MILESTONES = [
-  { at: 1, id: 'buyall', name: 'Buy all', desc: 'A button that buys every upgrade you can afford.' },
-] as const;
-export type MilestoneId = (typeof AWAKEN_MILESTONES)[number]['id'];
 
 // ---------- cursed descents ----------
 
@@ -684,7 +677,7 @@ export const LEGENDS: LegendDef[] = [
   o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'sm_large_samurai', what: 'All damage, for each attack in your streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}% per attack`, note: 'A streak ends 2 seconds after your last attack, and counts up to 2,000 attacks.' }),
   o({ id: 'hourglass', name: 'The Hourglass', kind: 'utility', sprite: 'sd_magic_shopkeeper', what: 'Time to beat a boss', value: share(30, (n) => `+${+n.toFixed(1)}s`) }),
   o({ id: 'wither', name: 'The Wither', kind: 'utility', sprite: 'sd_bishop', what: 'Boss health', value: share(0.5, (n) => `−${pct(n)}`) }),
-  o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${Math.min(10, lv)}`, maxLv: 10 }),
+  o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${lv}`, maxLv: 10 }),
   o({ id: 'haggler', name: 'The Haggler', kind: 'utility', sprite: 'sm_merchant', what: 'Companion level costs', value: (lv) => `−${pct(1 - 0.95 ** lv)}` }),
   o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'sm_kabuki', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`) }),
   o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Increased chance a boss is a champion boss (starting on floor 100)', value: share(0.75, (n) => pct(0.25 + n)) }),
@@ -701,35 +694,42 @@ export const LEGENDS: LegendDef[] = [
 ];
 export const LEGEND_BY_ID = new Map(LEGENDS.map((d) => [d.id, d]));
 
-// ---------- the heart (second prestige) ----------
+// ---------- awakening ----------
 
-/** Awakening needs this deepest floor. */
-export const AWAKEN_FLOOR = 200;
+/** Awakening first opens at this deepest floor. */
+export const AWAKEN_FLOOR = 300;
 /** A boss beaten with this many seconds or fewer left is a clutch kill. */
 export const CLUTCH_SECONDS = 3;
 
-export interface HeartDef {
-  id: string;
-  name: string;
-  icon: string;
-  /** Cost of the next level, given levels owned. */
-  cost: (lv: number) => number;
-  max: number;
-  desc: (lv: number) => string;
+export type BoundId = 'ogre' | 'lich' | 'troll' | 'golem' | 'thing' | 'ent' | 'pitlord' | 'frost';
+
+/** The zone bosses, bound in the Heart's room once you've awakened: each makes one thing you have work harder. Bought
+ *  with bound souls; all but the Ogre Chieftain cost one more each level. */
+export interface BoundDef {
+  id: BoundId;
+  /** The zone whose boss it is (its name and look). */
+  zone: number;
+  what: string;
+  value: (lv: number) => string;
+  max?: number;
+  /** The Spirit it makes work harder (its `what` names it). */
+  spirit?: LegendId;
 }
 
-/** Heart of Fury's damage multiplier per level. */
-export const FURY = 1.5;
-
-export const HEART: HeartDef[] = [
-  { id: 'fury', name: 'Heart of Fury', icon: 'ui_heart_full', max: Infinity, cost: (l) => 2 ** l, desc: (l) => `All damage ×${FURY} per level (now ×${fmtBig(FURY ** l)}).` },
-  { id: 'siphon', name: 'Soul Siphon', icon: 'skull', max: Infinity, cost: (l) => Math.ceil(3 * 1.6 ** l), desc: (l) => `Ascending earns +100% souls per level (now +${l * 100}%).` },
+const pct25 = (lv: number) => `+${lv * 25}%`;
+export const BOUND: BoundDef[] = [
+  { id: 'ogre', zone: 0, what: 'All damage', value: (lv) => `+${lv * 100}%` },
+  { id: 'lich', zone: 1, what: 'Spirit costs', value: (lv) => `−${Math.round((1 - 0.95 ** lv) * 100)}%`, max: 20 },
+  { id: 'troll', zone: 2, what: 'The Wither\'s effect', value: pct25, spirit: 'wither' },
+  { id: 'golem', zone: 3, what: 'The Soulcaller\'s effect', value: pct25, spirit: 'soulcaller' },
+  { id: 'thing', zone: 4, what: 'The Lure\'s effect', value: pct25, spirit: 'lure' },
+  { id: 'ent', zone: 5, what: 'The Hourglass\'s effect', value: pct25, spirit: 'hourglass' },
+  { id: 'pitlord', zone: 6, what: 'Souls from champion bosses', value: (lv) => `×${1 + lv * lv}` },
+  { id: 'frost', zone: 7, what: 'The Thinning\'s most', value: (lv) => `−${10 + lv} kills`, max: 5, spirit: 'thinning' },
 ];
-export const HEART_BY_ID = new Map(HEART.map((h) => [h.id, h]));
-
-function fmtBig(n: number) {
-  return n >= 1e6 ? n.toExponential(1).replace('e+', 'e') : n >= 100 ? String(Math.round(n)) : String(+n.toFixed(2));
-}
+export const BOUND_BY_ID = new Map(BOUND.map((b) => [b.id, b]));
+export const boundName = (b: BoundDef) => ZONES[b.zone].boss.name;
+export const boundCost = (b: BoundDef, lv: number) => (b.id === 'ogre' ? 1 : lv + 1);
 
 // ---------- cards ----------
 

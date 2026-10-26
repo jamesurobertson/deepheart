@@ -1275,6 +1275,19 @@ body.compact .card-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap:
 @keyframes cr-text { from { opacity: 0; transform: translateY(10px); } }
 @keyframes cr-fly { to { transform: translate(var(--tx), calc(var(--ty) - 90px)) scale(0.12); opacity: 0.4; } }
 @keyframes cr-shine { from { background-position: 130% 0; } to { background-position: -130% 0; } }
+.gold .cr-front .mcard { background: linear-gradient(135deg, #fff4b0 0%, #ffd23a 22%, #c98e16 46%, #ffe372 68%, #b47a10 100%); }
+.gold .cr-front .mc-name { color: #ffe48a; text-shadow: 0 0 6px rgba(255, 200, 60, 0.6); }
+/* A gold card glitters as champions do: an aura breathing behind it, stars twinkling round it, motes rising off it. */
+.cr-dazzle { position: absolute; inset: -30px -40px; pointer-events: none; animation: cr-text 0.4s 0.6s both; }
+.cr-aura { position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(ellipse at 50% 50%, rgba(255, 214, 110, 0.55), rgba(255, 170, 40, 0.2) 45%, transparent 70%); animation: cr-breathe 1.6s ease-in-out infinite alternate; }
+.cr-star { position: absolute; left: var(--x); top: var(--y); z-index: 2; width: 28px; height: 28px; margin: -14px; color: #fff6c8; filter: drop-shadow(0 0 4px rgba(255, 210, 90, 0.95)); opacity: 0; scale: var(--s); animation: cr-twinkle var(--d) ease-in-out var(--w) infinite; }
+.cr-star svg { display: block; width: 100%; height: 100%; }
+.cr-mote { position: absolute; left: var(--x); bottom: 18%; z-index: 2; width: calc(3px * var(--s)); height: calc(3px * var(--s)); background: #ffe07a; box-shadow: 0 0 6px rgba(255, 190, 60, 0.9); opacity: 0; animation: cr-rise var(--d) ease-in var(--w) infinite; }
+@keyframes cr-breathe { from { opacity: 0.55; scale: 0.92; } to { opacity: 1; scale: 1.06; } }
+@keyframes cr-twinkle { 0%, 100% { opacity: 0; rotate: 0deg; } 45% { opacity: 1; } 55% { opacity: 1; rotate: 45deg; } }
+@keyframes cr-rise { 0% { opacity: 0; translate: 0 0; } 15% { opacity: 1; } 100% { opacity: 0; translate: 4px -170px; } }
+.card-reveal.go .cr-dazzle { animation: cr-out 0.25s forwards; }
+@media (prefers-reduced-motion: reduce) { .cr-aura, .cr-star, .cr-mote { animation: none; } .cr-star { opacity: 0.8; } }
 .dock-b.bump { animation: dockbump 0.35s; }
 @keyframes dockbump { 40% { transform: scale(1.18); filter: brightness(1.5); } }
 body.compact .cr-flip { width: 100px; height: 136px; }
@@ -1449,3 +1462,177 @@ body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .a
   .tr-table { grid-template-columns: minmax(0, 1fr); justify-items: center; }
   .tr-swap { rotate: 90deg; }
 }
+
+/* Awakening: bound souls, the Bound, the Heart's labels in the Keep. */
+
+/* The Bound, as cards like the Spirits', in the Heart's red. */
+.bcard::before { background: radial-gradient(ellipse at 18% 70%, rgba(255, 90, 126, 0.16), transparent 55%); }
+.bcard .lc-val { color: var(--ess-hi); text-shadow: 0 0 14px rgba(255, 90, 126, 0.45); }
+.bcard .ped-stone { background: radial-gradient(ellipse at 50% 35%, #8a5560 0 30%, #5e3640 31% 62%, #301c22 63%); }
+.bcard.unbought .ped-fig { filter: grayscale(0.7) brightness(0.6); }
+.bcard.unbought .lc-val { color: var(--faint); text-shadow: none; }
+.bsparks { position: absolute; left: 50%; bottom: 6px; width: 100px; height: 110px; translate: -50% 0; pointer-events: none; }
+.bsparks::before { content: ''; position: absolute; inset: 10% 8% 0; border-radius: 50%; background: radial-gradient(ellipse at 50% 70%, rgba(255, 90, 126, 0.35), rgba(200, 40, 80, 0.1) 45%, transparent 70%); animation: aura 3.2s ease-in-out infinite; }
+.bsparks i { position: absolute; bottom: 6px; left: var(--x); width: 3px; height: 3px; background: #ffb3c4; box-shadow: 0 0 6px var(--ess); opacity: 0; transform: scale(var(--s)); animation: wisp var(--d) ease-in var(--w) infinite; }
+.bcard.unbought .bsparks { display: none; }
+.heart-bar-box { display: grid; justify-items: center; gap: 10px; padding: 14px 12px; text-align: center; }
+.heart-bar-box p { margin: 0; font: 400 20px/1 'Jersey 10'; color: var(--dim); }
+.heart-bar-box p b { color: var(--text); font-weight: 400; }
+.heart-bar-box .bar { width: min(100%, 360px); }
+.bshades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 8px; justify-items: center; padding: 18px 0 8px; }
+.bshade { display: grid; place-items: end center; height: 64px; filter: drop-shadow(0 0 8px rgba(255, 90, 126, 0.35)); animation: float 3.6s ease-in-out infinite; }
+.bshade:nth-child(2n) { animation-delay: -1.2s; }
+.bshades-note { text-align: center; font: 400 20px/1 'Jersey 10'; color: var(--faint); margin: 6px 0 4px; }
+.keep-label.heart b { color: var(--ess-hi); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--ess), 0 0 14px rgba(255, 90, 126, 0.45); }
+.keep-label.heart i { color: var(--ess-hi); }
+.set-check { display: flex; align-items: center; gap: 8px; justify-content: center; font: 400 18px/1 'Jersey 10'; color: var(--text); cursor: pointer; }
+
+/* Expeditions. */
+.trips { display: grid; gap: 6px; }
+.trip { display: grid; grid-template-columns: 40px 1fr auto auto; align-items: center; gap: 10px; padding: 6px 10px; border: 6px solid transparent; border-image: var(--f-btn) 2 fill / 6px stretch; }
+.trip-ico { display: grid; place-items: center; }
+.trip-mid { display: grid; gap: 3px; min-width: 0; }
+.trip-mid b { font: 700 15px/1.05 var(--f-text); color: var(--text); }
+.trip-mid b small { font: 400 16px/1 'Jersey 10'; color: var(--dim); margin-left: 4px; }
+.trip-mid > small { font: 400 17px/1.1 'Jersey 10'; color: var(--dim); font-variant-numeric: tabular-nums; }
+.trip-takes { color: var(--ess-hi); }
+.trip-floor { display: flex; align-items: center; gap: 6px; font: 400 17px/1 'Jersey 10'; color: var(--dim); }
+.trip-floor input { width: 64px; padding: 4px 6px; font: 400 18px/1 'Jersey 10'; color: var(--text); background: rgba(0, 0, 0, 0.35); border: 2px solid #5a4030; font-variant-numeric: tabular-nums; }
+.trip.away { opacity: 0.85; }
+@media (max-width: 560px) {
+  .trip { grid-template-columns: 40px 1fr auto; }
+  .trip-floor { grid-column: 2; }
+}
+.gen.away { opacity: 0.55; }
+.gen.away .gen-dps { color: var(--gold-hi); }
+
+.od-now.bnd { color: var(--ess-hi); }
+.spirit-u { color: #e2d2ff; text-decoration: underline dotted var(--soul); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: help; }
+.badge.bound { background: #5a1a2c; color: var(--ess-hi); }
+.badge.bound.hot { background: #6a1830; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--ess), 0 0 12px rgba(255, 90, 126, 0.8); }
+.dock-heart .glyph { color: var(--ess); }
+
+/* Awaken the Heart: what you gain beside what you lose. */
+.modal.m-awaken { width: min(620px, calc(100vw - 24px)); }
+.aw-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; text-align: left; }
+@media (max-width: 560px) { .aw-cols { grid-template-columns: 1fr; } }
+.aw-cols h4 { margin: 0 0 8px; font: 400 12px/1 'Silkscreen'; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); }
+.aw-gain { padding-right: 18px; border-right: 2px solid #3b2b2e; }
+@media (max-width: 560px) { .aw-gain { padding-right: 0; border-right: 0; } }
+.aw-big { display: flex; align-items: center; gap: 10px; }
+.aw-big b { font: 400 60px/0.9 'Jersey 10'; color: var(--ess-hi); text-shadow: 0 0 18px rgba(255, 90, 126, 0.55); }
+.aw-gain > small { display: block; font: 400 18px/1 'Jersey 10'; color: var(--dim); margin-top: 2px; }
+.aw-gain h5 { margin: 16px 0 6px; font: 400 11px/1 'Silkscreen'; letter-spacing: 1px; text-transform: uppercase; color: var(--ess); }
+.aw-faces { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 4px; justify-items: center; }
+.aw-face { position: relative; display: grid; place-items: end center; height: 50px; }
+.aw-face > i { position: absolute; right: -6px; bottom: 0; font: 400 15px/1 'Jersey 10'; font-style: normal; color: var(--gold-hi); text-shadow: var(--outline); }
+.aw-faces.shade .aw-face { filter: drop-shadow(0 0 6px rgba(255, 90, 126, 0.5)); animation: float 3.6s ease-in-out infinite; }
+.aw-faces.shade .aw-face:nth-child(2n) { animation-delay: -1.2s; }
+.aw-lose .stats dt { gap: 6px; align-items: center; }
+.aw-kept { font: 400 18px/1.2 'Jersey 10'; color: var(--faint); }
+.aw-confirm .set-check { margin-top: 4px; }
+
+/* The awakening, as a scene. */
+.awk { position: fixed; inset: 0; z-index: 80; overflow: hidden; pointer-events: auto; background: radial-gradient(circle at 50% 50%, #1a0a10, #050206 70%); cursor: pointer; animation: fadein 0.7s both; }
+.awk.out { animation: awk-out 0.7s forwards; pointer-events: none; }
+.awk-heart { position: absolute; left: 50%; top: 50%; translate: -50% -50%; color: var(--ess); opacity: 0; animation: awk-heart-in 1s 0.4s both; }
+.awk-heart::before { content: ''; position: absolute; inset: -120px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 90, 126, 0.55), rgba(255, 90, 126, 0) 65%); opacity: 0; animation: awk-glow 3.5s 0.6s ease-in forwards; z-index: -1; }
+.awk-heart svg { display: block; filter: drop-shadow(0 0 10px rgba(255, 90, 126, 0.7)); }
+.awk.thump .awk-heart svg { animation: awk-thump 0.32s ease-out; }
+.awk.burst .awk-heart svg { animation: awk-burst 1s ease-out forwards; }
+.awk-souls i { position: absolute; left: 50%; top: 50%; width: calc(3px * var(--s)); height: calc(3px * var(--s)); background: #e2d2ff; box-shadow: 0 0 8px var(--soul), 0 0 16px rgba(179, 140, 255, 0.6); opacity: 0; transform: rotate(var(--a)) translateX(var(--r)); animation: awk-pull var(--t) ease-in var(--d) both; }
+.awk.burst .awk-souls { display: none; }
+.awk-flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 50%, #fff 0, #ffb3c4 18%, rgba(255, 90, 126, 0.35) 40%, rgba(255, 90, 126, 0) 70%); }
+.awk.burst .awk-flash { animation: awk-flash 1.1s ease-out; }
+.awk-text { position: absolute; left: 50%; top: 4%; translate: -50% 0; display: grid; justify-items: center; gap: 6px; text-align: center; white-space: nowrap; opacity: 0; }
+.awk.told .awk-text { animation: cr-text 0.5s both; opacity: 1; }
+.awk-text b { font: 400 54px/0.9 'Jersey 10'; color: var(--ess-hi); letter-spacing: 1px; text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 0 0 24px rgba(255, 90, 126, 0.7); }
+.awk-gain { display: inline-flex; align-items: center; gap: 8px; }
+.awk-gain em { font: 400 44px/1 'Jersey 10'; font-style: normal; color: #fff; text-shadow: var(--outline); font-variant-numeric: tabular-nums; }
+.awk-gain small { font: 400 20px/1 'Jersey 10'; color: var(--dim); }
+.awk-bound { position: absolute; left: 50%; top: 50%; display: grid; justify-items: center; gap: 4px; transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))); opacity: 0; }
+.awk.rise .awk-bound { animation: awk-rise 0.7s cubic-bezier(0.2, 1.5, 0.4, 1) calc(var(--k) * 0.18s) both; }
+.awk-fig { display: grid; place-items: end center; height: 84px; }
+/* The first time, each rises as a shadow and then comes into its own colors. */
+.awk.first .awk-fig { filter: brightness(0) drop-shadow(0 0 10px rgba(255, 90, 126, 0.7)); }
+.awk.first.rise .awk-fig { animation: awk-color 0.8s calc(1.5s + var(--k) * 0.18s) both; }
+.awk-bound b { font: 400 17px/1 'Jersey 10'; color: var(--text); text-shadow: var(--outline); }
+.awk-bound > i { position: absolute; right: -8px; top: 60px; font: 400 18px/1 'Jersey 10'; font-style: normal; color: var(--gold-hi); text-shadow: var(--outline); }
+.awk-tap { position: absolute; left: 50%; bottom: 5%; translate: -50% 0; font: 400 12px/1 'Silkscreen', monospace; letter-spacing: 2px; text-transform: uppercase; color: var(--gold-hi); text-shadow: var(--outline); opacity: 0; }
+.awk.done .awk-tap { animation: cr-text 0.4s both, cr-tap 1.2s 0.4s ease-in-out infinite; opacity: 1; }
+@keyframes awk-heart-in { from { opacity: 0; scale: 0.6; filter: brightness(0.3); } to { opacity: 1; scale: 1; filter: brightness(0.75); } }
+@keyframes awk-glow { to { opacity: 1; } }
+@keyframes awk-thump { 0% { scale: 1; } 25% { scale: 1.2; } 100% { scale: 1; } }
+@keyframes awk-burst { 0% { scale: 1; filter: drop-shadow(0 0 10px rgba(255, 90, 126, 0.7)) brightness(1); } 25% { scale: 1.7; filter: drop-shadow(0 0 40px #fff) brightness(2.2); } 100% { scale: 1.25; filter: drop-shadow(0 0 22px rgba(255, 90, 126, 0.95)) brightness(1.15); } }
+@keyframes awk-pull { 0% { opacity: 0; transform: rotate(var(--a)) translateX(var(--r)); } 20% { opacity: 1; } 100% { opacity: 0.2; transform: rotate(calc(var(--a) + 50deg)) translateX(0); } }
+@keyframes awk-flash { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes awk-rise { from { opacity: 0; margin-top: 40px; scale: 0.5; } to { opacity: 1; margin-top: 0; scale: 1; } }
+@keyframes awk-color { 0% { filter: brightness(0) drop-shadow(0 0 10px rgba(255, 90, 126, 0.7)); } 45% { filter: brightness(2.4) drop-shadow(0 0 14px #fff); } 100% { filter: none; } }
+@keyframes awk-out { to { opacity: 0; } }
+body.compact .awk-text b { font-size: 38px; }
+body.compact .awk-fig { height: 56px; }
+/* Red sparks: embers drifting up through the dark, thicker once the Heart wakes, and a burst flying out from it. */
+.awk-embers i { position: absolute; left: var(--x); bottom: -10px; width: calc(2px * var(--s)); height: calc(2px * var(--s)); background: #ff6a8a; box-shadow: 0 0 6px #ff3a64, 0 0 14px rgba(255, 58, 100, 0.6); opacity: 0; animation: awk-ember var(--d) linear var(--w) infinite; }
+.awk-embers i:nth-child(3n) { background: #ffd0dc; }
+.awk-embers i:nth-child(n+70) { display: none; }
+.awk.burst .awk-embers i:nth-child(n+70) { display: block; }
+.awk-wave { position: absolute; left: 50%; top: 50%; width: 160px; height: 160px; margin: -80px; border-radius: 50%; box-shadow: 0 0 0 4px rgba(255, 90, 126, 0.9), 0 0 24px rgba(255, 58, 100, 0.8); opacity: 0; pointer-events: none; }
+.awk.thump .awk-wave { animation: awk-wave 0.9s ease-out; }
+.awk.burst .awk-wave { animation: awk-wave 1.4s ease-out; box-shadow: 0 0 0 6px #ffd0dc, 0 0 40px #ff3a64; }
+@keyframes awk-wave { 0% { opacity: 1; scale: 0.5; } 100% { opacity: 0; scale: 4; } }
+.awk-sparks i { position: absolute; left: 50%; top: 50%; width: calc(3px * var(--s)); height: calc(3px * var(--s)); background: #ffb3c4; box-shadow: 0 0 8px #ff3a64, 0 0 18px rgba(255, 58, 100, 0.8); opacity: 0; }
+.awk.burst .awk-sparks i { animation: awk-spark var(--t) cubic-bezier(0.1, 0.7, 0.3, 1) both; }
+@keyframes awk-ember { 0% { opacity: 0; translate: 0 0; } 10% { opacity: 0.9; } 100% { opacity: 0; translate: var(--dx) -105vh; } }
+@keyframes awk-spark { 0% { opacity: 1; transform: rotate(var(--a)) translateX(0); } 70% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--r)); } }
+/* Each Bound glitters red as it rises (the first time, once it has its colors). */
+.awk-glint { position: absolute; inset: -10px -14px 18px; pointer-events: none; opacity: 0; }
+.awk.rise .awk-glint { animation: cr-text 0.4s calc(var(--k) * 0.18s + 0.3s) both; opacity: 1; }
+.awk.first.rise .awk-glint { animation-delay: calc(1.6s + var(--k) * 0.18s); }
+.awk-glint::before { content: ''; position: absolute; inset: 10% 0 0; border-radius: 50%; background: radial-gradient(ellipse at 50% 75%, rgba(255, 58, 100, 0.4), transparent 65%); animation: aura 2.6s ease-in-out infinite; }
+.g-mote { position: absolute; left: var(--x); bottom: 0; width: calc(2px * var(--s)); height: calc(2px * var(--s)); background: #ff8aa4; box-shadow: 0 0 6px #ff3a64; opacity: 0; animation: wisp var(--d) ease-in var(--w) infinite; }
+.g-star { position: absolute; left: var(--x); top: var(--y); width: 16px; height: 16px; margin: -8px; color: #ffd0dc; filter: drop-shadow(0 0 4px #ff3a64); opacity: 0; animation: cr-twinkle var(--d) ease-in-out var(--w) infinite; }
+.g-star svg { display: block; width: 100%; height: 100%; }
+.awk-fig { position: relative; }
+@media (prefers-reduced-motion: reduce) { .awk-souls, .awk-embers, .awk-sparks, .awk-wave, .awk-glint { display: none; } .awk.thump .awk-heart svg { animation: none; } }
+.sp-lv th { font: 400 10px/1 'Silkscreen'; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); text-align: left; padding-bottom: 4px; }
+.sp-lv tr.on td { color: var(--ess-hi); }
+
+/* Souls are the Spirits' purple wherever they show; bound souls are the Heart's red. */
+.glyph.g-soul { color: var(--soul); }
+.glyph.g-soul.g-bound { color: var(--ess); }
+.bcard .sparks i { background: var(--ess); box-shadow: 0 0 6px var(--ess); }
+.bcard.flaring .lc-fig .px { animation: bmaterialize 0.7s ease-out; }
+@keyframes bmaterialize { 0% { filter: grayscale(1) sepia(1) hue-rotate(-40deg) saturate(2.6) brightness(2.2) drop-shadow(0 0 14px #fff); opacity: 0.85; } 100% { filter: none; opacity: 1; } }
+
+/* A trade, played out: your cards fly into his face-down card, it shakes, then turns over in a burst. */
+.tr-card.fly { z-index: 5; pointer-events: none; animation: tr-fly 0.5s cubic-bezier(0.5, 0, 0.8, 0.4) var(--dl, 0s) forwards; }
+@keyframes tr-fly { 40% { transform: translate(calc(var(--dx) * 0.35), calc(var(--dy) * 0.35 - 30px)) rotate(-8deg) scale(1.05); } 100% { transform: translate(var(--dx), var(--dy)) rotate(14deg) scale(0.5); opacity: 0; } }
+.tr-table.dealing .tr-swap { animation: tr-spin 0.6s ease-in-out infinite; }
+@keyframes tr-spin { 50% { transform: scale(1.35); color: #fff; } }
+.tr-table.dealing ~ .tr-foot .btn, .tr-table.dealing ~ .tr-hand { pointer-events: none; opacity: 0.6; }
+.tr-back.shake { animation: tr-shake 0.75s ease-in-out both; }
+.tr-back.shake.gold { --glow: rgba(255, 210, 58, 0.9); }
+@keyframes tr-shake {
+  0% { transform: none; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #4a3a40; }
+  15%, 45%, 75% { transform: rotate(-6deg) scale(1.04); }
+  30%, 60%, 90% { transform: rotate(6deg) scale(1.08); }
+  100% { transform: scale(1.14); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #fff, 0 0 26px var(--glow, rgba(255, 90, 126, 0.9)); filter: brightness(1.6); }
+}
+.tr-got { overflow: visible; }
+.tr-flip { position: relative; width: 72px; height: 100px; transform-style: preserve-3d; }
+.tr-fback, .tr-ffront { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.tr-fback { display: grid; place-items: center; color: var(--heart, var(--ess)); background: #241a2c; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #4a3a40; transform: rotateY(180deg); }
+.tr-got .tr-ffront .mcard { width: 72px; height: 100px; }
+.tr-got.reveal .tr-flip { animation: tr-turn 0.6s ease-out both; }
+@keyframes tr-turn { 0% { transform: rotateY(180deg) scale(1.14); } 70% { transform: rotateY(-12deg) scale(1.1); } 100% { transform: none; } }
+.tr-rays { position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; margin: -120px; border-radius: 50%; pointer-events: none;
+  background: repeating-conic-gradient(color-mix(in srgb, var(--rc) 55%, transparent) 0deg 8deg, transparent 8deg 20deg);
+  mask: radial-gradient(circle, #000 20%, transparent 66%); -webkit-mask: radial-gradient(circle, #000 20%, transparent 66%);
+  animation: cr-rays-in 0.45s 0.25s both, cr-spin 9s linear infinite, tr-rays-out 0.6s 1.6s forwards; }
+@keyframes tr-rays-out { to { opacity: 0; } }
+.tr-got.reveal .tr-new { animation: tr-stamp 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) 0.55s both; }
+@keyframes tr-stamp { from { opacity: 0; transform: scale(2.4) rotate(-12deg); } }
+.tr-got .sparks i { background: var(--rc); box-shadow: 0 0 6px var(--rc); left: 36px; top: 50px; }
+.tr-got .cr-dazzle { inset: -24px -30px; animation-delay: 0.5s; }
+@media (prefers-reduced-motion: reduce) { .tr-card.fly, .tr-back.shake, .tr-got.reveal .tr-flip, .tr-rays, .tr-got.reveal .tr-new { animation: none !important; } }
+.tr-got.gold .mcard { background: linear-gradient(135deg, #fff4b0 0%, #ffd23a 22%, #c98e16 46%, #ffe372 68%, #b47a10 100%); }

@@ -1,10 +1,13 @@
-import { LEGENDS, OFFER_SIZE, RESPEC_REFUND, SUMMON_COST, legendCost, legendShare, rerollCost, type LegendDef } from '../../game/data.ts';
+import { BOUND, boundName, LEGENDS, OFFER_SIZE, RESPEC_REFUND, SUMMON_COST, legendCost, legendShare, rerollCost, type LegendDef } from '../../game/data.ts';
 import { TUNE } from '../../game/game.ts';
 import { h2, infobox, link, pct, range, splitTables, table, toc } from '../kit.ts';
 import { spr } from '../sprites.ts';
 import type { Page } from '../pages.ts';
 
 const KIND = { power: 'Power', utility: 'Utility', sink: 'Sink' } as const;
+
+/** The Bound that make a Spirit work harder. */
+const BOOSTED_BY: Record<string, string> = { wither: 'troll', soulcaller: 'golem', lure: 'thing', hourglass: 'ent', thinning: 'frost' };
 
 /** Where each Spirit's bonus applies, and the rule behind its number. */
 const HOW: Record<string, string> = {
@@ -72,6 +75,7 @@ function spiritPage(d: LegendDef): Page {
     ])}
       <p class="lede">${HOW[d.id] ?? d.what}</p>
       ${d.note ? `<p class="note">${d.note}</p>` : ''}
+      ${BOOSTED_BY[d.id] ? `<p>${link('awakening', boundName(BOUND.find((b) => b.id === BOOSTED_BY[d.id])!), 'The Bound')} makes it ${d.id === 'thinning' ? 'go further: one more level each, up to 15 kills off' : 'work 25% harder each level'}.</p>` : ''}
       ${h2(`Leveling ${d.name}`)}
       <p>Summoning ${d.name} costs your current ${link('spirits', 'summon cost', 'Summoning')}. After that, each level costs ${costRule(d)}.
       ${d.kind === 'utility' && CAP[d.id] && d.id !== 'thinning' ? `Its effect closes in on its cap: each level closes a tenth of the gap that's left (${pct(legendShare(1), 0)} of the cap at level 1, ${pct(legendShare(10), 0)} at level 10, ${pct(legendShare(20), 0)} at level 20).` : ''}</p>
@@ -88,7 +92,7 @@ const listBody = () => {
   ];
   const summonRows = SUMMON_COST.map((cost, owned) => [`<b>${owned + 1}</b>`, cost.toLocaleString('en-US'), rerollCost(owned).toLocaleString('en-US')]);
   const totalSummon = SUMMON_COST.slice(0, LEGENDS.length).reduce((a, b) => a + b, 0);
-  return `<p class="lede">Spirits are what you spend souls on. Each one boosts one part of the game, and you level them up with more souls. They stay with you through every ascent.</p>
+  return `<p class="lede">Spirits are what you spend souls on. Each one boosts one part of the game, and you level them up with more souls. They stay with you through every ascent; awakening sends them all away.</p>
     ${toc('spirits', ['Summoning', 'Leveling', 'All Spirits', 'Respec', 'Kept souls'])}
     ${h2('Summoning')}
     <p>Spirits open after your first ascent. The summoning circle offers ${OFFER_SIZE} Spirits at a time; pick one and pay the summon cost to bring it in at level 1. Every summon rolls a new offer. You can also reroll the offer for a third of the summon cost, rounded up.</p>

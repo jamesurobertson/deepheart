@@ -36,7 +36,8 @@ export class Novelty {
   event(ev: GameEvent, t: number) {
     if (ev.t === 'buyUpg') this.first(t, `u:${ev.id}`, 'new upgrade');
     else if (ev.t === 'ability' && ev.unlocked) this.first(t, `ab:${ev.id}`, 'new ability');
-    else if (ev.t === 'heart') this.first(t, `h:${ev.id}:${ev.lv}`, 'new Heart level');
+    else if (ev.t === 'bound') this.first(t, `b:${ev.id}:${ev.lv}`, 'new Bound level');
+    else if (ev.t === 'expedition' && ev.cards) this.first(t, `x:${t}`, 'expedition cards');
     else if (ev.t === 'relic' && ev.star) this.first(t, `s:${ev.id}:${ev.star}`, 'relic star');
     else if (ev.t === 'curse') this.first(t, `c:${ev.id}:${ev.tier}`, 'curse tier');
     else if (ev.t === 'trophy') this.first(t, `t:${ev.id}`, 'trophy');

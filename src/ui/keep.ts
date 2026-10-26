@@ -1,5 +1,5 @@
 import type { Rect } from '../render/atlas.ts';
-import { COMPS, LEGENDS, LEGEND_BY_ID, type LegendId } from '../game/data.ts';
+import { BOUND, COMPS, LEGENDS, LEGEND_BY_ID, ZONES, boundName, type BoundId, type LegendId } from '../game/data.ts';
 import type { Game } from '../game/game.ts';
 import { spriteFrames, uiAtlas } from './px.ts';
 
@@ -9,12 +9,12 @@ import { spriteFrames, uiAtlas } from './px.ts';
  * chest or the stairs and its label lights up with a key to press to use it.
  */
 
-/** A place to use: the stairs, a trader, a Spirit on offer in the shrine (`offer:<id>`) or one of yours in the Great
- *  Hall (`legend:<id>`). */
-export type KeepStation = 'stairs' | 'dan' | 'victor' | `offer:${LegendId}` | `legend:${LegendId}`;
+/** A place to use: the stairs, a trader, the expedition ladder, the Heart, a Spirit on offer in the shrine
+ *  (`offer:<id>`), one of yours in the Great Hall (`legend:<id>`) or one of the Bound (`bound:<id>`). */
+export type KeepStation = 'stairs' | 'dan' | 'victor' | 'trips' | 'heart' | `offer:${LegendId}` | `legend:${LegendId}` | `bound:${BoundId}`;
 
-/** Floor rectangles (x, y, w, h) for the rooms and the halls between them; the walls grow around them. The first room,
- *  as big as the shrine's, stands empty for now. */
+/** Floor rectangles (x, y, w, h) for the rooms and the halls between them; the walls grow around them. The first room
+ *  is the Heart's. */
 const ROOMS: [number, number, number, number][] = [[1, 2, 13, 10], [16, 2, 15, 10], [1, 16, 9, 8], [12, 15, 22, 9], [36, 16, 9, 8], [19, 27, 9, 6]];
 const HALLS: [number, number, number, number][] = [[22, 12, 3, 3], [10, 19, 2, 2], [34, 19, 2, 2], [5, 12, 2, 4], [22, 24, 2, 3]];
 const W = 47;
@@ -35,7 +35,13 @@ const THINGS: Thing[] = [
   ...[[39, 20], [41, 20], [40, 21], [38, 18], [42, 18], [39, 22], [41, 22]].map(([x, y]): Thing => ['coin', x, y, 'flat']),
   ['doors_frame_left', 21, 26, 'wall'], ['doors_leaf_open', 22, 26, 'wall'], ['doors_frame_right', 24, 26, 'wall'], ['doors_frame_top', 22, 24, 'wall'],
   ['floor_stairs', 22, 30, 'flat'], ['floor_stairs', 23, 30, 'flat'], ['floor_stairs', 24, 30, 'flat'],
+  ['wall_banner_red', 3, 1, 'wall'], ['wall_banner_red', 11, 1, 'wall'],
 ];
+/** The ladder hunters climb down on expeditions (shown once expeditions are open). */
+const LADDER: [number, number] = [20, 28];
+/** The Heart stands on its plinth here; the Bound around the room once you've awakened. */
+const HEART: [number, number] = [7, 4];
+const BOUND_AT: [number, number][] = [[2, 7], [4, 7], [10, 7], [12, 7], [2, 10], [4, 10], [10, 10], [12, 10]];
 const PEOPLE: { id: 'dan' | 'victor'; sprite: string; x: number; y: number }[] = [{ id: 'dan', sprite: 'ef_elf_m', x: 3, y: 18 }, { id: 'victor', sprite: 'victor', x: 7, y: 18 }];
 /** What each station is, where it's used from (cells you stand on), where its label floats, and (spirits, which you
  *  can walk through) the cells of its body that a click picks it by. */
@@ -44,7 +50,9 @@ const STATIONS: Station[] = [
   { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 19.55], body: [[3, 18], [3, 17]] },
   { id: 'victor', label: 'Victor', cells: [[6, 18], [7, 19], [8, 18], [7, 17]], tag: [7, 19.55], body: [[7, 18], [7, 17]] },
   { id: 'stairs', label: 'Way down', cells: [[22, 30], [23, 30], [24, 30]], tag: [23, 31.6] },
+  { id: 'heart', label: 'The Heart', cells: [[6, 5], [7, 5], [8, 5], [6, 4], [8, 4]], tag: [7, 6.1], body: [[7, 4], [7, 3]] },
 ];
+const TRIPS: Station = { id: 'trips', label: 'Expeditions', cells: [[20, 28], [19, 28], [21, 28], [20, 29], [19, 29], [21, 29]], tag: [20, 29.55] };
 /** Where you arrive: on the stairs, facing up into the Entrance. */
 const ARRIVE: [number, number] = [23, 29];
 const SPEED = 5.5;
@@ -146,8 +154,9 @@ export class KeepView {
     }
     this.tiles = autotile(this.cells);
     for (const [, x, y, how] of THINGS) if (!how) this.blocked.add(`${x},${y}`);
-    // The shrine's obelisk stands in the way; spirits don't (you walk right through them).
+    // The shrine's obelisk and the Heart's plinth stand in the way; spirits don't (you walk right through them).
     this.blocked.add(`${SHRINE[0]},${SHRINE[1]}`);
+    this.blocked.add(`${HEART[0]},${HEART[1]}`);
     for (const p of PEOPLE) this.blocked.add(`${p.x},${p.y}`);
     // Everyone comes up the stairs: the party starts wound round the Entrance behind you, as if they'd walked it.
     for (let k = 0; k < ENTRANCE_WIND.length - 1; k++) {
@@ -175,6 +184,11 @@ export class KeepView {
   private walkable(x: number, y: number) {
     const cx = Math.floor(x), cy = Math.floor(y);
     return this.cells[cy]?.[cx] === '.' && !this.blocked.has(`${cx},${cy}`);
+  }
+
+  /** The Bound and where each stands, once you've awakened. */
+  private bound() {
+    return this.game.s.awakens ? BOUND.map((b, k) => ({ b, at: BOUND_AT[k] })) : [];
   }
 
   /** The Spirits you've summoned and where each stands (you can walk through them). */
@@ -253,6 +267,16 @@ export class KeepView {
     }
     this.walkTo(id);
     this.goal = id;
+  }
+
+  /** Arrive in front of the Heart instead of on the stairs (after an awakening), the party gathered round. */
+  arriveAtHeart() {
+    this.hero.x = HEART[0] + 0.5;
+    this.hero.y = HEART[1] + 2.6;
+    this.trail = Array.from({ length: 400 }, (_, k) => ({ x: this.hero.x + Math.sin(k * 0.05) * 1.5, y: this.hero.y + Math.min(3, k * 0.012) }));
+    this.path = [];
+    this.party.clear();
+    this.cam = { x: this.hero.x, y: this.hero.y - 1 };
   }
 
   /** Walk up to a station, to whichever of its spots is the shortest way. */
@@ -350,7 +374,8 @@ export class KeepView {
     });
     const offer = this.game.legendOffer().slice(0, SPIRITS.length).map((id, k) => figure(`offer:${id}`, LEGEND_BY_ID.get(id)!.name, SPIRITS[k], 3));
     const mine = this.guards().map(({ d, at }) => ({ ...figure(`legend:${d.id}`, d.name, at, 2), tag: [at[0], at[1] + 1.3] as [number, number] }));
-    return [...STATIONS, ...offer, ...mine];
+    const bound = this.bound().map(({ b, at }) => ({ ...figure(`bound:${b.id}`, boundName(b), at, 2), tag: [at[0], at[1] + 1.3] as [number, number] }));
+    return [...STATIONS, ...(this.game.tripsOpen() ? [TRIPS] : []), ...offer, ...mine, ...bound];
   }
 
   /** A point along the trail, `idx` steps back from the hero (in between two points, part of the way). */
@@ -373,9 +398,30 @@ export class KeepView {
       const below = st.id !== 'stairs';
       const [tx, ty] = below ? [st.tag[0], st.tag[1] - 0.45] : st.tag;
       // Only the stairs and the spirits on offer always show their names; the rest when you point at them or stand there.
-      const shown = st.id === 'stairs' || st.id.startsWith('offer:') || this.near === st.id || this.hover === st.id;
+      const shown = st.id === 'stairs' || st.id.startsWith('offer:') || (st.id === 'heart' && this.game.canAwaken()) || this.near === st.id || this.hover === st.id;
       return { id: st.id, label: st.label, x: r.left + r.width / 2 + (tx + 0.5 - this.cam.x) * s, y: r.top + r.height / 2 + (ty - this.cam.y) * s, below, shown };
     });
+  }
+
+  /** A sprite frame in a monster's tint (as the dungeon colors it), drawn once and kept. */
+  private tints = new Map<string, HTMLCanvasElement>();
+  private tinted(img: CanvasImageSource, r: Rect, tint: number) {
+    const key = `${r.x},${r.y},${tint}`;
+    let c = this.tints.get(key);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = r.w;
+    c.height = r.h;
+    const t = c.getContext('2d')!;
+    t.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    t.globalCompositeOperation = 'multiply';
+    t.fillStyle = `#${tint.toString(16).padStart(6, '0')}`;
+    t.fillRect(0, 0, r.w, r.h);
+    // Multiply fills the clear pixels too: cut back to the sprite's own shape.
+    t.globalCompositeOperation = 'destination-in';
+    t.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    this.tints.set(key, c);
+    return c;
   }
 
   private draw(dt: number, w: number, h: number) {
@@ -433,6 +479,7 @@ export class KeepView {
     for (const t of this.tiles[0]) tile(atlas.rect(`floor_${worn(t.x, t.y)}`), t.x, t.y);
     for (const t of this.tiles[1]) tile(atlas.rect(t.name), t.x, t.y);
     for (const t of this.tiles[2]) tile(atlas.rect(t.name), t.x, t.y);
+    if (this.game.tripsOpen()) tile(rect('floor_ladder'), LADDER[0], LADDER[1]);
     for (const [name, x, y, how] of THINGS) {
       if (how === 'flat') tile(rect(name, tick), x, y);
       else if (how === 'wall' || how === 'soul') {
@@ -562,6 +609,47 @@ export class KeepView {
       }
       g.globalAlpha = 1;
     } });
+    // The Heart on its plinth: dark until awakening opens, then beating red.
+    const ready = this.game.canAwaken();
+    const awake = this.game.s.awakens > 0;
+    standing.push({ y: HEART[1] + 1, draw: () => {
+      const column = atlas.rect('column');
+      g.filter = 'sepia(1) hue-rotate(-50deg) saturate(2.4) brightness(0.8)';
+      stand(img, column, HEART[0] + 0.5, HEART[1] + 1);
+      g.filter = 'none';
+      const heart = atlas.rect('ui_heart_full');
+      const beat = ready || awake ? 1 + 0.12 * Math.max(0, Math.sin(this.time * (ready ? 6 : 3))) ** 8 : 1;
+      const size = 2 * beat;
+      g.save();
+      g.translate((HEART[0] + 0.5) * 16, (HEART[1] - 1.1) * 16 + Math.sin(this.time * 1.4) * 1.5);
+      g.scale(size, size);
+      if (!ready && !awake) g.filter = 'grayscale(0.85) brightness(0.55)';
+      else g.filter = `drop-shadow(0 0 ${ready ? 3 : 1.5}px rgba(255, 90, 126, 0.9))`;
+      g.drawImage(img, heart.x, heart.y, heart.w, heart.h, -heart.w / 2, -heart.h / 2, heart.w, heart.h);
+      g.restore();
+      g.filter = 'none';
+    } });
+    // The Bound, as themselves in their own colors, with red sparks rising round them.
+    this.bound().forEach(({ b, at }, k) => {
+      const boss = ZONES[b.zone].boss;
+      const src = spriteFrames(boss.sprite);
+      if (!src) return;
+      const frame = (tick + k) % src.frames.length;
+      const r = src.frames[frame];
+      standing.push({ y: at[1] + 1, draw: () => {
+        shadow(at[0] + 0.5, at[1] + 1, 7);
+        const tinted = boss.tint !== undefined ? this.tinted(src.img, r, boss.tint) : null;
+        if (tinted) stand(tinted, { x: 0, y: 0, w: r.w, h: r.h } as Rect, at[0] + 0.5, at[1] + 1, at[0] > HEART[0]);
+        else stand(src.img, r, at[0] + 0.5, at[1] + 1, at[0] > HEART[0]);
+        for (let w = 0; w < 6; w++) {
+          const t = (this.time * 0.3 + w / 6 + k * 0.21) % 1;
+          g.fillStyle = w % 3 === 0 ? '#ffb3c4' : '#ff5a7e';
+          g.globalAlpha = Math.sin(t * Math.PI) * 0.7;
+          g.fillRect(Math.round((at[0] + 0.5) * 16 + ((w * 5) % 15) - 7 + Math.sin(this.time * 1.3 + w + k) * 2), Math.round((at[1] + 1) * 16 + 1 - t * 30), 1, 1);
+        }
+        g.globalAlpha = 1;
+      } });
+    });
     for (const p of PEOPLE) {
       const src = spriteFrames(p.sprite);
       if (!src) continue;
@@ -606,6 +694,15 @@ export class KeepView {
       } });
     }
     standing.sort((a, b) => a.y - b.y).forEach((s2) => s2.draw());
+    // The Heart's glow, once it's stirred.
+    if (ready || awake) {
+      const hx = (HEART[0] + 0.5) * 16, hy = (HEART[1] - 1.1) * 16;
+      const red = g.createRadialGradient(hx, hy, 2, hx, hy, 60);
+      red.addColorStop(0, `rgba(255, 90, 126, ${(ready ? 0.32 : 0.18) + 0.06 * Math.sin(this.time * 3)})`);
+      red.addColorStop(1, 'rgba(255, 90, 126, 0)');
+      g.fillStyle = red;
+      g.fillRect(hx - 60, hy - 60, 120, 120);
+    }
     // The shrine's glow.
     const cx = (SHRINE[0] + 0.5) * 16, cy = (SHRINE[1] - 0.8) * 16;
     const glow = g.createRadialGradient(cx, cy, 2, cx, cy, 70);

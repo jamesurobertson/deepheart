@@ -4,7 +4,7 @@ import '@fontsource/silkscreen/700.css';
 import '@fontsource/jersey-10/400.css';
 import './style.css';
 import Decimal from 'break_infinity.js';
-import { Game, floorHp, newSave, SAVE_VERSION, type GameEvent, type SaveState } from './game/game.ts';
+import { Game, TUNE, floorHp, newSave, SAVE_VERSION, type GameEvent, type SaveState } from './game/game.ts';
 import { Atlas } from './render/atlas.ts';
 import { FELL_HIT, Scene, type Quality } from './render/scene.ts';
 import { fpsOverlay } from './ui/fps.ts';
@@ -233,8 +233,8 @@ async function boot() {
     if (TEST_STATE === 'awaken' || TEST_STATE === 'reawaken') {
       const s = game.s;
       const again = TEST_STATE === 'reawaken';
-      Object.assign(s, { awakens: again ? 1 : 0, stones: again ? 1 : 0, souls: again ? 2e6 : 5e4, soulsLifetime: again ? 5e5 : 0 });
-      const depth = game.awakenFloor();
+      Object.assign(s, { awakens: again ? 1 : 0, boundEarned: again ? 12 : 0, bound: {}, souls: again ? 4000 : 400, soulsLifetime: again ? 400 : 0, tripsOpen: true, expeditions: [], inKeep: false });
+      const depth = TUNE.awakenFloor + (again ? 40 : 0);
       Object.assign(s, { maxFloor: depth, bestFloor: Math.max(s.bestFloor, depth), cycleBest: depth, bestCleared: depth - 1, auto: true });
       s.owned = s.owned.map((n) => Math.max(n, 40 + depth * 4));
       s.cards = {};
@@ -467,9 +467,9 @@ async function boot() {
       slow = 0.1;
       ui.update();
     }
-    // The kid's room has its own tune.
-    // The Keep always has its own tune.
-    sfx.music(game.s.inKeep ? 'keep' : trackFor(game));
+    // The Keep always has its own tune; the awakening plays in silence.
+    if (ui.cutscene) sfx.hush();
+    else sfx.music(game.s.inKeep ? 'keep' : trackFor(game));
   };
   ui.update();
   requestAnimationFrame(frame);
@@ -529,7 +529,8 @@ function playSound(sfx: Sfx, ev: GameEvent) {
       break;
     case 'raidEscape': sfx.play('close', { vol: 0.5, rate: 0.8 }); break;
     case 'fever': if (ev.on) sfx.play('awaken', { vol: 0.8 }); break;
-    case 'heart': sfx.play('awaken', { vol: 0.6, rate: 0.8 }); break;
+    case 'bound': sfx.play('awaken', { vol: 0.6, rate: 0.8 }); break;
+    case 'expedition': sfx.play('jackpot', { vol: 0.5 }); break;
     case 'legend': sfx.play(ev.summoned ? 'awaken' : 'levelup', { vol: ev.summoned ? 0.6 : 0.45, rate: ev.summoned ? 0.7 : 1 }); break;
     case 'mark': sfx.play(ev.moved ? 'equip' : 'jackpot', { vol: 0.5 }); break;
     case 'split': sfx.play('bosskill', { vol: 0.6, rate: 1.3 }); break;

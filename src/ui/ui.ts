@@ -1,13 +1,13 @@
 import { morph } from './morph.ts';
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, AWAKEN_MILESTONES, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, HEART, HEART_BY_ID, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { AWAKEN_ON, CURSES_ON, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TUNE, bossSouls, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { AWAKEN_ON, CURSES_ON, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TRIP_HOURS, TUNE, bossSouls, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
-import { G, cardArt, charFit, silhouette, sprite, spriteFit } from './px.ts';
+import { G, cardArt, charFit, silhouette, sprite, spriteFit, spriteFrames } from './px.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
 
 export interface UiHooks {
@@ -106,6 +106,23 @@ function legendDetail(d: LegendDef, lv: number): string {
 const WISPS = Array.from({ length: 7 }, (_, k) =>
   `<i style="--x:${10 + ((k * 37) % 80)}%;--d:${(2.4 + ((k * 13) % 22) / 10).toFixed(1)}s;--w:${-((k * 29) % 40) / 10}s;--s:${(0.6 + ((k * 7) % 8) / 10).toFixed(1)}"></i>`).join('');
 
+/** A gold card's dazzle, as champions shed it in the dungeon: a breathing aura, pixel stars twinkling round the card
+ *  and motes rising off it, placed by index so every gold card glitters the same way. */
+const STAR = '<svg viewBox="0 0 7 7" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h1v2H3zM2 2h3v1H2zM0 3h7v1H0zM2 4h3v1H2zM3 5h1v2H3z"/></svg>';
+const GOLD_DAZZLE = `<span class="cr-dazzle"><i class="cr-aura"></i>${Array.from({ length: 11 }, (_, k) => {
+  // Round the card's edge, a little in and out.
+  const a = (k / 11) * Math.PI * 2 + 0.4;
+  const x = 50 + Math.cos(a) * (46 + ((k * 17) % 14));
+  const y = 50 + Math.sin(a) * (44 + ((k * 23) % 12));
+  return `<i class="cr-star" style="--x:${x.toFixed(1)}%;--y:${y.toFixed(1)}%;--d:${(1.1 + ((k * 7) % 9) / 10).toFixed(1)}s;--w:${(0.7 + ((k * 13) % 15) / 10).toFixed(1)}s;--s:${(0.7 + ((k * 5) % 7) / 10).toFixed(1)}">${STAR}</i>`;
+}).join('')}${Array.from({ length: 22 }, (_, k) =>
+  `<i class="cr-mote" style="--x:${8 + ((k * 37) % 84)}%;--d:${(1.6 + ((k * 11) % 12) / 10).toFixed(1)}s;--w:${(0.6 + ((k * 19) % 20) / 10).toFixed(1)}s;--s:${(1 + ((k * 3) % 3) * 0.5).toFixed(1)}"></i>`).join('')}</span>`;
+
+/** The red glitter on each Bound in the awakening: motes rising off it and a few stars twinkling over it. */
+const GLINT = `${Array.from({ length: 9 }, (_, k) =>
+  `<i class="g-mote" style="--x:${10 + ((k * 37) % 80)}%;--d:${(1.2 + ((k * 13) % 10) / 10).toFixed(1)}s;--w:${-((k * 29) % 20) / 10}s;--s:${1 + (k % 2)}"></i>`).join('')}${Array.from({ length: 3 }, (_, k) =>
+  `<i class="g-star" style="--x:${[18, 78, 50][k]}%;--y:${[30, 45, 8][k]}%;--d:${(1.1 + k * 0.4).toFixed(1)}s;--w:${(k * 0.5).toFixed(1)}s">${STAR}</i>`).join('')}`;
+
 /** What this many kept souls add to all damage, as a percentage ("+300%"). */
 const soulPct = (n: number) => `+${fmt(n * TUNE.soulPower * 100)}%`;
 
@@ -158,6 +175,35 @@ function floorArt(floor: number, box: number) {
   const def = floor % 5 === 0 ? bossFor(floor) : featuredFor(floor);
   const card = CARD_BY_ID.get(cardId(def.name));
   return card ? cardArt(card, box, 'mon', lapOf(floor)) : charFit(def.sprite, box, box, 'mon');
+}
+
+/** A bound soul: the soul glyph in the Heart's red. */
+const boundGlyph = (scale = 2) => G.soul(scale).replace('g-soul', 'g-soul g-bound');
+
+/** A Bound standing on its plinth: the boss's first frame, tinted as the dungeon colors it, drawn once and kept. */
+const bossFigs = new Map<string, string>();
+function bossFig(b: BoundDef, height: number, maxW: number) {
+  const boss = ZONES[b.zone].boss;
+  if (boss.tint === undefined) return charFit(boss.sprite, height, maxW);
+  let url = bossFigs.get(b.id);
+  const src = spriteFrames(boss.sprite);
+  if (!src) return '';
+  const f = src.frames[0];
+  if (!url) {
+    const c = document.createElement('canvas');
+    c.width = f.w;
+    c.height = f.h;
+    const t = c.getContext('2d')!;
+    t.drawImage(src.img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+    t.globalCompositeOperation = 'multiply';
+    t.fillStyle = `#${boss.tint.toString(16).padStart(6, '0')}`;
+    t.fillRect(0, 0, f.w, f.h);
+    t.globalCompositeOperation = 'destination-in';
+    t.drawImage(src.img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+    bossFigs.set(b.id, (url = c.toDataURL()));
+  }
+  const k = Math.min(height / f.h, maxW / f.w);
+  return `<img class="px" src="${url}" width="${Math.round(f.w * k)}" height="${Math.round(f.h * k)}" alt="">`;
 }
 
 /**
@@ -286,6 +332,7 @@ export class Ui {
         <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy(3)}<span>Collection</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics"${RELICS_ON ? '' : ' hidden'}>${G.relic(3)}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>Ascend</span><em class="badge" hidden></em></button>
+        <button class="btn dock-b dock-heart" data-open="heart" data-tip="dock:heart" hidden>${G.heart(3)}<span>The Heart</span><em class="badge bound" hidden></em></button>
         <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden>${G.door(3)}<span>The Keep</span></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>Stats</span></button>
         <button class="btn dock-b dock-stat blade-rate" data-tip="dock:blade" tabindex="-1">${spriteFit('weapon_knife', 20, 'glyph')}<span>1/s</span></button>
@@ -299,7 +346,7 @@ export class Ui {
         <div class="modes">
           <span>Hire</span>
           <button class="btn mode" data-mode="1">×1</button><button class="btn mode" data-mode="10">×10</button><button class="btn mode" data-mode="100">×100</button><button class="btn mode" data-mode="next" data-tip="shop:next">Next</button><button class="btn mode" data-mode="-1">Max</button>
-          <button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden></button><button class="btn small buy-all" data-act="buyAll" hidden>Buy all</button>
+          <button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden></button>
         </div>
         <div class="gens"></div>
       </aside>
@@ -318,8 +365,8 @@ export class Ui {
       zonePrev: q('[data-act=zonePrev]'), zoneNext: q('[data-act=zoneNext]'), down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
       fever: q('.fever'), feverBar: q('.fever > i'), feverLabel: q('.fever > span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), vaultPick: q('.vault-pick'), vaultLeave: q('.vault-leave'), vaultFaces: q('.vp-faces'), heroMark: q('.hero-mark'), raid: q('.raid-mark'), exitMark: q('.exit-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'),
-      buyAll: q('.buy-all'), autoUpg: q('.auto-upg'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
-      blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), keepBtn: q('[data-act=keep]'), keepLabels: q('.keep-labels'),
+      autoUpg: q('.auto-upg'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
+      blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), heartBtn: q('.dock-heart'), heartBadge: q('.dock-heart .badge'), keepBtn: q('[data-act=keep]'), keepLabels: q('.keep-labels'),
       relicBadge: q('[data-open=relics] .badge'), cardBadge: q('[data-open=trophies] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
     };
 
@@ -693,12 +740,14 @@ export class Ui {
         }
         return;
       }
-      const heart = t.closest<HTMLElement>('[data-heart]');
-      if (heart) {
-        if (this.game.buyHeart(heart.dataset.heart!)) {
+      const bound = t.closest<HTMLElement>('[data-bound]');
+      if (bound) {
+        const id = bound.dataset.bound as BoundId;
+        if (this.game.buyBound(id)) {
           this.renderModal();
           this.refreshTip();
-        } else this.deny(heart);
+          this.flareLegend(id);
+        } else this.deny(bound);
         return;
       }
       const old = t.closest<HTMLElement>('[data-legend]');
@@ -713,12 +762,14 @@ export class Ui {
       }
       const put = t.closest<HTMLElement>('[data-put]');
       if (put && (this.modal === 'dan' || this.modal === 'victor')) {
+        if (this.tradeBusy) return;
         this.tradePut(this.modal, put.dataset.put!);
         this.renderModal();
         return;
       }
       const take = t.closest<HTMLElement>('[data-take]');
       if (take) {
+        if (this.tradeBusy) return;
         this.trade.side.splice(this.trade.side.lastIndexOf(take.dataset.take!), 1);
         this.hooks.sound('click', { vol: 0.3 });
         this.renderModal();
@@ -779,6 +830,14 @@ export class Ui {
 
     r.addEventListener('input', (e) => {
       const t = e.target as HTMLInputElement;
+      if (t.dataset.trip) {
+        const floor = Math.floor(Number(t.value));
+        if (floor >= 1 && floor <= this.game.s.bestFloor) {
+          this.tripPick[Number(t.dataset.trip)] = floor;
+          this.renderModal(true);
+        }
+        return;
+      }
       const key = t.dataset.set as 'sfxVol' | 'musicVol' | undefined;
       if (!key) return;
       this.game.s.settings[key] = Number(t.value) / 100;
@@ -836,7 +895,6 @@ export class Ui {
     const s = g.s.settings;
     switch (act) {
       case 'close': this.closeModal(); break;
-      case 'buyAll': if (g.buyAllUpgs()) this.hideTip(); break;
       case 'autoUpg':
         g.s.settings.autoUpg = !g.s.settings.autoUpg;
         g.s.autoTipSeen = true;
@@ -929,9 +987,14 @@ export class Ui {
       case 'tradeGo':
       case 'tradeAgain': {
         const who = this.modal as Trader;
+        // A trade plays out before anything else on the table can be touched.
+        if (this.tradeBusy) break;
+        if (act === 'tradeGo') {
+          this.tradeGo(who);
+          break;
+        }
         if (act === 'tradeClear') this.trade.side = [];
         else if (act === 'tradeAgain') this.trade = { side: [], got: null, line: pickLine(TRADER_LINES[who][this.tradeHand().length ? 'hello' : 'short']) };
-        else if (act === 'tradeGo') this.tradeGo(who);
         else {
           // Auto-fill only uses doubles: never your last copy.
           while (this.trade.side.length < this.tradeNeed(who)) {
@@ -969,6 +1032,20 @@ export class Ui {
       case 'descendGo': this.doDescend(); break;
       case 'leaveVault': this.game.leaveVault(); break;
       case 'abyssBack': this.modal = 'abyss'; this.renderModal(); break;
+      case 'tripGo': {
+        const i = Number(el.closest<HTMLElement>('[data-hunter]')!.dataset.hunter);
+        if (this.game.sendTrip(i, this.tripPick[i] ?? this.game.tripFloor(i))) {
+          this.hooks.sound('descend', { vol: 0.4 });
+          this.rowCache[i] = '';
+          this.renderModal();
+        } else this.deny(el);
+        break;
+      }
+      case 'tripHome': {
+        const i = Number(el.closest<HTMLElement>('[data-hunter]')!.dataset.hunter);
+        if (this.game.callHome(i)) this.renderModal();
+        break;
+      }
     }
   }
 
@@ -1117,6 +1194,11 @@ export class Ui {
       }
       // The tink: something rare just dropped.
       case 'card':
+        // A hunter's cards come home with it, all at once (see 'expedition').
+        if (ev.src === 'trip') {
+          this.tripCards.push(ev);
+          break;
+        }
         this.cardsComing++;
         this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 });
         break;
@@ -1174,7 +1256,11 @@ export class Ui {
         if (s) this.pop(s.x, s.y + s.h * 0.2, 'Split!', 'p-mod');
         break;
       }
-      case 'heart': this.toast(`<b>${esc(HEART_BY_ID.get(ev.id)!.name)}</b> is now level ${ev.lv}`, HEART_BY_ID.get(ev.id)!.icon); break;
+      case 'expedition':
+        this.rowCache[ev.comp] = '';
+        this.tripsBack.push({ comp: ev.comp, floor: ev.floor, kills: ev.kills, cards: this.tripCards.splice(0) });
+        break;
+      case 'tripsOpen': this.toast('<b>Expeditions</b> are open: the ladder in the Keep', COMPS[ev.comp].sprite, 'trophy'); break;
       case 'legend': if (ev.summoned) this.toast(`<b>${esc(LEGEND_BY_ID.get(ev.id)!.name)}</b> joins you`, LEGEND_BY_ID.get(ev.id)!.sprite); break;
       case 'mark':
         this.rowCache[ev.comp] = '';
@@ -1391,6 +1477,8 @@ export class Ui {
     if (g.s.inKeep && !this.keepView) {
       this.keepView = new KeepView(g, this.root);
       this.keepView.onUse = (id) => this.station(id);
+      if (this.arriveAtHeart) this.keepView.arriveAtHeart();
+      this.arriveAtHeart = false;
     } else if (!g.s.inKeep && this.keepView) {
       this.keepView.destroy();
       this.keepView = null;
@@ -1537,8 +1625,14 @@ export class Ui {
 
     if (g.canAwaken() && !this.toldAwaken) {
       this.toldAwaken = true;
-      if (g.s.awakens === 0) this.toast('<b>The Heart stirs.</b> You can awaken it now: Ascend → Awaken.', 'ui_heart_full', 'trophy');
+      if (g.s.awakens === 0) this.toast('<b>The Heart stirs</b>', 'ui_heart_full', 'trophy');
     }
+    // The Heart's button shows up when the Heart first stirs; its badge is what an awakening would pay now.
+    this.el.heartBtn.hidden = !AWAKEN_ON || (!g.s.awakens && g.s.cycleBest < TUNE.awakenFloor);
+    const bound = g.canAwaken() ? g.pendingBound() : 0;
+    this.el.heartBadge.hidden = bound < 1;
+    setText(this.el.heartBadge, fmt(bound));
+    this.el.heartBadge.classList.toggle('hot', bound > 0 && (!g.s.awakens || bound >= g.s.boundEarned / 4));
     const rb = this.el.relicBadge;
     rb.hidden = this.newRelics < 1;
     // The Keep opens with your first ascent; from then on it's a button away (and the way back down, while you're there).
@@ -1560,7 +1654,8 @@ export class Ui {
     if (rateEl.textContent !== rate) rateEl.textContent = rate;
 
     this.hints();
-    if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'stats', 'party', 'records', 'ascents', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
+    if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'trips', 'stats', 'party', 'records', 'ascents', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
+    if (this.tripsBack.length && (!this.modal || this.modal === 'trips') && !this.descending && !this.keepFading) this.showTripsBack();
     this.refreshTip();
   }
 
@@ -1699,8 +1794,10 @@ export class Ui {
       const mystery = i === revealed && i > 0 && g.s.owned[i] === 0;
       const locked = !g.compUnlocked(i);
       const q = g.compQuote(i);
-      const can = !locked && !mystery && g.s.gold.gte(q.cost);
+      const trip = g.s.expeditions.find((e) => e.comp === i);
+      const can = !locked && !mystery && !trip && g.s.gold.gte(q.cost);
       row.classList.toggle('can', can);
+      row.classList.toggle('away', !!trip);
       row.classList.toggle('is-hero', g.heroIndex() === i);
       row.classList.toggle('owned', g.s.owned[i] > 0);
       row.classList.toggle('mystery', mystery || locked);
@@ -1708,14 +1805,15 @@ export class Ui {
       const lv = g.s.owned[i];
       const traits = lv > 0 && !locked && !mystery ? this.traitStates(i, offer) : [];
       const marks = g.s.marks[i];
-      const key = [mystery, locked, q.n, q.cost.toString(), lv, can, marks, g.s.settings.notation, Math.round(g.compDps(i).plus(1).log10() * 20), traits.join('')].join('|');
+      const left = trip ? Math.ceil((TRIP_HOURS * 3600 - g.tripSeconds(trip)) / 60) : 0;
+      const key = [mystery, locked, q.n, q.cost.toString(), lv, can, marks, g.s.settings.notation, Math.round(g.compDps(i).plus(1).log10() * 20), traits.join(''), trip?.floor, left].join('|');
       if (key === this.rowCache[i]) return;
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
       row.querySelector('.gen-name')!.innerHTML = `${name}${marks && !locked && !mystery ? ` <span class="marks" data-tip="mark:${i}">${G.heart(1.5)}${marks}</span>` : ''}${q.n > 1 && !locked && !mystery ? ` <small>×${q.n}</small>` : ''}`;
-      row.querySelector('.gen-cost')!.innerHTML = locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.bestFloor)}</span>` : gold(q.cost, can ? 'ok' : 'no');
+      row.querySelector('.gen-cost')!.innerHTML = trip ? `<span class="need">Floor ${trip.floor} · ${duration(left * 60)}</span>` : locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.bestFloor)}</span>` : gold(q.cost, can ? 'ok' : 'no');
       row.querySelector('.gen-lv')!.textContent = lv ? `Lv ${lv}` : '';
-      row.querySelector('.gen-dps')!.textContent = lv ? `${fmt(g.compDps(i))} dps` : '';
+      row.querySelector('.gen-dps')!.textContent = trip ? 'Away' : lv ? `${fmt(g.compDps(i))} dps` : '';
       // Owned traits and the next one only: the rest show up as you buy your way along. Past the last trait, the next
       // automatic level bonus.
       const shown = traits.findIndex((st) => st !== 'got');
@@ -1928,11 +2026,9 @@ export class Ui {
     setTimeout(() => burst.remove(), 500);
   }
 
-  /** Auto-buy and Buy all for companion traits, beside the hire modes. */
+  /** Auto-buy for companion traits, beside the hire modes. */
   private renderShopActs() {
     const g = this.game;
-    const affordable = g.shopUpgrades().filter((u) => g.s.gold.gte(g.upgCost(u))).length;
-    this.el.buyAll.hidden = !g.milestone('buyall') || affordable < 2;
     const auto = g.autoUpgOpen();
     this.el.autoUpg.hidden = !auto;
     if (auto) {
@@ -2245,6 +2341,39 @@ export class Ui {
       return `<div class="tt-h"><b>Respec</b></div><p class="tt-d">Every Spirit leaves. You get back ${RESPEC_REFUND * 100}% of the souls spent on them.</p>
         <p class="tt-f">Spent ${G.soul(1.2)} ${fmt(g.s.legendSpent)} · back ${G.soul(1.2)} ${fmt(back)}</p>`;
     }
+    if (kind === 'bound') {
+      const b = BOUND.find((x) => x.id === id)!;
+      const lv = g.boundLv(b.id);
+      // The next four levels: each one's price and what it gives, as the Spirits' tooltip shows.
+      const rows = Array.from({ length: 4 }, (_, k) => lv + 1 + k)
+        .filter((n) => b.max === undefined || n <= b.max)
+        .map((n) => `<tr><td>Level ${n}</td><td>${boundGlyph(1.2)} ${fmt(boundCost(b, n - 1))}</td><td>${esc(b.value(n))}</td></tr>`).join('');
+      return `<div class="tt-h">${bossFig(b, 30, 36)}<b>${esc(boundName(b))}</b><span class="tt-own">${lv ? `level ${lv}` : 'Bound'}</span></div>
+        <p class="od-what">${esc(b.what)}: <b class="od-now bnd">${lv ? esc(b.value(lv)) : '—'}</b></p>
+        ${rows ? `<table class="od-lv">${rows}</table>` : ''}
+        ${b.max !== undefined ? `<p class="od-max">Max level ${b.max}</p>` : ''}`;
+    }
+    if (kind === 'spirit') {
+      const d = LEGEND_BY_ID.get(id as LegendId)!;
+      const lv = g.legendLv(d.id);
+      const b = BOUND.find((x) => x.spirit === d.id)!;
+      const blv = g.boundLv(b.id);
+      // The Spirit's effect at its level (or level 1, not yet summoned) for its Bound's level now and the next three.
+      const shown = Math.max(1, lv);
+      const rows = Array.from({ length: 4 }, (_, k) => blv + k).map((L) => {
+        const boost = 1 + 0.25 * L;
+        const share = legendShare(shown);
+        const v = d.id === 'wither' ? `−${Math.round(Math.min(0.9, 0.5 * share * boost) * 100)}%`
+          : d.id === 'soulcaller' ? `${Math.round((0.25 + 0.75 * Math.min(1, share * boost)) * 100)}%`
+          : d.id === 'hourglass' ? `+${+(30 * share * boost).toFixed(1)}s`
+          : d.id === 'lure' ? `+${Math.round(200 * share * boost)}%`
+          : `−${Math.min(10 + L, shown)} kills, up to −${10 + L}`;
+        return `<tr${L === blv ? ' class="on"' : ''}><td>${esc(boundName(b))} ${L}</td><td>${v}</td></tr>`;
+      }).join('');
+      return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? `Spirit · level ${lv}` : 'Spirit · not summoned'}</span></div>
+        <p class="od-what">${esc(d.what)} at level ${shown}</p>
+        <table class="od-lv sp-lv">${rows}</table>`;
+    }
     if (kind === 'legend') {
       const d = LEGEND_BY_ID.get(id as LegendId)!;
       const lv = g.legendLv(d.id);
@@ -2254,11 +2383,6 @@ export class Ui {
       const i = Number(id);
       const n = g.s.marks[i];
       return `<div class="tt-h"><b>${n} Heartmark${n === 1 ? '' : 's'}</b></div><p class="tt-d">The ${esc(COMPS[i].name)} deals +${n * MARK_POWER * 100}% damage.</p>`;
-    }
-    if (kind === 'heart') {
-      const h = HEART_BY_ID.get(id)!;
-      const lv = g.heartLv(id);
-      return `<div class="tt-h">${spriteFit(h.icon, 32)}<b>${esc(h.name)}</b><span class="tt-own">${lv ? `level ${lv}` : 'heart power'}</span></div><p class="tt-d">${esc(h.desc(lv))}</p>${g.heartMaxed(id) ? '<p class="tt-f">Maxed.</p>' : `<p class="tt-f">Next level: ${G.heart(1.5)} ${fmt(g.heartCost(id))} heartstones</p>`}`;
     }
     if (kind === 'floor') {
       const mods = g.bossFloor() ? g.bossMods() : [];
@@ -2294,7 +2418,8 @@ export class Ui {
       const text: Record<string, string> = {
         trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length}. Cards ${g.cardVersions()}/${g.cardVersionsTotal()}.`,
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
-        abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${g.ascendFloor()}.`) + (g.canAwaken() ? ` Or awaken the Heart for ${fmt(g.pendingStones())} heartstones.` : ''),
+        abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${g.ascendFloor()}.`),
+        heart: g.canAwaken() ? `Awaken for ${fmt(g.pendingBound())} bound souls` : `Bound souls ${fmt(g.boundFree())}`,
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
@@ -2374,8 +2499,11 @@ export class Ui {
       const d = LEGEND_BY_ID.get(this.legendFocus)!;
       html = head(esc(d.name), `${G.soul()} ${fmt(g.soulsFree())} souls kept`) + `<div class="lcards one">${this.legendCard(d)}</div>
         <div class="legend-panel">${legendDetail(d, g.legendLv(d.id))}</div>`;
+    } else if (name === 'trips') {
+      const out = g.s.expeditions.length;
+      html = head('Expeditions', out ? `${out} out` : '') + this.tripsHtml();
     } else if (name === 'heart') {
-      html = head('The Heart', g.s.awakens ? `${G.heart()} ${fmt(g.s.stones)} heartstones · ${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}` : '') + this.tabs('heart') + this.heartHtml();
+      html = head('The Heart', g.s.awakens ? `${boundGlyph()} ${fmt(g.boundFree())} bound souls · ${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}` : '') + this.heartHtml();
     } else if (name === 'relics') {
       html = head('Relics', `${g.relicsFound()} / ${RELICS.length} found · ${g.s.equipped.length} / ${g.relicSlots()} slots`) + this.relicsHtml();
     } else if (name === 'stats' || name === 'party' || name === 'records' || name === 'ascents') {
@@ -2527,7 +2655,7 @@ export class Ui {
   private legendFocus: LegendId | null = null;
 
   /** A Spirit just summoned or levelled: jump its card into view, then let it flare. */
-  private flareLegend(id: LegendId) {
+  private flareLegend(id: string) {
     const card = this.el.modal.querySelector<HTMLElement>(`[data-card="${id}"]`);
     if (!card) return;
     const box = card.getBoundingClientRect();
@@ -2602,22 +2730,15 @@ export class Ui {
     return `<h3>Cursed descents <span class="muted">pick one, then ascend</span></h3><div class="curse-grid">${cards}</div>`;
   }
 
-  /** What awakening has brought so far (the rest are surprises). */
-  private milestonesHtml(): string {
-    const n = this.game.s.awakens;
-    const got = AWAKEN_MILESTONES.filter((m) => n >= m.at);
-    if (!got.length) return '';
-    const items = got.map((m) => `<li class="got"><span class="ms-at">${m.at}</span><b>${esc(m.name)}</b><small>${esc(m.desc)}</small></li>`).join('');
-    return `<h3>Awakening rewards</h3><ul class="milestones">${items}</ul>`;
-  }
-
   private troTabs(on: 'trophies' | 'cards') {
     const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
     return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${this.newCards ? ` <em class="tab-new">+${this.newCards}</em>` : ''}`)}</nav>`;
   }
 
   /** Trading with Dan or Victor: the spares you've put down, the card you got last, and what he just said. */
-  private trade: { side: string[]; got: { id: string; gold: boolean; lap: number; first: boolean } | null; line: string } = { side: [], got: null, line: '' };
+  private trade: { side: string[]; got: { id: string; gold: boolean; lap: number; first: boolean } | null; line: string; reveal?: boolean } = { side: [], got: null, line: '' };
+  /** A trade is playing out (your cards flying over, his card shaking and turning over). */
+  private tradeBusy = false;
 
   private openTrade(who: Trader) {
     this.trade = { side: [], got: null, line: pickLine(TRADER_LINES[who][this.tradeHand().length ? 'hello' : 'short']) };
@@ -2670,7 +2791,10 @@ export class Ui {
     const odds = this.tradeOdds(who);
     const setName = (zone: number) => ZONES[zone].name.replace(/^The /, '');
     const his = got
-      ? `<div class="tr-got">${cardFace(CARD_BY_ID.get(got.id)!, 'got', got.gold, 56, got.lap)}${got.first ? '<em class="tr-new">New</em>' : ''}</div>`
+      ? `<div class="tr-got${this.trade.reveal ? ' reveal' : ''}${got.gold ? ' gold' : ''}" style="--rc:${got.gold ? CARD_FRAME.gold : CARD_FRAME[CARD_BY_ID.get(got.id)!.kind]}">
+          ${this.trade.reveal ? '<i class="tr-rays"></i>' : ''}${got.gold ? GOLD_DAZZLE : ''}
+          <div class="tr-flip"><div class="tr-fback">${G.heart(3)}</div><div class="tr-ffront">${cardFace(CARD_BY_ID.get(got.id)!, 'got', got.gold, 56, got.lap)}</div></div>
+          ${got.first ? '<em class="tr-new">New</em>' : ''}</div>`
       : `<div class="tr-back">${G.heart(3)}</div>`;
     const from = got ? '' : who === 'victor'
       ? '<p class="tr-from">Any gold card</p>'
@@ -2704,14 +2828,46 @@ export class Ui {
     this.hooks.sound('card', { vol: 0.35, rate: 1.1 + this.trade.side.length * 0.03 });
   }
 
+  /** The trade as a little scene: your cards fly over into his face-down card, it shakes and glows, then turns over in
+   *  a burst (a gold one glittering, a new one stamped New). */
   private tradeGo(who: Trader) {
     const g = this.game;
     const got = who === 'dan' ? g.tradeWithDan(this.trade.side) : g.tradeWithVictor(this.trade.side);
     if (!got) return;
-    this.trade = { side: [], got, line: pickLine(TRADER_LINES[who][got.first ? 'new' : 'dupe']) };
     this.hooks.save();
-    this.hooks.sound(got.gold ? 'cardgold' : 'card', { vol: 0.8 });
-    if (got.first) this.hooks.sound('jackpot', { vol: 0.35 });
+    const modal = this.el.modal;
+    const back = modal.querySelector<HTMLElement>('.tr-back');
+    const cards = [...modal.querySelectorAll<HTMLElement>('.tr-slots .tr-card')];
+    const reveal = () => {
+      this.trade = { side: [], got, line: pickLine(TRADER_LINES[who][got.first ? 'new' : 'dupe']), reveal: true };
+      this.tradeBusy = false;
+      this.renderModal();
+      this.hooks.sound(got.gold ? 'cardgold' : 'card', { vol: 0.9 });
+      if (got.first) setTimeout(() => this.hooks.sound('jackpot', { vol: 0.45 }), 450);
+      const turned = modal.querySelector<HTMLElement>('.tr-got');
+      if (turned) setTimeout(() => this.flare(turned), 300);
+      // (Only this once: later redraws show it face up and still.)
+      setTimeout(() => (this.trade.reveal = false), 1500);
+    };
+    if (!back || !cards.length || matchMedia('(prefers-reduced-motion: reduce)').matches) return reveal();
+    this.tradeBusy = true;
+    modal.querySelector('.tr-table')?.classList.add('dealing');
+    const to = back.getBoundingClientRect();
+    cards.forEach((card, k) => {
+      const from = card.getBoundingClientRect();
+      card.style.setProperty('--dx', `${to.left + to.width / 2 - (from.left + from.width / 2)}px`);
+      card.style.setProperty('--dy', `${to.top + to.height / 2 - (from.top + from.height / 2)}px`);
+      card.style.setProperty('--dl', `${k * 0.07}s`);
+      card.classList.add('fly');
+      setTimeout(() => this.hooks.sound('card', { vol: 0.25, rate: 1.3 + k * 0.05 }), k * 70 + 250);
+    });
+    const flown = cards.length * 70 + 500;
+    setTimeout(() => {
+      back.classList.add('shake');
+      if (got.gold) back.classList.add('gold');
+      this.hooks.sound('chest', { vol: 0.45 });
+    }, flown);
+    setTimeout(reveal, flown + 750);
   }
 
   /** Every monster's card, zone by zone: a dark silhouette until the card turns up. A zone's row
@@ -2804,7 +2960,7 @@ export class Ui {
       mul('Trophies', p.trophies, `${g.s.trophies.length} trophies`),
       mul('Souls', p.souls, `${fmt(g.soulsFree())} kept, ${soulPct(1)} each${g.legendLv('hungry') ? ` + the Hungry Dark ${g.legendLv('hungry')}` : ''}`, 'Ascend to earn souls'),
       relicMul(relicName('shard'), p.shard, 'Legendary relic', 'A legendary relic'),
-      ...(AWAKEN_ON ? [mul('Heart of Fury', p.fury, `level ${g.heartLv('fury')}`, 'A Heart power')] : []),
+      ...(g.s.awakens ? [mul('Ogre Chieftain', p.ogre, `level ${g.boundLv('ogre')}`, 'Bound in the Heart')] : []),
     ];
 
     const dps = panel('Party damage', fmt(g.dps()), '/sec', [
@@ -2851,8 +3007,8 @@ export class Ui {
     const souls = panel('Souls', fmt(g.s.souls), '', [
       row('Unspent', fmt(g.soulsFree())),
       row('An ascent now pays', fmt(g.pendingSouls()), `${fmt(Math.floor(g.runLevels() / TUNE.levelsPerSoul))} from levels, ${fmt(g.s.bossSouls)} from champion bosses`),
-      mul('Soul gain', g.soulGainMult(), `${g.relic('souls') ? `${relicName('cage')} ` : ''}${g.heartLv('siphon') ? `Soul Siphon ${g.heartLv('siphon')}` : ''}`.trim(), 'Soul Siphon'),
-      ...(AWAKEN_ON ? [row('Heartstones', fmt(g.s.stones), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`)] : []),
+      ...(RELICS_ON ? [mul('Soul gain', g.soulGainMult(), g.relic('souls') ? relicName('cage') : '', relicName('cage'))] : []),
+      ...(g.s.awakens ? [mul('Champion souls', g.champSoulMult(g.s.maxFloor), `on floor ${g.s.maxFloor}`), row('Bound souls', fmt(g.s.boundEarned), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`)] : []),
     ]);
     return `<div class="st-grid">${dps}${click}${crit}${goldT}${boss}${souls}</div>`;
   }
@@ -2886,40 +3042,87 @@ export class Ui {
     return `<dl class="stats">${rows.map(([k, v, sub]) => `<div${sub ? ' class="sub"' : ''}><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
   }
 
-  private tabs(on: 'abyss' | 'marks' | 'heart') {
+  private tabs(on: 'abyss' | 'marks') {
     const g = this.game;
-    if (!g.marksTotal() && !AWAKEN_ON) return '';
-    const hot = g.canAwaken() ? ' hot' : '';
+    if (!g.marksTotal()) return '';
     return `<nav class="tabs">
       <button class="tab ${on === 'abyss' ? 'on' : ''}" data-open="abyss">Spirits</button>
       ${g.marksTotal() ? `<button class="tab ${on === 'marks' ? 'on' : ''}" data-open="marks">${G.heart()} Heartmarks ${g.marksTotal()}</button>` : ''}
-      ${AWAKEN_ON ? `<button class="tab ${on === 'heart' ? 'on' : ''}${hot}" data-open="heart">${G.heart()} Awaken</button>` : ''}
     </nav>`;
+  }
+
+  /** The floor picked for each companion in the Expeditions panel (until sent; otherwise its suggestion). */
+  private tripPick: Record<number, number> = {};
+
+  private tripsHtml(): string {
+    const g = this.game;
+    const rate = (r: number) => (r >= 10 ? fmt(Math.round(r)) : r.toFixed(r >= 1 ? 1 : 2));
+    const rows = COMPS.map((c, i) => {
+      const trip = g.s.expeditions.find((e) => e.comp === i);
+      if (trip) {
+        const left = TRIP_HOURS * 3600 - g.tripSeconds(trip);
+        return `<div class="trip away" data-hunter="${i}"><span class="trip-ico">${charFit(c.sprite, 34)}</span>
+          <span class="trip-mid"><b>${esc(c.name)}</b><small>Floor ${trip.floor} · ${fmt(g.tripKills(trip))} kills · ${duration(Math.max(0, left))} left</small></span>
+          <button class="btn small" data-act="tripHome">Call home</button></div>`;
+      }
+      if (g.s.owned[i] < EXPEDITION_LEVEL) return '';
+      const floor = Math.min(g.s.bestFloor, this.tripPick[i] ?? g.tripFloor(i));
+      const dps = g.compDps(i);
+      const takes = ABILITIES.filter((a) => a.comp === i && g.abilityUnlocked(a.id)).map((a) => a.name);
+      return `<div class="trip" data-hunter="${i}"><span class="trip-ico">${charFit(c.sprite, 34)}</span>
+        <span class="trip-mid"><b>${esc(c.name)} <small>Lv ${g.s.owned[i]}</small></b>
+        <small>${rate(g.tripRate(floor, dps))} kills/s · ${rate(g.tripCardsPerDay(floor, dps))} cards a day${takes.length ? ` · <span class="trip-takes">Takes ${esc(takes.join(', '))}</span>` : ''}</small></span>
+        <label class="trip-floor">Floor <input type="number" id="trip-floor-${i}" min="1" max="${g.s.bestFloor}" value="${floor}" data-trip="${i}"></label>
+        <button class="btn small primary" data-act="tripGo">Send</button></div>`;
+    }).join('');
+    return `<div class="trips">${rows || `<p class="muted">Companions at level ${EXPEDITION_LEVEL} can go</p>`}</div>`;
   }
 
   private heartHtml(): string {
     const g = this.game;
-    const pending = g.pendingStones();
-    const best = Math.max(g.s.cycleBest, g.s.maxFloor);
-    const box = g.canAwaken()
-      ? `<p>Awakening gives up your <b>souls</b> for heartstones. Trophies, cards and the companions you've met stay.</p>
-         <button class="btn primary big heart-go" data-act="awaken">Awaken for ${G.heart()} ${fmt(pending)} heartstones</button>`
-      : `<p>Reach <b>floor ${g.awakenFloor()}</b> to awaken the Heart.</p>
-         <div class="bar heart-bar"><i style="width:${Math.min(100, (best / g.awakenFloor()) * 100)}%"></i></div>
-         <p class="muted">Deepest since you last awakened: floor ${best}</p>`;
-    const nodes = HEART.map((h) => {
-      const lv = g.heartLv(h.id);
-      const maxed = g.heartMaxed(h.id);
-      const cost = maxed ? 0 : g.heartCost(h.id);
-      const afford = !maxed && g.s.stones >= cost;
-      return `<button class="aby hrt ${maxed ? 'owned' : afford ? 'can' : 'avail'}" data-heart="${h.id}" data-tip="heart:${h.id}" ${maxed ? 'disabled' : ''}>
-        <span class="aby-ico">${spriteFit(h.icon, 32)}</span><b>${esc(h.name)}${lv ? ` <i class="lv">${lv}</i>` : ''}</b><small>${maxed ? 'Maxed' : `${G.heart(1.5)} ${fmt(cost)}`}</small></button>`;
-    }).join('');
-    // Heart powers stay out of sight until the first awakening.
-    return `<div class="descend-box heart-box">${box}</div>
-      ${this.milestonesHtml()}
-      ${g.s.awakens ? `<h3>Heart powers <span class="muted">${G.heart(1.5)} ${fmt(g.s.stones)} to spend</span></h3>
-      <div class="aby-grid">${nodes}</div>` : ''}`;
+    const cycle = g.cycleSouls();
+    let bar: string;
+    if (g.canAwaken()) {
+      bar = `<button class="btn primary big" data-act="awaken">Awaken for ${boundGlyph()} ${fmt(g.pendingBound())}</button>`;
+    } else if (!g.s.awakens) {
+      const best = Math.max(g.s.cycleBest, g.s.maxFloor);
+      bar = `<p>Deepest floor <b>${best} / ${TUNE.awakenFloor}</b></p><div class="bar heart-bar"><i style="width:${Math.min(100, (best / TUNE.awakenFloor) * 100)}%"></i></div>`;
+    } else {
+      const at = g.nextBoundAt();
+      bar = `<p>Souls this cycle <b>${fmt(cycle)} / ${fmt(at)}</b></p><div class="bar heart-bar"><i style="width:${Math.min(100, (Math.log10(Math.max(1, cycle)) / Math.log10(at)) * 100)}%"></i></div>`;
+    }
+    // Before the first awakening the Bound wait as shadows, as the Spirits do before the first ascent.
+    if (!g.s.awakens) {
+      const shades = BOUND.map((b) => `<span class="bshade">${silhouette(ZONES[b.zone].boss.sprite, 56, '#0b0710')}</span>`).join('');
+      return `<div class="heart-bar-box">${bar}</div><div class="bshades">${shades}</div><p class="bshades-note">The Bound await after you awaken</p>`;
+    }
+    return `<div class="heart-bar-box">${bar}</div>
+      <div class="lc-head"><h3>The Bound</h3><small>${boundGlyph(1.2)} ${fmt(g.boundFree())} to spend</small></div>
+      <div class="lcards">${BOUND.map((b) => this.boundCard(b)).join('')}</div>`;
+  }
+
+  /** One of the Bound as a card: its figure, level, what it gives now and next, and its Level up button. */
+  private boundCard(b: BoundDef) {
+    const g = this.game;
+    const lv = g.boundLv(b.id);
+    const cost = g.boundPrice(b.id);
+    const next = g.boundMaxed(b.id)
+      ? `<span class="lc-max" data-tip="bound:${b.id}">Max level</span>`
+      : `<span>Next: ${esc(b.value(lv + 1))}</span><span class="lc-up" data-tip="bound:${b.id}" data-bound="${b.id}"><button class="btn primary" ${g.boundFree() >= cost ? '' : 'disabled'}>Level up · ${boundGlyph(1.5)} ${fmt(cost)}</button></span>`;
+    return `<div class="lcard bcard${lv ? '' : ' unbought'}" data-card="${b.id}">
+      <div class="lc-fig"><span class="bsparks">${WISPS}</span><span class="ped-fig">${bossFig(b, 80, 96)}</span><span class="ped-stone"></span></div>
+      <div class="lc-nm"><b>${esc(boundName(b))}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
+      <div class="lc-val">${lv ? esc(b.value(lv)) : '—'}</div>
+      <div class="lc-what">${this.boundWhat(b)}</div>
+      <div class="lc-next">${next}</div>
+    </div>`;
+  }
+
+  /** What a Bound boosts, the Spirit it works through underlined (hover it for what that Spirit does). */
+  private boundWhat(b: BoundDef) {
+    if (!b.spirit) return esc(b.what);
+    const name = LEGEND_BY_ID.get(b.spirit)!.name;
+    return esc(b.what).replace(esc(name), `<span class="spirit-u" data-tip="spirit:${b.spirit}">${esc(name)}</span>`);
   }
 
   private relicsHtml(): string {
@@ -3015,7 +3218,7 @@ export class Ui {
     const head = ev.gold ? (ev.newColor ? 'New gold card!' : 'Gold card!') : ev.newColor ? 'New card!' : 'Card';
     const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
-      <div class="cr-card"><div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96, ev.lap)}</div></div></div>
+      <div class="cr-card">${ev.gold ? GOLD_DAZZLE : ''}<div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96, ev.lap)}</div></div></div>
       <div class="cr-text"><small>${head}</small><b>${esc(cardName(d.name, ev.lap))} Card${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
     this.el.loot.parentElement!.appendChild(el);
     // The sound lands with the flip.
@@ -3051,30 +3254,161 @@ export class Ui {
     const g = this.game;
     this.modal = 'confirm';
     this.modalKey = 'confirm';
-    this.el.modal.className = 'modal pnl m-confirm';
-    this.el.modal.innerHTML = `<header class="m-head"><h2>Awaken?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
-      <div class="confirm heart-confirm">
-        <p>The Heart is hungry. It takes your <b>${G.soul()} ${fmt(g.s.souls)} souls</b> and all you've built down here.</p>
-        <p>You gain <b>${G.heart()} ${fmt(g.pendingStones())} heartstones</b> to spend on Heart powers, forever.</p>
-        <p class="muted">Trophies, cards, heartstones and the companions you've met all stay.</p>
-        ${COMPS.some((c) => c.heart === g.s.awakens + 1) ? `<p class="omen">Someone new will answer the Heart…</p>` : ''}
+    this.el.modal.className = 'modal pnl m-confirm m-awaken';
+    const first = !g.s.awakens;
+    const gain = g.pendingBound();
+    const away = g.s.expeditions.length;
+    const faces = BOUND.map((b) => {
+      const lv = g.boundLv(b.id);
+      return `<span class="aw-face">${first ? silhouette(ZONES[b.zone].boss.sprite, 40, '#0b0710') : bossFig(b, 40, 48)}${lv ? `<i>${lv}</i>` : ''}</span>`;
+    }).join('');
+    const row = (k: string, v: string) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+    this.el.modal.innerHTML = `<header class="m-head"><h2>Awaken the Heart</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
+      <div class="confirm aw-confirm">
+        <div class="aw-cols">
+          <section class="aw-gain"><h4>Gain</h4>
+            <div class="aw-big">${boundGlyph(3)}<b>${fmt(gain)}</b></div>
+            <small>bound souls${first ? '' : ` · ${fmt(g.s.boundEarned + gain)} in all`}</small>
+            <h5>${first ? 'The Bound wake' : 'The Bound'}</h5>
+            <div class="aw-faces${first ? ' shade' : ''}">${faces}</div>
+          </section>
+          <section class="aw-lose"><h4>Lose</h4>
+            <dl class="stats">${row(`${G.soul(1.5)} Souls`, fmt(g.s.souls))}${row('Spirits', fmt(g.legendsOwned()))}${row(`${G.heart(1.5)} Heartmarks`, fmt(g.marksTotal()))}${row('This run', `floor ${g.s.maxFloor}`)}</dl>
+          </section>
+        </div>
+        <p class="aw-kept">Kept: cards, trophies, companions${away ? ` · ${away} on ${away === 1 ? 'an expedition comes' : 'expeditions come'} home` : ''}</p>
+        ${!first && g.boundSpent() ? `<label class="set-check"><input type="checkbox" id="awaken-respec"> Respec the Bound</label>` : ''}
         <div class="set-row"><button class="btn" data-act="heartBack">Not yet</button><button class="btn primary big" data-act="awakenGo">Awaken</button></div>
       </div>`;
   }
 
   private doAwaken() {
+    const respec = !!this.el.modal.querySelector<HTMLInputElement>('#awaken-respec')?.checked;
+    this.playAwakening(respec);
+  }
+
+  /** Arriving in the Keep after an awakening: in front of the Heart, not on the stairs. */
+  private arriveAtHeart = false;
+  /** A scene is playing (the music hushes for it). */
+  cutscene = false;
+
+  /**
+   * The awakening as a scene: the room goes dark, the Heart beats faster and faster as your souls stream into it, bursts,
+   * the bound souls count up and the Bound rise round it (out of the dark, the first time). A click skips ahead; the
+   * end is the Heart's room in the Keep, with the Bound open.
+   */
+  private playAwakening(respec: boolean) {
     const g = this.game;
+    if (!g.canAwaken() || this.descending) return;
+    const first = !g.s.awakens;
+    const gain = g.pendingBound();
+    const title = first ? 'The Heart awakens' : `Awakening ${g.s.awakens + 1}`;
+    this.descending = true;
+    this.cutscene = true;
     this.modal = null;
     this.el.modalWrap.hidden = true;
-    this.hooks.sound('awaken', { vol: 0.9 });
-    g.awaken();
-    this.shown = new Decimal(0);
-    this.rowCache.fill('');
-    this.floorKey = '';
-    this.hooks.save();
-    this.hooks.sound('drop4', { vol: 0.7 });
-    // Straight to the shop for the new heartstones.
-    this.openModal('heart');
+    this.hideTip();
+    // Red sparks fill the dark: drifting up all through, bursting out from the Heart when it wakes.
+    const embers = Array.from({ length: 140 }, (_, k) =>
+      `<i style="--x:${(k * 37) % 100}%;--d:${(2.6 + ((k * 13) % 40) / 10).toFixed(1)}s;--w:${-((k * 29) % 70) / 10}s;--s:${1 + ((k * 7) % 4)};--dx:${((k * 23) % 80) - 40}px"></i>`).join('');
+    const sparks = Array.from({ length: 48 }, (_, k) => {
+      const a = (k / 48) * 360 + ((k * 31) % 17);
+      return `<i style="--a:${a}deg;--r:${30 + ((k * 41) % 45)}vmin;--t:${(0.8 + ((k * 7) % 9) / 10).toFixed(1)}s;--s:${1 + ((k * 3) % 3)}"></i>`;
+    }).join('');
+    const souls = Array.from({ length: 40 }, (_, k) => {
+      const angle = (k / 40) * 360 + ((k * 47) % 23);
+      return `<i style="--a:${angle}deg;--r:${55 + ((k * 29) % 30)}vmin;--d:${(0.9 + ((k * 37) % 230) / 100).toFixed(2)}s;--t:${(0.9 + ((k * 13) % 7) / 10).toFixed(1)}s;--s:${1 + ((k * 5) % 3)}"></i>`;
+    }).join('');
+    const ring = BOUND.map((b, k) => {
+      const angle = (k / BOUND.length) * Math.PI * 2 - Math.PI / 2;
+      const lv = g.boundLv(b.id);
+      return `<span class="awk-bound" style="--x:${(Math.cos(angle) * 34).toFixed(1)}vmin;--y:${(Math.sin(angle) * 30).toFixed(1)}vmin;--k:${k}">
+        <span class="awk-glint">${GLINT}</span><span class="awk-fig">${bossFig(b, 72, 84)}</span>
+        <b>${esc(boundName(b))}</b>${!first && lv && !respec ? `<i>${lv}</i>` : ''}</span>`;
+    }).join('');
+    const el = document.createElement('div');
+    el.className = `awk${first ? ' first' : ''}`;
+    el.innerHTML = `<div class="awk-embers">${embers}</div><div class="awk-souls">${souls}</div><div class="awk-sparks">${sparks}</div><div class="awk-ring">${ring}</div>
+      <div class="awk-heart">${G.heart(18)}<i class="awk-wave"></i></div><div class="awk-flash"></div>
+      <div class="awk-text"><b>${esc(title)}</b><span class="awk-gain">${boundGlyph(3)}<em>0</em><small>bound souls</small></span></div>
+      <span class="awk-tap">${this.touch ? 'Tap' : 'Click'} to continue</span>`;
+    this.root.appendChild(el);
+    const timers: number[] = [];
+    const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+    let awoken = false;
+    const awaken = () => {
+      if (awoken) return;
+      awoken = true;
+      g.awaken(respec);
+      this.shown = new Decimal(0);
+      this.rowCache.fill('');
+      this.floorKey = '';
+      this.hooks.save();
+    };
+    // Once the dark has closed over wherever you were, up to the Keep behind it: the dungeon stops (no fighting under
+    // the scene), and you come out in front of the Heart.
+    let moved = false;
+    const toKeep = () => {
+      if (moved) return;
+      moved = true;
+      // (Already up there: just step over to the Heart.)
+      if (g.s.inKeep) this.keepView?.arriveAtHeart();
+      else {
+        this.arriveAtHeart = true;
+        g.enterKeep();
+      }
+    };
+    at(750, toKeep);
+    // The Heart beats faster and faster as the souls pour in.
+    this.hooks.sound('descend', { vol: 0.6, rate: 0.7 });
+    [900, 1700, 2350, 2850, 3200, 3450, 3650].forEach((ms, k) => at(ms, () => {
+      el.classList.remove('thump');
+      void el.offsetWidth;
+      el.classList.add('thump');
+      this.hooks.sound('boss', { vol: 0.25 + k * 0.06, rate: 0.55 + k * 0.03 });
+    }));
+    at(3900, () => {
+      awaken();
+      el.classList.add('burst');
+      this.hooks.sound('awaken', { vol: 1 });
+      this.hooks.sound('drop4', { vol: 0.8, rate: 0.7 });
+    });
+    at(4500, () => {
+      el.classList.add('told');
+      const num = el.querySelector('.awk-gain em')!;
+      const t0 = performance.now();
+      const count = () => {
+        const p = Math.min(1, (performance.now() - t0) / 900);
+        num.textContent = fmt(Math.round(gain * (1 - (1 - p) ** 3)));
+        if (p < 1 && el.isConnected) requestAnimationFrame(count);
+      };
+      count();
+    });
+    at(5600, () => {
+      el.classList.add('rise');
+      // A chime as each one rises (the first time, as each comes into its colors).
+      BOUND.forEach((_, k) => at((first ? 1500 : 0) + k * 180, () => this.hooks.sound('card', { vol: 0.35, rate: 0.8 + k * 0.05 })));
+    });
+    at(first ? 8900 : 7400, () => el.classList.add('done'));
+    let ending = false;
+    const end = () => {
+      if (ending) return;
+      ending = true;
+      timers.forEach(clearTimeout);
+      toKeep();
+      awaken();
+      el.classList.add('out');
+      setTimeout(() => {
+        el.remove();
+        this.descending = false;
+        this.cutscene = false;
+        this.hooks.sound('drop4', { vol: 0.6 });
+        this.openModal('heart');
+      }, 700);
+    };
+    // A click before the end skips to it; once everything's shown, it carries on.
+    el.addEventListener('pointerdown', (e) => e.stopPropagation());
+    el.addEventListener('click', end);
   }
 
   /** The floor number turns into a box: type any floor you've reached and go there (going back turns Auto off). */
@@ -3215,7 +3549,7 @@ export class Ui {
     const ids = labels.map((l) => l.id).join(' ');
     if (host.dataset.ids !== ids) {
       host.dataset.ids = ids;
-      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}</b><em>Space</em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
+      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}</b><em>Space</em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
       // Clicking a label walks you over and uses it when you get there.
       host.querySelectorAll<HTMLElement>('[data-station]').forEach((b) => b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -3290,6 +3624,33 @@ export class Ui {
       this.openModal('legend');
     } else if (id === 'stairs') this.toggleKeep();
     else if (id === 'dan' || id === 'victor') this.openTrade(id);
+    else if (id === 'trips') this.openModal('trips');
+    else if (id === 'heart') this.openModal('heart');
+    else if (id.startsWith('bound:')) {
+      this.openModal('heart');
+      this.flareLegend(id.slice(6));
+    }
+  }
+
+  /** Cards from a hunt as they come in, and the hunters home but not yet shown. */
+  private tripCards: Extract<GameEvent, { t: 'card' }>[] = [];
+  private tripsBack: { comp: number; floor: number; kills: number; cards: Extract<GameEvent, { t: 'card' }>[] }[] = [];
+
+  /** Hunters home: who, from where, and what they found (collecting spins the cards, as after time away). */
+  private showTripsBack() {
+    const back = this.tripsBack.splice(0);
+    const cards = back.flatMap((b) => b.cards);
+    this.modal = 'offline';
+    this.el.modalWrap.hidden = false;
+    this.el.modal.className = 'modal pnl m-offline';
+    const who = back.map((b) => `<p>${charFit(COMPS[b.comp].sprite, 22)} <b>${esc(COMPS[b.comp].name)}</b> · floor ${b.floor} · ${fmt(b.kills)} kills</p>`).join('');
+    this.el.modal.innerHTML = `<header class="m-head"><h2>Back from ${back.length === 1 ? 'an expedition' : 'expeditions'}</h2></header>
+      <div class="offline">
+        ${who}
+        ${cards.length ? `<p>Cards <b>${fmt(cards.length)}</b></p><div class="offline-cards">${this.offlineCardsHtml(cards)}</div>` : '<p class="muted">No cards</p>'}
+        <button class="btn primary big" data-act="close">${cards.length ? 'Collect' : 'Okay'}</button>
+      </div>`;
+    this.offlineCards = this.groupCards(cards);
   }
 
   showOffline(o: OfflineSummary) {
