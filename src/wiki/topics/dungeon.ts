@@ -88,7 +88,7 @@ const bossesBody = () => `<p class="lede">Every fifth floor is a boss fight agai
   ${h3('Before floor 100')}
   <p>Once champions have started (floor ${CHAMP_FLOOR} or your first ascent), a boss on a floor you've already passed has a 1 in ${Math.round(1 / CHAMP_BOSS_CHANCE)} chance to come as a champion: ×${CHAMP_BOSS_HP} health, 50% more time and ×${CHAMP_BOSS_GOLD} gold. These drop no souls.</p>
   ${h3('Floor 100 and deeper')}
-  <p>From floor ${TUNE.goldBossFrom}, each boss is rolled once per run: ${pct(TUNE.goldBossChance, 0)} of them are champions (${link('spirit-soulcaller', 'the Soulcaller')} raises this), and floors 100, 110, 120, 130 and every 50th floor always are. They have normal health and time, and drop souls the first time you beat them each run. A champion you fail against stays a champion until you beat it.</p>
+  <p>From floor ${TUNE.goldBossFrom}, each boss is rolled once per run: ${pct(TUNE.goldBossChance, 0)} of them are champions (${link('spirit-soulcaller', 'the Soulcaller')} raises this), and floors 100, 110, 120, 130 and every 100th floor always are. A boss you haven't beaten this run becomes a champion if you raise the chance enough while you're below it. They have normal health and time, and drop souls the first time you beat them each run. A champion you fail against stays a champion until you beat it.</p>
   ${h2('Souls from champion bosses')}
   <p>The deeper the boss, the more souls: at least 1, and at least 2 on the floors that are always champions.</p>
   ${splitTables([{ h: 'Floor', cls: 'c' }, { h: 'Souls', cls: 'num' }], [

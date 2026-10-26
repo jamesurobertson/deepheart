@@ -103,6 +103,8 @@ export const EXPEDITION_LEVEL = 1000;
 export const TRIP_HOURS = 24;
 /** Bosses a hunter can kill a second on a boss floor: they come one at a time. */
 const TRIP_BOSS_RATE = 0.5;
+/** Hunters roll their kills for cards this often (ms of the expedition clock). */
+const TRIP_ROLL_EVERY = 30_000;
 
 /** Party damage is shown as numbers in batches this many seconds apart. */
 const DPS_SHOWN_EVERY = 0.35;
@@ -233,7 +235,8 @@ export interface SaveState {
   abilitiesFound: string[];
   /** Souls this run's gold bosses have paid (they come with the ascent). */
   bossSouls: number;
-  /** Boss floors reached this run from goldBossFrom on, and whether that boss is gold (false once beaten). */
+  /** Gold bosses this run from goldBossFrom on: true while waiting to be beaten, false once beaten (no entry: not gold,
+   *  or not reached). */
   goldBosses: Record<number, boolean>;
   /** Souls were recounted under the level-and-boss rules. */
   soulsV2?: boolean;
@@ -369,6 +372,9 @@ export interface Expedition {
   floor: number;
   dps: string;
   start: number;
+  /** Kills already rolled for cards, and the cards found so far (handed over when the hunter comes home). */
+  rolled?: number;
+  found?: { id: string; gold: boolean }[];
 }
 
 export function newSave(): SaveState {
@@ -565,8 +571,9 @@ function seeded(a: number, b: number) {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
-/** Floors whose boss is always gold (from goldBossFrom): the first four zone bosses, so a first ascent pays, then every 50th. */
-export const GOLD_BOSS_SURE = (f: number) => f >= TUNE.goldBossFrom && ((f <= 130 && f % 10 === 0) || f % 50 === 0);
+/** Floors whose boss is always gold (from goldBossFrom): the first four zone bosses, so a first ascent pays (as Clicker
+ *  Heroes' 100–130 primals), then every 100th. */
+export const GOLD_BOSS_SURE = (f: number) => f >= TUNE.goldBossFrom && ((f <= 130 && f % 10 === 0) || f % 100 === 0);
 
 /** Souls a gold boss on this floor pays (Clicker Heroes' primal bosses). */
 export const bossSouls = (f: number) => Math.max(GOLD_BOSS_SURE(f) ? 2 : 1, Math.floor(((f - 75) / 25) ** 1.3));
@@ -1369,15 +1376,25 @@ export class Game {
     this.events.push({ t: 'spawn', id: m.id });
   }
 
-  /** Is this floor's boss gold? From goldBossFrom it's rolled the first time you reach the floor in a run (and kept
-   *  until beaten); before that, now and then on a boss floor you've beaten before, so it never stands in new ground's
-   *  way. */
+  /** Is this floor's boss gold? From goldBossFrom, each boss floor has a number of its own for the run (from the run's
+   *  seed, so a reload can't fish for one) and is gold while that number is under the champion chance: asked every time
+   *  the boss comes, so a Soulcaller level bought below a boss can make it gold. Once gold it stays gold until beaten
+   *  (a respec can't take it away), and once beaten it pays no more this run. Before goldBossFrom, now and then on a
+   *  boss floor you've beaten before, so it never stands in new ground's way. */
   private goldBoss(floor: number) {
     if (!this.championsOn()) return false;
     if (floor < TUNE.goldBossFrom) return floor < this.s.bestFloor && Math.random() < (this.debugCards ? 0.34 : CHAMP_BOSS_CHANCE);
-    const rolls = this.s.goldBosses;
-    rolls[floor] ??= GOLD_BOSS_SURE(floor) || seeded(this.s.runSeed, floor) < this.goldBossChance();
-    return rolls[floor];
+    // (true: gold and waiting to be beaten; false: beaten this run.)
+    const known = this.s.goldBosses[floor];
+    if (known !== undefined) return known;
+    if (!GOLD_BOSS_SURE(floor) && seeded(this.s.runSeed, floor) >= this.goldBossChance()) return false;
+    this.s.goldBosses[floor] = true;
+    return true;
+  }
+
+  /** Souls a champion boss on this floor pays: its own, times the Pit Lord and the pull of every bound soul. */
+  champSouls(floor: number) {
+    return Math.floor(bossSouls(floor) * this.champSoulMult(floor));
   }
 
   goldBossChance() {
@@ -1482,7 +1499,7 @@ export class Game {
       this.unlockNext();
       let souls: number | undefined;
       if (m.champ && this.s.floor >= TUNE.goldBossFrom && this.s.goldBosses[this.s.floor]) {
-        souls = Math.floor(bossSouls(this.s.floor) * this.champSoulMult(this.s.floor));
+        souls = this.champSouls(this.s.floor);
         this.s.soulBossDone = true;
         this.s.bossSouls += souls;
         this.s.goldBosses[this.s.floor] = false;
@@ -2409,9 +2426,10 @@ export class Game {
     const k = this.s.expeditions.findIndex((e) => e.comp === i);
     if (k < 0) return false;
     const [e] = this.s.expeditions.splice(k, 1);
+    this.hunt(e);
     const kills = this.tripKills(e);
     const before = this.events.length;
-    this.huntFinds(kills, e.floor, new Decimal(e.dps));
+    for (const f of e.found ?? []) this.giveCard(f.id, f.gold, 'trip', e.floor);
     const cards = this.events.slice(before).filter((ev): ev is Extract<GameEvent, { t: 'card' }> => ev.t === 'card');
     this.invalidate();
     this.events.push({ t: 'expedition', comp: i, floor: e.floor, kills, cards: cards.length, gold: cards.filter((c) => c.gold).length });
@@ -2424,16 +2442,33 @@ export class Game {
     for (const e of [...this.s.expeditions]) this.callHome(e.comp);
   }
 
-  /** Hunters out their whole time come home on their own. */
+  /** Roll a hunter's kills since it last rolled: what it finds is kept with the trip (saved, so a reload can't redraw
+   *  it) until it comes home. */
+  private hunt(e: Expedition) {
+    const kills = this.tripKills(e);
+    const fresh = kills - (e.rolled ?? 0);
+    if (fresh <= 0) return;
+    e.rolled = kills;
+    const found = (e.found ??= []);
+    this.huntFinds(fresh, e.floor, new Decimal(e.dps), (id, gold) => found.push({ id, gold }));
+  }
+
+  /** Hunters roll what they've found every so often, and come home on their own once their time is up. */
   private tickTrips() {
     if (!this.s.expeditions.length) return;
     const now = this.now();
-    for (const e of [...this.s.expeditions]) if (now - e.start >= TRIP_HOURS * 3600e3) this.callHome(e.comp);
+    if (now - this.huntedAt < TRIP_ROLL_EVERY) return;
+    this.huntedAt = now;
+    for (const e of [...this.s.expeditions]) {
+      if (now - e.start >= TRIP_HOURS * 3600e3) this.callHome(e.comp);
+      else this.hunt(e);
+    }
   }
+  private huntedAt = 0;
 
   /** A hunt's kills, in bulk: the floor's mix of monsters (or its boss), CHAMP_CHANCE of them champions rolling gold,
    *  every card drawn at once at the dungeon's odds, the Collector and the Ronin included. */
-  private huntFinds(kills: number, floor: number, dps: Decimal) {
+  private huntFinds(kills: number, floor: number, dps: Decimal, find: (id: string, gold: boolean) => void) {
     if (kills <= 0) return;
     const lap = Math.min(lapOf(floor), CORRUPTION.length - 1);
     const luck = this.tripLuck(floor, dps);
@@ -2441,8 +2476,8 @@ export class Game {
       this.s.slain[id] = (this.s.slain[id] ?? 0) + n;
       if (lap) (this.s.slainLaps[id] ??= CORRUPTION.map(() => 0))[lap] += n;
       if (champs) (this.s.champSlain[id] ??= CORRUPTION.map(() => 0))[lap] += champs;
-      for (let c = poisson((n * luck) / odds); c > 0; c--) this.giveCard(id, false, 'trip', floor);
-      for (let c = poisson((champs * luck) / goldOdds); c > 0; c--) this.giveCard(id, true, 'trip', floor);
+      for (let c = poisson((n * luck) / odds); c > 0; c--) find(id, false);
+      for (let c = poisson((champs * luck) / goldOdds); c > 0; c--) find(id, true);
     };
     if (isBossFloor(floor)) {
       const champs = this.championsOn() && floor >= TUNE.goldBossFrom ? Math.round(kills * this.goldBossChance()) : 0;

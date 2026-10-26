@@ -1419,8 +1419,20 @@ body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .a
 .keep-label.soul b { color: #e2d2ff; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--soul), 0 0 14px rgba(179, 140, 255, 0.5); }
 .keep-label.soul i { color: #e2d2ff; }
 /* Standing at it: the label lights up with the key that uses it. */
-.keep-label em { display: none; font: 400 11px/1 'Silkscreen'; font-style: normal; text-transform: uppercase; letter-spacing: 1px; padding: 3px 6px 4px; color: var(--ink); background: var(--gold-hi); box-shadow: 0 0 0 2px var(--ink), 0 2px 0 2px #855415; }
-.keep-label.near.keyed em { display: block; animation: hintbob 0.9s ease-in-out infinite; }
+/* The key prompt: a keycap and what it does ("E Trade"), popping in under the label of the thing you're at. */
+.keep-label em.kp { display: none; align-items: center; gap: 6px; padding: 3px 8px 3px 3px; font-style: normal; background: rgba(20, 12, 14, 0.88); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #5a4030; }
+.keep-label.near em.kp { display: flex; margin-top: 6px; animation: kp-in 0.22s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+/* The prompt shows how you're getting about: the E key after walking with the keys, the mouse button after clicking. */
+.kp kbd, .keep-label.keyed .k-mouse { display: none; }
+.keep-label.keyed .kp kbd { display: grid; }
+.k-mouse { display: block; }
+@media (hover: none) { .k-mouse { display: none !important; } .keep-label em.kp { padding-left: 8px; } }
+.kp kbd { place-items: center; width: 20px; height: 20px; font: 400 12px/1 'Silkscreen', monospace; color: var(--ink); background: linear-gradient(#fff4d6, #e9d6aa); box-shadow: 0 0 0 2px var(--ink), 0 3px 0 2px #8a6a3a; translate: 0 -2px; }
+.keep-label.near.keyed .kp kbd { animation: kp-press 1.6s ease-in-out 0.4s infinite; }
+.kp span { font: 400 18px/1 'Jersey 10'; color: #fff; letter-spacing: 0.5px; }
+@keyframes kp-in { from { opacity: 0; transform: translateY(-6px) scale(0.8); } }
+@keyframes kp-press { 0%, 80%, 100% { translate: 0 -2px; box-shadow: 0 0 0 2px var(--ink), 0 3px 0 2px #8a6a3a; } 88% { translate: 0 1px; box-shadow: 0 0 0 2px var(--ink), 0 0 0 2px #8a6a3a; } }
+@media (prefers-reduced-motion: reduce) { .keep-label.near em.kp, .keep-label.near.keyed .kp kbd { animation: none; } }
 .keep-label.near.keyed i { display: none; }
 /* Under a Legend's feet, pointing up at it (the arrow stays when the key shows, so the label doesn't jump). */
 .keep-label.below { translate: -50% 0; }
@@ -1504,7 +1516,6 @@ body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .a
   .trip-floor { grid-column: 2; }
 }
 .gen.away { opacity: 0.55; }
-.gen.away .gen-dps { color: var(--gold-hi); }
 
 .od-now.bnd { color: var(--ess-hi); }
 .spirit-u { color: #e2d2ff; text-decoration: underline dotted var(--soul); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: help; }
@@ -1636,3 +1647,22 @@ body.compact .awk-fig { height: 56px; }
 .tr-got .cr-dazzle { inset: -24px -30px; animation-delay: 0.5s; }
 @media (prefers-reduced-motion: reduce) { .tr-card.fly, .tr-back.shake, .tr-got.reveal .tr-flip, .tr-rays, .tr-got.reveal .tr-new { animation: none !important; } }
 .tr-got.gold .mcard { background: linear-gradient(135deg, #fff4b0 0%, #ffd23a 22%, #c98e16 46%, #ffe372 68%, #b47a10 100%); }
+
+/* Pointing at something in the Keep from afar: its prompt shows with the mouse (a click walks there and uses it); the
+   E key only once you're close enough for it to work. */
+.keep-label.hover em.kp { display: flex; margin-top: 6px; animation: kp-in 0.22s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.keep-label.hover:not(.near) .kp kbd { display: none; }
+.keep-label.hover:not(.near) .k-mouse { display: block; }
+.blade-act { position: absolute; left: 14px; top: -26px; display: none; filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.6)); animation: kp-in 0.18s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.blade-act svg { display: block; }
+body.over-act .blade-act { display: block; }
+
+/* A companion away hunting: its row just says so; hovering it shows the trip. */
+.gen .trip-tag { color: var(--gold-hi); }
+.tt-trip { display: grid; gap: 4px; margin: 6px 0 0; min-width: 200px; }
+.tt-trip div { display: flex; align-items: baseline; }
+.tt-trip dt { flex: 1; display: flex; align-items: baseline; color: var(--dim); }
+.tt-trip dt::after { content: ''; flex: 1; min-width: 12px; height: 2px; margin: 0 8px; background: linear-gradient(to right, var(--faint) 2px, transparent 2px) 0 0 / 6px 2px repeat-x; }
+.tt-trip dd { margin: 0; color: var(--text); }
+/* Counting numbers keep their width, so nothing beside them jumps. */
+.tip, .trip-mid, .tt-trip dd { font-variant-numeric: tabular-nums; }

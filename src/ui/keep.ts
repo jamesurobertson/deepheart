@@ -41,7 +41,11 @@ const THINGS: Thing[] = [
 const LADDER: [number, number] = [20, 28];
 /** The Heart stands on its plinth here; the Bound around the room once you've awakened. */
 const HEART: [number, number] = [7, 4];
-const BOUND_AT: [number, number][] = [[2, 7], [4, 7], [10, 7], [12, 7], [2, 10], [4, 10], [10, 10], [12, 10]];
+/** Where each Bound stands: the four that make a Spirit's effect stronger on the Heart's right, the rest on its left. */
+const BOUND_AT: Record<BoundId, [number, number]> = {
+  ogre: [2, 7], lich: [4, 7], pitlord: [2, 10], frost: [4, 10],
+  troll: [10, 7], golem: [12, 7], thing: [10, 10], ent: [12, 10],
+};
 const PEOPLE: { id: 'dan' | 'victor'; sprite: string; x: number; y: number }[] = [{ id: 'dan', sprite: 'ef_elf_m', x: 3, y: 18 }, { id: 'victor', sprite: 'victor', x: 7, y: 18 }];
 /** What each station is, where it's used from (cells you stand on), where its label floats, and (spirits, which you
  *  can walk through) the cells of its body that a click picks it by. */
@@ -49,7 +53,8 @@ type Station = { id: KeepStation; label: string; cells: [number, number][]; tag:
 const STATIONS: Station[] = [
   { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 19.55], body: [[3, 18], [3, 17]] },
   { id: 'victor', label: 'Victor', cells: [[6, 18], [7, 19], [8, 18], [7, 17]], tag: [7, 19.55], body: [[7, 18], [7, 17]] },
-  { id: 'stairs', label: 'Way down', cells: [[22, 30], [23, 30], [24, 30]], tag: [23, 31.6] },
+  // The way down works from anywhere round the stairs, not just on them.
+  { id: 'stairs', label: 'Way down', cells: [21, 22, 23, 24, 25].flatMap((x) => [29, 30, 31].map((y): [number, number] => [x, y])), tag: [23, 31.6] },
   { id: 'heart', label: 'The Heart', cells: [[6, 5], [7, 5], [8, 5], [6, 4], [8, 4]], tag: [7, 6.1], body: [[7, 4], [7, 3]] },
 ];
 const TRIPS: Station = { id: 'trips', label: 'Expeditions', cells: [[20, 28], [19, 28], [21, 28], [20, 29], [19, 29], [21, 29]], tag: [20, 29.55] };
@@ -132,6 +137,8 @@ export class KeepView {
   pinned: KeepStation | null = null;
   /** The station under the pointer, and the one you clicked and are walking to (used when you get there). */
   hover: KeepStation | null = null;
+  /** The pointer is over a station's label (it counts as pointing at the station). */
+  labelHover: KeepStation | null = null;
   private goal: KeepStation | null = null;
   /** A held click: where the pointer is on screen (the camera moves under it), where it went down, when, and whether
    *  the hero has started following it. */
@@ -188,7 +195,7 @@ export class KeepView {
 
   /** The Bound and where each stands, once you've awakened. */
   private bound() {
-    return this.game.s.awakens ? BOUND.map((b, k) => ({ b, at: BOUND_AT[k] })) : [];
+    return this.game.s.awakens ? BOUND.map((b) => ({ b, at: BOUND_AT[b.id] })) : [];
   }
 
   /** The Spirits you've summoned and where each stands (you can walk through them). */
@@ -238,7 +245,7 @@ export class KeepView {
 
   private onHover = (e: PointerEvent) => {
     const [tx, ty] = this.cellAt(e);
-    this.hover = this.stationAt(tx, ty);
+    this.hover = this.stationAt(tx, ty) ?? this.labelHover;
     if (!this.held) return;
     this.held.x = e.clientX;
     this.held.y = e.clientY;
@@ -387,10 +394,20 @@ export class KeepView {
     return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
   }
 
+  /** What using a station does, for its key prompt. */
+  private verb(id: KeepStation) {
+    if (id === 'stairs') return 'Go down';
+    if (id === 'dan' || id === 'victor') return 'Trade';
+    if (id === 'trips') return 'Send';
+    if (id === 'heart') return this.game.canAwaken() ? 'Awaken' : 'Open';
+    if (id.startsWith('offer:')) return 'Summon';
+    return 'Open';
+  }
+
   /** Where each station's label goes on screen. */
   /** A Spirit's name hangs just below its feet. Your own Spirits and the traders only show theirs when you're at them or
    *  pointing at them. */
-  labels(): { id: KeepStation; label: string; x: number; y: number; below: boolean; shown: boolean }[] {
+  labels(): { id: KeepStation; label: string; verb: string; x: number; y: number; below: boolean; shown: boolean }[] {
     const r = this.canvas.getBoundingClientRect();
     const s = 16 * this.zoom;
     return this.stations().map((st) => {
@@ -399,7 +416,7 @@ export class KeepView {
       const [tx, ty] = below ? [st.tag[0], st.tag[1] - 0.45] : st.tag;
       // Only the stairs and the spirits on offer always show their names; the rest when you point at them or stand there.
       const shown = st.id === 'stairs' || st.id.startsWith('offer:') || (st.id === 'heart' && this.game.canAwaken()) || this.near === st.id || this.hover === st.id;
-      return { id: st.id, label: st.label, x: r.left + r.width / 2 + (tx + 0.5 - this.cam.x) * s, y: r.top + r.height / 2 + (ty - this.cam.y) * s, below, shown };
+      return { id: st.id, label: st.label, verb: this.verb(st.id), x: r.left + r.width / 2 + (tx + 0.5 - this.cam.x) * s, y: r.top + r.height / 2 + (ty - this.cam.y) * s, below, shown };
     });
   }
 
@@ -421,6 +438,27 @@ export class KeepView {
     t.globalCompositeOperation = 'destination-in';
     t.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
     this.tints.set(key, c);
+    return c;
+  }
+
+  /** A sprite frame as a flat shape in one color (for the hover outline), drawn once and kept. */
+  private flats = new WeakMap<object, Map<string, HTMLCanvasElement>>();
+  private flat(img: CanvasImageSource, r: Rect, color: string) {
+    // (Kept per image: a tinted Bound is its own little canvas, its frame always at 0,0.)
+    let byFrame = this.flats.get(img);
+    if (!byFrame) this.flats.set(img, (byFrame = new Map()));
+    const key = `${r.x},${r.y},${r.w},${r.h},${color}`;
+    let c = byFrame.get(key);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = r.w;
+    c.height = r.h;
+    const t = c.getContext('2d')!;
+    t.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    t.globalCompositeOperation = 'source-in';
+    t.fillStyle = color;
+    t.fillRect(0, 0, r.w, r.h);
+    byFrame.set(key, c);
     return c;
   }
 
@@ -470,6 +508,15 @@ export class KeepView {
         g.drawImage(src, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
         g.restore();
       } else g.drawImage(src, r.x, r.y, r.w, r.h, px, py, r.w, r.h);
+    };
+    // The one thing under the pointer gets a one-pixel outline, so you can see what a click will use.
+    const standLit = (id: KeepStation, src: CanvasImageSource, r: Rect, x: number, feet: number, left = false) => {
+      if (this.hover === id && !this.held) {
+        const shape = this.flat(src, r, '#fff4d6');
+        const box = { x: 0, y: 0, w: r.w, h: r.h } as Rect;
+        for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) stand(shape, box, x + dx / 16, feet + dy / 16, left);
+      }
+      stand(src, r, x, feet, left);
     };
     const tick = Math.floor(this.time * 6);
     const worn = (x: number, y: number) => {
@@ -543,7 +590,7 @@ export class KeepView {
       const r = src.frames[(tick + k) % src.frames.length];
       standing.push({ y: at[1] + 1, draw: () => {
         shadow(at[0] + 0.5, at[1] + 1, 6);
-        stand(src.img, r, at[0] + 0.5, at[1] + 1, at[0] > 23);
+        standLit(`legend:${d.id}`, src.img, r, at[0] + 0.5, at[1] + 1, at[0] > 23);
         // Soul sparkles drifting up around them and in front of them.
         for (let w = 0; w < 7; w++) {
           const t = (this.time * 0.35 + w / 7 + k * 0.17) % 1;
@@ -639,8 +686,8 @@ export class KeepView {
       standing.push({ y: at[1] + 1, draw: () => {
         shadow(at[0] + 0.5, at[1] + 1, 7);
         const tinted = boss.tint !== undefined ? this.tinted(src.img, r, boss.tint) : null;
-        if (tinted) stand(tinted, { x: 0, y: 0, w: r.w, h: r.h } as Rect, at[0] + 0.5, at[1] + 1, at[0] > HEART[0]);
-        else stand(src.img, r, at[0] + 0.5, at[1] + 1, at[0] > HEART[0]);
+        if (tinted) standLit(`bound:${b.id}`, tinted, { x: 0, y: 0, w: r.w, h: r.h } as Rect, at[0] + 0.5, at[1] + 1, at[0] > HEART[0]);
+        else standLit(`bound:${b.id}`, src.img, r, at[0] + 0.5, at[1] + 1, at[0] > HEART[0]);
         for (let w = 0; w < 6; w++) {
           const t = (this.time * 0.3 + w / 6 + k * 0.21) % 1;
           g.fillStyle = w % 3 === 0 ? '#ffb3c4' : '#ff5a7e';
@@ -654,7 +701,7 @@ export class KeepView {
       const src = spriteFrames(p.sprite);
       if (!src) continue;
       const r = src.frames[tick % src.frames.length];
-      standing.push({ y: p.y + 1, draw: () => (shadow(p.x + 0.5, p.y + 1, 6), stand(src.img, r, p.x + 0.5, p.y + 1, true)) });
+      standing.push({ y: p.y + 1, draw: () => (shadow(p.x + 0.5, p.y + 1, 6), standLit(p.id, src.img, r, p.x + 0.5, p.y + 1, true)) });
     }
     // Your party: each has a place along your trail (the hero at its head) and runs there along the trail itself, so
     // a new hero runs up the line to the front and the old one drops back into it, never through a wall.

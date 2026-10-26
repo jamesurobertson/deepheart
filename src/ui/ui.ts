@@ -2,7 +2,7 @@ import { morph } from './morph.ts';
 import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { AWAKEN_ON, CURSES_ON, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TRIP_HOURS, TUNE, bossSouls, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { AWAKEN_ON, CURSES_ON, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
@@ -106,6 +106,16 @@ function legendDetail(d: LegendDef, lv: number): string {
 const WISPS = Array.from({ length: 7 }, (_, k) =>
   `<i style="--x:${10 + ((k * 37) % 80)}%;--d:${(2.4 + ((k * 13) % 22) / 10).toFixed(1)}s;--w:${-((k * 29) % 40) / 10}s;--s:${(0.6 + ((k * 7) % 8) / 10).toFixed(1)}"></i>`).join('');
 
+/** One of the Bound in full: what it boosts now, and the next four levels with their price and what each gives. */
+function boundDetail(b: BoundDef, lv: number): string {
+  const rows = Array.from({ length: 4 }, (_, k) => lv + 1 + k)
+    .filter((n) => b.max === undefined || n <= b.max)
+    .map((n) => `<tr><td>Level ${n}</td><td>${boundGlyph(1.2)} ${fmt(boundCost(b, n - 1))}</td><td>${esc(b.value(n))}</td></tr>`).join('');
+  return `<p class="od-what">${esc(b.what)}: <b class="od-now bnd">${lv ? esc(b.value(lv)) : '—'}</b></p>
+    ${rows ? `<table class="od-lv">${rows}</table>` : ''}
+    ${b.max !== undefined ? `<p class="od-max">Max level ${b.max}</p>` : ''}`;
+}
+
 /** A gold card's dazzle, as champions shed it in the dungeon: a breathing aura, pixel stars twinkling round the card
  *  and motes rising off it, placed by index so every gold card glitters the same way. */
 const STAR = '<svg viewBox="0 0 7 7" shape-rendering="crispEdges"><path fill="currentColor" d="M3 0h1v2H3zM2 2h3v1H2zM0 3h7v1H0zM2 4h3v1H2zM3 5h1v2H3z"/></svg>';
@@ -122,6 +132,12 @@ const GOLD_DAZZLE = `<span class="cr-dazzle"><i class="cr-aura"></i>${Array.from
 const GLINT = `${Array.from({ length: 9 }, (_, k) =>
   `<i class="g-mote" style="--x:${10 + ((k * 37) % 80)}%;--d:${(1.2 + ((k * 13) % 10) / 10).toFixed(1)}s;--w:${-((k * 29) % 20) / 10}s;--s:${1 + (k % 2)}"></i>`).join('')}${Array.from({ length: 3 }, (_, k) =>
   `<i class="g-star" style="--x:${[18, 78, 50][k]}%;--y:${[30, 45, 8][k]}%;--d:${(1.1 + k * 0.4).toFixed(1)}s;--w:${(k * 0.5).toFixed(1)}s">${STAR}</i>`).join('')}`;
+
+/** The cursor's badge over something you can use: a little speech bubble. */
+const ACT_GLYPH = '<svg viewBox="0 0 9 8" width="27" height="24" shape-rendering="crispEdges" aria-hidden="true"><path fill="#140a12" d="M1 0h7v1H1zM0 1h1v4H0zM8 1h1v4H8zM1 5h2v1H1zM5 5h3v1H5zM2 6h1v2H2zM3 6h2v1H3z"/><path fill="#fff4d6" d="M1 1h7v4H1zM3 5h2v1H3z"/><path fill="#140a12" d="M2 3h1v1H2zM4 3h1v1H4zM6 3h1v1H6z"/></svg>';
+
+/** A mouse with its left button lit: the Keep's use prompt for someone walking with the mouse. */
+const MOUSE_GLYPH = '<svg class="k-mouse" viewBox="0 0 9 12" width="18" height="24" shape-rendering="crispEdges" aria-hidden="true"><path fill="#140a12" d="M2 0h5v1H2zM1 1h1v1H1zM7 1h1v1H7zM0 2h1v8H0zM8 2h1v8H8zM1 10h1v1H1zM7 10h1v1H7zM2 11h5v1H2zM4 1h1v4H4zM1 5h7v1H1z"/><path fill="#ffe08a" d="M2 1h2v1H2zM1 2h3v3H1z"/><path fill="#e9d6aa" d="M5 1h2v1H5zM5 2h3v3H5zM1 6h7v4H1zM2 10h5v1H2z"/></svg>';
 
 /** What this many kept souls add to all damage, as a percentage ("+300%"). */
 const soulPct = (n: number) => `+${fmt(n * TUNE.soulPower * 100)}%`;
@@ -355,7 +371,7 @@ export class Ui {
       <div class="tip pnl" hidden></div>
       <div class="modal-wrap" hidden><div class="modal pnl"></div></div>
       <div class="curtain" hidden><b></b><span></span></div>
-      <div class="blade" hidden><div class="blade-in"></div></div>
+      <div class="blade" hidden><div class="blade-in"></div><i class="blade-act">${ACT_GLYPH}</i></div>
     `;
     const q = (sel: string) => root.querySelector(sel) as HTMLElement;
     this.floorMaps = [...root.querySelectorAll<HTMLElement>('.floor-map')];
@@ -1136,10 +1152,10 @@ export class Ui {
           const boss = g.monsters.find((m) => m.boss);
           const mods = g.bossMods(ev.floor).map((id) => MOD_BY_ID.get(id)!.name);
           const time = `Kill it in ${Math.round(g.bossTimeMax)} seconds`;
-          const souls = boss?.champ && ev.floor >= TUNE.goldBossFrom ? ` · ${bossSouls(ev.floor)} souls` : '';
+          const souls = boss?.champ && ev.floor >= TUNE.goldBossFrom ? ` · ${g.champSouls(ev.floor)} souls` : '';
           this.banner(`${souls ? 'Champion boss' : 'Boss'}: ${boss?.def.name ?? 'Guardian'}`, (mods.length ? `${mods.join(' · ')} — ${time.toLowerCase()}` : time) + souls, 'boss');
         } else if (ev.boss && ev.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.boss && m.champ)) {
-          this.banner('Champion boss!', `Beat it for ${bossSouls(ev.floor)} soul${bossSouls(ev.floor) === 1 ? '' : 's'}`, 'boss');
+          this.banner('Champion boss!', `Beat it for ${g.champSouls(ev.floor)} soul${g.champSouls(ev.floor) === 1 ? '' : 's'}`, 'boss');
         }
         break;
       case 'bossWin':
@@ -1154,7 +1170,7 @@ export class Ui {
           this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold${ev.souls ? ` · +${ev.souls} souls` : ''}`, 'clutch');
         }
         else if (ev.first) this.banner('Victory!', `Floor ${ev.floor} conquered${ev.souls ? ` · +${ev.souls} soul${ev.souls === 1 ? '' : 's'}` : ''}`, 'win');
-        else if (ev.souls) this.banner('Champion boss down!', `+${ev.souls} soul${ev.souls === 1 ? '' : 's'} for your next ascent`, 'win');
+        else if (ev.souls) this.banner('Champion boss down!', `+${ev.souls} soul${ev.souls === 1 ? '' : 's'}`, 'win');
         break;
       case 'bossFail':
         // The first wall: this is where the game teaches you to descend.
@@ -1532,7 +1548,7 @@ export class Ui {
       if (!bar) {
         bar = document.createElement('div');
         bar.className = `hp ${m.boss ? 'boss' : ''}`;
-        const souls = m.boss && m.champ && g.s.floor >= TUNE.goldBossFrom && g.s.goldBosses[g.s.floor] ? bossSouls(g.s.floor) : 0;
+        const souls = m.boss && m.champ && g.s.floor >= TUNE.goldBossFrom && g.s.goldBosses[g.s.floor] ? g.champSouls(g.s.floor) : 0;
         const chips = (souls ? `<em class="mod soul-chip" style="--mc:var(--soul)">${G.soul(1)} ${souls} soul${souls === 1 ? '' : 's'}</em>` : '') + modChips(m.mods);
         bar.innerHTML = `<i></i>${chips ? `<span class="hp-mods">${chips}</span>` : ''}`;
         this.el.bars.appendChild(bar);
@@ -1805,15 +1821,14 @@ export class Ui {
       const lv = g.s.owned[i];
       const traits = lv > 0 && !locked && !mystery ? this.traitStates(i, offer) : [];
       const marks = g.s.marks[i];
-      const left = trip ? Math.ceil((TRIP_HOURS * 3600 - g.tripSeconds(trip)) / 60) : 0;
-      const key = [mystery, locked, q.n, q.cost.toString(), lv, can, marks, g.s.settings.notation, Math.round(g.compDps(i).plus(1).log10() * 20), traits.join(''), trip?.floor, left].join('|');
+      const key = [mystery, locked, q.n, q.cost.toString(), lv, can, marks, g.s.settings.notation, Math.round(g.compDps(i).plus(1).log10() * 20), traits.join(''), !!trip].join('|');
       if (key === this.rowCache[i]) return;
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
       row.querySelector('.gen-name')!.innerHTML = `${name}${marks && !locked && !mystery ? ` <span class="marks" data-tip="mark:${i}">${G.heart(1.5)}${marks}</span>` : ''}${q.n > 1 && !locked && !mystery ? ` <small>×${q.n}</small>` : ''}`;
-      row.querySelector('.gen-cost')!.innerHTML = trip ? `<span class="need">Floor ${trip.floor} · ${duration(left * 60)}</span>` : locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.bestFloor)}</span>` : gold(q.cost, can ? 'ok' : 'no');
+      row.querySelector('.gen-cost')!.innerHTML = trip ? '<span class="need trip-tag">Expedition</span>' : locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.bestFloor)}</span>` : gold(q.cost, can ? 'ok' : 'no');
       row.querySelector('.gen-lv')!.textContent = lv ? `Lv ${lv}` : '';
-      row.querySelector('.gen-dps')!.textContent = trip ? 'Away' : lv ? `${fmt(g.compDps(i))} dps` : '';
+      row.querySelector('.gen-dps')!.textContent = trip ? '' : lv ? `${fmt(g.compDps(i))} dps` : '';
       // Owned traits and the next one only: the rest show up as you buy your way along. Past the last trait, the next
       // automatic level bonus.
       const shown = traits.findIndex((st) => st !== 'got');
@@ -2167,7 +2182,7 @@ export class Ui {
     const g = this.game;
     const champ = g.monsters.find((m) => m.champ && m.boss) ?? g.monsters.find((m) => m.champ);
     if (champ?.boss && g.s.floor >= TUNE.goldBossFrom) {
-      const n = bossSouls(g.s.floor);
+      const n = g.champSouls(g.s.floor);
       return `<b>A champion boss!<small>Beat it for ${n} soul${n === 1 ? '' : 's'}. It might drop a gold card.</small></b>`;
     }
     return champ?.boss ? '<b>A champion boss!<small>Tougher, and it might drop a gold card</small></b>' : '<b>A champion!<small>Tougher and drops gold cards!</small></b>';
@@ -2232,6 +2247,14 @@ export class Ui {
       if (fullGameOnly(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">${COMPS.length - DEMO_COMPANIONS} more companions join you in the full game.</p>`;
       if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. ${meetText(def, g.s.bestFloor)}.</p>`;
       if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">A new companion is on their way. Earn more gold to meet them.</p>`;
+      // Away hunting: the trip, not the hire.
+      const trip = g.s.expeditions.find((e) => e.comp === i);
+      if (trip) {
+        return `<div class="tt-h">${charFit(def.sprite, 30)}<b>${def.name}</b><span class="tt-own">expedition</span></div>
+          <dl class="tt-trip"><div><dt>Floor</dt><dd>${trip.floor}</dd></div><div><dt>Kills</dt><dd>${fmt(g.tripKills(trip))}</dd></div>
+          <div><dt>Cards found</dt><dd>${fmt(trip.found?.length ?? 0)}</dd></div>
+          <div><dt>Back in</dt><dd>${duration(Math.max(0, TRIP_HOURS * 3600 - g.tripSeconds(trip)))}</dd></div></dl>`;
+      }
       const q = g.compQuote(i);
       const next = g.compNext(i).times(q.n);
       const share = g.baseDps().gt(0) ? g.compDps(i).div(g.baseDps()).toNumber() : 0;
@@ -2344,14 +2367,7 @@ export class Ui {
     if (kind === 'bound') {
       const b = BOUND.find((x) => x.id === id)!;
       const lv = g.boundLv(b.id);
-      // The next four levels: each one's price and what it gives, as the Spirits' tooltip shows.
-      const rows = Array.from({ length: 4 }, (_, k) => lv + 1 + k)
-        .filter((n) => b.max === undefined || n <= b.max)
-        .map((n) => `<tr><td>Level ${n}</td><td>${boundGlyph(1.2)} ${fmt(boundCost(b, n - 1))}</td><td>${esc(b.value(n))}</td></tr>`).join('');
-      return `<div class="tt-h">${bossFig(b, 30, 36)}<b>${esc(boundName(b))}</b><span class="tt-own">${lv ? `level ${lv}` : 'Bound'}</span></div>
-        <p class="od-what">${esc(b.what)}: <b class="od-now bnd">${lv ? esc(b.value(lv)) : '—'}</b></p>
-        ${rows ? `<table class="od-lv">${rows}</table>` : ''}
-        ${b.max !== undefined ? `<p class="od-max">Max level ${b.max}</p>` : ''}`;
+      return `<div class="tt-h">${bossFig(b, 30, 36)}<b>${esc(boundName(b))}</b><span class="tt-own">${lv ? `level ${lv}` : 'Bound'}</span></div>${boundDetail(b, lv)}`;
     }
     if (kind === 'spirit') {
       const d = LEGEND_BY_ID.get(id as LegendId)!;
@@ -2386,7 +2402,7 @@ export class Ui {
     }
     if (kind === 'floor') {
       const mods = g.bossFloor() ? g.bossMods() : [];
-      const champ = g.bossFloor() && g.s.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.boss && m.champ) ? bossSouls(g.s.floor) : 0;
+      const champ = g.bossFloor() && g.s.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.boss && m.champ) ? g.champSouls(g.s.floor) : 0;
       const souls = champ ? `<li><em class="mod soul-chip" style="--mc:var(--soul)">${G.soul(1)} ${champ} soul${champ === 1 ? '' : 's'}</em> Champion boss</li>` : '';
       if (souls) return `<div class="tt-h"><b>Floor ${g.s.floor} boss</b></div><ul class="tt-l">${souls}${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
       if (!mods.length) return `<div class="tt-h"><b>Floor ${g.s.floor}</b><span class="tt-own">${esc(zoneName(g.s.floor))}</span></div><p class="tt-d">${g.bossFloor() ? `Beat the boss before the clock runs out.` : `Kill ${g.killsNeeded()} monsters to clear the floor.`}</p>${g.s.floor < 30 ? '<p class="tt-f">From floor 30, bosses start showing up with modifiers.</p>' : ''}<p class="tt-f">Click the floor number to jump to a floor.</p>`;
@@ -2495,6 +2511,10 @@ export class Ui {
     } else if (name === 'abyss' || name === 'marks') {
       const sub = `${G.soul()} ${fmt(g.soulsFree())} souls kept · ${soulPct(g.soulsFree())} damage`;
       html = head('Ascend', sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
+    } else if (name === 'bound' && this.boundFocus) {
+      const b = BOUND.find((x) => x.id === this.boundFocus)!;
+      html = head(esc(boundName(b)), `${boundGlyph()} ${fmt(g.boundFree())} bound souls`) + `<div class="lcards one">${this.boundCard(b)}</div>
+        <div class="legend-panel">${boundDetail(b, g.boundLv(b.id))}</div>`;
     } else if (name === 'legend' && this.legendFocus) {
       const d = LEGEND_BY_ID.get(this.legendFocus)!;
       html = head(esc(d.name), `${G.soul()} ${fmt(g.soulsFree())} souls kept`) + `<div class="lcards one">${this.legendCard(d)}</div>
@@ -2653,6 +2673,8 @@ export class Ui {
 
   /** The Spirit whose own panel is open (walked up to in the Keep). */
   private legendFocus: LegendId | null = null;
+  /** The Bound whose own panel is open (walked up to in the Keep). */
+  private boundFocus: BoundId | null = null;
 
   /** A Spirit just summoned or levelled: jump its card into view, then let it flare. */
   private flareLegend(id: string) {
@@ -3062,7 +3084,7 @@ export class Ui {
       if (trip) {
         const left = TRIP_HOURS * 3600 - g.tripSeconds(trip);
         return `<div class="trip away" data-hunter="${i}"><span class="trip-ico">${charFit(c.sprite, 34)}</span>
-          <span class="trip-mid"><b>${esc(c.name)}</b><small>Floor ${trip.floor} · ${fmt(g.tripKills(trip))} kills · ${duration(Math.max(0, left))} left</small></span>
+          <span class="trip-mid"><b>${esc(c.name)}</b><small>Floor ${trip.floor} · ${fmt(g.tripKills(trip))} kills · ${fmt(trip.found?.length ?? 0)} cards · ${duration(Math.max(0, left))} left</small></span>
           <button class="btn small" data-act="tripHome">Call home</button></div>`;
       }
       if (g.s.owned[i] < EXPEDITION_LEVEL) return '';
@@ -3544,17 +3566,27 @@ export class Ui {
     const labels = this.keepView?.labels() ?? null;
     if (!labels) {
       if (host.childElementCount) host.innerHTML = '';
+      document.body.classList.remove('over-act');
       return;
     }
-    const ids = labels.map((l) => l.id).join(' ');
+    const ids = labels.map((l) => `${l.id}:${l.verb}`).join(' ');
     if (host.dataset.ids !== ids) {
       host.dataset.ids = ids;
-      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}</b><em>Space</em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
+      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}</b><em class="kp"><kbd>E</kbd>${MOUSE_GLYPH}<span>${esc(l.verb)}</span></em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
       // Clicking a label walks you over and uses it when you get there.
-      host.querySelectorAll<HTMLElement>('[data-station]').forEach((b) => b.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.keepView?.useOrWalk(b.dataset.station as KeepStation);
-      }));
+      host.querySelectorAll<HTMLElement>('[data-station]').forEach((b) => {
+        b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.keepView?.useOrWalk(b.dataset.station as KeepStation);
+        });
+        // Pointing at a label is pointing at its station: its figure lights up and its prompt shows.
+        b.addEventListener('pointerenter', () => {
+          if (this.keepView) this.keepView.hover = this.keepView.labelHover = b.dataset.station as KeepStation;
+        });
+        b.addEventListener('pointerleave', () => {
+          if (this.keepView) this.keepView.hover = this.keepView.labelHover = null;
+        });
+      });
     }
     labels.forEach((l, i) => {
       const el = host.children[i] as HTMLElement;
@@ -3564,6 +3596,8 @@ export class Ui {
       el.classList.toggle('keyed', !!this.keepView?.keyed);
       el.classList.toggle('hover', this.keepView?.hover === l.id);
     });
+    // Over something you can use, the cursor says so (a speech bubble on the blade).
+    document.body.classList.toggle('over-act', !!this.keepView?.hover);
   }
 
   /** Back after time away with the party up in the Keep: nothing happened below. */
@@ -3627,8 +3661,8 @@ export class Ui {
     else if (id === 'trips') this.openModal('trips');
     else if (id === 'heart') this.openModal('heart');
     else if (id.startsWith('bound:')) {
-      this.openModal('heart');
-      this.flareLegend(id.slice(6));
+      this.boundFocus = id.slice(6) as BoundId;
+      this.openModal('bound');
     }
   }
 
