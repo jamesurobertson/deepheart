@@ -152,6 +152,8 @@ export const BASE_CRIT_MULT = 2;
 export const RELICS_ON = false;
 export const CURSES_ON = false;
 export const AWAKEN_ON = true;
+/** The Heart shows itself this many floors before it can first be awakened. */
+export const AWAKEN_TEASE = 50;
 /** The way up first opens at this floor's boss. */
 export const DESCEND_FLOOR = 100;
 /**
@@ -163,6 +165,8 @@ export const DESCEND_FLOOR = 100;
  * - Bound souls a level up, as Clicker Heroes' Ancient Souls: floor(5 × log10(souls earned this cycle)) in all; an
  *   awakening pays what's above the best so far. Every bound soul ever earned pulls champion souls up with depth:
  *   ×(1 + p)^((floor − 100) / 10), p rising toward `pullCap` (`pullRate` of the gap left closes per bound soul).
+ * - Past floor `wallFrom` every monster has `wall`× the health (Clicker Heroes' wall past zone 500): a run that hasn't
+ *   awakened stops there; the Bound and bound souls carry you past it.
  * - The Ogre Chieftain adds `ogre` (×100%) to all damage per level. Zone bosses have `zoneBoss`× the health of mid-bosses.
  * - Up to floor `deepFrom` each floor has about `hpBase`× the health of the last, past it `deepHp`×. A floor's gold
  *   starts at `goldBase` and grows `goldGrowth`× a floor, `deepGold`× past `deepFrom`. Companion damage grows about
@@ -170,7 +174,7 @@ export const DESCEND_FLOOR = 100;
  *   further out of reach than the last: the gap souls, Legends and Heartmarks close.
  *   A floor's health and gold are shared across its 25 monsters.
  */
-export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.62, deepGold: 1.15, levelsPerSoul: 2000, goldBossFrom: 100, goldBossChance: 0.25, soulPower: 0.1, deepHp: 1.145, deepFrom: 100, zoneBoss: 1, hpCreep: 0.004, awakenFloor: AWAKEN_FLOOR, pullCap: 0.1, pullRate: 0.03, ogre: 1 };
+export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.62, deepGold: 1.15, levelsPerSoul: 2000, goldBossFrom: 100, goldBossChance: 0.25, soulPower: 0.1, deepHp: 1.145, deepFrom: 100, zoneBoss: 1, hpCreep: 0.004, awakenFloor: AWAKEN_FLOOR, pullCap: 0.1, pullRate: 0.03, ogre: 1, wallFrom: 400, wall: 1000 };
 
 /** How gold on the floor reached the bank: picked up, left too long, swept up leaving the floor, or flown up when
  *  a rainbow portal opens. */
@@ -306,6 +310,8 @@ export interface SaveState {
   expeditions: Expedition[];
   /** A companion has reached EXPEDITION_LEVEL: expeditions are open for good. */
   tripsOpen: boolean;
+  /** The Heart has been teased (its button showed up, AWAKEN_TEASE floors before it can wake). */
+  heartTeased: boolean;
   /** Has the first wake-up (the dungeon was a dream) played? */
   dreamSeen: boolean;
   /** You've beaten a champion boss for souls (until then, the first one you meet is pointed out). */
@@ -384,7 +390,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
+    relics: {}, equipped: [], bossBest: 0, bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, graphics: 'auto' },
   };
 }
@@ -540,7 +546,8 @@ export function floorHp(f: number): Decimal {
   // Past deepFrom each floor's growth creeps up by hpCreep (in natural log) every 100 floors, so walls steepen the
   // deeper you go and runs settle into steady gains instead of snowballing.
   const n = f - TUNE.deepFrom;
-  return floorHp(TUNE.deepFrom).times(Decimal.pow(TUNE.deepHp, n)).times(Decimal.exp((TUNE.hpCreep * n * n) / 200));
+  const wall = f > TUNE.wallFrom ? TUNE.wall : 1;
+  return floorHp(TUNE.deepFrom).times(Decimal.pow(TUNE.deepHp, n)).times(Decimal.exp((TUNE.hpCreep * n * n) / 200)).times(wall);
 }
 
 /** Gold for one ordinary monster's worth of a floor (monsters get a share of it, like their health). */

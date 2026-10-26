@@ -459,13 +459,23 @@ async function boot() {
     const slowmo = freeze > 0 ? 0.1 : 1;
     freeze = Math.max(0, freeze - dt);
     timeScale = scene.timeScale(dt);
+    // Each stage on its own: one that throws mustn't skip the rest (a skipped ui.update would leave the Keep showing
+    // the dungeon's HUD).
+    const stage = (fn: () => void) => {
+      try {
+        fn();
+      } catch (err) {
+        if (!loggedError) console.error(err);
+        loggedError = true;
+      }
+    };
     // Up in the Keep the dungeon is hidden and paused: no need to draw it.
-    if (!game.s.inKeep) scene.update(dt * slowmo * timeScale, game);
-    ui.frame(dt);
+    if (!game.s.inKeep) stage(() => scene.update(dt * slowmo * timeScale, game));
+    stage(() => ui.frame(dt));
     slow -= dt;
     if (slow <= 0) {
       slow = 0.1;
-      ui.update();
+      stage(() => ui.update());
     }
     // The Keep always has its own tune; the awakening plays in silence.
     if (ui.cutscene) sfx.hush();

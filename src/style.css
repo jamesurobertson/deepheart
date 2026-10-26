@@ -1600,9 +1600,9 @@ body.compact .awk-fig { height: 56px; }
 .awk.rise .awk-glint { animation: cr-text 0.4s calc(var(--k) * 0.18s + 0.3s) both; opacity: 1; }
 .awk.first.rise .awk-glint { animation-delay: calc(1.6s + var(--k) * 0.18s); }
 .awk-glint::before { content: ''; position: absolute; inset: 10% 0 0; border-radius: 50%; background: radial-gradient(ellipse at 50% 75%, rgba(255, 58, 100, 0.4), transparent 65%); animation: aura 2.6s ease-in-out infinite; }
-.g-mote { position: absolute; left: var(--x); bottom: 0; width: calc(2px * var(--s)); height: calc(2px * var(--s)); background: #ff8aa4; box-shadow: 0 0 6px #ff3a64; opacity: 0; animation: wisp var(--d) ease-in var(--w) infinite; }
-.g-star { position: absolute; left: var(--x); top: var(--y); width: 16px; height: 16px; margin: -8px; color: #ffd0dc; filter: drop-shadow(0 0 4px #ff3a64); opacity: 0; animation: cr-twinkle var(--d) ease-in-out var(--w) infinite; }
-.g-star svg { display: block; width: 100%; height: 100%; }
+.glint-mote { position: absolute; left: var(--x); bottom: 0; width: calc(2px * var(--s)); height: calc(2px * var(--s)); background: #ff8aa4; box-shadow: 0 0 6px #ff3a64; opacity: 0; animation: wisp var(--d) ease-in var(--w) infinite; }
+.glint-star { position: absolute; left: var(--x); top: var(--y); width: 16px; height: 16px; margin: -8px; color: #ffd0dc; filter: drop-shadow(0 0 4px #ff3a64); opacity: 0; animation: cr-twinkle var(--d) ease-in-out var(--w) infinite; }
+.glint-star svg { display: block; width: 100%; height: 100%; }
 .awk-fig { position: relative; }
 @media (prefers-reduced-motion: reduce) { .awk-souls, .awk-embers, .awk-sparks, .awk-wave, .awk-glint { display: none; } .awk.thump .awk-heart svg { animation: none; } }
 .sp-lv th { font: 400 10px/1 'Silkscreen'; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); text-align: left; padding-bottom: 4px; }

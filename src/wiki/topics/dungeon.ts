@@ -44,7 +44,7 @@ const floorsBody = () => `<p class="lede">The dungeon is a stack of floors. Each
   ]))}
   <p>Past the ${CORRUPTION[CORRUPTION.length - 1].name} lap the names keep the last color and add a numeral: II, III and so on.</p>
   ${h2('Monster health and gold')}
-  <p>Monster health grows about ${pct(hpGrowth(50), 0)} a floor up to floor ${TUNE.deepFrom} (a little faster over the first few floors). Past ${TUNE.deepFrom} it grows about ${pct(hpGrowth(101), 1)} a floor, and that creeps up the deeper you go: about ${pct(hpGrowth(200), 0)} by floor 200 and ${pct(hpGrowth(500), 0)} by floor 500.</p>
+  <p>Monster health grows about ${pct(hpGrowth(50), 0)} a floor up to floor ${TUNE.deepFrom} (a little faster over the first few floors). Past ${TUNE.deepFrom} it grows about ${pct(hpGrowth(101), 1)} a floor, and that creeps up the deeper you go: about ${pct(hpGrowth(200), 0)} by floor 200 and ${pct(hpGrowth(500), 0)} by floor 500. Past floor ${TUNE.wallFrom}, every monster has ${TUNE.wall.toLocaleString('en-US')}× the health.</p>
   <p>Gold grows about ${pct(goldGrowth(50), 0)} a floor up to floor ${TUNE.deepFrom}, then ${pct(goldGrowth(101), 0)} a floor. An ordinary monster has ${pct(TRASH, 0)} of the floor's health (each kind a little more or less), and a boss pays 20 monsters' worth of gold, a whole floor.</p>
   ${table([{ h: 'Floor', cls: 'c' }, { h: 'Monster health', cls: 'num' }, { h: 'Boss health', cls: 'num' }, { h: 'Monster gold', cls: 'num' }, { h: 'Boss gold', cls: 'num' }],
     SAMPLE_FLOORS.map((f) => [`<b>${f}</b>`, fmt(floorHp(f).times(TRASH)), fmt(bossHp(f)), fmt(floorGold(f).times(TRASH)), fmt(floorGold(f).times(8))]))}

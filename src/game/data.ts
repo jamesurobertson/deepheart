@@ -64,7 +64,7 @@ export const COMPS: CompDef[] = [
   c('necro', 'Necromancer', 'necromancer', 6e22, 6.4e17, 'skull', 'Used to raise these monsters. Now it lowers them.', 130),
   c('king', 'Exiled King', 'sd_king', 1.5e24, 2e19, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 190),
   c('angel', 'Fallen Angel', 'angel', 1e28, 1.5e22, 'light', 'Fell from somewhere bright. Landed swinging.', 240),
-  c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 3e29, 1.1e24, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 300, true),
+  c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 1.8e28, 6.7e22, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 280, true),
   c('demon', 'Bound Demon', 'big_demon', 1e32, 1.8e25, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 370, true),
 ];
 

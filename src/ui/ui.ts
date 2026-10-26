@@ -2,7 +2,7 @@ import { morph } from './morph.ts';
 import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { AWAKEN_ON, CURSES_ON, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { AWAKEN_ON, AWAKEN_TEASE, CURSES_ON, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
@@ -130,8 +130,8 @@ const GOLD_DAZZLE = `<span class="cr-dazzle"><i class="cr-aura"></i>${Array.from
 
 /** The red glitter on each Bound in the awakening: motes rising off it and a few stars twinkling over it. */
 const GLINT = `${Array.from({ length: 9 }, (_, k) =>
-  `<i class="g-mote" style="--x:${10 + ((k * 37) % 80)}%;--d:${(1.2 + ((k * 13) % 10) / 10).toFixed(1)}s;--w:${-((k * 29) % 20) / 10}s;--s:${1 + (k % 2)}"></i>`).join('')}${Array.from({ length: 3 }, (_, k) =>
-  `<i class="g-star" style="--x:${[18, 78, 50][k]}%;--y:${[30, 45, 8][k]}%;--d:${(1.1 + k * 0.4).toFixed(1)}s;--w:${(k * 0.5).toFixed(1)}s">${STAR}</i>`).join('')}`;
+  `<i class="glint-mote" style="--x:${10 + ((k * 37) % 80)}%;--d:${(1.2 + ((k * 13) % 10) / 10).toFixed(1)}s;--w:${-((k * 29) % 20) / 10}s;--s:${1 + (k % 2)}"></i>`).join('')}${Array.from({ length: 3 }, (_, k) =>
+  `<i class="glint-star" style="--x:${[18, 78, 50][k]}%;--y:${[30, 45, 8][k]}%;--d:${(1.1 + k * 0.4).toFixed(1)}s;--w:${(k * 0.5).toFixed(1)}s">${STAR}</i>`).join('')}`;
 
 /** The cursor's badge over something you can use: a little speech bubble. */
 const ACT_GLYPH = '<svg viewBox="0 0 9 8" width="27" height="24" shape-rendering="crispEdges" aria-hidden="true"><path fill="#140a12" d="M1 0h7v1H1zM0 1h1v4H0zM8 1h1v4H8zM1 5h2v1H1zM5 5h3v1H5zM2 6h1v2H2zM3 6h2v1H3z"/><path fill="#fff4d6" d="M1 1h7v4H1zM3 5h2v1H3z"/><path fill="#140a12" d="M2 3h1v1H2zM4 3h1v1H4zM6 3h1v1H6z"/></svg>';
@@ -1537,9 +1537,9 @@ export class Ui {
     this.shown = bank.lt(this.shown) || bank.minus(this.shown).lt(1) ? bank : this.shown.plus(bank.minus(this.shown).times(Math.min(1, dt * 10)));
     setText(this.el.bank, fmt(this.shown));
 
-    // Health bars over bosses, and over monsters once they've been hit.
+    // Health bars over bosses, and over monsters once they've been hit (none up in the Keep).
     const seen = new Set<number>();
-    for (const m of g.monsters) {
+    for (const m of g.s.inKeep ? [] : g.monsters) {
       let bar = this.bars.get(m.id);
       if (!m.boss && (m.arrive > 0 || (!bar && m.hp.gte(m.max)))) continue;
       const s = this.scene.screenOf(m.id);
@@ -1643,8 +1643,14 @@ export class Ui {
       this.toldAwaken = true;
       if (g.s.awakens === 0) this.toast('<b>The Heart stirs</b>', 'ui_heart_full', 'trophy');
     }
-    // The Heart's button shows up when the Heart first stirs; its badge is what an awakening would pay now.
-    this.el.heartBtn.hidden = !AWAKEN_ON || (!g.s.awakens && g.s.cycleBest < TUNE.awakenFloor);
+    // The Heart's button shows up AWAKEN_TEASE floors before it can first wake (its panel shows the way to it); its badge
+    // is what an awakening would pay now.
+    const teased = g.s.awakens > 0 || g.s.cycleBest >= TUNE.awakenFloor - AWAKEN_TEASE;
+    this.el.heartBtn.hidden = !AWAKEN_ON || !teased;
+    if (AWAKEN_ON && teased && !g.s.heartTeased) {
+      g.s.heartTeased = true;
+      if (!g.s.awakens) this.toast(`<b>Something beats below</b> Floor ${TUNE.awakenFloor}`, 'ui_heart_full', 'trophy');
+    }
     const bound = g.canAwaken() ? g.pendingBound() : 0;
     this.el.heartBadge.hidden = bound < 1;
     setText(this.el.heartBadge, fmt(bound));
@@ -2298,7 +2304,9 @@ export class Ui {
       const key = this.touch ? '' : ` (or press ${abilityKey(a.id)})`;
       const fever = a.id === 'rampage' ? g.s.buffs.find((b) => b.id === 'fever') : undefined;
       const next = fever ? g.rampageNext() : null;
-      const status = !g.abilityUnlocked(a.id)
+      const status = g.away(a.comp)
+        ? `The ${comp.name} is on an expedition.`
+        : !g.abilityUnlocked(a.id)
         ? `Unlocked by the ${comp.name}.`
         : a.kind === 'passive' ? 'Always on.'
           : fever ? (next ? `×${fmt(g.feverMult())}. Keep attacking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
