@@ -1,7 +1,7 @@
 {
   "name": "deepheart-desktop",
   "productName": "Deepheart",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "Deepheart as a desktop app (Electron), for Steam and for playing offline.",
   "main": "main.cjs",
