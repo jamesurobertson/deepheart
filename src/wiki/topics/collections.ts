@@ -81,7 +81,7 @@ const tripsBody = () => `<p class="lede">Send a companion at level ${EXPEDITION_
   <p>Every kill rolls for its card at the usual chance (1 in ${CARD_ODDS.monster.toLocaleString('en-US')} for a monster), with ${link('spirit-collector', 'the Collector')} and ${link('spirit-ronin', 'the Ronin')}. ${pct(CHAMP_CHANCE, 0)} of the kills are champions and roll for gold cards, and on a boss floor champion bosses do. Cards come in the floor's color.</p>
   <p>Up to about 100 floors above your deepest, a strong hunter kills at the sweep limit. Near your deepest it slows down a lot.</p>
   ${h2('Coming home')}
-  <p>A hunter stays out up to ${TRIP_HOURS} hours, time away included, then comes home on its own. You can call one home sooner from the ladder. Ascending or awakening calls everyone home. Each hunter brings what it found so far.</p>`;
+  <p>A hunter stays out up to ${TRIP_HOURS} hours, time away included, then comes home on its own. You can call one home sooner from the ladder. Ascending calls everyone home, and before awakening you call them home yourself. Each hunter brings what it found so far.</p>`;
 
 export const COLLECTION_PAGES: Page[] = [
   { id: 'cards', group: 'Collections', title: 'Cards', summary: 'Drop chances, colors, gold cards and every card.', body: cardsBody },

@@ -1554,6 +1554,7 @@ body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .a
 .aw-faces.shade .aw-face:nth-child(2n) { animation-delay: -1.2s; }
 .aw-lose .stats dt { gap: 6px; align-items: center; }
 .aw-kept { font: 400 18px/1.2 'Jersey 10'; color: var(--faint); }
+.aw-away { font: 400 20px/1.2 'Jersey 10'; color: var(--gold-hi); }
 .aw-confirm .set-check { margin-top: 4px; }
 
 /* The awakening, as a scene. */

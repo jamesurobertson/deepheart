@@ -224,6 +224,7 @@ export class Sim {
       const bound = game.pendingBound();
       this.awakens++;
       this.hooks.awaken?.(bound, this);
+      game.recallAll();
       game.awaken(true);
       this.afterReset();
       this.buyBound();

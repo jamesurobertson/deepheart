@@ -2316,10 +2316,10 @@ export class Game {
 
   /** Give up souls, Spirits, Heartmarks and the run for bound souls; `respec` hands back every one spent on the Bound. */
   awaken(respec = false) {
-    if (!this.canAwaken()) return false;
+    // Hunters have to be called home first, so what they found is seen before the cutscene.
+    if (!this.canAwaken() || this.s.expeditions.length) return false;
     const s = this.s;
     const gained = this.pendingBound();
-    this.recallAll();
     // Gold still on the floor belongs to this cycle.
     this.bankAllDrops();
     s.soulsLifetime += this.cycleSouls();

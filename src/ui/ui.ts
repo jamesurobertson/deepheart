@@ -1054,6 +1054,10 @@ export class Ui {
       case 'awaken': this.renderAwakenConfirm(); break;
       case 'keep': this.toggleKeep(); break;
       case 'awakenGo': this.doAwaken(); break;
+      case 'recallAll':
+        this.game.recallAll();
+        this.closeModal();
+        break;
       case 'heartBack': this.modal = 'heart'; this.renderModal(); break;
       case 'descendGo': this.doDescend(); break;
       case 'leaveVault': this.game.leaveVault(); break;
@@ -3348,9 +3352,10 @@ export class Ui {
             <dl class="stats">${row(`${G.soul(1.5)} Souls`, fmt(g.s.souls))}${row('Spirits', fmt(g.legendsOwned()))}${row(`${G.heart(1.5)} Heartmarks`, fmt(g.marksTotal()))}${row('This run', `floor ${fmt(g.s.maxFloor)}`)}</dl>
           </section>
         </div>
-        <p class="aw-kept">Kept: cards, trophies, companions${away ? ` · ${away} on ${away === 1 ? 'an expedition comes' : 'expeditions come'} home` : ''}</p>
+        <p class="aw-kept">Kept: cards, trophies, companions</p>
+        ${away ? `<p class="aw-away">On expeditions: ${away}</p>` : ''}
         ${!first && g.boundSpent() ? `<label class="set-check"><input type="checkbox" id="awaken-respec" checked> Respec the Bound</label>` : ''}
-        <div class="set-row"><button class="btn" data-act="heartBack">Not yet</button><button class="btn primary big" data-act="awakenGo">Awaken</button></div>
+        <div class="set-row"><button class="btn" data-act="heartBack">Not yet</button>${away ? '<button class="btn primary big" data-act="recallAll">Call everyone home</button>' : '<button class="btn primary big" data-act="awakenGo">Awaken</button>'}</div>
       </div>`;
   }
 
