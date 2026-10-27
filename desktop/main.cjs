@@ -1,11 +1,13 @@
 /**
  * Deepheart as a desktop app. The built web game (../dist, copied into the app as resources/game) is served from a
  * private app:// origin rather than file://, because the game fetches its sprites and sounds and Chromium won't fetch
- * file:// URLs. Saves live in the app's own storage, separate from the browser's.
+ * file:// URLs. Saves are plain files in the app's data folder (saves/), where Steam Cloud can pick them up.
  */
 const { app, BrowserWindow, Menu, ipcMain, net, protocol, shell } = require('electron');
+const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const steam = require('./steam.cjs');
 
 const RELEASES = 'https://api.github.com/repos/jamesurobertson/deepheart/releases/latest';
 /** How often a running game checks for a newer release (it also checks on launch). */
@@ -16,6 +18,7 @@ const ROOT = app.isPackaged ? path.join(process.resourcesPath, 'game') : path.jo
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
 // Music and sounds start without waiting for a click, as a game should.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+steam.prepare();
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -40,10 +43,13 @@ function createWindow() {
     shell.openExternal(url);
     return { action: 'deny' };
   });
-  win.webContents.once('did-finish-load', () => {
-    checkForUpdate(win);
-    setInterval(() => checkForUpdate(win), CHECK_EVERY);
-  });
+  // Under Steam, Steam does the updating.
+  if (!steam.enabled) {
+    win.webContents.once('did-finish-load', () => {
+      checkForUpdate(win);
+      setInterval(() => checkForUpdate(win), CHECK_EVERY);
+    });
+  }
   win.webContents.on('before-input-event', (e, input) => {
     if (input.type === 'keyDown' && input.key === 'F11') {
       win.setFullScreen(!win.isFullScreen());
@@ -87,6 +93,70 @@ ipcMain.on('update:download', () => {
   if (update) shell.openExternal(update.url);
 });
 
+// ---------- saves ----------
+
+const SAVES = path.join(app.getPath('userData'), 'saves');
+/** A copy of each save is kept this often, the last BACKUPS of them, in case a save file is ever damaged. */
+const BACKUP_EVERY = 10 * 60 * 1000;
+const BACKUPS = 3;
+const backedUp = new Map();
+
+/** "deepheart-save" → saves/save.json, "deepheart-save:playtest" → saves/save-playtest.json. */
+function saveFile(key) {
+  const slot = String(key).replace(/^deepheart-save:?/, '').replace(/[^a-z0-9_-]+/gi, '-');
+  return path.join(SAVES, slot ? `save-${slot}.json` : 'save.json');
+}
+
+const readable = (file) => {
+  try {
+    const text = fs.readFileSync(file, 'utf8');
+    JSON.parse(text);
+    return text;
+  } catch {
+    return null;
+  }
+};
+
+ipcMain.on('save:read', (e, key) => {
+  const file = saveFile(key);
+  if (!fs.existsSync(file)) return void (e.returnValue = null);
+  // A damaged save falls back to the newest backup that reads.
+  let text = readable(file);
+  for (let i = 1; !text && i <= BACKUPS; i++) text = readable(`${file}.bak${i}`);
+  e.returnValue = text;
+});
+
+ipcMain.on('save:write', (e, key, text) => {
+  try {
+    fs.mkdirSync(SAVES, { recursive: true });
+    const file = saveFile(key);
+    const now = Date.now();
+    if (fs.existsSync(file) && now - (backedUp.get(file) ?? 0) > BACKUP_EVERY) {
+      for (let i = BACKUPS; i > 1; i--) if (fs.existsSync(`${file}.bak${i - 1}`)) fs.renameSync(`${file}.bak${i - 1}`, `${file}.bak${i}`);
+      fs.copyFileSync(file, `${file}.bak1`);
+      backedUp.set(file, now);
+    }
+    // Written whole and then swapped in, so a crash mid-write never leaves half a save.
+    fs.writeFileSync(`${file}.tmp`, text);
+    fs.renameSync(`${file}.tmp`, file);
+    e.returnValue = true;
+  } catch {
+    e.returnValue = false;
+  }
+});
+
+/** New Game: the save goes, and so do its backups (one copy is kept aside, just in case). */
+ipcMain.on('save:remove', (e, key) => {
+  const file = saveFile(key);
+  try {
+    if (fs.existsSync(file)) fs.renameSync(file, `${file}.removed`);
+    for (let i = 1; i <= BACKUPS; i++) fs.rmSync(`${file}.bak${i}`, { force: true });
+  } catch { /* nothing to remove */ }
+  e.returnValue = true;
+});
+
+ipcMain.on('steam:trophies', (_e, trophies) => steam.unlock(trophies));
+
 app.whenReady().then(() => {
   protocol.handle('app', (req) => {
     const file = path.normalize(path.join(ROOT, decodeURIComponent(new URL(req.url).pathname)));
@@ -95,6 +165,7 @@ app.whenReady().then(() => {
   });
   // The Mac keeps its standard menu (Cmd+Q, full screen); elsewhere there's no menu bar at all.
   if (process.platform !== 'darwin') Menu.setApplicationMenu(null);
+  steam.start();
   createWindow();
 });
 

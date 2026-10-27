@@ -19,7 +19,11 @@
     },
     "files": [
       "main.cjs",
-      "preload.cjs"
+      "preload.cjs",
+      "steam.cjs"
+    ],
+    "asarUnpack": [
+      "node_modules/steamworks.js/**"
     ],
     "extraResources": [
       {
@@ -74,5 +78,8 @@
   "devDependencies": {
     "electron": "^44.5.1",
     "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "steamworks.js": "^0.4.0"
   }
 }

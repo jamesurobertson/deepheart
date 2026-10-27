@@ -18,7 +18,12 @@ import { TitleMenu } from './ui/menu.ts';
 declare global {
   interface Window {
     /** Only in the desktop app (see desktop/preload.cjs). */
-    deepheart?: { onUpdate(callback: (update: { version: string }) => void): void; downloadUpdate(): void };
+    deepheart?: {
+      onUpdate(callback: (update: { version: string }) => void): void;
+      downloadUpdate(): void;
+      saves?: { read(key: string): string | null; write(key: string, text: string): boolean; remove(key: string): boolean };
+      trophies?(ids: string[]): void;
+    };
   }
 }
 
@@ -63,9 +68,27 @@ const SPEED = import.meta.env.DEV ? Math.max(1, Number(params.get('speed')) || 1
 // ?fps shows frame rate and frame cost in a corner (dev build only).
 const SHOW_FPS = import.meta.env.DEV && params.has('fps');
 
+/** Where saves live: the desktop app's save files (desktop/main.cjs), or the browser's storage. A desktop app without a
+ *  save file yet picks up the one its browser storage still holds, from before saves were files. */
+const store = {
+  get(key: string): string | null {
+    const files = window.deepheart?.saves;
+    return (files && files.read(key)) ?? localStorage.getItem(key);
+  },
+  set(key: string, text: string) {
+    const files = window.deepheart?.saves;
+    if (files) files.write(key, text);
+    else localStorage.setItem(key, text);
+  },
+  remove(key: string) {
+    window.deepheart?.saves?.remove(key);
+    localStorage.removeItem(key);
+  },
+};
+
 function load(): SaveState | null {
   try {
-    const s = JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null') as SaveState | null;
+    const s = JSON.parse(store.get(SAVE_KEY) ?? 'null') as SaveState | null;
     return s?.v === SAVE_VERSION ? s : null;
   } catch {
     return null;
@@ -89,11 +112,11 @@ async function boot() {
     const { save, hours } = playTo(SIM_FLOOR);
     // (Now, so the time it took isn't paid out as time away.)
     save.lastSave = Date.now();
-    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    store.set(SAVE_KEY, JSON.stringify(save));
     console.info(`?sim: floor ${save.bestFloor} after ${hours.toFixed(1)} h of nonstop play, ${save.descents} ascents`);
   }
   if (QUICK && params.has('fresh')) {
-    localStorage.removeItem(SAVE_KEY);
+    store.remove(SAVE_KEY);
     params.delete('fresh');
     history.replaceState(null, '', `?${params}`);
   }
@@ -123,7 +146,9 @@ async function boot() {
     if (resetting || atMenu) return;
     try {
       game.s.lastSave = Date.now();
-      localStorage.setItem(SAVE_KEY, JSON.stringify(game.saveState()));
+      store.set(SAVE_KEY, JSON.stringify(game.saveState()));
+      // Steam is told every trophy now and then (it skips the ones it has), so ones earned away get there too.
+      window.deepheart?.trophies?.(game.s.trophies);
     } catch { /* storage unavailable: play continues unsaved */ }
   };
 
@@ -143,7 +168,7 @@ async function boot() {
         const s = JSON.parse(decodeURIComponent(escape(atob(text)))) as SaveState;
         if (s?.v !== SAVE_VERSION || !Array.isArray(s.owned)) return false;
         resetting = true;
-        localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+        store.set(SAVE_KEY, JSON.stringify(s));
         location.reload();
         return true;
       } catch {
@@ -160,7 +185,7 @@ async function boot() {
     reset: () => {
       resetting = true;
       try {
-        localStorage.removeItem(SAVE_KEY);
+        store.remove(SAVE_KEY);
       } catch { /* ignore */ }
       location.reload();
     },
@@ -360,7 +385,7 @@ async function boot() {
       newGame: () => {
         resetting = true;
         try {
-          localStorage.removeItem(SAVE_KEY);
+          store.remove(SAVE_KEY);
           sessionStorage.setItem(IN_GAME, '1');
         } catch { /* ignore */ }
         location.reload();
