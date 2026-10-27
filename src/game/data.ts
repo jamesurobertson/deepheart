@@ -855,7 +855,11 @@ export interface TrophyDef {
   desc: string;
   icon: Icon;
   req: TrophyReq;
+  /** A Steam achievement too (docs/steam-achievements.md): 75 of them, the tiers close together left out. */
+  steam: boolean;
 }
+
+const NOT_ON_STEAM = new Set(['floor-750', 'floor-1500', 'floor-2000', 'gold-e9', 'gold-e40', 'gold-e90', 'gold-e120', 'dps-e6', 'dps-e40', 'dps-e80', 'dps-e150', 'kill-1000', 'kill-100000', 'boss-10', 'boss-5000', 'champ-100', 'levelall-500', 'level-2500', 'clicks-100', 'clicks-100000', 'crit-1', 'crit-10000', 'raid-77', 'raid-2777', 'miss-100', 'miss-1000', 'miss-20000', 'rainbow-50', 'vault-25', 'desc-10', 'fev-100']);
 
 /** A round power of ten in words for trophy text ("1 sextillion"), falling back to 1e80 past the named ones. */
 const POWER_WORDS: Record<number, string> = { 6: 'million', 9: 'billion', 12: 'trillion', 15: 'quadrillion', 18: 'quintillion', 21: 'sextillion', 24: 'septillion', 27: 'octillion', 30: 'nonillion', 33: 'decillion', 36: 'undecillion', 39: 'duodecillion', 42: 'tredecillion', 45: 'quattuordecillion', 60: 'novemdecillion' };
@@ -871,7 +875,7 @@ const count = (n: number) => n.toLocaleString('en-US');
 const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
 
 function buildTrophies(): TrophyDef[] {
-  const out: TrophyDef[] = [];
+  const out: Omit<TrophyDef, 'steam'>[] = [];
   // Ids carry their threshold ("kill-1000"), so a retired tier never lines up with a new one in an old save.
   const tag = (n: number) => (n >= 1e6 ? `e${Math.round(Math.log10(n))}` : String(n));
   const tiers = (prefix: string, list: [number, string][], desc: (n: number) => string, sprite: string, req: (n: number) => TrophyReq, tierFrom = 0) =>
@@ -940,7 +944,7 @@ function buildTrophies(): TrophyDef[] {
     { id: 'gcard-25', name: 'Golden Touch', desc: 'Find 25 different gold cards.', icon: { sprite: 'big_demon', tier: 3 }, req: { t: 'goldCards', n: 25 } },
     { id: 'gcard-all', name: 'Midas Deck', desc: 'Find every gold card.', icon: { sprite: 'big_demon', tier: 4 }, req: { t: 'goldCards', n: CARDS.filter((c) => c.gold).length } },
   );
-  return out;
+  return out.map((t) => ({ ...t, steam: !NOT_ON_STEAM.has(t.id) }));
 }
 
 export const TROPHIES = buildTrophies();

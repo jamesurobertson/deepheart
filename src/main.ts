@@ -11,7 +11,7 @@ import { fpsOverlay } from './ui/fps.ts';
 import { Ui } from './ui/ui.ts';
 import { setAtlas } from './ui/px.ts';
 import { Sfx, type Track } from './audio/sfx.ts';
-import { CARDS, CORRUPTION, LEGENDS, UPGRADES, lapOf, zoneOf } from './game/data.ts';
+import { CARDS, CORRUPTION, LEGENDS, TROPHIES, UPGRADES, lapOf, zoneOf } from './game/data.ts';
 import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
 import { TitleMenu } from './ui/menu.ts';
 
@@ -28,6 +28,7 @@ declare global {
 }
 
 const params = new URLSearchParams(location.search);
+const STEAM_TROPHIES = new Set(TROPHIES.filter((t) => t.steam).map((t) => t.id));
 // ?slot=name (dev only) keeps a separate save (handy for testing without touching your run).
 /** Where the site is served from ('./' in builds), so asset URLs work in a subfolder. */
 const BASE = import.meta.env.BASE_URL;
@@ -148,7 +149,7 @@ async function boot() {
       game.s.lastSave = Date.now();
       store.set(SAVE_KEY, JSON.stringify(game.saveState()));
       // Steam is told every trophy now and then (it skips the ones it has), so ones earned away get there too.
-      window.deepheart?.trophies?.(game.s.trophies);
+      window.deepheart?.trophies?.(game.s.trophies.filter((id) => STEAM_TROPHIES.has(id)));
     } catch { /* storage unavailable: play continues unsaved */ }
   };
 
