@@ -65,8 +65,8 @@ const CHEST_REACH = 1.1;
 const COIN_SIZE = 1.15;
 
 /** A clutch kill's slow motion: real seconds until the release burst, and until time is back to full speed. */
-const CLUTCH_RELEASE = 0.9;
-const CLUTCH_END = 1.9;
+const CLUTCH_RELEASE = 1.4;
+const CLUTCH_END = 2.4;
 
 /** A relic on the floor: its glow in the rarity's color, how long it waits before flying to the party by itself
  *  (shorter while the staircase is waiting on it), and how long that flight takes. */

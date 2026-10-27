@@ -1176,10 +1176,11 @@ export class Ui {
         if (ev.clutch) {
           // CLUTCH! slams in as the slow motion starts, with letterbox bars for the length of it.
           const { left, gold } = ev.clutch;
+          this.clutchHold = { left, max: g.bossTimeMax, until: performance.now() + 2400 };
           if (g.s.settings.cinematics) {
-            this.cinemaUntil = performance.now() + 1900;
+            this.cinemaUntil = performance.now() + 2400;
             document.body.classList.add('cinema');
-            setTimeout(() => document.body.classList.remove('cinema'), 1650);
+            setTimeout(() => document.body.classList.remove('cinema'), 2150);
           }
           this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold${ev.souls ? ` · +${ev.souls} souls` : ''}`, 'clutch');
         }
@@ -1301,6 +1302,7 @@ export class Ui {
         if (ev.on) this.toast(`<b>${esc(COMPS[ev.comp].name)}</b> fights with you on floor ${fmt(g.s.floor)}`, COMPS[ev.comp].sprite);
         break;
       case 'tripsOpen': this.toast('<b>Expeditions</b> are open: the ladder in the Keep', COMPS[ev.comp].sprite, 'trophy'); break;
+      case 'tripReady': this.toast(`<b>${esc(COMPS[ev.comp].name)}</b> can go on expeditions`, COMPS[ev.comp].sprite); break;
       case 'legend': if (ev.summoned) this.toast(`<b>${esc(LEGEND_BY_ID.get(ev.id)!.name)}</b> joins you`, LEGEND_BY_ID.get(ev.id)!.sprite); break;
       case 'mark':
         this.rowCache[ev.comp] = '';
@@ -1776,7 +1778,13 @@ export class Ui {
       this.el.zonePrev.classList.toggle('home', home < page);
       this.el.zoneNext.classList.toggle('home', home > page);
     }
-    if (boss && g.inVault()) {
+    if (this.clutchHold && performance.now() < this.clutchHold.until) {
+      // A clutch kill: the clock stops where the boss fell, for the slow motion to show it.
+      const { left, max } = this.clutchHold;
+      this.el.floorBar.style.width = `${max ? (left / max) * 100 : 0}%`;
+      setText(this.el.floorBarT, `${left.toFixed(1)}s`);
+      this.el.floorBox.classList.add('urgent');
+    } else if (boss && g.inVault()) {
       // The boss steps aside for the vault; its clock is frozen.
       this.el.floorBar.style.width = `${g.bossTimeMax ? (Math.max(0, g.bossTime) / g.bossTimeMax) * 100 : 100}%`;
       setText(this.el.floorBarT, 'Boss waits');
@@ -3139,7 +3147,7 @@ export class Ui {
         const left = TRIP_HOURS * 3600 - g.tripSeconds(trip);
         const time = trip.pausedAt !== undefined ? 'With you' : `${duration(Math.max(0, left))} left`;
         return `<div class="trip away" data-hunter="${i}"><span class="trip-ico">${charFit(c.sprite, 34)}</span>
-          <span class="trip-mid"><b>${esc(c.name)}</b><small>Floor ${fmt(trip.floor)} · ${fmt(g.tripKills(trip))} kills · ${fmt(trip.found?.length ?? 0)} cards · ${time}</small></span>
+          <span class="trip-mid"><b>${esc(c.name)}</b><small class="trip-stats"><span>Floor ${fmt(trip.floor)}</span><span>${fmt(g.tripKills(trip))} kills</span><span>${fmt(trip.found?.length ?? 0)} cards</span><span>${time}</span></small></span>
           <button class="btn small" data-act="tripHome">Call home</button></div>`;
       }
       if (g.s.owned[i] < EXPEDITION_LEVEL) return '';
@@ -3160,7 +3168,7 @@ export class Ui {
     let bar: string;
     if (g.canAwaken()) {
       bar = `<button class="btn primary big" data-act="awaken">Awaken for ${boundGlyph()} ${fmt(g.pendingBound())}</button>`;
-    } else if (!g.s.awakens) {
+    } else if (Math.max(g.s.cycleBest, g.s.maxFloor) < TUNE.awakenFloor) {
       const best = Math.max(g.s.cycleBest, g.s.maxFloor);
       bar = `<p>Deepest floor <b>${fmt(best)} / ${fmt(TUNE.awakenFloor)}</b></p><div class="bar heart-bar"><i style="width:${Math.min(100, (best / TUNE.awakenFloor) * 100)}%"></i></div>`;
     } else {
@@ -3279,12 +3287,15 @@ export class Ui {
    *  Collection button. */
   private revealCard() {
     const ev = this.cardQueue[0];
+    // (The Keep's labels step aside while a card waits: they'd show through its words.)
+    document.body.classList.toggle('card-up', !!ev);
     if (!ev) return;
     const d = CARD_BY_ID.get(ev.id)!;
     const el = document.createElement('div');
     el.className = `card-reveal${ev.gold ? ' gold' : ''}${ev.newColor || ev.gold ? '' : ' dupe'}`;
     el.style.setProperty('--rc', ev.gold ? CARD_FRAME.gold : CARD_FRAME[d.kind]);
-    const mid = this.scene.centerScreen();
+    // (Up in the Keep the dungeon isn't drawn, so its middle isn't anywhere: the field's middle stands in.)
+    const mid = this.game.s.inKeep ? { x: this.field.w / 2, y: this.field.h * 0.45 } : this.scene.centerScreen();
     el.style.left = `${mid.x}px`;
     el.style.top = `${mid.y}px`;
     const dock = this.el.cardBadge.parentElement!;
@@ -3530,6 +3541,7 @@ export class Ui {
   private renderDescendConfirm() {
     const g = this.game;
     const pending = g.pendingSouls();
+    const away = g.s.expeditions.length;
     this.modal = 'confirm';
     this.modalKey = 'confirm';
     this.el.modal.className = 'modal pnl m-confirm';
@@ -3537,7 +3549,8 @@ export class Ui {
       <div class="confirm">
         <p>${soulPct(pending)} damage. Gold, companions and floor reset.</p>
         ${this.curseChoice ? `<p class="omen">The next descent is cursed: ${esc(CURSE_BY_ID.get(this.curseChoice)!.name)}. ${esc(CURSE_BY_ID.get(this.curseChoice)!.rule)}</p>` : ''}
-        <div class="set-row"><button class="btn" data-act="abyssBack">Not yet</button><button class="btn primary big" data-act="descendGo">Ascend</button></div>
+        ${away ? `<p class="aw-away">On expeditions: ${away}</p>` : ''}
+        <div class="set-row"><button class="btn" data-act="abyssBack">Not yet</button>${away ? '<button class="btn primary big" data-act="recallAll">Call everyone home</button>' : '<button class="btn primary big" data-act="descendGo">Ascend</button>'}</div>
       </div>`;
   }
 
@@ -3696,6 +3709,8 @@ export class Ui {
     setTimeout(() => (c.hidden = true), 2200);
   }
   private keepFading = false;
+  /** A clutch kill's time left, held on the boss clock through the slow motion. */
+  private clutchHold: { left: number; max: number; until: number } | null = null;
   /** What the Keep button says now (it swaps its icon when this changes). */
   private keepBtnText = 'The Keep';
   /** The Keep's top-down map, while you're up there. */

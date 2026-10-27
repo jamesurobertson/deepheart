@@ -17,6 +17,10 @@ export type KeepStation = 'stairs' | 'dan' | 'victor' | 'trips' | 'heart' | `off
  *  is the Heart's. */
 const ROOMS: [number, number, number, number][] = [[1, 2, 13, 10], [16, 2, 15, 10], [1, 16, 9, 8], [12, 15, 22, 9], [36, 16, 9, 8], [19, 27, 9, 6]];
 const HALLS: [number, number, number, number][] = [[22, 12, 3, 3], [10, 19, 2, 2], [34, 19, 2, 2], [5, 12, 2, 4], [22, 24, 2, 3]];
+/** How close (in tiles) the hero's middle may come to a wall at its side. */
+const SIDE_GAP = 0.45;
+/** How far (in tiles) the hero's feet stay from a south wall. */
+const SOUTH_GAP = 0.2;
 const W = 47;
 const H = 35;
 
@@ -122,6 +126,8 @@ export class KeepView {
   private cells: string[][];
   private tiles: ReturnType<typeof autotile>;
   private blocked = new Set<string>();
+  /** Floor squares with a south wall's cap drawn along their bottom. */
+  private capped = new Set<string>();
   /** The hero (cell units, feet at the point), the trail it leaves, a path to walk when you click, the camera. */
   private hero = { x: ARRIVE[0] + 0.5, y: ARRIVE[1] + 0.5, left: false, moving: false };
   private trail: { x: number; y: number }[] = [];
@@ -160,8 +166,13 @@ export class KeepView {
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (this.cells[y + dy]?.[x + dx] === '.') this.cells[y][x] = '#';
     }
     this.tiles = autotile(this.cells);
+    // A south wall's cap is drawn along the bottom of the room's last floor row.
+    for (const t of this.tiles[2]) if (t.name === 'wall_top_mid' && this.cells[t.y]?.[t.x] === '.') this.capped.add(`${t.x},${t.y}`);
     for (const [, x, y, how] of THINGS) if (!how) this.blocked.add(`${x},${y}`);
     // The shrine's obelisk and the Heart's plinth stand in the way; spirits don't (you walk right through them).
+    // The door's posts are two tiles tall: their lower halves stand on the floor in front of the doorway.
+    this.blocked.add('21,27');
+    this.blocked.add('24,27');
     this.blocked.add(`${SHRINE[0]},${SHRINE[1]}`);
     this.blocked.add(`${HEART[0]},${HEART[1]}`);
     for (const p of PEOPLE) this.blocked.add(`${p.x},${p.y}`);
@@ -190,7 +201,14 @@ export class KeepView {
 
   private walkable(x: number, y: number) {
     const cx = Math.floor(x), cy = Math.floor(y);
-    return this.cells[cy]?.[cx] === '.' && !this.blocked.has(`${cx},${cy}`);
+    if (this.cells[cy]?.[cx] !== '.' || this.blocked.has(`${cx},${cy}`)) return false;
+    // Not half over a side wall: the hero (and the party in its footsteps) is a tile wide.
+    const fx = x - cx;
+    if (fx < SIDE_GAP && this.cells[cy][cx - 1] !== '.') return false;
+    if (fx > 1 - SIDE_GAP && this.cells[cy][cx + 1] !== '.') return false;
+    // On the last row before a south wall, the feet stay off the cap along its bottom.
+    if (y - cy > 1 - SOUTH_GAP && this.capped.has(`${cx},${cy}`)) return false;
+    return true;
   }
 
   /** The Bound and where each stands, once you've awakened. */
@@ -361,7 +379,9 @@ export class KeepView {
       }
     }
     const cx = Math.floor(hero.x), cy = Math.floor(hero.y);
-    this.near = this.stations().find((st) => st.cells.some(([x, y]) => x === cx && y === cy))?.id ?? null;
+    // Where two stations share a square, the one you're walking to wins, else the smaller one (the ladder by the stairs).
+    const here = this.stations().filter((st) => st.cells.some(([x, y]) => x === cx && y === cy));
+    this.near = (here.find((st) => st.id === this.goal) ?? here.sort((a, b) => a.cells.length - b.cells.length)[0])?.id ?? null;
     if (this.goal && !this.path.length) {
       const goal = this.goal;
       this.goal = null;
@@ -525,7 +545,7 @@ export class KeepView {
     };
     for (const t of this.tiles[0]) tile(atlas.rect(`floor_${worn(t.x, t.y)}`), t.x, t.y);
     for (const t of this.tiles[1]) tile(atlas.rect(t.name), t.x, t.y);
-    for (const t of this.tiles[2]) tile(atlas.rect(t.name), t.x, t.y);
+    for (const t of this.tiles[2]) if (!this.capped.has(`${t.x},${t.y}`)) tile(atlas.rect(t.name), t.x, t.y);
     if (this.game.tripsOpen()) tile(rect('floor_ladder'), LADDER[0], LADDER[1]);
     for (const [name, x, y, how] of THINGS) {
       if (how === 'flat') tile(rect(name, tick), x, y);
@@ -741,6 +761,8 @@ export class KeepView {
       } });
     }
     standing.sort((a, b) => a.y - b.y).forEach((s2) => s2.draw());
+    // A south wall stands in front of the room: its cap goes over anyone right up against it (feet, rings and all).
+    for (const t of this.tiles[2]) if (this.capped.has(`${t.x},${t.y}`)) tile(atlas.rect(t.name), t.x, t.y);
     // The Heart's glow, once it's stirred.
     if (ready || awake) {
       const hx = (HEART[0] + 0.5) * 16, hy = (HEART[1] - 1.1) * 16;

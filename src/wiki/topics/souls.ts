@@ -27,7 +27,7 @@ const boundTotal = (b: (typeof BOUND)[number], lv: number) => Array.from({ lengt
 const awakenBody = () => `<p class="lede">Reach floor ${TUNE.awakenFloor} and you can awaken the Heart: give up your souls, Spirits, Heartmarks and the run for bound souls, which buy the Bound.</p>
   ${toc('awakening', ['Awakening', 'Bound souls', 'What awakening keeps', 'The Bound', 'Champion souls'])}
   ${h2('Awakening')}
-  <p>The Heart stands in the Keep's top-left room. It wakes the first time you reach floor ${TUNE.awakenFloor}. After that you can awaken whenever it would pay at least one bound soul. Awakening ascends too: the souls your run would pay count toward it, then the run starts over on floor 1.</p>
+  <p>The Heart stands in the Keep's top-left room. Each awakening needs floor ${TUNE.awakenFloor} reached since the last one, and has to pay at least one bound soul. Awakening ascends too: the souls your run would pay count toward it, then the run starts over on floor 1.</p>
   ${h2('Bound souls')}
   <p>Count every soul you've earned since you last awakened, spent or not, plus what an ascent would pay now. Bound souls in all are 5 for every power of ten of that count, rounded down. An awakening pays what's above the most you've had before.</p>
   ${table(['Souls this cycle', { h: 'Bound souls in all', cls: 'num' }], [10, 100, 400, 1000, 1e4, 1e5, 1e6].map((n) => [n.toLocaleString('en-US'), Math.floor(5 * Math.log10(n))]))}

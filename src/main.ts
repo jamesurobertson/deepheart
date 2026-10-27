@@ -23,6 +23,8 @@ declare global {
 }
 
 const params = new URLSearchParams(location.search);
+// ?tune={"costGrowth":1.08} (dev only) overrides pacing knobs for a try, as TUNE='{...}' does for the simulator.
+if (import.meta.env.DEV && params.has('tune')) Object.assign(TUNE, JSON.parse(params.get('tune')!));
 // ?slot=name (dev only) keeps a separate save (handy for testing without touching your run).
 /** Where the site is served from ('./' in builds), so asset URLs work in a subfolder. */
 const BASE = import.meta.env.BASE_URL;
@@ -519,7 +521,7 @@ function playSound(sfx: Sfx, ev: GameEvent) {
       // A clutch kill: a deep, slowed boom as time drops, then the hit landing as it lets go.
       if (ev.clutch) {
         sfx.play('mega', { vol: 0.9, rate: 0.55 });
-        setTimeout(() => sfx.play('bosskill', { vol: 0.9, rate: 0.85 }), 900);
+        setTimeout(() => sfx.play('bosskill', { vol: 0.9, rate: 0.85 }), 1400);
       }
       break;
     case 'rampage': sfx.play('mega', { vol: 0.6, rate: 1 + ev.tier * 0.2 }); break;

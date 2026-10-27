@@ -1,7 +1,7 @@
-import { ABILITIES, ABILITY_BY_UPGRADE, COMPS, COST_GROWTH, LEGENDS, LEVEL_BONUS, UPGRADES, levelMult, type CompDef, type UpgDef } from '../../game/data.ts';
+import { ABILITIES, ABILITY_BY_UPGRADE, COMPS, LEGENDS, LEVEL_BONUS, UPGRADES, levelMult, type CompDef, type UpgDef } from '../../game/data.ts';
 import {
   AUTO_BASE, BASE_CRIT, BASE_CRIT_MULT, CLEAVE_BASE, CLICK_DPS, DRUMS_CRIT, FEVER_CLICKS, FEVER_TIME, FLURRY_RATE, IDLE_AFTER, MANUAL_RATE, MARK_POWER,
-  RAMPAGE_EXTEND, RAMPAGE_STEPS, RAMPAGE_TIERS, REBUY_GAP, REVEAL_AT, STREAK_CAP, STREAK_GAP,
+  RAMPAGE_EXTEND, RAMPAGE_STEPS, RAMPAGE_TIERS, REBUY_GAP, REVEAL_AT, STREAK_CAP, STREAK_GAP, TUNE,
 } from '../../game/game.ts';
 import { fmt } from '../../game/format.ts';
 import { esc, h2, infobox, link, pct, secs, splitTables, table, toc } from '../kit.ts';
@@ -17,8 +17,8 @@ const traitText = (u: UpgDef) => {
 const compId = (c: CompDef) => `companion-${c.id}`;
 const joins = (c: CompDef) => (c.floor ? `Floor ${c.floor}` : 'From the start');
 
-const levelCost = (c: CompDef, lv: number) => c.cost * COST_GROWTH ** (lv - 1);
-const totalCost = (c: CompDef, lv: number) => (c.cost * (COST_GROWTH ** lv - 1)) / (COST_GROWTH - 1);
+const levelCost = (c: CompDef, lv: number) => c.cost * TUNE.costGrowth ** (lv - 1);
+const totalCost = (c: CompDef, lv: number) => (c.cost * (TUNE.costGrowth ** lv - 1)) / (TUNE.costGrowth - 1);
 const baseDamage = (c: CompDef, lv: number) => c.dps * lv * levelMult(lv);
 
 const LEVELS = [[1, 10, 25, 50, 75, 100, 125, 150], [175, 200, 225, 250, 300, 400, 500, 1000]];
@@ -40,7 +40,7 @@ function companionPage(c: CompDef, i: number): Page {
       <p>A trait opens when ${c.name} reaches its level, and is bought with gold on ${c.name}'s row. Traits are bought again every run.</p>
       ${table([{ h: 'Level', cls: 'c' }, 'Trait', { h: 'Cost', cls: 'num' }, 'Effect'], traits.map((u) => [`<b>${traitLevel(u)}</b>`, esc(u.name), fmt(u.cost), traitText(u)]))}
       ${h2('Levels')}
-      <p>Each level costs ×${COST_GROWTH} the last. Damage is ${fmt(c.dps)} × level, ×${LEVEL_BONUS.mult} every ${LEVEL_BONUS.every} levels from ${LEVEL_BONUS.from} (×${LEVEL_BONUS.thousand} at each 1000th level). The table leaves out traits and every other bonus.</p>
+      <p>Each level costs ×${TUNE.costGrowth} the last. Damage is ${fmt(c.dps)} × level, ×${LEVEL_BONUS.mult} every ${LEVEL_BONUS.every} levels from ${LEVEL_BONUS.from} (×${LEVEL_BONUS.thousand} at each 1000th level). The table leaves out traits and every other bonus.</p>
       ${splitTables([{ h: 'Lvl', cls: 'c' }, { h: 'Level cost', cls: 'num' }, { h: 'Total', cls: 'num' }, { h: 'Damage', cls: 'num' }],
         LEVELS.map((levels) => levels.map((lv) => [`<b>${lv}</b>`, fmt(levelCost(c, lv)), fmt(totalCost(c, lv)), fmt(baseDamage(c, lv))])))}
       <div class="clear"></div>`,
@@ -54,7 +54,7 @@ const companionsBody = () => `<p class="lede">Companions fight for you. Hire the
     `<a class="who" href="#/${compId(c)}">${spr(c.sprite, 28)}${c.name}</a>`, fmt(c.cost), fmt(c.dps), joins(c), traitsOf(i).length,
   ]))}
   ${h2('Hiring and leveling')}
-  <p>The first level of a companion costs its hire price; each level after costs ×${COST_GROWTH} the one before. The next companion in the roster shows up once you've had ${pct(REVEAL_AT, 0)} of its hire price this run. The last six wait on a floor: they join once your deepest floor ever has reached it, and stay available after that.</p>
+  <p>The first level of a companion costs its hire price; each level after costs ×${TUNE.costGrowth} the one before. The next companion in the roster shows up once you've had ${pct(REVEAL_AT, 0)} of its hire price this run. The last six wait on a floor: they join once your deepest floor ever has reached it, and stay available after that.</p>
   <p>The buy buttons above the roster set how many levels a click buys:</p>
   ${table(['Button', 'Buys'], [
     ['×1, ×10, ×100', 'That many levels'],

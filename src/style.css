@@ -159,6 +159,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .bank-ico.bump { animation: coinbump 0.2s; }
 .bank-v.bump { animation: bankflash 0.25s ease-out; }
 @keyframes bankflash { 40% { color: var(--gold-hi); transform: scale(1.04); } }
+@keyframes bankflash-soul { 40% { color: #f0e6ff; transform: scale(1.04); } }
+.bank.spirit-on .bank-v.bump { animation-name: bankflash-soul; }
 .bank-v {
   font: 400 68px/0.85 'Jersey 10'; color: #fff4ea; letter-spacing: 1px;
   text-shadow: 0 4px 0 var(--ink), 4px 0 0 var(--ink), -4px 0 0 var(--ink), 0 -4px 0 var(--ink), 0 0 24px rgba(255, 190, 80, 0.45);
@@ -1417,6 +1419,7 @@ body.in-keep #stage { visibility: hidden; }
 /* Up in the Keep there's no fight: the floor, skills, Rampage and damage lines step aside. */
 body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .abilities, body.in-keep .fever, body.in-keep .buffs, body.in-keep .bars, body.in-keep .blade-rate { display: none !important; }
 .keep-labels { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+body.card-up .keep-labels { visibility: hidden; }
 .keep-label { position: absolute; left: 0; top: 0; display: grid; justify-items: center; gap: 2px; translate: -50% -100%; padding: 0; background: none; border: 0; cursor: pointer; pointer-events: auto; }
 .keep-label[hidden] { display: none; }
 .keep-label b { padding: 4px 8px; font: 400 21px/1 'Jersey 10'; color: var(--gold-hi); background: rgba(20, 12, 14, 0.82); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #946a26; }
@@ -1516,6 +1519,9 @@ body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .a
 .trip-floor { display: flex; align-items: center; gap: 6px; font: 400 17px/1 'Jersey 10'; color: var(--dim); }
 .trip-floor input { width: 64px; padding: 4px 6px; font: 400 18px/1 'Jersey 10'; color: var(--text); background: rgba(0, 0, 0, 0.35); border: 2px solid #5a4030; font-variant-numeric: tabular-nums; }
 .trip.away { opacity: 0.85; }
+/* Each value in its own column, so a count gaining a digit doesn't push the rest along. */
+.trip-mid > .trip-stats { display: grid; grid-template-columns: 5.4em 7.6em 5.2em auto; white-space: nowrap; }
+.trip-stats span + span::before { content: '· '; color: var(--faint); }
 @media (max-width: 560px) {
   .trip { grid-template-columns: 40px 1fr auto; }
   .trip-floor { grid-column: 2; }
