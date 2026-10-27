@@ -111,10 +111,11 @@ export class TitleMenu {
     canvas.setAttribute('aria-label', 'The stairway: left and right (or A and D) walk, up, W or Space jumps, down or S drops a step, Escape goes back to the menu');
     this.el.appendChild(canvas);
     // Your hero, once you move them, draws on a layer over the menu: the menu's words are ledges too, floating in the
-    // dark (the heart, the title, the tagline, every line of the list, the DEMO stamp and the Wishlist button).
+    // dark (the heart, the title, the tagline, every line of the list, the DEMO stamp, the Wishlist button, and on the
+    // credits every heading and line).
     const actor = document.createElement('canvas');
     actor.className = 'mm-actor';
-    this.stairs = new Stairs(canvas, actor, game, () => [...this.el.querySelectorAll<HTMLElement>('.mm-heart, .mm-logo, .mm-tag, .mm-list > *, .mm-run, .mm-stamp, .mm-btn.steam')].map(textBox));
+    this.stairs = new Stairs(canvas, actor, game, () => [...this.el.querySelectorAll<HTMLElement>('.mm-heart, .mm-logo, .mm-tag, .mm-list > *, .mm-run, .mm-stamp, .mm-btn.steam, .mm-credits h2, .mm-credits .mm-by, .mm-credits h3, .mm-credits li, .mm-credits .mm-btn')].map(textBox));
     const panel = document.createElement('div');
     panel.className = 'mm-panel';
     this.el.appendChild(panel);
@@ -152,6 +153,7 @@ export class TitleMenu {
     this.view = view;
     const panel = this.el.querySelector<HTMLElement>('.mm-panel')!;
     panel.innerHTML = view === 'credits' ? this.credits() : view === 'confirm' ? this.confirm() : this.mainMenu();
+    this.stairs.wordsChanged();
     panel.querySelector<HTMLElement>(view === 'credits' ? '[data-mm="main"]' : 'button, a')?.focus({ preventScroll: true });
   }
 
@@ -197,7 +199,7 @@ export class TitleMenu {
   }
 }
 
-/** The colours a sprite's first frame is drawn in (its opaque pixels, less the near-black outline that would vanish
+/** The colors a sprite's first frame is drawn in (its opaque pixels, less the near-black outline that would vanish
  *  against the dark), for the embers a fallen hero bursts into. */
 function colorsOf(src: NonNullable<ReturnType<typeof spriteFrames>>): string[] {
   const f = src.frames[0];
@@ -290,6 +292,16 @@ class Stairs {
     });
     canvas.addEventListener('blur', () => this.held.clear());
     this.frame(performance.now());
+  }
+
+  /** The menu changed its words (to the credits and back): whoever stood on one drops, onto whatever's below now. */
+  wordsChanged() {
+    const h = this.hero;
+    if (h && h.on !== null && h.on >= 100) {
+      h.on = null;
+      h.drop = null;
+      h.vy = 0;
+    }
   }
 
   stop() {
