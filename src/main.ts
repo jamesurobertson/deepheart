@@ -374,6 +374,8 @@ async function boot() {
     const gap = (now - lastTick) / 1000;
     lastTick = now;
     // Hidden tabs (and the dungeon while you're in the room) are paused; the time is settled when you come back.
+    // Expeditions aren't: they run on real time wherever you are.
+    if (!document.hidden) game.realtime();
     if (document.hidden || game.s.inKeep) return;
     // A long gap while visible means the computer slept.
     if (gap > OFFLINE_AFTER) return catchUp(gap);

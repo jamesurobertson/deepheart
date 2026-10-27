@@ -1,5 +1,5 @@
 import { COMPS, zoneName } from '../game/data.ts';
-import { duration } from '../game/format.ts';
+import { duration, fmt } from '../game/format.ts';
 import type { Game } from '../game/game.ts';
 import { DEMO, STEAM_URL, WIKI_URL } from '../demo.ts';
 import { GAME_VERSION, olderVersion } from '../version.ts';
@@ -160,7 +160,7 @@ export class TitleMenu {
   /** The demo's is the same, with a DEMO stamp on the logo and Wishlist on Steam as the button that stands out. */
   private mainMenu() {
     const s = this.game.s;
-    const run = this.hasRun ? `<p class="mm-run">Floor ${s.floor} · ${esc(zoneName(s.floor))} · ${duration(s.playTime)}</p>` : '';
+    const run = this.hasRun ? `<p class="mm-run">Floor ${fmt(s.floor)} · ${esc(zoneName(s.floor))} · ${duration(s.playTime)}</p>` : '';
     const logo = DEMO ? `<div class="mm-stamped">${LOGO}<span class="mm-stamp">DEMO</span></div>` : LOGO;
     const play = this.hasRun ? 'Continue' : DEMO ? 'Play the Demo' : 'New Game';
     return `<div class="mm-head">${HEART}${logo}<p class="mm-tag">AN IDLE DUNGEON CRAWLER</p></div>
@@ -178,7 +178,7 @@ export class TitleMenu {
   private confirm() {
     return `<div class="mm-head">${HEART}${LOGO}</div>
       <div class="mm-confirm">
-        <p>Start a new game? Your run (floor ${this.game.s.floor}, ${duration(this.game.s.playTime)}) will be lost.</p>
+        <p>Start a new game? Your run (floor ${fmt(this.game.s.floor)}, ${duration(this.game.s.playTime)}) will be lost.</p>
         <div class="mm-row">
           <button type="button" class="mm-btn danger" data-mm="restart">Start over</button>
           <button type="button" class="mm-btn" data-mm="main">Keep my run</button>

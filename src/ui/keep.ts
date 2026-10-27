@@ -28,7 +28,7 @@ const THINGS: Thing[] = [
   ...[15, 19, 27, 31].flatMap((x): Thing[] => [['column', x, 17], ['column', x, 22]]),
   ...([[13, 'red'], [17, 'blue'], [28, 'blue'], [32, 'red']] as const).map(([x, c]): Thing => [`wall_banner_${c}`, x, 14, 'wall']),
   ['wall_banner_green', 2, 15, 'wall'], ['wall_banner_green', 8, 15, 'wall'],
-  ['crate', 2, 20], ['crate', 4, 20], ['flask_big_red', 3, 20], ['flask_big_blue', 2, 21], ['flask_big_green', 4, 21],
+  ['flask_big_red', 3, 20], ['flask_big_blue', 2, 21], ['flask_big_green', 4, 21],
   ['chest_full_open', 6, 20], ['chest_full_open', 8, 20], ['coin', 7, 20, 'flat'], ['coin', 7, 21, 'flat'],
   ['wall_banner_yellow', 38, 15, 'wall'], ['wall_banner_yellow', 42, 15, 'wall'],
   ['chest_full_open', 40, 19], ['chest_full_open', 37, 22], ['chest_full_open', 43, 22],
@@ -54,10 +54,10 @@ const STATIONS: Station[] = [
   { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 19.55], body: [[3, 18], [3, 17]] },
   { id: 'victor', label: 'Victor', cells: [[6, 18], [7, 19], [8, 18], [7, 17]], tag: [7, 19.55], body: [[7, 18], [7, 17]] },
   // The way down works from anywhere round the stairs, not just on them.
-  { id: 'stairs', label: 'Way down', cells: [21, 22, 23, 24, 25].flatMap((x) => [29, 30, 31].map((y): [number, number] => [x, y])), tag: [23, 31.6] },
+  { id: 'stairs', label: 'Way down', cells: [21, 22, 23, 24, 25].flatMap((x) => [29, 30, 31].map((y): [number, number] => [x, y])), tag: [23, 31.6], body: [[22, 30], [23, 30], [24, 30]] },
   { id: 'heart', label: 'The Heart', cells: [[6, 5], [7, 5], [8, 5], [6, 4], [8, 4]], tag: [7, 6.1], body: [[7, 4], [7, 3]] },
 ];
-const TRIPS: Station = { id: 'trips', label: 'Expeditions', cells: [[20, 28], [19, 28], [21, 28], [20, 29], [19, 29], [21, 29]], tag: [20, 29.55] };
+const TRIPS: Station = { id: 'trips', label: 'Expeditions', cells: [[20, 28], [19, 28], [21, 28], [20, 29], [19, 29], [21, 29]], tag: [20, 29.55], body: [[20, 28]] };
 /** Where you arrive: on the stairs, facing up into the Entrance. */
 const ARRIVE: [number, number] = [23, 29];
 const SPEED = 5.5;

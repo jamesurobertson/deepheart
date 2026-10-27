@@ -89,6 +89,16 @@ const TRADER_LINES: Record<Trader, Record<'hello' | 'short' | 'new' | 'dupe', st
 };
 const pickLine = (lines: string[]) => lines[Math.floor(Math.random() * lines.length)];
 
+/** What a Spirit boosts, a companion skill it names underlined (hover it for what the skill is and does). */
+function skillText(what: string) {
+  let out = esc(what);
+  for (const a of ABILITIES) {
+    const phrase = a.id === 'crit' ? 'Critical hit' : a.name;
+    if (out.includes(phrase)) out = out.replace(phrase, `<span class="skill-u" data-tip="skill:${a.id}">${phrase}</span>`);
+  }
+  return out;
+}
+
 /** A Legend in full: what it boosts and by how much now (level 1, if not summoned), the next four levels with their
  *  cost, and the rule worth knowing. */
 function legendDetail(d: LegendDef, lv: number): string {
@@ -96,7 +106,7 @@ function legendDetail(d: LegendDef, lv: number): string {
   const rows = Array.from({ length: 4 }, (_, k) => now + 1 + k)
     .filter((n) => !d.maxLv || n <= d.maxLv)
     .map((n) => `<tr><td>Level ${n}</td><td>${G.soul(1.2)} ${fmt(legendCost(d, n - 1))}</td><td>${esc(d.value(n))}</td></tr>`).join('');
-  return `<p class="od-what">${esc(d.what)}: <b class="od-now">${esc(d.value(now))}</b>${lv ? '' : ' at level 1'}</p>
+  return `<p class="od-what">${skillText(d.what)}: <b class="od-now">${esc(d.value(now))}</b>${lv ? '' : ' at level 1'}</p>
     ${rows ? `<table class="od-lv">${rows}</table>` : ''}
     ${d.maxLv ? `<p class="od-max">Max level ${d.maxLv}</p>` : ''}
     ${d.note ? `<p class="od-note">${esc(d.note)}</p>` : ''}`;
@@ -157,7 +167,7 @@ const fullGameOnly = (i: number) => DEMO && i >= DEMO_COMPANIONS;
 /** What it takes to meet a companion who hasn't joined yet. */
 const meetText = (def: { floor: number; heart?: number }, bestFloor: number) =>
   fullGameOnly(COMPS.indexOf(def as (typeof COMPS)[number])) ? 'In the full game'
-    : bestFloor < def.floor ? `Reach floor ${def.floor} to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
+    : bestFloor < def.floor ? `Reach floor ${fmt(def.floor)} to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
 
 /** A relic's stars, as little gold glyphs after its name. */
 /** A small rate with up to two decimals (1.15, not 1.1); big ones as usual. */
@@ -688,7 +698,7 @@ export class Ui {
           if (this.game.s.heroTips === 1) this.game.s.heroTips = 2;
           this.hooks.sound('toggle', { vol: 0.6 });
           this.refreshTip();
-        }
+        } else this.deny(hero);
         return;
       }
       const pick = t.closest<HTMLElement>('[data-vault-hero]');
@@ -1135,7 +1145,7 @@ export class Ui {
         // A cleared floor: say so in the middle of the field, and give the floor bar a gold flash as it ticks over.
         if (ev.cleared) {
           const mid = this.scene.fieldScreen();
-          this.pop(mid.x, mid.y, `Floor ${ev.floor - 1} cleared!`, 'p-floor');
+          this.pop(mid.x, mid.y, `Floor ${fmt(ev.floor - 1)} cleared!`, 'p-floor');
           this.el.floorBox.classList.remove('advance');
           void this.el.floorBox.offsetWidth;
           this.el.floorBox.classList.add('advance');
@@ -1169,7 +1179,7 @@ export class Ui {
           }
           this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold${ev.souls ? ` · +${ev.souls} souls` : ''}`, 'clutch');
         }
-        else if (ev.first) this.banner('Victory!', `Floor ${ev.floor} conquered${ev.souls ? ` · +${ev.souls} soul${ev.souls === 1 ? '' : 's'}` : ''}`, 'win');
+        else if (ev.first) this.banner('Victory!', `Floor ${fmt(ev.floor)} conquered${ev.souls ? ` · +${ev.souls} soul${ev.souls === 1 ? '' : 's'}` : ''}`, 'win');
         else if (ev.souls) this.banner('Champion boss down!', `+${ev.souls} soul${ev.souls === 1 ? '' : 's'}`, 'win');
         break;
       case 'bossFail':
@@ -1275,6 +1285,16 @@ export class Ui {
       case 'expedition':
         this.rowCache[ev.comp] = '';
         this.tripsBack.push({ comp: ev.comp, floor: ev.floor, kills: ev.kills, cards: this.tripCards.splice(0) });
+        break;
+      // Gathered for a moment, so a catch-up after time away is one toast, not one per hunter.
+      case 'tripFind': {
+        const had = this.tripFinds.get(ev.comp) ?? { cards: 0, gold: 0 };
+        this.tripFinds.set(ev.comp, { cards: had.cards + ev.cards, gold: had.gold + ev.gold });
+        break;
+      }
+      case 'hunterHere':
+        this.rowCache[ev.comp] = '';
+        if (ev.on) this.toast(`<b>${esc(COMPS[ev.comp].name)}</b> fights with you on floor ${fmt(g.s.floor)}`, COMPS[ev.comp].sprite);
         break;
       case 'tripsOpen': this.toast('<b>Expeditions</b> are open: the ladder in the Keep', COMPS[ev.comp].sprite, 'trophy'); break;
       case 'legend': if (ev.summoned) this.toast(`<b>${esc(LEGEND_BY_ID.get(ev.id)!.name)}</b> joins you`, LEGEND_BY_ID.get(ev.id)!.sprite); break;
@@ -1649,7 +1669,7 @@ export class Ui {
     this.el.heartBtn.hidden = !AWAKEN_ON || !teased;
     if (AWAKEN_ON && teased && !g.s.heartTeased) {
       g.s.heartTeased = true;
-      if (!g.s.awakens) this.toast(`<b>Something beats below</b> Floor ${TUNE.awakenFloor}`, 'ui_heart_full', 'trophy');
+      if (!g.s.awakens) this.toast(`<b>Something beats below</b> Floor ${fmt(TUNE.awakenFloor)}`, 'ui_heart_full', 'trophy');
     }
     const bound = g.canAwaken() ? g.pendingBound() : 0;
     this.el.heartBadge.hidden = bound < 1;
@@ -1678,6 +1698,7 @@ export class Ui {
     this.hints();
     if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'trips', 'stats', 'party', 'records', 'ascents', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
     if (this.tripsBack.length && (!this.modal || this.modal === 'trips') && !this.descending && !this.keepFading) this.showTripsBack();
+    this.tellTripFinds();
     this.refreshTip();
   }
 
@@ -1704,7 +1725,7 @@ export class Ui {
     const key = `${s.floor}|${s.maxFloor}|${s.auto}|${boss}|${page}|${owned}`;
     if (key !== this.floorKey) {
       this.floorKey = key;
-      setText(this.el.floorN, `Floor ${s.floor}`);
+      setText(this.el.floorN, `Floor ${fmt(s.floor)}`);
       const mods = boss ? g.bossMods() : [];
       // Two tags fit; the rest show as a count (hover for them all).
       if (mods.length) this.el.floorSub.innerHTML = `Boss <span class="chips">${modChips(mods.slice(0, mods.length > 2 ? 1 : 2))}${mods.length > 2 ? `<em class="mod more" style="--mc:var(--dim)">+${mods.length - 1}</em>` : ''}</span>`;
@@ -1727,7 +1748,7 @@ export class Ui {
         const kind = f % 10 === 0 ? ' zone' : f % 5 === 0 ? ' boss' : '';
         const badge = kind ? (f % 10 === 0 ? CROWN : SKULL) : '';
         const pin = state === 'now' ? `<b class="pin">${charFit(COMPS[owned].sprite, 14)}</b>` : '';
-        return `<button class="fm ${state}${kind}${f === fresh ? ' fresh' : ''}" style="--x:${x}%;--y:${y}%" data-goto="${f}" data-tip="fm:${f}"${state === 'locked' ? ' disabled' : ''}>${floorArt(f, kind ? 26 : 20)}${badge}<span class="num">${f}</span>${pin}</button>`;
+        return `<button class="fm ${state}${kind}${f === fresh ? ' fresh' : ''}" style="--x:${x}%;--y:${y}%" data-goto="${f}" data-tip="fm:${f}"${state === 'locked' ? ' disabled' : ''}>${floorArt(f, kind ? 26 : 20)}${badge}<span class="num">${fmt(f)}</span>${pin}</button>`;
       }).join('');
       // The corridor runs in from the page before and on to the next; stretches you've walked are lit.
       const path = [[0, 57], ...spots, [100, 57]];
@@ -1816,7 +1837,7 @@ export class Ui {
       const mystery = i === revealed && i > 0 && g.s.owned[i] === 0;
       const locked = !g.compUnlocked(i);
       const q = g.compQuote(i);
-      const trip = g.s.expeditions.find((e) => e.comp === i);
+      const trip = g.s.expeditions.find((e) => e.comp === i && e.pausedAt === undefined);
       const can = !locked && !mystery && !trip && g.s.gold.gte(q.cost);
       row.classList.toggle('can', can);
       row.classList.toggle('away', !!trip);
@@ -1827,12 +1848,12 @@ export class Ui {
       const lv = g.s.owned[i];
       const traits = lv > 0 && !locked && !mystery ? this.traitStates(i, offer) : [];
       const marks = g.s.marks[i];
-      const key = [mystery, locked, q.n, q.cost.toString(), lv, can, marks, g.s.settings.notation, Math.round(g.compDps(i).plus(1).log10() * 20), traits.join(''), !!trip].join('|');
+      const key = [mystery, locked, q.n, q.cost.toString(), lv, can, marks, g.s.settings.notation, Math.round(g.compDps(i).plus(1).log10() * 20), traits.join(''), trip?.floor].join('|');
       if (key === this.rowCache[i]) return;
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
       row.querySelector('.gen-name')!.innerHTML = `${name}${marks && !locked && !mystery ? ` <span class="marks" data-tip="mark:${i}">${G.heart(1.5)}${marks}</span>` : ''}${q.n > 1 && !locked && !mystery ? ` <small>×${q.n}</small>` : ''}`;
-      row.querySelector('.gen-cost')!.innerHTML = trip ? '<span class="need trip-tag">Expedition</span>' : locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.bestFloor)}</span>` : gold(q.cost, can ? 'ok' : 'no');
+      row.querySelector('.gen-cost')!.innerHTML = trip ? `<span class="need trip-tag">Expedition · floor ${fmt(trip.floor)}</span>` : locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.bestFloor)}</span>` : gold(q.cost, can ? 'ok' : 'no');
       row.querySelector('.gen-lv')!.textContent = lv ? `Lv ${lv}` : '';
       row.querySelector('.gen-dps')!.textContent = trip ? '' : lv ? `${fmt(g.compDps(i))} dps` : '';
       // Owned traits and the next one only: the rest show up as you buy your way along. Past the last trait, the next
@@ -2254,7 +2275,7 @@ export class Ui {
       if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. ${meetText(def, g.s.bestFloor)}.</p>`;
       if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">A new companion is on their way. Earn more gold to meet them.</p>`;
       // Away hunting: the trip, not the hire.
-      const trip = g.s.expeditions.find((e) => e.comp === i);
+      const trip = g.s.expeditions.find((e) => e.comp === i && e.pausedAt === undefined);
       if (trip) {
         return `<div class="tt-h">${charFit(def.sprite, 30)}<b>${def.name}</b><span class="tt-own">expedition</span></div>
           <dl class="tt-trip"><div><dt>Floor</dt><dd>${trip.floor}</dd></div><div><dt>Kills</dt><dd>${fmt(g.tripKills(trip))}</dd></div>
@@ -2332,7 +2353,7 @@ export class Ui {
       const lap = inPanel ? view : c.laps.includes(onLap) ? onLap : c.laps[0];
       const goldView = inPanel && this.cardGold;
       const places = c.where[lap].filter((w) => w.floor <= g.s.bestFloor);
-      const lines = places.map((w) => `<li>${esc(w.zone)} · ${w.boss ? `floor ${w.from} boss` : `floors ${w.from}–${w.to}`}</li>`).join('');
+      const lines = places.map((w) => `<li>${esc(w.zone)} · ${w.boss ? `floor ${fmt(w.from)} boss` : `floors ${w.from}–${w.to}`}</li>`).join('');
       const common = places.flatMap((w) => w.common);
       const commonLine = common.length ? `<p class="tt-d">Most common on floor${common.length > 1 ? 's' : ''} ${common.length > 1 ? `${common.slice(0, -1).join(', ')} and ${common.at(-1)}` : common[0]}</p>` : '';
       // Until you've killed one, only where to find it: not its name.
@@ -2364,7 +2385,7 @@ export class Ui {
       return `<div class="tt-h"><b>How souls work</b></div>
         <p class="tt-d">You get them when you ascend:</p>
         <ul class="tt-l"><li>1 soul for every ${fmt(TUNE.levelsPerSoul)} companion levels you bought this run.</li>
-        <li>Champion bosses (from floor ${TUNE.goldBossFrom}) drop souls the first time you beat them each run, more the deeper they are.</li></ul>
+        <li>Champion bosses (from floor ${fmt(TUNE.goldBossFrom)}) drop souls the first time you beat them each run, more the deeper they are.</li></ul>
         <p class="tt-d">Each soul you keep adds ${soulPct(1)} damage. Or spend them on Spirits.</p>`;
     }
     if (kind === 'respec') {
@@ -2376,6 +2397,15 @@ export class Ui {
       const b = BOUND.find((x) => x.id === id)!;
       const lv = g.boundLv(b.id);
       return `<div class="tt-h">${bossFig(b, 30, 36)}<b>${esc(boundName(b))}</b><span class="tt-own">${lv ? `level ${lv}` : 'Bound'}</span></div>${boundDetail(b, lv)}`;
+    }
+    if (kind === 'skill') {
+      const a = ABILITY_BY_ID.get(id as AbilityId)!;
+      const comp = COMPS[a.comp];
+      const lasts = a.id === 'rampage' ? g.rampageDuration() : g.abilityDuration(a.id);
+      const timing = a.kind === 'button' ? `Lasts ${duration(lasts)} · every ${duration(a.cooldown ?? 0)}` : a.kind === 'charge' ? `Lasts ${duration(lasts)}` : 'Always on';
+      return `<div class="tt-h">${charFit(comp.sprite, 30)}<b>${esc(a.name)}</b><span class="tt-own">skill</span></div>
+        <p class="tt-d">${esc(a.desc)}</p>
+        <p class="tt-f">${esc(comp.name)} · level ${traitLevels(a.comp)[a.trait]}<br>${timing}</p>`;
     }
     if (kind === 'spirit') {
       const d = LEGEND_BY_ID.get(id as LegendId)!;
@@ -2412,9 +2442,9 @@ export class Ui {
       const mods = g.bossFloor() ? g.bossMods() : [];
       const champ = g.bossFloor() && g.s.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.boss && m.champ) ? g.champSouls(g.s.floor) : 0;
       const souls = champ ? `<li><em class="mod soul-chip" style="--mc:var(--soul)">${G.soul(1)} ${champ} soul${champ === 1 ? '' : 's'}</em> Champion boss</li>` : '';
-      if (souls) return `<div class="tt-h"><b>Floor ${g.s.floor} boss</b></div><ul class="tt-l">${souls}${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
-      if (!mods.length) return `<div class="tt-h"><b>Floor ${g.s.floor}</b><span class="tt-own">${esc(zoneName(g.s.floor))}</span></div><p class="tt-d">${g.bossFloor() ? `Beat the boss before the clock runs out.` : `Kill ${g.killsNeeded()} monsters to clear the floor.`}</p>${g.s.floor < 30 ? '<p class="tt-f">From floor 30, bosses start showing up with modifiers.</p>' : ''}<p class="tt-f">Click the floor number to jump to a floor.</p>`;
-      return `<div class="tt-h"><b>Floor ${g.s.floor} boss</b></div><ul class="tt-l">${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
+      if (souls) return `<div class="tt-h"><b>Floor ${fmt(g.s.floor)} boss</b></div><ul class="tt-l">${souls}${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
+      if (!mods.length) return `<div class="tt-h"><b>Floor ${fmt(g.s.floor)}</b><span class="tt-own">${esc(zoneName(g.s.floor))}</span></div><p class="tt-d">${g.bossFloor() ? `Beat the boss before the clock runs out.` : `Kill ${g.killsNeeded()} monsters to clear the floor.`}</p>${g.s.floor < 30 ? '<p class="tt-f">From floor 30, bosses start showing up with modifiers.</p>' : ''}<p class="tt-f">Click the floor number to jump to a floor.</p>`;
+      return `<div class="tt-h"><b>Floor ${fmt(g.s.floor)} boss</b></div><ul class="tt-l">${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
     }
     if (kind === 'cur') {
       const c = CURSORS.find((x) => x.id === id)!;
@@ -2435,19 +2465,19 @@ export class Ui {
       const what = f % 10 === 0 ? 'Zone boss' : f % 5 === 0 ? 'Boss' : zoneName(f).replace(/^The /, '');
       const face = f % 5 === 0 ? bossFor(f) : featuredFor(f);
       const where = f === g.s.floor ? 'You are here' : reached ? 'Click to go there' : 'Not reached yet';
-      return `<div class="tt-h">${reached ? floorArt(f, 30) : ''}<b>Floor ${f}</b><span class="tt-own">${what}</span></div><p class="tt-d">${reached ? esc(face.name) : '???'}</p><p class="tt-f">${where}</p>`;
+      return `<div class="tt-h">${reached ? floorArt(f, 30) : ''}<b>Floor ${fmt(f)}</b><span class="tt-own">${what}</span></div><p class="tt-d">${reached ? esc(face.name) : '???'}</p><p class="tt-f">${where}</p>`;
     }
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it.'}</p>`;
     if (kind === 'dock') {
       const text: Record<string, string> = {
         trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length}. Cards ${g.cardVersions()}/${g.cardVersionsTotal()}.`,
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
-        abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${g.ascendFloor()}.`),
+        abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${fmt(g.ascendFloor())}.`),
         heart: g.canAwaken() ? `Awaken for ${fmt(g.pendingBound())} bound souls` : `Bound souls ${fmt(g.boundFree())}`,
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        keep: g.s.inKeep ? `Back to floor ${g.s.floor}` : 'The Keep',
+        keep: g.s.inKeep ? `Back to floor ${fmt(g.s.floor)}` : 'The Keep',
         blade: `Phantom Blade: ${perSec(g.autoRate())} attack${g.autoRate() === 1 ? '' : 's'} a second.`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
@@ -2577,7 +2607,7 @@ export class Ui {
     const help = '<span class="soul-help" data-tip="souls:" tabindex="0" aria-label="How souls work">?</span>';
     const active = g.s.curse ? CURSE_BY_ID.get(g.s.curse) : undefined;
     const activeLine = active
-      ? `<p class="curse-now"><b>This descent is cursed: ${esc(active.name)}.</b> ${esc(active.rule)}${g.curseTier(active.id) < CURSE_FLOORS.length ? ` Reach floor ${CURSE_FLOORS[g.curseTier(active.id)]} for tier ${g.curseTier(active.id) + 1}.` : ' Every tier broken.'}</p>`
+      ? `<p class="curse-now"><b>This descent is cursed: ${esc(active.name)}.</b> ${esc(active.rule)}${g.curseTier(active.id) < CURSE_FLOORS.length ? ` Reach floor ${fmt(CURSE_FLOORS[g.curseTier(active.id)])} for tier ${g.curseTier(active.id) + 1}.` : ' Every tier broken.'}</p>`
       : '';
     const levels = g.runLevels();
     const per = TUNE.levelsPerSoul;
@@ -2590,7 +2620,7 @@ export class Ui {
         ${mult > 1 ? `<div class="as-row"><span>Soul bonus</span><b>×${+mult.toFixed(2)}</b></div>` : ''}
       </div>`;
     if (!g.descendOpen()) {
-      return `${activeLine}<div class="ascend">${rows}<div class="as-go locked"><small>The way up opens at floor ${g.ascendFloor()}</small>
+      return `${activeLine}<div class="ascend">${rows}<div class="as-go locked"><small>The way up opens at floor ${fmt(g.ascendFloor())}</small>
         <span class="as-floor">Floor ${fmt(g.s.maxFloor)} / ${g.ascendFloor()}</span>
         <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / g.ascendFloor()) * 100)}%"></i></div></div></div>`;
     }
@@ -2674,7 +2704,7 @@ export class Ui {
       <div class="lc-fig"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 88, 96)}</span><span class="ped-stone"></span></div>
       <div class="lc-nm"><b>${esc(d.name)}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
       <div class="lc-val">${esc(d.value(lv))}</div>
-      <div class="lc-what">${esc(d.what)}</div>
+      <div class="lc-what">${skillText(d.what)}</div>
       <div class="lc-next">${next}</div>
     </div>`;
   }
@@ -2754,7 +2784,7 @@ export class Ui {
       return `<button class="curse${this.curseChoice === c.id ? ' on' : ''}${done ? ' done' : ''}" data-curse="${c.id}">
         <b>${esc(c.name)} <span class="stars">${pips}</span></b>
         <small>${esc(c.rule)}</small>
-        <em>${done ? `Beaten: ${esc(c.reward(tier))}` : `Floor ${CURSE_FLOORS[tier]}: ${esc(c.reward(tier + 1))}`}</em>
+        <em>${done ? `Beaten: ${esc(c.reward(tier))}` : `Floor ${fmt(CURSE_FLOORS[tier])}: ${esc(c.reward(tier + 1))}`}</em>
       </button>`;
     }).join('');
     return `<h3>Cursed descents <span class="muted">pick one, then ascend</span></h3><div class="curse-grid">${cards}</div>`;
@@ -2926,7 +2956,7 @@ export class Ui {
       const cards = all.filter((c) => inView(c));
       if (!cards.length) return '';
       const got = cards.filter((c) => owned(c)).length;
-      const marker = here && hereLap ? ` <em class="here-mark">▸ Floor ${floor}</em>` : '';
+      const marker = here && hereLap ? ` <em class="here-mark">▸ Floor ${fmt(floor)}</em>` : '';
       return `<h3${here && hereLap ? ' class="here-zone"' : ''}><span>${esc(title)}${marker}</span> <span class="muted">${got} / ${cards.length}</span></h3><div class="card-grid">${cards.map(face).join('')}</div>`;
     };
     const tally = (l: number) => {
@@ -3038,7 +3068,7 @@ export class Ui {
       row('Unspent', fmt(g.soulsFree())),
       row('An ascent now pays', fmt(g.pendingSouls()), `${fmt(Math.floor(g.runLevels() / TUNE.levelsPerSoul))} from levels, ${fmt(g.s.bossSouls)} from champion bosses`),
       ...(RELICS_ON ? [mul('Soul gain', g.soulGainMult(), g.relic('souls') ? relicName('cage') : '', relicName('cage'))] : []),
-      ...(g.s.awakens ? [mul('Champion souls', g.champSoulMult(g.s.maxFloor), `on floor ${g.s.maxFloor}`), row('Bound souls', fmt(g.s.boundEarned), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`)] : []),
+      ...(g.s.awakens ? [mul('Champion souls', g.champSoulMult(g.s.maxFloor), `on floor ${fmt(g.s.maxFloor)}`), row('Bound souls', fmt(g.s.boundEarned), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`)] : []),
     ]);
     return `<div class="st-grid">${dps}${click}${crit}${goldT}${boss}${souls}</div>`;
   }
@@ -3062,7 +3092,7 @@ export class Ui {
     const g = this.game;
     const s = g.s;
     const rows: [string, string, boolean?][] = [
-      ['Floor', `${s.floor} (deepest this descent ${s.maxFloor})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
+      ['Floor', `${fmt(s.floor)} (deepest this descent ${fmt(s.maxFloor)})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
       ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses beaten', fmt(s.bosses)],
       ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rainbow Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
       ['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ...(RELICS_ON ? [['Relics', `${g.relicsFound()} / ${RELICS.length}`] as [string, string]] : []), ['Cards found', fmt(g.cardsFound())],
@@ -3091,17 +3121,17 @@ export class Ui {
       const trip = g.s.expeditions.find((e) => e.comp === i);
       if (trip) {
         const left = TRIP_HOURS * 3600 - g.tripSeconds(trip);
+        const time = trip.pausedAt !== undefined ? 'With you' : `${duration(Math.max(0, left))} left`;
         return `<div class="trip away" data-hunter="${i}"><span class="trip-ico">${charFit(c.sprite, 34)}</span>
-          <span class="trip-mid"><b>${esc(c.name)}</b><small>Floor ${trip.floor} · ${fmt(g.tripKills(trip))} kills · ${fmt(trip.found?.length ?? 0)} cards · ${duration(Math.max(0, left))} left</small></span>
+          <span class="trip-mid"><b>${esc(c.name)}</b><small>Floor ${fmt(trip.floor)} · ${fmt(g.tripKills(trip))} kills · ${fmt(trip.found?.length ?? 0)} cards · ${time}</small></span>
           <button class="btn small" data-act="tripHome">Call home</button></div>`;
       }
       if (g.s.owned[i] < EXPEDITION_LEVEL) return '';
       const floor = Math.min(g.s.bestFloor, this.tripPick[i] ?? g.tripFloor(i));
       const dps = g.compDps(i);
-      const takes = ABILITIES.filter((a) => a.comp === i && g.abilityUnlocked(a.id)).map((a) => a.name);
       return `<div class="trip" data-hunter="${i}"><span class="trip-ico">${charFit(c.sprite, 34)}</span>
         <span class="trip-mid"><b>${esc(c.name)} <small>Lv ${g.s.owned[i]}</small></b>
-        <small>${rate(g.tripRate(floor, dps))} kills/s · ${rate(g.tripCardsPerDay(floor, dps))} cards a day${takes.length ? ` · <span class="trip-takes">Takes ${esc(takes.join(', '))}</span>` : ''}</small></span>
+        <small>${rate(g.tripRate(floor, dps))} kills/s</small></span>
         <label class="trip-floor">Floor <input type="number" id="trip-floor-${i}" min="1" max="${g.s.bestFloor}" value="${floor}" data-trip="${i}"></label>
         <button class="btn small primary" data-act="tripGo">Send</button></div>`;
     }).join('');
@@ -3116,7 +3146,7 @@ export class Ui {
       bar = `<button class="btn primary big" data-act="awaken">Awaken for ${boundGlyph()} ${fmt(g.pendingBound())}</button>`;
     } else if (!g.s.awakens) {
       const best = Math.max(g.s.cycleBest, g.s.maxFloor);
-      bar = `<p>Deepest floor <b>${best} / ${TUNE.awakenFloor}</b></p><div class="bar heart-bar"><i style="width:${Math.min(100, (best / TUNE.awakenFloor) * 100)}%"></i></div>`;
+      bar = `<p>Deepest floor <b>${fmt(best)} / ${fmt(TUNE.awakenFloor)}</b></p><div class="bar heart-bar"><i style="width:${Math.min(100, (best / TUNE.awakenFloor) * 100)}%"></i></div>`;
     } else {
       const at = g.nextBoundAt();
       bar = `<p>Souls this cycle <b>${fmt(cycle)} / ${fmt(at)}</b></p><div class="bar heart-bar"><i style="width:${Math.min(100, (Math.log10(Math.max(1, cycle)) / Math.log10(at)) * 100)}%"></i></div>`;
@@ -3303,7 +3333,7 @@ export class Ui {
             <div class="aw-faces${first ? ' shade' : ''}">${faces}</div>
           </section>
           <section class="aw-lose"><h4>Lose</h4>
-            <dl class="stats">${row(`${G.soul(1.5)} Souls`, fmt(g.s.souls))}${row('Spirits', fmt(g.legendsOwned()))}${row(`${G.heart(1.5)} Heartmarks`, fmt(g.marksTotal()))}${row('This run', `floor ${g.s.maxFloor}`)}</dl>
+            <dl class="stats">${row(`${G.soul(1.5)} Souls`, fmt(g.s.souls))}${row('Spirits', fmt(g.legendsOwned()))}${row(`${G.heart(1.5)} Heartmarks`, fmt(g.marksTotal()))}${row('This run', `floor ${fmt(g.s.maxFloor)}`)}</dl>
           </section>
         </div>
         <p class="aw-kept">Kept: cards, trophies, companions${away ? ` · ${away} on ${away === 1 ? 'an expedition comes' : 'expeditions come'} home` : ''}</p>
@@ -3632,7 +3662,7 @@ export class Ui {
     const c = this.el.curtain;
     c.hidden = false;
     c.className = 'curtain in';
-    c.querySelector('b')!.textContent = up ? 'The Keep' : `Floor ${g.s.floor}`;
+    c.querySelector('b')!.textContent = up ? 'The Keep' : `Floor ${fmt(g.s.floor)}`;
     c.querySelector('span')!.textContent = '';
     this.hooks.sound('descend', { vol: 0.5 });
     setTimeout(() => {
@@ -3674,6 +3704,23 @@ export class Ui {
     }
   }
 
+  /** Hunters' finds out on their trips, not yet told (one toast for them all, from update). */
+  private tripFinds = new Map<number, { cards: number; gold: number }>();
+
+  /** "Squire found 2 cards · Ranger found a gold card". */
+  private tellTripFinds() {
+    if (!this.tripFinds.size) return;
+    const parts = [...this.tripFinds].map(([comp, f]) => {
+      const plain = f.cards - f.gold;
+      const what = [plain ? (plain === 1 ? 'a card' : `${fmt(plain)} cards`) : '', f.gold ? (f.gold === 1 ? 'a gold card' : `${fmt(f.gold)} gold cards`) : ''].filter(Boolean).join(' and ');
+      return `<b>${esc(COMPS[comp].name)}</b> found ${what}`;
+    });
+    const first = [...this.tripFinds.keys()][0];
+    this.tripFinds.clear();
+    this.toast(parts.join(' · '), COMPS[first].sprite);
+    this.hooks.sound('card', { vol: 0.35, rate: 1.2 });
+  }
+
   /** Cards from a hunt as they come in, and the hunters home but not yet shown. */
   private tripCards: Extract<GameEvent, { t: 'card' }>[] = [];
   private tripsBack: { comp: number; floor: number; kills: number; cards: Extract<GameEvent, { t: 'card' }>[] }[] = [];
@@ -3685,7 +3732,7 @@ export class Ui {
     this.modal = 'offline';
     this.el.modalWrap.hidden = false;
     this.el.modal.className = 'modal pnl m-offline';
-    const who = back.map((b) => `<p>${charFit(COMPS[b.comp].sprite, 22)} <b>${esc(COMPS[b.comp].name)}</b> · floor ${b.floor} · ${fmt(b.kills)} kills</p>`).join('');
+    const who = back.map((b) => `<p>${charFit(COMPS[b.comp].sprite, 22)} <b>${esc(COMPS[b.comp].name)}</b> · floor ${fmt(b.floor)} · ${fmt(b.kills)} kills</p>`).join('');
     this.el.modal.innerHTML = `<header class="m-head"><h2>Back from ${back.length === 1 ? 'an expedition' : 'expeditions'}</h2></header>
       <div class="offline">
         ${who}
@@ -3703,7 +3750,7 @@ export class Ui {
     this.el.modal.innerHTML = `<header class="m-head"><h2>Welcome back</h2></header>
       <div class="offline">
         <p>You were away for <b>${duration(o.seconds)}</b>.</p>
-        <p>Your party kept fighting, killed <b>${kills}</b>${o.floor ? ` and reached <b>floor ${o.floor}</b>` : ''}, and looted</p>
+        <p>Your party kept fighting, killed <b>${kills}</b>${o.floor ? ` and reached <b>floor ${fmt(o.floor)}</b>` : ''}, and looted</p>
         <div class="offline-v">${sprite('coin', 5)}<b>${fmt(o.gold)}</b></div>
         <p class="muted">gold</p>
         ${o.cards.length ? `<p>and found <b>${o.cards.length === 1 ? 'a card' : `${o.cards.length} cards`}</b></p><div class="offline-cards">${this.offlineCardsHtml(o.cards)}</div>` : ''}

@@ -1960,9 +1960,10 @@ export class Scene {
           if (any) this.addShake(0.15);
         }
         const z = zoneOf(ev.floor);
-        // Going down into a zone you haven't reached this descent: the staircase. Not while blitzing back through old
-        // floors after a descent (sweeping them in seconds), where a staircase every ten floors would just stall you.
-        const deeper = z > zoneOf(this.lastFloor) && ev.floor >= game.s.maxFloor && this.time - this.sweptAt > 4;
+        // Walking down into a zone you haven't reached this descent: the staircase. Not on a jump (Auto back on, the
+        // floor box), which skips the floors in between, and not while blitzing back through old floors after a descent
+        // (sweeping them in seconds), where a staircase every ten floors would just stall you.
+        const deeper = z > zoneOf(this.lastFloor) && ev.floor === this.lastFloor + 1 && ev.floor >= game.s.maxFloor && this.time - this.sweptAt > 4;
         // The demo ends at the bottom of its last staircase, so that one always plays (the game has stopped by then).
         const demoEnd = z === this.endBefore;
         this.lastFloor = ev.floor;

@@ -372,12 +372,18 @@ export interface SaveState {
   settings: Settings;
 }
 
-/** A companion out hunting cards: on which floor, its damage a second when it left, and when it left (ms). */
+/** A companion out hunting cards: on which floor, at what damage a second, and since when (ms) at that damage. While
+ *  the party is on its floor it fights with them instead (`pausedAt`): its hunt and its clock wait, and when the party
+ *  moves on it goes back to hunting at whatever strength it has by then. */
 export interface Expedition {
   comp: number;
   floor: number;
   dps: string;
   start: number;
+  /** Kills and seconds hunted before `start` (earlier stretches, at other strengths). */
+  banked?: number;
+  hunted?: number;
+  pausedAt?: number;
   /** Kills already rolled for cards, and the cards found so far (handed over when the hunter comes home). */
   rolled?: number;
   found?: { id: string; gold: boolean }[];
@@ -467,6 +473,10 @@ export type GameEvent =
   | { t: 'bound'; id: BoundId; lv: number }
   | { t: 'expedition'; comp: number; floor: number; kills: number; cards: number; gold: number }
   | { t: 'tripsOpen'; comp: number }
+  /** A hunter found cards out on its trip (kept with it until it's home). */
+  | { t: 'tripFind'; comp: number; cards: number; gold: number }
+  /** A hunter fights with the party on its floor (on), or goes back to hunting (off). */
+  | { t: 'hunterHere'; comp: number; on: boolean }
   /** `src`: dropped by a monster just killed, on a swept floor (no body to drop from), or by a goblin caught. */
   /** `first`: your first copy of the card at all; `newColor`: your first in this lap's color (and gold or not). */
   | { t: 'card'; id: string; gold: boolean; lap: number; count: number; first: boolean; newColor: boolean; src: 'kill' | 'sweep' | 'raid' | 'trip'; kill: number; copies?: number };
@@ -1683,8 +1693,10 @@ export class Game {
     // Up in the Keep someone always walks for you, even fresh from an ascent with nobody hired yet.
     if (this.s.inKeep) return this.s.hero >= 0 && this.inParty(this.s.hero) ? this.s.hero : COMPS.findIndex((_, i) => this.inParty(i));
     if (this.s.hero < 0) return -1;
+    // A hero away hunting leaves you without one (not someone else) until it's back.
+    if (this.away(this.s.hero)) return -1;
     if (this.s.owned[this.s.hero] > 0) return this.s.hero;
-    return this.s.owned.findIndex((n) => n > 0);
+    return this.s.owned.findIndex((n, k) => n > 0 && !this.away(k));
   }
 
   /** Pick a companion as your hero; picking the one you already have means no hero at all. */
@@ -1693,7 +1705,7 @@ export class Game {
       this.s.hero = -1;
       return true;
     }
-    if (this.s.owned[i] === 0) return false;
+    if (this.s.owned[i] === 0 || this.away(i)) return false;
     this.s.hero = i;
     return true;
   }
@@ -2361,12 +2373,37 @@ export class Game {
     return this.s.tripsOpen;
   }
 
+  /** Out hunting right now (not with the party on its floor). */
   away(i: number) {
-    return this.s.expeditions.some((e) => e.comp === i);
+    return this.s.expeditions.some((e) => e.comp === i && e.pausedAt === undefined);
+  }
+
+  /** The hunter whose floor the party is on fights with them; anyone else whose floor it isn't goes back to hunting. */
+  private meetHunters() {
+    const now = this.now();
+    for (const e of this.s.expeditions) {
+      const here = !this.s.inKeep && this.s.floor === e.floor;
+      if (here && e.pausedAt === undefined) {
+        this.hunt(e);
+        e.banked = this.tripKills(e, now);
+        e.hunted = this.tripSeconds(e, now);
+        e.pausedAt = now;
+        this.invalidate();
+        this.events.push({ t: 'hunterHere', comp: e.comp, on: true });
+      } else if (!here && e.pausedAt !== undefined) {
+        // (Its strength now: levels bought while it was here count from here on.)
+        const dps = this.compDps(e.comp);
+        if (dps.gt(0)) e.dps = dps.toString();
+        e.start = now;
+        e.pausedAt = undefined;
+        this.invalidate();
+        this.events.push({ t: 'hunterHere', comp: e.comp, on: false });
+      }
+    }
   }
 
   canSend(i: number) {
-    return this.s.tripsOpen && this.s.owned[i] >= EXPEDITION_LEVEL && !this.away(i);
+    return this.s.tripsOpen && this.s.owned[i] >= EXPEDITION_LEVEL && !this.s.expeditions.some((e) => e.comp === i);
   }
 
   /** Send a companion to hunt a floor you've reached; it leaves the party (and takes its traits) until it's back. */
@@ -2420,12 +2457,15 @@ export class Game {
     return (this.tripRate(floor, dps) * 86400 * this.tripLuck(floor, dps)) / odds;
   }
 
+  /** Seconds hunted in all (the time the party spent on its floor doesn't count), up to TRIP_HOURS. */
   tripSeconds(e: Expedition, now = this.now()) {
-    return Math.max(0, Math.min(TRIP_HOURS * 3600, (now - e.start) / 1000));
+    const stretch = e.pausedAt !== undefined ? 0 : (now - e.start) / 1000;
+    return Math.max(0, Math.min(TRIP_HOURS * 3600, (e.hunted ?? 0) + stretch));
   }
 
   tripKills(e: Expedition, now = this.now()) {
-    return Math.floor(this.tripRate(e.floor, new Decimal(e.dps)) * this.tripSeconds(e, now));
+    const stretch = this.tripSeconds(e, now) - (e.hunted ?? 0);
+    return (e.banked ?? 0) + Math.floor(this.tripRate(e.floor, new Decimal(e.dps)) * Math.max(0, stretch));
   }
 
   /** Bring a hunter home with what it found: every kill rolls for its card, as it would in the dungeon. */
@@ -2433,7 +2473,7 @@ export class Game {
     const k = this.s.expeditions.findIndex((e) => e.comp === i);
     if (k < 0) return false;
     const [e] = this.s.expeditions.splice(k, 1);
-    this.hunt(e);
+    this.hunt(e, true);
     const kills = this.tripKills(e);
     const before = this.events.length;
     for (const f of e.found ?? []) this.giveCard(f.id, f.gold, 'trip', e.floor);
@@ -2451,13 +2491,21 @@ export class Game {
 
   /** Roll a hunter's kills since it last rolled: what it finds is kept with the trip (saved, so a reload can't redraw
    *  it) until it comes home. */
-  private hunt(e: Expedition) {
+  private hunt(e: Expedition, quiet = false) {
     const kills = this.tripKills(e);
     const fresh = kills - (e.rolled ?? 0);
     if (fresh <= 0) return;
     e.rolled = kills;
     const found = (e.found ??= []);
-    this.huntFinds(fresh, e.floor, new Decimal(e.dps), (id, gold) => found.push({ id, gold }));
+    let cards = 0;
+    let gold = 0;
+    this.huntFinds(fresh, e.floor, new Decimal(e.dps), (id, isGold) => {
+      found.push({ id, gold: isGold });
+      cards++;
+      if (isGold) gold++;
+    });
+    // Said as it happens (not on the way home, where the cards themselves come in).
+    if (cards && !quiet) this.events.push({ t: 'tripFind', comp: e.comp, cards, gold });
   }
 
   /** Hunters roll what they've found every so often, and come home on their own once their time is up. */
@@ -2467,8 +2515,8 @@ export class Game {
     if (now - this.huntedAt < TRIP_ROLL_EVERY) return;
     this.huntedAt = now;
     for (const e of [...this.s.expeditions]) {
-      if (now - e.start >= TRIP_HOURS * 3600e3) this.callHome(e.comp);
-      else this.hunt(e);
+      if (this.tripSeconds(e, now) >= TRIP_HOURS * 3600) this.callHome(e.comp);
+      else if (e.pausedAt === undefined) this.hunt(e);
     }
   }
   private huntedAt = 0;
@@ -2779,9 +2827,16 @@ export class Game {
     this.s.totalGold = this.s.totalGold.plus(n);
   }
 
+  /** Expeditions run on real time: they keep going (rolling finds, coming home) while the dungeon is paused, up in
+   *  the Keep or at the menu. */
+  realtime() {
+    if (this.s.expeditions.length) this.meetHunters();
+    this.tickTrips();
+  }
+
   update(dt: number) {
     const s = this.s;
-    this.tickTrips();
+    this.realtime();
     if (s.inKeep) return;
     s.playTime += dt;
     this.sinceAttack += dt;

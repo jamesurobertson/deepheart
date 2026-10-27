@@ -505,6 +505,7 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 .gen-hero { position: absolute; left: 3px; top: 3px; display: none; padding: 3px; line-height: 0; color: var(--faint); cursor: pointer;
   filter: drop-shadow(0 1px 0 var(--ink)); }
 .gen.owned:hover .gen-hero, body.touch .gen.owned .gen-hero, .shop.show-stars .gen.owned .gen-hero { display: block; }
+.gen.away .gen-hero { display: none !important; }
 .gen.is-hero .gen-hero { display: block; color: var(--gold-hi);
   filter: drop-shadow(0 1px 0 var(--ink)) drop-shadow(0 0 3px rgba(255, 210, 100, 0.7)); }
 .gen-hero:hover { color: var(--gold-hi); }
@@ -1507,7 +1508,6 @@ body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .a
 .trip-mid b { font: 700 15px/1.05 var(--f-text); color: var(--text); }
 .trip-mid b small { font: 400 16px/1 'Jersey 10'; color: var(--dim); margin-left: 4px; }
 .trip-mid > small { font: 400 17px/1.1 'Jersey 10'; color: var(--dim); font-variant-numeric: tabular-nums; }
-.trip-takes { color: var(--ess-hi); }
 .trip-floor { display: flex; align-items: center; gap: 6px; font: 400 17px/1 'Jersey 10'; color: var(--dim); }
 .trip-floor input { width: 64px; padding: 4px 6px; font: 400 18px/1 'Jersey 10'; color: var(--text); background: rgba(0, 0, 0, 0.35); border: 2px solid #5a4030; font-variant-numeric: tabular-nums; }
 .trip.away { opacity: 0.85; }
@@ -1515,7 +1515,15 @@ body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .a
   .trip { grid-template-columns: 40px 1fr auto; }
   .trip-floor { grid-column: 2; }
 }
-.gen.away { opacity: 0.55; }
+/* On an expedition: not the greyed look of a companion you can't afford. Faint stripes across the card and the figure
+   faded. */
+.gen.away::before { display: none; }
+.gen.away::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(135deg, rgba(255, 224, 138, 0.06) 0 6px, transparent 6px 14px); }
+.gen.away .gen-ico, .gen.away .gen-ico .px, .gen.away img { opacity: 0.45; filter: grayscale(0.6); }
+.gen.away .traits { opacity: 0.5; }
+.gen.away .gen-lv { color: var(--dim); }
+/* (The narrower face: "Expedition · floor 10,000" fits the row where the pixel capitals don't.) */
+.gen .need.trip-tag { display: block; font: 400 18px/1 'Jersey 10'; letter-spacing: 0.5px; color: var(--gold-hi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 .od-now.bnd { color: var(--ess-hi); }
 .spirit-u { color: #e2d2ff; text-decoration: underline dotted var(--soul); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: help; }
@@ -1658,7 +1666,6 @@ body.compact .awk-fig { height: 56px; }
 body.over-act .blade-act { display: block; }
 
 /* A companion away hunting: its row just says so; hovering it shows the trip. */
-.gen .trip-tag { color: var(--gold-hi); }
 .tt-trip { display: grid; gap: 4px; margin: 6px 0 0; min-width: 200px; }
 .tt-trip div { display: flex; align-items: baseline; }
 .tt-trip dt { flex: 1; display: flex; align-items: baseline; color: var(--dim); }
@@ -1666,3 +1673,4 @@ body.over-act .blade-act { display: block; }
 .tt-trip dd { margin: 0; color: var(--text); }
 /* Counting numbers keep their width, so nothing beside them jumps. */
 .tip, .trip-mid, .tt-trip dd { font-variant-numeric: tabular-nums; }
+.skill-u { text-decoration: underline dotted var(--gold-hi); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: help; }
