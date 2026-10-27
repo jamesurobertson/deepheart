@@ -591,7 +591,7 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .pop.p-pick { font-size: 20px; color: var(--gold-hi); animation-name: popgold; animation-duration: 0.8s; z-index: 3; }
 @media (prefers-reduced-motion: reduce) { .drop.landed, .sparks b, .coin-fly .px, .drop.spinning .px { animation: none; } }
 .gen-lv { font: 400 28px/1 'Jersey 10'; color: rgba(241, 228, 204, 0.55); text-shadow: var(--shadow); font-weight: 400; }
-.gen-dps { font: 400 16px/1 'Jersey 10'; color: var(--faint); }
+.gen-dps { font: 400 18px/1 'Jersey 10'; color: var(--dim); text-shadow: var(--shadow); }
 .gen.can .gen-lv { color: var(--text); }
   .gen.mystery .gen-ico .px { filter: brightness(0) drop-shadow(0 0 1px rgba(180, 140, 255, 0.6)); }
   .gen.mystery .gen-name { color: var(--faint); letter-spacing: 3px; }
@@ -635,8 +635,8 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .modal-wrap > .trips-back { position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 1; box-shadow: 0 0 0 9999px rgba(6, 3, 5, 0.5), 0 8px 0 var(--ink); }
 .modal { width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 40px); overflow-y: auto; padding: 12px 12px 18px 18px; animation: modalin 0.22s; }
 /* Panels with tabs hang from the top, so switching to a shorter tab doesn't move the tabs. */
-.modal-wrap:has(> .m-trophies, > .m-cards, > .m-abyss, > .m-marks, > .m-heart, > .m-stats, > .m-party, > .m-records) { align-items: start; }
-.modal-wrap:has(> .m-trophies, > .m-cards, > .m-abyss, > .m-marks, > .m-heart, > .m-stats, > .m-party, > .m-records) > .modal { margin-top: 20px; }
+.modal-wrap:has(> .m-trophies, > .m-cards, > .m-abyss, > .m-marks, > .m-heart, > .m-stats, > .m-party, > .m-records, > .m-ascents) { align-items: start; }
+.modal-wrap:has(> .m-trophies, > .m-cards, > .m-abyss, > .m-marks, > .m-heart, > .m-stats, > .m-party, > .m-records, > .m-ascents) > .modal { margin-top: 20px; }
 .m-head { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 2px solid #2d2224; }
 .m-head h2 { margin: 0; font: 400 38px/0.9 'Jersey 10'; letter-spacing: 1px; color: var(--gold-hi); text-shadow: var(--shadow); }
 .m-head span { flex: 1; font: 400 20px/1 'Jersey 10'; color: var(--dim); display: inline-flex; align-items: center; gap: 6px; }
@@ -717,6 +717,8 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 .as-floor { font: 400 22px/1 'Jersey 10'; color: var(--text); }
 .as-go .bar { width: 100%; margin: 0; }
 .soul-help { display: inline-grid; place-items: center; width: 18px; height: 18px; font: 400 15px/1 'Jersey 10'; color: var(--ink); background: var(--soul); border-radius: 50%; cursor: help; text-transform: none; }
+/* The demo's: just the way up. */
+.ascend:has(> .as-go:only-child) { grid-template-columns: 1fr; }
 @media (max-width: 560px) { .ascend { grid-template-columns: 1fr; } }
 
 /* Summoning: three Spirits on stone pedestals. Not yours yet, a Spirit is a ghost; the picked one materializes. */
@@ -1041,7 +1043,7 @@ body.compact .m-head h2 { font-size: 30px; }
 body.compact .m-head span { font-size: 16px; order: 3; flex-basis: 100%; }
 body.compact .m-head .btn { position: absolute; right: 12px; top: 10px; }
 body.compact .modal { position: relative; }
-body.compact .modal-wrap:has(> .m-trophies, > .m-cards, > .m-abyss, > .m-marks, > .m-heart, > .m-stats, > .m-party, > .m-records) > .modal { margin-top: calc(8px + var(--safe-t)); }
+body.compact .modal-wrap:has(> .m-trophies, > .m-cards, > .m-abyss, > .m-marks, > .m-heart, > .m-stats, > .m-party, > .m-records, > .m-ascents) > .modal { margin-top: calc(8px + var(--safe-t)); }
 body.compact .tro-grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 4px; }
 body.compact .tro { width: auto; height: auto; aspect-ratio: 1; }
 body.compact .aby-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
@@ -1221,8 +1223,8 @@ body.compact .bd th { font-size: 13px; }
 body.compact .bd td { font-size: 18px; }
 body.compact .bd.wide td { padding-left: 6px; font-size: 15px; }
 /* Same height on every stats tab, so the tabs don't jump when you switch. */
-.modal.m-stats, .modal.m-party, .modal.m-records { height: min(700px, calc(100vh - 40px)); }
-body.compact .modal.m-stats, body.compact .modal.m-party, body.compact .modal.m-records { height: calc(100dvh - 16px - var(--safe-t) - var(--safe-b)); }
+.modal.m-stats, .modal.m-party, .modal.m-records, .modal.m-ascents { height: min(700px, calc(100vh - 40px)); }
+body.compact .modal.m-stats, body.compact .modal.m-party, body.compact .modal.m-records, body.compact .modal.m-ascents { height: calc(100dvh - 16px - var(--safe-t) - var(--safe-b)); }
 
 /* ---------- monster cards ---------- */
 

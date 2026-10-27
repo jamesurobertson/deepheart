@@ -1,7 +1,8 @@
 /** The demo build (`npm run build:demo`, VITE_DEMO=1): the game up to the floor-30 boss. Beating it and taking the
  *  stairs down ends the demo; the companions after the Shadow Thief stay locked. */
-// (import.meta.env is Vite's: under plain Node, as the pacing scripts run, it's absent and this is the full game.)
-export const DEMO = import.meta.env?.VITE_DEMO === '1';
+// (__DEMO__ is set by vite.config.ts: under plain Node, as the pacing scripts run, it's absent and this is the full game.)
+declare const __DEMO__: boolean;
+export const DEMO: boolean = typeof __DEMO__ === 'boolean' ? __DEMO__ : false;
 export const DEMO_LAST_FLOOR = 30;
 /** Companions from this place in the roster on (the Corsair Captain, after the Shadow Thief) are in the full game. */
 export const DEMO_COMPANIONS = 8;

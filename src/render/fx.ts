@@ -487,6 +487,19 @@ export class Fx {
     this.stains.splice(i, 1);
   }
 
+  /** A new floor: the last one's blood and spray fade out quickly (their opacity follows their life from these). */
+  fadeGround() {
+    for (const st of this.stains) st.life = Math.min(st.life, 2.5);
+    for (const sp of this.sprays) sp.life = Math.min(sp.life, 1.2);
+  }
+
+  /** A new room (the stairwell, a new zone): nothing on the floor comes along. */
+  clearGround() {
+    while (this.stains.length) this.dropStain(0);
+    while (this.sprays.length) this.dropSpray(0);
+    for (const d of this.decals) d.life = 0;
+  }
+
   /** Column of light (level-ups, awakenings, boss kills): a sheet facing the camera, brightest at its core and its foot,
    *  soft at the sides and fading out as it rises. */
   pillar(at: THREE.Vector3, color: THREE.ColorRepresentation, height = 6, dur = 0.9) {
