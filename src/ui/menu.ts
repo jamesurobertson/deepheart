@@ -2,7 +2,7 @@ import { COMPS, zoneName } from '../game/data.ts';
 import { duration, fmt } from '../game/format.ts';
 import type { Game } from '../game/game.ts';
 import { DEMO, STEAM_URL, WIKI_URL } from '../demo.ts';
-import { GAME_VERSION, olderVersion } from '../version.ts';
+import { GAME_VERSION } from '../version.ts';
 import { G, spriteFrames } from './px.ts';
 
 export interface MenuHooks {
@@ -66,7 +66,7 @@ export class TitleMenu {
   private game: Game;
   private hasRun: boolean;
   private hooks: MenuHooks;
-  private view: 'main' | 'credits' | 'confirm' | 'old' = 'main';
+  private view: 'main' | 'credits' | 'confirm' = 'main';
   /** An older save was set aside: everyone starts fresh on this version. */
   private freshStart: boolean;
   /** Up and down (or W and S) move through the menu, wrapping round; Enter or Space picks; Escape backs out. While the
@@ -110,11 +110,11 @@ export class TitleMenu {
     canvas.tabIndex = 0;
     canvas.setAttribute('aria-label', 'The stairway: left and right (or A and D) walk, up, W or Space jumps, down or S drops a step, Escape goes back to the menu');
     this.el.appendChild(canvas);
-    // Your hero, once you move them, draws on a layer over the menu: they can jump onto the DEMO stamp and the Wishlist
-    // button, which are the panel's.
+    // Your hero, once you move them, draws on a layer over the menu: the menu's words are ledges too, floating in the
+    // dark (the heart, the title, the tagline, every line of the list, the DEMO stamp and the Wishlist button).
     const actor = document.createElement('canvas');
     actor.className = 'mm-actor';
-    this.stairs = new Stairs(canvas, actor, game, () => [...this.el.querySelectorAll<HTMLElement>('.mm-stamp, .mm-btn.steam')]);
+    this.stairs = new Stairs(canvas, actor, game, () => [...this.el.querySelectorAll<HTMLElement>('.mm-heart, .mm-logo, .mm-tag, .mm-list > *, .mm-run, .mm-stamp, .mm-btn.steam')].map(textBox));
     const panel = document.createElement('div');
     panel.className = 'mm-panel';
     this.el.appendChild(panel);
@@ -140,23 +140,18 @@ export class TitleMenu {
   }
 
   private act(what: string | undefined) {
-    // A save from an older version is offered a fresh start first.
-    if (what === 'play') this.hasRun && olderVersion(this.game.s.version) ? this.show('old') : this.hooks.play();
-    else if (what === 'keep') {
-      this.game.s.version = GAME_VERSION;
-      this.hooks.play();
-    }
+    if (what === 'play') this.hooks.play();
     else if (what === 'new') this.hasRun ? this.show('confirm') : this.hooks.play();
     else if (what === 'restart') this.hooks.newGame();
     else if (what === 'options') this.hooks.options();
     else if (what === 'quit') this.hooks.quit?.();
-    else if (what === 'credits' || what === 'main' || what === 'confirm' || what === 'old') this.show(what);
+    else if (what === 'credits' || what === 'main' || what === 'confirm') this.show(what);
   }
 
-  private show(view: 'main' | 'credits' | 'confirm' | 'old') {
+  private show(view: 'main' | 'credits' | 'confirm') {
     this.view = view;
     const panel = this.el.querySelector<HTMLElement>('.mm-panel')!;
-    panel.innerHTML = view === 'credits' ? this.credits() : view === 'confirm' ? this.confirm() : view === 'old' ? this.oldSave() : this.mainMenu();
+    panel.innerHTML = view === 'credits' ? this.credits() : view === 'confirm' ? this.confirm() : this.mainMenu();
     panel.querySelector<HTMLElement>(view === 'credits' ? '[data-mm="main"]' : 'button, a')?.focus({ preventScroll: true });
   }
 
@@ -167,7 +162,7 @@ export class TitleMenu {
     const logo = DEMO ? `<div class="mm-stamped">${LOGO}<span class="mm-stamp">DEMO</span></div>` : LOGO;
     const play = this.hasRun ? 'Continue' : DEMO ? 'Play the Demo' : 'New Game';
     return `<div class="mm-head">${HEART}${logo}<p class="mm-tag">AN IDLE DUNGEON CRAWLER</p></div>
-      ${this.freshStart ? '<p class="mm-run">Version 0.10 starts everyone fresh</p>' : ''}
+      ${this.freshStart ? `<p class="mm-run">Version ${GAME_VERSION.split('.').slice(0, 2).join('.')} starts everyone fresh</p>` : ''}
       ${DEMO ? `<a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}Wishlist on Steam</a>` : ''}
       <nav class="mm-list">
         <button type="button" data-mm="${this.hasRun || DEMO ? 'play' : 'new'}"><span>▸</span>${play}</button>${run}
@@ -186,17 +181,6 @@ export class TitleMenu {
         <div class="mm-row">
           <button type="button" class="mm-btn danger" data-mm="restart">Start over</button>
           <button type="button" class="mm-btn" data-mm="main">Keep my run</button>
-        </div>
-      </div>`;
-  }
-
-  private oldSave() {
-    return `<div class="mm-head">${HEART}${LOGO}</div>
-      <div class="mm-confirm">
-        <p>This save is from an older version of Deepheart. Start fresh?</p>
-        <div class="mm-row">
-          <button type="button" class="mm-btn primary" data-mm="restart">Start over</button>
-          <button type="button" class="mm-btn" data-mm="keep">Keep playing</button>
         </div>
       </div>`;
   }
@@ -230,6 +214,14 @@ function colorsOf(src: NonNullable<ReturnType<typeof spriteFrames>>): string[] {
   return out.length ? out : ['#ffd27a'];
 }
 
+/** Where a menu element's words are (not its whole box: a line of the list runs only as far as its text), as a ledge. */
+function textBox(el: HTMLElement) {
+  if (!el.textContent?.trim()) return el.getBoundingClientRect();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  return range.getBoundingClientRect();
+}
+
 /** The stairway beside the full game's menu: a wall of dungeon bricks, steps going down to the right into a red glow,
  *  torches, and your party standing on the steps in pairs. */
 class Stairs {
@@ -237,7 +229,7 @@ class Stairs {
   private ctx: CanvasRenderingContext2D;
   private actor: CanvasRenderingContext2D;
   /** The menu's elements your hero can stand on (their tops). */
-  private standOn: () => HTMLElement[];
+  private standOn: () => DOMRect[];
   private raf = 0;
   private t = 0;
   private last = 0;
@@ -265,7 +257,7 @@ class Stairs {
    *  keys can walk you off the top of the landing). */
   private geo: { S: number; minX: number; maxX: number; W: number; H: number } | null = null;
 
-  constructor(canvas: HTMLCanvasElement, actor: HTMLCanvasElement, game: Game, standOn: () => HTMLElement[]) {
+  constructor(canvas: HTMLCanvasElement, actor: HTMLCanvasElement, game: Game, standOn: () => DOMRect[]) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.actor = actor.getContext('2d')!;
@@ -459,8 +451,8 @@ class Stairs {
   }
 
   /** Your hero, free on the stairs. Each step is a ledge running to the right edge of the screen, which is a wall: walk
-   *  along it, jump up through the one above and land on it, drop (↓) through to the one below. The DEMO stamp and the
-   *  Wishlist button are ledges too, just in reach of a jump from the very end of the landing. Walk off the top of the
+   *  along it, jump up through the one above and land on it, drop (↓) through to the one below. The menu's words are ledges
+   *  too (the title, the tagline, each line of the list and so on), floating in the dark to the left. Walk off the top of the
    *  landing (or a menu element) and they fall into the dark, and the next in line takes over (until nobody's left:
    *  they're back next time the menu opens). A click walks them to where you clicked, hopping up and dropping down
    *  through the steps (and off the DEMO stamp) to the one at that height. */
@@ -470,10 +462,7 @@ class Stairs {
     const dpr = devicePixelRatio || 1;
     // The front step at x (every step above it runs past here too), or null over the void.
     const front = (x: number) => (x + 8 < landX || x + 8 > geo.W ? null : stepAt(x));
-    const extras = this.standOn().map((el) => {
-      const r = el.getBoundingClientRect();
-      return { x0: (r.left * dpr) / geo.S, x1: (r.right * dpr) / geo.S, y: (r.top * dpr) / geo.S };
-    });
+    const extras = this.standOn().map((r) => ({ x0: (r.left * dpr) / geo.S, x1: (r.right * dpr) / geo.S, y: (r.top * dpr) / geo.S }));
     /** Every ledge under x: the steps (to the front one) and the menu's elements that x is over. */
     const ledges = (x: number) => {
       const f = front(x);
