@@ -214,12 +214,24 @@ function colorsOf(src: NonNullable<ReturnType<typeof spriteFrames>>): string[] {
   return out.length ? out : ['#ffd27a'];
 }
 
-/** Where a menu element's words are (not its whole box: a line of the list runs only as far as its text), as a ledge. */
+let measure: CanvasRenderingContext2D | null = null;
+
+/** Where a menu element's words are, as a ledge: only as wide as its text (not its whole box), and starting at the top
+ *  of its letters rather than the space above them in the line. */
 function textBox(el: HTMLElement) {
-  if (!el.textContent?.trim()) return el.getBoundingClientRect();
+  const text = el.textContent?.trim();
+  if (!text) return el.getBoundingClientRect();
   const range = document.createRange();
   range.selectNodeContents(el);
-  return range.getBoundingClientRect();
+  const box = range.getBoundingClientRect();
+  // (The title is two stacked copies of the word; its font is on them.)
+  const style = getComputedStyle(el.matches('.mm-logo') ? (el.lastElementChild as HTMLElement) : el);
+  measure ??= document.createElement('canvas').getContext('2d');
+  if (!measure) return box;
+  measure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  const m = measure.measureText(text);
+  const drop = ((m.fontBoundingBoxAscent - m.actualBoundingBoxAscent) / (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) * box.height;
+  return new DOMRect(box.left, box.top + drop, box.width, box.height - drop);
 }
 
 /** The stairway beside the full game's menu: a wall of dungeon bricks, steps going down to the right into a red glow,
@@ -469,7 +481,8 @@ class Stairs {
       const out: { id: number; y: number }[] = [];
       if (f !== null) for (let j = 0; j <= f; j++) out.push({ id: j, y: stepY(j) });
       extras.forEach((e, i) => {
-        if (x + 8 >= e.x0 && x + 8 <= e.x1 && e.y > 0) out.push({ id: 100 + i, y: e.y });
+        // (Any of the feet will do on the menu's words: a ledge you can see under a boot holds you.)
+        if (x + 13 >= e.x0 && x + 3 <= e.x1 && e.y > 0) out.push({ id: 100 + i, y: e.y });
       });
       return out;
     };
