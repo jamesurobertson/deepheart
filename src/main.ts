@@ -14,11 +14,12 @@ import { Sfx, type Track } from './audio/sfx.ts';
 import { CARDS, CORRUPTION, LEGENDS, UPGRADES, lapOf, zoneOf } from './game/data.ts';
 import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
 import { TitleMenu } from './ui/menu.ts';
+import { PlayRecorder } from './record.ts';
 
 declare global {
   interface Window {
     /** Only in the desktop app (see desktop/preload.cjs). */
-    deepheart?: { onUpdate(callback: (update: { version: string }) => void): void; downloadUpdate(): void };
+    deepheart?: { onUpdate(callback: (update: { version: string }) => void): void; downloadUpdate(): void; log?(text: string): void };
   }
 }
 
@@ -121,6 +122,7 @@ async function boot() {
   };
   /** Up while the main menu is: the fight waits, and nothing is saved (time away is settled when you play). */
   let atMenu = !SKIP_MENU;
+  let recorder: PlayRecorder | null = null;
   const save = () => {
     if (resetting || atMenu) return;
     try {
@@ -391,12 +393,25 @@ async function boot() {
   }, 50);
   setInterval(save, 5000);
   addEventListener('beforeunload', save);
+  // The play log (see record.ts): your own sessions on the dev server and in the desktop app, never test runs.
+  const recording = (import.meta.env.DEV && !navigator.webdriver && !TEST_STATE && !SIM_FLOOR && !QUICK) || !!window.deepheart?.log;
+  recorder = recording
+    ? new PlayRecorder(game, SLOT, (text) => {
+      if (window.deepheart?.log) window.deepheart.log(text);
+      else fetch(`${BASE}__log`, { method: 'POST', body: text, keepalive: true }).catch(() => {});
+    })
+    : null;
+  setInterval(() => {
+    if (!atMenu && !document.hidden) recorder?.second();
+  }, 1000);
+  addEventListener('beforeunload', () => recorder?.flush());
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       hiddenAt = Date.now();
       save();
     } else if (hiddenAt) {
+      recorder?.away((Date.now() - hiddenAt) / 1000);
       catchUp((Date.now() - hiddenAt) / 1000);
       hiddenAt = 0;
       lastTick = Date.now();
@@ -455,6 +470,7 @@ async function boot() {
       scene.handle(ev, game);
       ui.handle(ev);
       playSound(sfx, ev);
+      recorder?.event(ev);
       if (ev.t === 'descend' || ev.t === 'awaken') scene.rebuild(game);
     }
     // Big impacts briefly slow everything down.

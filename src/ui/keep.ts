@@ -134,7 +134,9 @@ export class KeepView {
   private path: { x: number; y: number }[] = [];
   private cam = { x: 0, y: 0 };
   /** Where each of your party is standing and which way they face (they run to their places, never jump). */
-  private party = new Map<number, { idx: number; x: number; y: number; left: boolean; running: boolean }>();
+  private party = new Map<number, { idx: number; x: number; y: number; left: boolean; running: boolean; arriving?: { x: number; y: number }[] }>();
+  /** Once the party has been placed: anyone joining after that runs in from somewhere out of sight. */
+  private partyPlaced = false;
   private zoom = 3;
   private time = 0;
   /** The station your hero is standing at, ready to use. */
@@ -314,6 +316,26 @@ export class KeepView {
   }
 
   /** Breadth-first search over the floor, around anything standing in the way. */
+  /** The floor square nearest the hero (by walking) that's just outside the view, for a newcomer to run in from. */
+  private offscreenCell(w: number, h: number) {
+    const half = { x: w / (2 * 16 * this.zoom) + 1, y: h / (2 * 16 * this.zoom) + 1.5 };
+    const out = (x: number, y: number) => Math.abs(x + 0.5 - this.cam.x) > half.x || Math.abs(y + 0.5 - this.cam.y) > half.y;
+    const sx = Math.floor(this.hero.x), sy = Math.floor(this.hero.y);
+    const seen = new Set<string>([`${sx},${sy}`]);
+    const queue: [number, number][] = [[sx, sy]];
+    while (queue.length) {
+      const [x, y] = queue.shift()!;
+      if (out(x, y)) return { x, y };
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const key = `${x + dx},${y + dy}`;
+        if (seen.has(key) || !this.walkable(x + dx + 0.5, y + dy + 0.5)) continue;
+        seen.add(key);
+        queue.push([x + dx, y + dy]);
+      }
+    }
+    return null;
+  }
+
   private route(sx: number, sy: number, tx: number, ty: number) {
     if (!this.walkable(tx + 0.5, ty + 0.5)) return [];
     const prev = new Map<string, string | null>([[`${sx},${sy}`, null]]);
@@ -732,7 +754,38 @@ export class KeepView {
     if (heroIndex >= 0) places.set(heroIndex, 0);
     for (const [i, want] of places) {
       let at = this.party.get(i);
-      if (!at) this.party.set(i, (at = { idx: want, x: 0, y: 0, left: false, running: false }));
+      if (!at) {
+        this.party.set(i, (at = { idx: want, x: 0, y: 0, left: false, running: false }));
+        // Hired up here: in from the nearest spot just out of sight, by the way round through the rooms.
+        if (this.partyPlaced) {
+          const goal = this.along(want);
+          const from = this.offscreenCell(w, h);
+          const path = from ? this.route(from.x, from.y, Math.floor(goal.x), Math.floor(goal.y)) : [];
+          if (from && path.length) {
+            at.x = from.x + 0.5;
+            at.y = from.y + 0.5;
+            at.arriving = path;
+          }
+        }
+      }
+      if (at.arriving) {
+        // Running in: along the path, then the last stretch straight to its place in line.
+        const next = at.arriving[0] ?? this.along(at.idx);
+        const dx = next.x - at.x, dy = next.y - at.y, len = Math.hypot(dx, dy);
+        const step = SPEED * 1.6 * dt;
+        at.running = true;
+        if (Math.abs(dx) > 0.01) at.left = dx < 0;
+        if (len <= step) {
+          at.x = next.x;
+          at.y = next.y;
+          if (at.arriving.length) at.arriving.shift();
+          else at.arriving = undefined;
+        } else {
+          at.x += (dx / len) * step;
+          at.y += (dy / len) * step;
+        }
+        continue;
+      }
       const gap = want - at.idx;
       at.running = Math.abs(gap) > 0.6;
       // (Running to catch up: quicker the further there is to go.)
@@ -744,6 +797,7 @@ export class KeepView {
       if (Math.abs(at.x - was) > 0.002) at.left = at.x < was;
     }
     for (const i of this.party.keys()) if (!places.has(i)) this.party.delete(i);
+    this.partyPlaced = true;
     for (const [i, at] of this.party) {
       const hero = i === heroIndex;
       const src = (at.running || (hero && this.hero.moving) ? spriteFrames(`${COMPS[i].sprite}_run`) : null) ?? spriteFrames(COMPS[i].sprite);

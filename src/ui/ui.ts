@@ -2,7 +2,7 @@ import { morph } from './morph.ts';
 import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { AWAKEN_ON, AWAKEN_TEASE, CURSES_ON, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { AWAKEN_ON, AWAKEN_TEASE, GOLD_SET_BONUS, SET_BONUS, CURSES_ON, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
@@ -368,11 +368,10 @@ export class Ui {
       <nav class="abilities" aria-label="Abilities"></nav>
       <div class="drops"></div>
       <aside class="shop">
-        <header class="shop-head"><h2>Your Party</h2><span class="shop-sub"></span><span class="sheet-grip" aria-hidden="true"></span></header>
+        <header class="shop-head"><h2>Your Party</h2><span class="shop-autos"><button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden></button><button class="btn small auto-upg auto-hire" data-act="autoHire" data-tip="shop:hire" hidden></button></span><span class="sheet-grip" aria-hidden="true"></span></header>
         <div class="modes">
           <span>Hire</span>
           <button class="btn mode" data-mode="1">×1</button><button class="btn mode" data-mode="10">×10</button><button class="btn mode" data-mode="100">×100</button><button class="btn mode" data-mode="next" data-tip="shop:next">Next</button><button class="btn mode" data-mode="-1">Max</button>
-          <button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden></button>
         </div>
         <div class="gens"></div>
       </aside>
@@ -390,8 +389,8 @@ export class Ui {
       floorN: q('.floor-n'), floorSub: q('.floor-sub'), floorBar: q('.floor-bar i'), floorBarT: q('.floor-bar span'), floorBox: q('.floor'),
       zonePrev: q('[data-act=zonePrev]'), zoneNext: q('[data-act=zoneNext]'), down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
       fever: q('.fever'), feverBar: q('.fever > i'), feverLabel: q('.fever > span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), vaultPick: q('.vault-pick'), vaultLeave: q('.vault-leave'), vaultFaces: q('.vp-faces'), heroMark: q('.hero-mark'), raid: q('.raid-mark'), exitMark: q('.exit-mark'),
-      banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'), shopSub: q('.shop-sub'),
-      autoUpg: q('.auto-upg'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
+      banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'),
+      autoUpg: q('.auto-upg:not(.auto-hire)'), autoHire: q('.auto-hire'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), heartBtn: q('.dock-heart'), heartBadge: q('.dock-heart .badge'), keepBtn: q('[data-act=keep]'), keepLabels: q('.keep-labels'),
       relicBadge: q('[data-open=relics] .badge'), cardBadge: q('[data-open=trophies] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
     };
@@ -926,6 +925,10 @@ export class Ui {
         g.s.autoTipSeen = true;
         this.refreshTip();
         break;
+      case 'autoHire':
+        g.s.settings.autoHire = !g.s.settings.autoHire;
+        this.refreshTip();
+        break;
       case 'sound':
         s.muted = !s.muted;
         this.syncMute();
@@ -1071,6 +1074,10 @@ export class Ui {
         } else this.deny(el);
         break;
       }
+      case 'tripsBackDone':
+        this.tripsBackDone();
+        this.renderModal();
+        break;
       case 'tripHome': {
         const i = Number(el.closest<HTMLElement>('[data-hunter]')!.dataset.hunter);
         if (this.game.callHome(i)) this.renderModal();
@@ -1302,6 +1309,7 @@ export class Ui {
         if (ev.on) this.toast(`<b>${esc(COMPS[ev.comp].name)}</b> fights with you on floor ${fmt(g.s.floor)}`, COMPS[ev.comp].sprite);
         break;
       case 'tripsOpen': this.toast('<b>Expeditions</b> are open: the ladder in the Keep', COMPS[ev.comp].sprite, 'trophy'); break;
+      case 'autoHireOpen': this.toast('<b>Auto hire</b> is open: the toggle above your party', 'knight_m', 'trophy'); break;
       case 'tripReady': this.toast(`<b>${esc(COMPS[ev.comp].name)}</b> can go on expeditions`, COMPS[ev.comp].sprite); break;
       case 'legend': if (ev.summoned) this.toast(`<b>${esc(LEGEND_BY_ID.get(ev.id)!.name)}</b> joins you`, LEGEND_BY_ID.get(ev.id)!.sprite); break;
       case 'mark':
@@ -1656,7 +1664,6 @@ export class Ui {
     this.renderAbilities();
     this.renderRows();
     this.renderShopActs();
-    setText(this.el.shopSub, `${g.s.owned.filter((n) => n > 0).length} companions · ${g.s.upgrades.length} traits`);
     if (document.body.classList.contains('compact')) {
       const hud = this.el.floorBox.getBoundingClientRect();
       if (Math.abs(Math.round(hud.bottom + 4) - this.hudTop) > 6) this.layout();
@@ -1707,7 +1714,7 @@ export class Ui {
 
     this.hints();
     if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'trips', 'stats', 'party', 'records', 'ascents', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
-    if (this.tripsBack.length && (!this.modal || this.modal === 'trips') && !this.descending && !this.keepFading) this.showTripsBack();
+    if (this.tripsBack.length && (!this.modal || this.modal === 'trips') && !this.descending && !this.keepFading) this.showTripsBack(this.modal === 'trips');
     this.tellTripFinds();
     this.refreshTip();
   }
@@ -2090,8 +2097,16 @@ export class Ui {
     const auto = g.autoUpgOpen();
     this.el.autoUpg.hidden = !auto;
     if (auto) {
-      if (this.el.autoUpg.textContent !== 'Auto') this.el.autoUpg.textContent = 'Auto';
+      if (this.el.autoUpg.textContent !== 'Auto traits') this.el.autoUpg.textContent = 'Auto traits';
       this.el.autoUpg.classList.toggle('on', g.s.settings.autoUpg);
+      this.el.autoUpg.classList.toggle('busy', g.s.settings.autoUpg && g.autoUpgLeft() > 0);
+    }
+    const hire = g.autoHireOpen();
+    this.el.autoHire.hidden = !hire;
+    if (hire) {
+      if (this.el.autoHire.textContent !== 'Auto hire') this.el.autoHire.textContent = 'Auto hire';
+      this.el.autoHire.classList.toggle('on', g.s.settings.autoHire);
+      this.el.autoHire.classList.toggle('busy', g.s.settings.autoHire && g.autoHireLeft() > 0);
     }
   }
 
@@ -2313,7 +2328,9 @@ export class Ui {
     if (kind === 'shop') {
       const text = id === 'next'
         ? 'Hire up to each companion\'s next milestone, where a damage upgrade unlocks.'
-        : `Auto-buy traits you've bought before: ${g.s.settings.autoUpg ? 'On' : 'Off'}.`;
+        : id === 'hire'
+          ? `Rehire companions up to their best levels: ${g.s.settings.autoHire ? 'On' : 'Off'}.`
+          : `Auto-buy traits you've bought before: ${g.s.settings.autoUpg ? 'On' : 'Off'}.`;
       return `<p class="tt-d">${text}</p>`;
     }
     if (kind === 'lvl') {
@@ -2547,6 +2564,7 @@ export class Ui {
   }
 
   closeModal() {
+    this.tripsBackDone();
     if (this.modal === 'offline') for (const card of this.offlineCards.splice(0)) this.showCard(card);
     if (this.modal === 'relics') this.levelledRelics.clear();
     this.modal = null;
@@ -2568,7 +2586,7 @@ export class Ui {
       html = head('Cards') + this.troTabs('cards') + this.cardsHtml();
 
     } else if (name === 'abyss' || name === 'marks') {
-      const sub = `${G.soul()} ${fmt(g.soulsFree())} souls kept · ${soulPct(g.soulsFree())} damage`;
+      const sub = `${G.soul()} ${fmt(g.soulsFree())} souls · ${soulPct(g.soulsFree())} damage`;
       html = head('Ascend', sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
     } else if (name === 'bound' && this.boundFocus) {
       const b = BOUND.find((x) => x.id === this.boundFocus)!;
@@ -2576,7 +2594,7 @@ export class Ui {
         <div class="legend-panel">${boundDetail(b, g.boundLv(b.id))}</div>`;
     } else if (name === 'legend' && this.legendFocus) {
       const d = LEGEND_BY_ID.get(this.legendFocus)!;
-      html = head(esc(d.name), `${G.soul()} ${fmt(g.soulsFree())} souls kept`) + `<div class="lcards one">${this.legendCard(d)}</div>
+      html = head(esc(d.name), `${G.soul()} ${fmt(g.soulsFree())} souls`) + `<div class="lcards one">${this.legendCard(d)}</div>
         <div class="legend-panel">${legendDetail(d, g.legendLv(d.id))}</div>`;
     } else if (name === 'trips') {
       const out = g.s.expeditions.length;
@@ -2973,12 +2991,15 @@ export class Ui {
       const got = owned(c);
       return `<span class="mc-cell${hereCards.has(c.id) ? ' here' : ''}" data-tip="card:${c.id}">${cardFace(c, got ? 'got' : 'locked', gold && got, 44, view)}</span>`;
     };
-    const section = (title: string, all: typeof CARDS, here = false) => {
+    const section = (title: string, all: typeof CARDS, here = false, zone = -1) => {
       const cards = all.filter((c) => inView(c));
       if (!cards.length) return '';
       const got = cards.filter((c) => owned(c)).length;
       const marker = here && hereLap ? ` <em class="here-mark">▸ Floor ${fmt(floor)}</em>` : '';
-      return `<h3${here && hereLap ? ' class="here-zone"' : ''}><span>${esc(title)}${marker}</span> <span class="muted">${got} / ${cards.length}</span></h3><div class="card-grid">${cards.map(face).join('')}</div>`;
+      // A finished set says what it's worth instead of its count.
+      const done = zone >= 0 && g.setDone(zone, view, gold);
+      const count = done ? `<span class="set-done">Set +${Math.round((gold ? GOLD_SET_BONUS : SET_BONUS) * 100)}% damage</span>` : `<span class="muted">${got} / ${cards.length}</span>`;
+      return `<h3${here && hereLap ? ' class="here-zone"' : ''}><span>${esc(title)}${marker}</span> ${count}</h3><div class="card-grid">${cards.map(face).join('')}</div>`;
     };
     const tally = (l: number) => {
       const cards = CARDS.filter((c) => inView(c, l));
@@ -2993,7 +3014,7 @@ export class Ui {
     const bar = `<nav class="subbar">${Array.from({ length: lapsReached + 1 }, (_, l) => lapTab(l)).join('')}
       <span class="sub-toggle"><button class="sub ${gold ? '' : 'on'}" data-card-gold="0">Normal</button><button class="sub gold-tab ${gold ? 'on' : ''}" data-card-gold="1">★ Gold</button></span></nav>`;
     const more = CARDS.some((c) => !seen(c)) ? '<p class="cards-more">More cards wait deeper down.</p>' : '';
-    return bar + ZONES.map((z, i) => section(z.name, CARDS.filter((c) => c.zone === i), i === hereZone)).join('')
+    return bar + ZONES.map((z, i) => section(z.name, CARDS.filter((c) => c.zone === i), i === hereZone, i)).join('')
       + section('Treasure goblins', CARDS.filter((c) => c.zone < 0)) + more;
   }
 
@@ -3042,6 +3063,7 @@ export class Ui {
     const buffNames = (k: 'dps' | 'click' | 'gold') => g.s.buffs.filter((u) => u[k] > 1).map((u) => `${u.name} ×${u[k]}`).join(', ');
     const allRows = [
       mul('Trophies', p.trophies, `${g.s.trophies.length} trophies`),
+      mul('Card sets', p.cards, `${g.setsDone(false)} sets · ${g.setsDone(true)} gold sets`, 'Every card of a zone in one color'),
       mul('Souls', p.souls, `${fmt(g.soulsFree())} kept, ${soulPct(1)} each${g.legendLv('hungry') ? ` + the Hungry Dark ${g.legendLv('hungry')}` : ''}`, 'Ascend to earn souls'),
       relicMul(relicName('shard'), p.shard, 'Legendary relic', 'A legendary relic'),
       ...(g.s.awakens ? [mul('Ogre Chieftain', p.ogre, `level ${g.boundLv('ogre')}`, 'Bound in the Heart')] : []),
@@ -3759,20 +3781,41 @@ export class Ui {
   private tripsBack: { comp: number; floor: number; kills: number; cards: Extract<GameEvent, { t: 'card' }>[] }[] = [];
 
   /** Hunters home: who, from where, and what they found (collecting spins the cards, as after time away). */
-  private showTripsBack() {
+  /** Hunters home: what they found. Called home from the Expeditions window, it shows over that window, which stays
+   *  open behind it (and behind the cards) for the next one. */
+  private showTripsBack(over = false) {
     const back = this.tripsBack.splice(0);
     const cards = back.flatMap((b) => b.cards);
-    this.modal = 'offline';
-    this.el.modalWrap.hidden = false;
-    this.el.modal.className = 'modal pnl m-offline';
     const who = back.map((b) => `<p>${charFit(COMPS[b.comp].sprite, 22)} <b>${esc(COMPS[b.comp].name)}</b> · floor ${fmt(b.floor)} · ${fmt(b.kills)} kills</p>`).join('');
-    this.el.modal.innerHTML = `<header class="m-head"><h2>Back from ${back.length === 1 ? 'an expedition' : 'expeditions'}</h2></header>
+    const html = `<header class="m-head"><h2>Back from ${back.length === 1 ? 'an expedition' : 'expeditions'}</h2></header>
       <div class="offline">
         ${who}
         ${cards.length ? `<p>Cards <b>${fmt(cards.length)}</b></p><div class="offline-cards">${this.offlineCardsHtml(cards)}</div>` : '<p class="muted">No cards</p>'}
-        <button class="btn primary big" data-act="close">${cards.length ? 'Collect' : 'Okay'}</button>
+        <button class="btn primary big" data-act="${over ? 'tripsBackDone' : 'close'}">${cards.length ? 'Collect' : 'Okay'}</button>
       </div>`;
+    if (over) {
+      this.tripsBackDone();
+      this.tripsBackEl = document.createElement('div');
+      this.tripsBackEl.className = 'modal pnl m-offline trips-back';
+      this.tripsBackEl.innerHTML = html;
+      this.el.modalWrap.appendChild(this.tripsBackEl);
+      this.tripsBackCards = this.groupCards(cards);
+      return;
+    }
+    this.modal = 'offline';
+    this.el.modalWrap.hidden = false;
+    this.el.modal.className = 'modal pnl m-offline';
+    this.el.modal.innerHTML = html;
     this.offlineCards = this.groupCards(cards);
+  }
+
+  /** The return summary over the Expeditions window and its cards; collected, its cards are shown. */
+  private tripsBackEl: HTMLElement | null = null;
+  private tripsBackCards: Extract<Drop, { t: 'card' }>[] = [];
+  private tripsBackDone() {
+    for (const card of this.tripsBackCards.splice(0)) this.showCard(card);
+    this.tripsBackEl?.remove();
+    this.tripsBackEl = null;
   }
 
   showOffline(o: OfflineSummary) {

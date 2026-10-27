@@ -32,13 +32,13 @@ export interface CompDef {
 const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, floor = 0, big = false, heart = 0): CompDef =>
   ({ id, name, sprite, cost, dps, attack, flavor, floor, big, heart });
 
-/** Spaced by price: each costs about ×7 the last (one every 4–5 floors against ×1.55 health a floor), the last four
- *  steeper. Once levels pass 200, damage per gold grows about gold^0.82 for everyone (×1.07 a level against ×4 every
- *  25), so damage is set from there: from the Shieldmaiden on, each companion's damage ÷ price^0.82 (with its ×2
- *  traits) is about 12% better than the last, so a new face is the natural pick and Heartmarks or a ×10 at level 1000
- *  can still make an older one the better buy. The first five keep their snappy opening numbers.
- *  The first eighteen carry the first climb to the way up (floor 100); the last six wait deeper, priced for the gold at
- *  their floor, so each starts near level 1 and grows over the next few minutes. */
+/** Prices go by place in the list, whoever stands there. The first twenty-three come with gold: the first five keep
+ *  their snappy opening numbers, then each costs about ×4 the last up to the Archmage. The last nine wait on a floor,
+ *  each priced against the gold on its floor, more of it the deeper it waits (150× the floor's gold at 95, rising to
+ *  30,000× from 450 on: about a minute and a half of killing at full speed), since a deeper one meets a stronger party. Once levels pass 200, damage per gold grows about gold^0.82 for
+ *  everyone (×1.07 a level against ×4 every 25), so damage is set from price: each one's damage ÷ price^0.82 (with its
+ *  ×2 traits) is about 8% better than the one before through the first twenty-three and 12% after, so a new face is
+ *  the natural pick and Heartmarks or a ×10 at level 1000 can still make an older one the better buy. */
 export const COMPS: CompDef[] = [
   // Plain adventurers first; the strange and the enormous come later.
   // The first four are cheap and hit hard, so the party carries the opening and clicking is a bonus.
@@ -66,14 +66,14 @@ export const COMPS: CompDef[] = [
   c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 3e14, 3e11, 'dark', 'Broke every vow but one: never stop swinging.'),
   c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2.5e11, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
   c('wraith', 'The Count', 'rm_dracula', 7.4e21, 4.1e17, 'bat', 'Came down for the dark. Stayed for the company.', 95),
-  c('elfqueen', 'Elf Queen', 'ef_highelf_f', 5.5e24, 5.2e19, 'light', 'Left her court for the deep. Brought its manners. Not its mercy.', 130),
-  c('necro', 'Necromancer', 'necromancer', 2.4e28, 2.8e22, 'skull', 'Used to raise these monsters. Now it lowers them.', 190),
-  c('king', 'Exiled King', 'sd_king', 2.6e31, 2e25, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 240),
-  c('elflord', 'Elf Lord', 'ef_highelf_m', 7e33, 2.1e27, 'slash', 'A thousand years of swordsmanship. Still practicing.', 280),
-  c('magus', 'Old Magus', 'ef_wizard', 1.3e41, 1.1e33, 'storm', 'Was down here before the dungeon. Says it followed him.', 400),
-  c('angel', 'Fallen Angel', 'angel', 8.1e68, 7.6e55, 'light', 'Fell from somewhere bright. Landed swinging.', 800),
-  c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 7.9e111, 6.1e91, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 1500, true),
-  c('demon', 'Bound Demon', 'big_demon', 8.7e202, 3.9e165, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 3000, true),
+  c('elfqueen', 'Elf Queen', 'ef_highelf_f', 1.1e25, 9.2e19, 'light', 'Left her court for the deep. Brought its manners. Not its mercy.', 130),
+  c('necro', 'Necromancer', 'necromancer', 1.4e29, 1.2e23, 'skull', 'Used to raise these monsters. Now it lowers them.', 190),
+  c('king', 'Exiled King', 'sd_king', 3.5e32, 1.6e26, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 240),
+  c('elflord', 'Elf Lord', 'ef_highelf_m', 1.9e35, 3.2e28, 'slash', 'A thousand years of swordsmanship. Still practicing.', 280),
+  c('magus', 'Old Magus', 'ef_wizard', 2.9e46, 2.7e37, 'storm', 'Was down here before the dungeon. Says it followed him.', 450),
+  c('angel', 'Fallen Angel', 'angel', 5.1e67, 7.9e54, 'light', 'Fell from somewhere bright. Landed swinging.', 800),
+  c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 1.6e110, 2.5e90, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 1500, true),
+  c('demon', 'Bound Demon', 'big_demon', 1.7e201, 1.5e164, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 3000, true),
 ];
 
 /** A companion's place in the roster, by id (so lists below don't break if the order changes). */
@@ -767,7 +767,7 @@ export const boundCost = (b: BoundDef, lv: number) => (b.id === 'ogre' ? 1 : lv 
 
 export type CardKind = 'monster' | 'mid' | 'boss' | 'goblin';
 
-/** One card per kind of monster, Ragnarok style: no bonus, just the collection. */
+/** One card per kind of monster. A zone's cards in one color are a set, which adds to all damage (see SET_BONUS). */
 export interface CardDef {
   id: string;
   name: string;

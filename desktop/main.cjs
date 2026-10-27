@@ -4,6 +4,7 @@
  * file:// URLs. Saves live in the app's own storage, separate from the browser's.
  */
 const { app, BrowserWindow, Menu, ipcMain, net, protocol, shell } = require('electron');
+const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
@@ -85,6 +86,15 @@ async function checkForUpdate(win) {
 
 ipcMain.on('update:download', () => {
   if (update) shell.openExternal(update.url);
+});
+
+/** The play log (src/record.ts): appended to logs/<date>.jsonl in the app's data folder. */
+ipcMain.on('log:append', (_e, text) => {
+  try {
+    const dir = path.join(app.getPath('userData'), 'logs');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(path.join(dir, `${new Date().toISOString().slice(0, 10)}.jsonl`), String(text));
+  } catch { /* a missed log line is no loss */ }
 });
 
 app.whenReady().then(() => {

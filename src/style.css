@@ -464,13 +464,15 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 }
 .shop-head { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 16px 8px; border-bottom: 2px solid #2d2224; }
 .shop-head h2 { margin: 0; font: 700 22px/1 var(--f-text); color: var(--gold-hi); text-shadow: var(--shadow); }
-.shop-sub { font: 400 12px/1 'Silkscreen'; color: var(--faint); }
+.shop-autos { display: flex; gap: 6px; align-self: center; }
 
 .auto-upg { color: var(--faint); }
-/* Room for the Auto toggle beside the hire modes: the HIRE label steps aside and the modes share the row. */
-.modes:has(.auto-upg:not([hidden])) > span { display: none; }
-.modes:has(.auto-upg:not([hidden])) .mode { flex: 1 1 0; min-width: 0; padding: 0 4px; }
 .auto-upg.on { color: var(--green); }
+/* The auto toggles: pulsing while there's still something to buy back, dimmer once it's all back. */
+.set-done { font: 400 13px/1 'Silkscreen'; color: var(--green); letter-spacing: 0.5px; }
+.auto-upg.on { opacity: 0.7; }
+.auto-upg.on.busy { opacity: 1; animation: hirepulse 1.2s ease-in-out infinite; }
+@keyframes hirepulse { 50% { text-shadow: 0 0 8px var(--green); } }
 
 .ico { position: relative; display: grid; place-items: center; }
 .ico .tier {
@@ -629,6 +631,8 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 /* ---------- modals ---------- */
 
 .modal-wrap { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(6, 3, 5, 0.66); z-index: 20; animation: fadein 0.18s; }
+/* Back from an expedition, over the Expeditions window (which stays open behind it). */
+.modal-wrap > .trips-back { position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 1; box-shadow: 0 0 0 9999px rgba(6, 3, 5, 0.5), 0 8px 0 var(--ink); }
 .modal { width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 40px); overflow-y: auto; padding: 12px 12px 18px 18px; animation: modalin 0.22s; }
 /* Panels with tabs hang from the top, so switching to a shorter tab doesn't move the tabs. */
 .modal-wrap:has(> .m-trophies, > .m-cards, > .m-abyss, > .m-marks, > .m-heart, > .m-stats, > .m-party, > .m-records) { align-items: start; }
@@ -980,9 +984,9 @@ body.phone .shop.full { height: min(78vh, 78dvh); }
 body.phone .shop.dragging { transition: none; }
 body.phone .shop-head { position: relative; cursor: grab; padding: 12px 12px 6px; align-items: center; gap: 8px; touch-action: none; flex: none; }
 body.phone .shop-head h2 { font-size: 17px; }
-body.phone .shop-head .shop-sub { margin-left: auto; font-size: 10px; }
+body.phone .shop-head .shop-autos { margin-left: auto; }
 body.phone .sheet-grip { position: absolute; left: 50%; top: 4px; width: 40px; height: 4px; margin-left: -20px; background: #5a4648; box-shadow: 0 0 0 1px var(--ink); }
-body.phone .shop.min .shop-sub { display: none; }
+body.phone .shop.min .shop-autos { display: none; }
 /* Folded: just the header, plus a strip of affordable upgrades (tap to buy) when there are any. */
 body.phone .shop.min .modes, body.phone .shop.min .gens { visibility: hidden; }
 /* Upgrades: one row that scrolls sideways. */
