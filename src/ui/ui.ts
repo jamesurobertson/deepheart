@@ -3349,7 +3349,7 @@ export class Ui {
             <div class="aw-faces${first ? ' shade' : ''}">${faces}</div>
           </section>
           <section class="aw-lose"><h4>Lose</h4>
-            <dl class="stats">${row(`${G.soul(1.5)} Souls`, fmt(g.s.souls))}${row('Spirits', fmt(g.legendsOwned()))}${row(`${G.heart(1.5)} Heartmarks`, fmt(g.marksTotal()))}${row('This run', `floor ${fmt(g.s.maxFloor)}`)}</dl>
+            <dl class="stats">${row(`${G.soul(1.5)} Souls`, fmt(g.cycleSouls()))}${row('Spirits', fmt(g.legendsOwned()))}${row(`${G.heart(1.5)} Heartmarks`, fmt(g.marksTotal()))}${row('This run', `floor ${fmt(g.s.maxFloor)}`)}</dl>
           </section>
         </div>
         <p class="aw-kept">Kept: cards, trophies, companions</p>
