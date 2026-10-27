@@ -165,9 +165,9 @@ const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${spr
 const fullGameOnly = (i: number) => DEMO && i >= DEMO_COMPANIONS;
 
 /** What it takes to meet a companion who hasn't joined yet. */
-const meetText = (def: { floor: number; heart?: number }, bestFloor: number) =>
+const meetText = (def: { floor: number; heart?: number }, cycleBest: number) =>
   fullGameOnly(COMPS.indexOf(def as (typeof COMPS)[number])) ? 'In the full game'
-    : bestFloor < def.floor ? `Reach floor ${fmt(def.floor)} to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
+    : cycleBest < def.floor ? `Reach floor ${fmt(def.floor)} to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
 
 /** A relic's stars, as little gold glyphs after its name. */
 /** A small rate with up to two decimals (1.15, not 1.1); big ones as usual. */
@@ -325,8 +325,8 @@ export class Ui {
     this.hooks = hooks;
     root.innerHTML = `
       <div class="hud-top">
-        <div class="bank"><span class="bank-ico">${sprite('coin', 5)}</span><b class="bank-v">0</b></div>
-        <div class="rate"><span><b class="dps-v">0</b> <i class="long">damage/sec</i><i class="short">dps</i></span><span class="sep">·</span><span><b class="click-v">1</b> <i class="long">per click</i><i class="short">/click</i></span></div>
+        <div class="bank" data-tip="idle:patient"><span class="bank-ico">${sprite('coin', 5)}</span><b class="bank-v">0</b></div>
+        <div class="rate"><span class="dps-w" data-tip="idle:sleeper"><b class="dps-v">0</b> <i class="long">damage/sec</i><i class="short">dps</i></span><span class="sep">·</span><span><b class="click-v">1</b> <i class="long">per click</i><i class="short">/click</i></span></div>
         <div class="streak"><i>Streak</i> <b class="streak-v">0</b> <span class="sep">·</span> <b class="streak-b"></b></div>
         <div class="floor pnl">
           <button class="btn icon sm" data-act="floorDown" aria-label="Previous floor">${G.left()}</button>
@@ -386,7 +386,7 @@ export class Ui {
     const q = (sel: string) => root.querySelector(sel) as HTMLElement;
     this.floorMaps = [...root.querySelectorAll<HTMLElement>('.floor-map')];
     this.el = {
-      bank: q('.bank-v'), bankIco: q('.bank-ico'), dps: q('.dps-v'), click: q('.click-v'), rate: q('.rate'), streak: q('.streak'), streakV: q('.streak-v'), streakB: q('.streak-b'),
+      bank: q('.bank-v'), bankIco: q('.bank-ico'), dps: q('.dps-v'), click: q('.click-v'), rate: q('.rate'), streak: q('.streak'), streakV: q('.streak-v'), streakB: q('.streak-b'), dpsWrap: q('.dps-w'), bankWrap: q('.bank'),
       floorN: q('.floor-n'), floorSub: q('.floor-sub'), floorBar: q('.floor-bar i'), floorBarT: q('.floor-bar span'), floorBox: q('.floor'),
       zonePrev: q('[data-act=zonePrev]'), zoneNext: q('[data-act=zoneNext]'), down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
       fever: q('.fever'), feverBar: q('.fever > i'), feverLabel: q('.fever > span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), vaultPick: q('.vault-pick'), vaultLeave: q('.vault-leave'), vaultFaces: q('.vp-faces'), heroMark: q('.hero-mark'), raid: q('.raid-mark'), exitMark: q('.exit-mark'),
@@ -1195,7 +1195,7 @@ export class Ui {
       case 'trophy': {
         // A card trophy waits for its card: the card is collected when you've seen it, not when it drops.
         const req = TROPHIES.find((x) => x.id === ev.id)!.req.t;
-        if ((req === 'cards' || req === 'goldCards') && (this.cardsComing > 0 || this.cardQueue.length)) {
+        if ((req === 'cards' || req === 'versions' || req === 'goldCards' || req === 'tripCards') && (this.cardsComing > 0 || this.cardQueue.length)) {
           this.heldTrophies.push(ev.id);
           clearTimeout(this.heldTimer);
           // (In case a card never gets picked up and shown.)
@@ -1629,6 +1629,10 @@ export class Ui {
       setText(this.el.streakV, fmt(g.streak));
       setText(this.el.streakB, `+${+(0.01 * unbroken * g.streak).toFixed(1)}%`);
     }
+    // Spirit colors on the numbers the Sleeper and the Patient are raising right now.
+    const idle = g.idle();
+    this.el.dpsWrap.classList.toggle('spirit-on', idle && g.legendLv('sleeper') > 0);
+    this.el.bankWrap.classList.toggle('spirit-on', idle && g.legendLv('patient') > 0);
 
     this.renderFloor();
 
@@ -1853,7 +1857,7 @@ export class Ui {
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
       row.querySelector('.gen-name')!.innerHTML = `${name}${marks && !locked && !mystery ? ` <span class="marks" data-tip="mark:${i}">${G.heart(1.5)}${marks}</span>` : ''}${q.n > 1 && !locked && !mystery ? ` <small>×${q.n}</small>` : ''}`;
-      row.querySelector('.gen-cost')!.innerHTML = trip ? `<span class="need trip-tag">Expedition · floor ${fmt(trip.floor)}</span>` : locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.bestFloor)}</span>` : gold(q.cost, can ? 'ok' : 'no');
+      row.querySelector('.gen-cost')!.innerHTML = trip ? `<span class="need trip-tag">Expedition · floor ${fmt(trip.floor)}</span>` : locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.cycleBest)}</span>` : gold(q.cost, can ? 'ok' : 'no');
       row.querySelector('.gen-lv')!.textContent = lv ? `Lv ${lv}` : '';
       row.querySelector('.gen-dps')!.textContent = trip ? '' : lv ? `${fmt(g.compDps(i))} dps` : '';
       // Owned traits and the next one only: the rest show up as you buy your way along. Past the last trait, the next
@@ -2272,7 +2276,7 @@ export class Ui {
       const i = Number(id);
       const def = COMPS[i];
       if (fullGameOnly(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">${COMPS.length - DEMO_COMPANIONS} more companions join you in the full game.</p>`;
-      if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. ${meetText(def, g.s.bestFloor)}.</p>`;
+      if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. ${meetText(def, g.s.cycleBest)}.</p>`;
       if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">A new companion is on their way. Earn more gold to meet them.</p>`;
       // Away hunting: the trip, not the hire.
       const trip = g.s.expeditions.find((e) => e.comp === i && e.pausedAt === undefined);
@@ -2406,6 +2410,11 @@ export class Ui {
       return `<div class="tt-h">${charFit(comp.sprite, 30)}<b>${esc(a.name)}</b><span class="tt-own">skill</span></div>
         <p class="tt-d">${esc(a.desc)}</p>
         <p class="tt-f">${esc(comp.name)} · level ${traitLevels(a.comp)[a.trait]}<br>${timing}</p>`;
+    }
+    if (kind === 'idle') {
+      const d = LEGEND_BY_ID.get(id as LegendId)!;
+      const lv = g.legendLv(d.id);
+      return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">Spirit · level ${lv}</span></div><p class="tt-d">${esc(d.what)}: ${esc(d.value(lv))}</p>`;
     }
     if (kind === 'spirit') {
       const d = LEGEND_BY_ID.get(id as LegendId)!;
@@ -2985,7 +2994,10 @@ export class Ui {
   private ascentsHtml(): string {
     const list = this.game.s.ascents;
     const clock = (t: number) => [Math.floor(t / 3600), Math.floor((t % 3600) / 60), Math.floor(t % 60)].map((n, i) => (i ? String(n).padStart(2, '0') : String(n))).join(':');
-    const rows = list.map((a, i) => `<tr><th>${i + 1}</th><td>${clock(a.time)}</td><td>${fmt(a.floor)}</td><td>${G.soul(1.2)} ${fmt(a.souls)}</td></tr>`).reverse().join('');
+    let ascent = 0;
+    const rows = list.map((a) => a.awakening
+      ? `<tr class="asc-awaken"><th>Awakening ${a.awakening}</th><td>${clock(a.time)}</td><td>${fmt(a.floor)}</td><td>${boundGlyph(1.2)} ${fmt(a.bound ?? 0)}</td></tr>`
+      : `<tr><th>${++ascent}</th><td>${clock(a.time)}</td><td>${fmt(a.floor)}</td><td>${G.soul(1.2)} ${fmt(a.souls)}</td></tr>`).reverse().join('');
     return `<section class="bd wide bd-ascents"><table><thead><tr><th>Ascent</th><td>Time</td><td>Deepest floor</td><td>Souls</td></tr></thead>${rows || '<tr><th>No ascents yet.</th></tr>'}</table></section>`;
   }
 
@@ -3337,7 +3349,7 @@ export class Ui {
           </section>
         </div>
         <p class="aw-kept">Kept: cards, trophies, companions${away ? ` · ${away} on ${away === 1 ? 'an expedition comes' : 'expeditions come'} home` : ''}</p>
-        ${!first && g.boundSpent() ? `<label class="set-check"><input type="checkbox" id="awaken-respec"> Respec the Bound</label>` : ''}
+        ${!first && g.boundSpent() ? `<label class="set-check"><input type="checkbox" id="awaken-respec" checked> Respec the Bound</label>` : ''}
         <div class="set-row"><button class="btn" data-act="heartBack">Not yet</button><button class="btn primary big" data-act="awakenGo">Awaken</button></div>
       </div>`;
   }
@@ -3604,6 +3616,7 @@ export class Ui {
     const labels = this.keepView?.labels() ?? null;
     if (!labels) {
       if (host.childElementCount) host.innerHTML = '';
+      delete host.dataset.ids;
       document.body.classList.remove('over-act');
       return;
     }

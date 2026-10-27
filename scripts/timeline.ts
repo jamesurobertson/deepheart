@@ -136,7 +136,8 @@ const ms: Milestone[] = [
   { name: 'All 24 companions met', window: '6h–10h', result: t(allMet), status: reach(allMet, 10 * H) ? 'REPORT' : within(allMet, 6 * H, 10 * H) },
   { name: 'Longest wait for a new companion', window: 'under 2h', result: allMet === null ? 'party not complete' : played(meetWait), status: allMet !== null && meetWait < 2 * H ? 'PASS' : reach(allMet, 10 * H) ? 'REPORT' : 'FAIL' },
   { name: `Every card can drop (floor ${ALL_CARDS_FLOOR})`, window: '5h–10h', result: t(allCardsAt), status: reach(allCardsAt, 10 * H) ? 'REPORT' : within(allCardsAt, 5 * H, 10 * H) },
-  { name: 'First awakening', window: '20h–26h', result: !AWAKEN_ON ? 'switched off' : firstAwaken === null ? t(firstAwaken) : `${t(firstAwaken)} (${ascentsToAwaken} ascents)`, status: !AWAKEN_ON || reach(firstAwaken, 26 * H) ? 'REPORT' : within(firstAwaken, 20 * H, 26 * H) },
+  // (Moved from 20h–26h when the trophy list went from 394 to 106 in October 2026: less trophy damage, slower on purpose.)
+  { name: 'First awakening', window: '35h–45h', result: !AWAKEN_ON ? 'switched off' : firstAwaken === null ? t(firstAwaken) : `${t(firstAwaken)} (${ascentsToAwaken} ascents)`, status: !AWAKEN_ON || reach(firstAwaken, 45 * H) ? 'REPORT' : within(firstAwaken, 35 * H, 45 * H) },
   (() => {
     const done = cycles.filter((c) => c.back !== null);
     const slowest = Math.max(0, ...done.map((c) => c.back!));

@@ -1,6 +1,6 @@
 import { CARDS, CORRUPTION, CURSORS, LEGENDS, TROPHIES, ZONES, type CardDef, type TrophyDef } from '../../game/data.ts';
 import { ABILITIES, COMPS } from '../../game/data.ts';
-import { AWAKEN_ON, CARD_ODDS, CHAMP_CHANCE, DAN_GIVES, EXPEDITION_LEVEL, FLOOR_KILLS, RELICS_ON, TRIP_HOURS, VICTOR_GIVES } from '../../game/game.ts';
+import { AWAKEN_ON, CARD_ODDS, CHAMP_CHANCE, DAN_GIVES, EXPEDITION_LEVEL, FLOOR_KILLS, TRIP_HOURS, VICTOR_GIVES } from '../../game/game.ts';
 import { esc, h2, link, pct, table, toc } from '../kit.ts';
 import { spr } from '../sprites.ts';
 import type { Page } from '../pages.ts';
@@ -42,13 +42,13 @@ const cardsBody = () => {
 };
 
 /** Trophies that belong to systems that aren't in the game yet stay off the list. */
-const live = (t: TrophyDef) => !(['relics', 'stars'].includes(t.req.t) && !RELICS_ON) && !(t.req.t === 'awakens' && !AWAKEN_ON);
+const live = (t: TrophyDef) => !(['awakens', 'boundAll', 'boundEarned'].includes(t.req.t) && !AWAKEN_ON);
 
 const GROUPS: [string, TrophyDef['req']['t'][]][] = [
   ['Floors', ['floor']], ['Gold', ['gold']], ['Kills', ['kills']], ['Bosses', ['bosses', 'clutches', 'champions']],
-  ['Companions', ['own']], ['Attacks', ['clicks', 'crits', 'fevers', 'rampage']], ['Damage', ['dps']],
-  ['Goblins', ['raids', 'missed', 'rainbows', 'vaults']], ['Ascents', ['descents']], ['Upgrades', ['upgrades']],
-  ['Cards', ['cards', 'goldCards']], ['Relics', ['relics', 'stars']], ['Awakening', ['awakens']],
+  ['Companions', ['level', 'levelAll']], ['Attacks', ['clicks', 'crits', 'fevers', 'rampage']], ['Damage', ['dps']],
+  ['Goblins', ['raids', 'missed', 'rainbows', 'vaults']], ['Ascents', ['descents']], ['Expeditions', ['trips', 'tripCards']],
+  ['Cards', ['cards', 'versions', 'goldCards']], ['Awakening', ['awakens', 'boundAll', 'boundEarned']],
 ];
 
 const trophiesBody = () => {

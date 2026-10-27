@@ -668,7 +668,7 @@ const o = (d: LegendDef) => d;
 const longer = (ability: AbilityId, secs: number) => ({ lengthens: { ability, secs }, value: (lv: number) => `+${secs * lv}s` });
 
 export const LEGENDS: LegendDef[] = [
-  o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Party damage while idle', value: per(0.25) }),
+  o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Damage while idle', value: per(0.25) }),
   o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Your attacks and the Phantom Blade', value: per(0.1) }),
   o({ id: 'needle', name: 'The Needle', kind: 'power', sprite: 'sd_executioner', what: 'Critical hit damage', value: per(0.15) }),
   o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'sd_mountain_king', what: 'All gold', value: per(0.05) }),
@@ -719,13 +719,13 @@ export interface BoundDef {
 const pct25 = (lv: number) => `+${lv * 25}%`;
 export const BOUND: BoundDef[] = [
   { id: 'ogre', zone: 0, what: 'All damage', value: (lv) => `+${lv * 100}%` },
+  { id: 'pitlord', zone: 6, what: 'Souls from champion bosses', value: (lv) => `×${1 + lv * lv}` },
   { id: 'lich', zone: 1, what: 'Spirit costs', value: (lv) => `−${Math.round((1 - 0.95 ** lv) * 100)}%`, max: 20 },
+  { id: 'frost', zone: 7, what: 'The Thinning\'s most', value: (lv) => `−${10 + lv} kills`, max: 5, spirit: 'thinning' },
   { id: 'troll', zone: 2, what: 'The Wither\'s effect', value: pct25, spirit: 'wither' },
   { id: 'golem', zone: 3, what: 'The Soulcaller\'s effect', value: pct25, spirit: 'soulcaller' },
   { id: 'thing', zone: 4, what: 'The Lure\'s effect', value: pct25, spirit: 'lure' },
   { id: 'ent', zone: 5, what: 'The Hourglass\'s effect', value: pct25, spirit: 'hourglass' },
-  { id: 'pitlord', zone: 6, what: 'Souls from champion bosses', value: (lv) => `×${1 + lv * lv}` },
-  { id: 'frost', zone: 7, what: 'The Thinning\'s most', value: (lv) => `−${10 + lv} kills`, max: 5, spirit: 'thinning' },
 ];
 export const BOUND_BY_ID = new Map(BOUND.map((b) => [b.id, b]));
 export const boundName = (b: BoundDef) => ZONES[b.zone].boss.name;
@@ -826,24 +826,27 @@ export type TrophyReq =
   | { t: 'floor'; n: number }
   | { t: 'kills'; n: number }
   | { t: 'bosses'; n: number }
-  | { t: 'own'; comp: number; n: number }
+  | { t: 'level'; n: number }
+  | { t: 'levelAll'; n: number }
   | { t: 'clicks'; n: number }
   | { t: 'crits'; n: number }
   | { t: 'raids'; n: number }
   | { t: 'fevers'; n: number }
   | { t: 'descents'; n: number }
-  | { t: 'upgrades'; n: number }
   | { t: 'dps'; n: number }
   | { t: 'missed'; n: number }
-  | { t: 'relics'; n: number }
   | { t: 'awakens'; n: number }
+  | { t: 'boundAll'; n: number }
+  | { t: 'boundEarned'; n: number }
+  | { t: 'trips'; n: number }
+  | { t: 'tripCards'; n: number }
   | { t: 'clutches'; n: number }
   | { t: 'champions'; n: number }
   | { t: 'vaults'; n: number }
   | { t: 'rainbows'; n: number }
   | { t: 'rampage'; n: number }
-  | { t: 'stars'; n: number }
   | { t: 'cards'; n: number }
+  | { t: 'versions'; n: number }
   | { t: 'goldCards'; n: number };
 
 export interface TrophyDef {
@@ -853,12 +856,6 @@ export interface TrophyDef {
   icon: Icon;
   req: TrophyReq;
 }
-
-const FLOOR_NAMES = ['Into the Dark', 'Down the Stairs', 'Deeper', 'Where Torches Fail', 'Bone Deep', 'The Long Descent', 'Lightless', 'The Underneath', 'Below Below', 'Heartland', 'No Way Back', 'The Bottom?', 'There Is No Bottom', 'Older Than Stone', 'A Thousand Down', 'The Abyss Stares Back', 'Two Thousand Fathoms', 'Root of the World', 'Where the Heart Beats'];
-const FLOOR_AT = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 5000];
-const GOLD_NAMES = ['Pocket Change', 'Coin Purse', 'Strongbox', 'Treasury', 'Dragon Hoard', 'Kingdom\'s Ransom', 'Empire\'s Gold', 'Gold Mountain', 'Sea of Gold', 'World of Gold', 'Starfall Gold', 'Beyond Counting'];
-const OWN_AT = [1, 25, 100, 200, 300, 500, 750, 1000, 1500, 2000, 3000];
-const OWN_TITLES = ['Hired:', 'Loyal', 'Veteran', 'Legendary', 'Mythic', 'Eternal', 'Ascended', 'Godlike', 'Immortal', 'Transcendent', 'Beyond'];
 
 /** A round power of ten in words for trophy text ("1 sextillion"), falling back to 1e80 past the named ones. */
 const POWER_WORDS: Record<number, string> = { 6: 'million', 9: 'billion', 12: 'trillion', 15: 'quadrillion', 18: 'quintillion', 21: 'sextillion', 24: 'septillion', 27: 'octillion', 30: 'nonillion', 33: 'decillion', 36: 'undecillion', 39: 'duodecillion', 42: 'tredecillion', 45: 'quattuordecillion', 60: 'novemdecillion' };
@@ -870,46 +867,79 @@ function bigWords(n: number): string {
   return w ? `${10 ** (e % 3)} ${w}` : `1e${e}`;
 }
 
+const count = (n: number) => n.toLocaleString('en-US');
+const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
+
 function buildTrophies(): TrophyDef[] {
   const out: TrophyDef[] = [];
-  FLOOR_AT.forEach((n, k) => out.push({ id: `fl${k}`, name: FLOOR_NAMES[k], desc: `Clear floor ${n}.`, icon: { sprite: 'stairs', tier: Math.min(k, 10) }, req: { t: 'floor', n } }));
-  GOLD_NAMES.forEach((name, k) => {
-    const n = 10 ** (2 + k * 4);
-    out.push({ id: `gold${k}`, name, desc: `Collect ${bigWords(n)} gold in total.`, icon: { sprite: 'coin', tier: Math.min(k, 10) }, req: { t: 'gold', n } });
-  });
-  [100, 1000, 10_000, 100_000, 1e6, 1e7].forEach((n, k) => out.push({ id: `kill${k}`, name: ['Monster Hunter', 'Slayer', 'Butcher', 'Massacre', 'Extinction Event', 'The Reaper'][k], desc: `Kill ${n.toLocaleString('en-US')} monsters.`, icon: { sprite: 'skull', tier: k }, req: { t: 'kills', n } }));
-  [1, 10, 50, 200, 1000].forEach((n, k) => out.push({ id: `boss${k}`, name: ['Giant Slayer', 'Kingsbane', 'Tyrant Killer', 'Boss Rush', 'Nothing Stands'][k], desc: `Defeat ${n} boss${n > 1 ? 'es' : ''}.`, icon: { sprite: 'ogre', tier: k }, req: { t: 'bosses', n } }));
-  COMPS.forEach((comp, i) => OWN_AT.forEach((n, k) => {
-    out.push({ id: `own${i}_${k}`, name: n === 1 ? `Hired: ${comp.name}` : `${OWN_TITLES[k]} ${comp.name}`, desc: n === 1 ? `Hire the ${comp.name}.` : `Get the ${comp.name} to level ${n}.`, icon: { sprite: comp.sprite, tier: k }, req: { t: 'own', comp: i, n } });
-  }));
-  [1, 100, 1_000, 10_000, 100_000].forEach((n, k) => out.push({ id: `clicks${k}`, name: ['First Blood', 'Tap Tap', 'Clicker', 'Relentless', 'Carpal Tunnel'][k], desc: `Click ${n.toLocaleString('en-US')} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'weapon_knife', tier: k }, req: { t: 'clicks', n } }));
-  [1, 100, 1_000, 10_000].forEach((n, k) => out.push({ id: `crit${k}`, name: ['Critical!', 'Sharp Eye', 'Surgeon', 'Every Hit Counts'][k], desc: `Land ${n.toLocaleString('en-US')} critical hit${n > 1 ? 's' : ''}.`, icon: { sprite: 'weapon_katana', tier: k }, req: { t: 'crits', n } }));
-  [1, 7, 27, 77, 277, 777].forEach((n, k) => out.push({ id: `raid${k}`, name: ['Finders Keepers', 'Goblin Catcher', 'Head Hunter', 'Goblin Bane', 'No One Escapes', 'Treasure Lord'][k], desc: `Catch ${n} treasure goblin${n > 1 ? 's' : ''}.`, icon: { sprite: 'goblin', tier: k }, req: { t: 'raids', n } }));
-  [1, 10, 50, 200].forEach((n, k) => out.push({ id: `fev${k}`, name: ['Rampage!', 'Hot Blooded', 'Berserker', 'Endless Fury'][k], desc: `Go on a Rampage ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'flask_big_red', tier: k }, req: { t: 'fevers', n } }));
-  [1, 3, 10, 25, 50].forEach((n, k) => out.push({ id: `desc${k}`, name: ['Up for Air', 'It Lets You Go', 'Return Ticket', 'The Deep Knows You', 'Always Back Down'][k], desc: `Ascend ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'floor_ladder', tier: k }, req: { t: 'descents', n } }));
-  [10, 50, 100, 130].forEach((n, k) => out.push({ id: `upg${k}`, name: ['Tinkerer', 'Improver', 'Perfectionist', 'Nothing Left to Buy'][k], desc: `Own ${n} upgrades at once.`, icon: { sprite: 'flask_big_yellow', tier: k }, req: { t: 'upgrades', n } }));
-  const missed: [number, string, string][] = [
-    [1, 'Butterfingers', 'Let a treasure goblin get away.'],
-    [5, 'Slippery Little Guys', 'Let 5 treasure goblins get away.'],
-    [15, 'Goblin Enabler', 'Let 15 treasure goblins get away. They are telling their friends.'],
-    [40, 'Goblin Philanthropist', 'Let 40 treasure goblins get away. You are funding their retirement.'],
-    [100, 'Official Goblin Sponsor', 'Let 100 treasure goblins get away. They have named a tunnel after you.'],
-    [250, 'The Goblins Thank You', 'Let 250 treasure goblins get away. There is a statue of you in Goblin Town.'],
-  ];
-  missed.forEach(([n, name, desc], k) => out.push({ id: `miss${k}`, name, desc, icon: { sprite: 'goblin', tier: k }, req: { t: 'missed', n } }));
-  [1, 4, 8, 12, 16].forEach((n, k) => out.push({ id: `rel${k}`, name: ['Finder', 'Collector', 'Curator', 'Reliquary', 'Every Last One'][k], desc: n === 1 ? 'Find a relic.' : n === 16 ? 'Find every relic.' : `Find ${n} different relics.`, icon: { sprite: 'chest_full_open', tier: k }, req: { t: 'relics', n } }));
-  [1, 10, 50].forEach((n, k) => out.push({ id: `clutch${k}`, name: ['By a Hair', 'Nerves of Steel', 'Living on the Edge'][k], desc: `Beat ${n === 1 ? 'a boss' : `${n} bosses`} with ${CLUTCH_SECONDS} seconds or less on the clock.`, icon: { sprite: 'flask_yellow', tier: k }, req: { t: 'clutches', n } }));
-  [1, 25, 100].forEach((n, k) => out.push({ id: `champ${k}`, name: ['Champion Slayer', 'Crown Breaker', 'Champion of Champions'][k], desc: `Slay ${n === 1 ? 'a champion' : `${n} champions`}.`, icon: { sprite: 'weapon_red_gem_sword', tier: k }, req: { t: 'champions', n } }));
-  [1, 3, 10].forEach((n, k) => out.push({ id: `vault${k}`, name: ['Over the Rainbow', 'Vault Raider', 'Goblin Banker'][k], desc: `Open the Rainbow Vault ${n === 1 ? 'once' : `${n} times`} (a rainbow goblin's jackpot).`, icon: { sprite: 'chest_full_open', tier: k }, req: { t: 'vaults', n } }));
-  [1, 5, 15, 40].forEach((n, k) => out.push({ id: `rainbow${k}`, name: ['Double Rainbow', 'Rainbow Wrangler', 'Chasing Rainbows', 'End of the Rainbow'][k], desc: `Catch ${n === 1 ? 'a rainbow goblin' : `${n} rainbow goblins`}.`, icon: { sprite: 'goblin', tier: k + 2 }, req: { t: 'rainbows', n } }));
-  [1, 2, 3, 4].forEach((n, k) => out.push({ id: `star${k}`, name: ['Polished', 'Gleaming', 'Radiant', 'Mythic'][k], desc: `Raise a relic to ${'★'.repeat(n)} (level ${RELIC_STARS[k]}).`, icon: { sprite: 'chest_full_open', tier: k + 1 }, req: { t: 'stars', n } }));
+  // Ids carry their threshold ("kill-1000"), so a retired tier never lines up with a new one in an old save.
+  const tag = (n: number) => (n >= 1e6 ? `e${Math.round(Math.log10(n))}` : String(n));
+  const tiers = (prefix: string, list: [number, string][], desc: (n: number) => string, sprite: string, req: (n: number) => TrophyReq, tierFrom = 0) =>
+    list.forEach(([n, name], k) => out.push({ id: `${prefix}-${tag(n)}`, name, desc: desc(n), icon: { sprite, tier: Math.min(10, k + tierFrom) }, req: req(n) }));
+
+  tiers('floor', [[10, 'Down the Stairs'], [50, 'The Long Descent'], [100, 'The Underneath'], [400, 'The Bottom?'], [500, 'There Is No Bottom'], [750, 'Older Than Stone'], [1000, 'A Thousand Down'], [1500, 'The Abyss Stares Back'], [2000, 'Two Thousand Fathoms'], [3000, 'Root of the World'], [5000, 'Where the Heart Beats']],
+    (n) => `Clear floor ${count(n)}.`, 'stairs', (n) => ({ t: 'floor', n }));
   [1, 2, 3, 4].forEach((n, k) => out.push({ id: `lap${k}`, name: ['Corruption', 'The Abyss Looks Back', 'Hollowed Out', 'Eternity'][k], desc: `Reach floor ${n * 80 + 1}, where the zones return ${CORRUPTION[n].name.toLowerCase()}.`, icon: { sprite: 'skull', tier: k + 1 }, req: { t: 'floor', n: n * 80 } }));
+  tiers('gold', [[1e9, 'Coin Purse'], [1e24, 'Strongbox'], [1e40, 'Treasury'], [1e60, 'Dragon Hoard'], [1e90, 'Kingdom\'s Ransom'], [1e120, 'Sea of Gold'], [1e160, 'Beyond Counting']],
+    (n) => `Collect ${bigWords(n)} gold in total.`, 'coin', (n) => ({ t: 'gold', n }));
+  tiers('dps', [[1e6, 'Fighter'], [1e24, 'Warlord'], [1e40, 'Cataclysm'], [1e60, 'Apocalypse'], [1e80, 'World Breaker'], [1e100, 'Googol'], [1e150, 'Heat Death'], [1e200, 'Big Bang']],
+    (n) => `Reach ${bigWords(n)} damage per second.`, 'weapon_waraxe', (n) => ({ t: 'dps', n }));
+  tiers('kill', [[1000, 'Slayer'], [100_000, 'Massacre'], [1e6, 'Extinction Event'], [1e7, 'The Reaper'], [1e8, 'Nothing Left Alive']],
+    (n) => `Kill ${count(n)} monsters.`, 'skull', (n) => ({ t: 'kills', n }));
+  tiers('boss', [[10, 'Kingsbane'], [100, 'Tyrant Killer'], [1000, 'Boss Rush'], [5000, 'Nothing Stands'], [25_000, 'Throne of Bones']],
+    (n) => `Defeat ${count(n)} bosses.`, 'ogre', (n) => ({ t: 'bosses', n }));
+  tiers('champ', [[1, 'Champion Slayer'], [100, 'Crown Breaker'], [1000, 'Champion of Champions'], [10_000, 'Kingmaker']],
+    (n) => `Slay ${n === 1 ? 'a champion' : `${count(n)} champions`}.`, 'weapon_red_gem_sword', (n) => ({ t: 'champions', n }));
+  tiers('clutch', [[1, 'By a Hair'], [20, 'Nerves of Steel'], [100, 'Living on the Edge']],
+    (n) => `Beat ${n === 1 ? 'a boss' : `${n} bosses`} with ${CLUTCH_SECONDS} seconds or less on the clock.`, 'flask_yellow', (n) => ({ t: 'clutches', n }));
+  out.push({ id: 'hire-all', name: 'Full Party', desc: `Hire all ${COMPS.length} companions.`, icon: { sprite: COMPS[0].sprite, tier: 0 }, req: { t: 'levelAll', n: 1 } });
+  tiers('level', [[1000, 'Legendary'], [2500, 'Mythic'], [5000, 'Immortal'], [10_000, 'Beyond']],
+    (n) => `Get a companion to level ${count(n)}.`, COMPS[COMPS.length - 1].sprite, (n) => ({ t: 'level', n }), 1);
+  tiers('levelall', [[500, 'Loyal Company'], [1000, 'Legendary Company'], [2500, 'Immortal Company']],
+    (n) => `Get every companion to level ${count(n)}.`, COMPS[0].sprite, (n) => ({ t: 'levelAll', n }), 1);
+  tiers('clicks', [[100, 'Tap Tap'], [10_000, 'Clicker'], [100_000, 'Relentless'], [1e6, 'Carpal Tunnel']],
+    (n) => `Click ${count(n)} times.`, 'weapon_knife', (n) => ({ t: 'clicks', n }));
+  tiers('crit', [[1, 'Critical!'], [10_000, 'Sharp Eye'], [100_000, 'Surgeon'], [1e6, 'Every Hit Counts']],
+    (n) => `Land ${count(n)} critical ${plural(n, 'hit')}.`, 'weapon_katana', (n) => ({ t: 'crits', n }));
+  tiers('fev', [[1, 'Rampage!'], [100, 'Berserker'], [1000, 'Endless Fury']],
+    (n) => `Go on a Rampage ${count(n)} ${plural(n, 'time')}.`, 'flask_big_red', (n) => ({ t: 'fevers', n }));
   out.push({ id: 'rampage0', name: 'Bloodrush', desc: 'Keep attacking until a Rampage reaches its top tier.', icon: { sprite: 'flask_big_red', tier: 1 }, req: { t: 'rampage', n: 1 } });
-  [1, 3, 10, 25].forEach((n, k) => out.push({ id: `awk${k}`, name: ['It Wakes', 'Heartbeat', 'Drumming Deep', 'The Heart Remembers'][k], desc: `Awaken the Heart ${n} time${n > 1 ? 's' : ''}.`, icon: { sprite: 'ui_heart_full', tier: k }, req: { t: 'awakens', n } }));
-  const dpsNames = ['Scrapper', 'Fighter', 'Warrior', 'Warlord', 'Army', 'Legion', 'Cataclysm', 'Apocalypse', 'Extinction', 'World Breaker', 'Star Eater', 'Galaxy Killer', 'Heat Death', 'Big Bang', 'Googol'];
-  [10, 1e3, 1e6, 1e9, 1e12, 1e15, 1e18, 1e21, 1e24, 1e30, 1e36, 1e45, 1e60, 1e80, 1e100].forEach((n, k) => out.push({ id: `dps${k}`, name: dpsNames[k], desc: `Reach ${bigWords(n)} damage per second.`, icon: { sprite: 'weapon_waraxe', tier: Math.min(k, 10) }, req: { t: 'dps', n } }));
-  [1, 10, 25, 50, CARDS.length].forEach((n, k) => out.push({ id: `card${k}`, name: ['Card Carrier', 'Card Sharp', 'Monster Manual', 'Bestiary', 'Every Last Monster'][k], desc: n === 1 ? 'Find a monster card.' : n === CARDS.length ? 'Find every monster card.' : `Find ${n} different monster cards.`, icon: { sprite: 'imp', tier: k }, req: { t: 'cards', n } }));
-  [1, 5, 20].forEach((n, k) => out.push({ id: `gcard${k}`, name: ['Gilded', 'Golden Touch', 'Midas Deck'][k], desc: n === 1 ? 'Find a gold card (champions drop them).' : `Find ${n} different gold cards.`, icon: { sprite: 'big_demon', tier: k + 2 }, req: { t: 'goldCards', n } }));
+  tiers('raid', [[1, 'Finders Keepers'], [77, 'Goblin Catcher'], [777, 'Goblin Bane'], [2777, 'No One Escapes'], [7777, 'Treasure Lord']],
+    (n) => `Catch ${n === 1 ? 'a treasure goblin' : `${count(n)} treasure goblins`}.`, 'goblin', (n) => ({ t: 'raids', n }));
+  const missed: [number, string, string][] = [
+    [1, 'Butterfingers', ''],
+    [100, 'Slippery Little Guys', ''],
+    [1000, 'Goblin Enabler', ' They are telling their friends.'],
+    [5000, 'Goblin Philanthropist', ' You are funding their retirement.'],
+    [20_000, 'Official Goblin Sponsor', ' They have named a tunnel after you.'],
+    [50_000, 'The Goblins Thank You', ' There is a statue of you in Goblin Town.'],
+  ];
+  missed.forEach(([n, name, joke], k) => out.push({ id: `miss-${n}`, name, desc: `Let ${n === 1 ? 'a treasure goblin' : `${count(n)} treasure goblins`} get away.${joke}`, icon: { sprite: 'goblin', tier: k }, req: { t: 'missed', n } }));
+  tiers('rainbow', [[1, 'Double Rainbow'], [50, 'Chasing Rainbows'], [500, 'End of the Rainbow']],
+    (n) => `Catch ${n === 1 ? 'a rainbow goblin' : `${count(n)} rainbow goblins`}.`, 'goblin', (n) => ({ t: 'rainbows', n }), 2);
+  tiers('vault', [[1, 'Over the Rainbow'], [25, 'Vault Raider'], [250, 'Goblin Banker']],
+    (n) => (n === 1 ? 'Open the Rainbow Vault.' : `Open the Rainbow Vault ${count(n)} times.`), 'chest_full_open', (n) => ({ t: 'vaults', n }));
+  tiers('desc', [[1, 'Up for Air'], [10, 'Return Ticket'], [50, 'The Deep Knows You'], [250, 'Always Back Down']],
+    (n) => `Ascend ${count(n)} ${plural(n, 'time')}.`, 'floor_ladder', (n) => ({ t: 'descents', n }));
+  tiers('awk', [[1, 'It Wakes'], [5, 'Heartbeat'], [25, 'Drumming Deep'], [100, 'The Heart Remembers']],
+    (n) => `Awaken the Heart ${count(n)} ${plural(n, 'time')}.`, 'ui_heart_full', (n) => ({ t: 'awakens', n }));
+  out.push({ id: 'bound-all', name: 'All Eight', desc: 'Wake every one of the Bound.', icon: { sprite: ZONES[ZONES.length - 1].boss.sprite, tier: 1 }, req: { t: 'boundAll', n: 1 } });
+  tiers('bound', [[50, 'Soul Debt'], [250, 'Soul Hoard']],
+    (n) => `Earn ${count(n)} bound souls in total.`, ZONES[0].boss.sprite, (n) => ({ t: 'boundEarned', n }), 2);
+  out.push({ id: 'trip-1', name: 'Gone Hunting', desc: 'Send a companion on an expedition.', icon: { sprite: 'floor_ladder', tier: 1 }, req: { t: 'trips', n: 1 } });
+  tiers('tripcard', [[25, 'Spoils'], [250, 'Trophy Hunter']],
+    (n) => `Find ${count(n)} cards on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripCards', n }), 2);
+  const versions = CARDS.reduce((sum, c) => sum + c.laps.length * (c.gold ? 2 : 1), 0);
+  out.push(
+    { id: 'card-1', name: 'Card Carrier', desc: 'Find a monster card.', icon: { sprite: 'imp', tier: 0 }, req: { t: 'cards', n: 1 } },
+    { id: 'card-25', name: 'Card Sharp', desc: 'Find 25 different monster cards.', icon: { sprite: 'imp', tier: 1 }, req: { t: 'cards', n: 25 } },
+    { id: 'card-all', name: 'Bestiary', desc: 'Find every monster card.', icon: { sprite: 'imp', tier: 2 }, req: { t: 'cards', n: CARDS.length } },
+    { id: 'versions-250', name: 'Monster Manual', desc: 'Collect 250 cards.', icon: { sprite: 'imp', tier: 3 }, req: { t: 'versions', n: 250 } },
+    { id: 'versions-all', name: 'Every Last Monster', desc: 'Collect every card.', icon: { sprite: 'imp', tier: 4 }, req: { t: 'versions', n: versions } },
+    { id: 'gcard-1', name: 'Gilded', desc: 'Find a gold card.', icon: { sprite: 'big_demon', tier: 2 }, req: { t: 'goldCards', n: 1 } },
+    { id: 'gcard-25', name: 'Golden Touch', desc: 'Find 25 different gold cards.', icon: { sprite: 'big_demon', tier: 3 }, req: { t: 'goldCards', n: 25 } },
+    { id: 'gcard-all', name: 'Midas Deck', desc: 'Find every gold card.', icon: { sprite: 'big_demon', tier: 4 }, req: { t: 'goldCards', n: CARDS.filter((c) => c.gold).length } },
+  );
   return out;
 }
 
@@ -931,35 +961,35 @@ export interface CursorDef {
  *  them. */
 export const CURSORS: CursorDef[] = [
   { id: 'rusty', name: 'Rusty Sword', sprite: 'weapon_rusty_sword' },
-  { id: 'machete', name: 'Machete', sprite: 'weapon_machete', trophy: 'kill2' },
-  { id: 'mace', name: 'Mace', sprite: 'weapon_mace', trophy: 'clicks3' },
-  { id: 'axe', name: 'Axe', sprite: 'weapon_axe', trophy: 'fl7' },
-  { id: 'throwing', name: 'Goblin Catcher', sprite: 'weapon_throwing_axe', trophy: 'raid2' },
-  { id: 'spiked', name: 'Consolation Club', sprite: 'weapon_baton_with_spikes', trophy: 'miss3' },
-  { id: 'hammer', name: 'War Hammer', sprite: 'weapon_hammer', trophy: 'boss3' },
-  { id: 'katana', name: 'Katana', sprite: 'weapon_katana', trophy: 'crit3' },
-  { id: 'cleaver', name: 'Cleaver', sprite: 'weapon_cleaver', trophy: 'kill4' },
-  { id: 'spear', name: 'Spear', sprite: 'weapon_spear', trophy: 'fl9' },
-  { id: 'redstaff', name: 'Blood Staff', sprite: 'weapon_red_magic_staff', trophy: 'fev3' },
-  { id: 'duel', name: 'Duelist', sprite: 'weapon_duel_sword', trophy: 'desc3' },
-  { id: 'greenstaff', name: 'Goblin Scepter', sprite: 'weapon_green_magic_staff', trophy: 'miss5' },
-  { id: 'waraxe', name: 'War Axe', sprite: 'weapon_waraxe', trophy: 'fl10' },
-  { id: 'knight', name: 'Knight\'s Oath', sprite: 'weapon_knight_sword', trophy: 'clutch2' },
-  { id: 'saw', name: 'Saw Blade', sprite: 'weapon_saw_sword', trophy: 'kill5' },
-  { id: 'bighammer', name: 'Maul', sprite: 'weapon_big_hammer', trophy: 'boss4' },
-  { id: 'bow', name: 'Rainbow Bow', sprite: 'weapon_bow', trophy: 'rainbow2' },
-  { id: 'bow2', name: 'Vault Bow', sprite: 'weapon_bow_2', trophy: 'vault2' },
-  { id: 'doubleaxe', name: 'Twin Axe', sprite: 'weapon_double_axe', trophy: 'desc4' },
-  { id: 'gem', name: 'Red Gem Blade', sprite: 'weapon_red_gem_sword', trophy: 'champ2' },
-  { id: 'arrow', name: 'The Last Arrow', sprite: 'weapon_arrow', trophy: 'clicks4' },
-  { id: 'lavish', name: 'Lavish Saber', sprite: 'weapon_lavish_sword', trophy: 'fl11' },
-  { id: 'fireball', name: 'Fireball', sprite: 'spell_fireball', trophy: 'gcard1' },
-  { id: 'icelance', name: 'Ice Lance', sprite: 'spell_ice_lance', trophy: 'card3' },
-  { id: 'anime', name: 'Hand of the Deep', sprite: 'weapon_anime_sword', trophy: 'awk0' },
-  { id: 'golden', name: 'Golden Sword', sprite: 'weapon_golden_sword', trophy: 'raid5' },
-  { id: 'lightbolt', name: 'Light Bolt', sprite: 'spell_light_bolt', trophy: 'awk2' },
-  { id: 'darkbolt', name: 'Darkness Bolt', sprite: 'spell_darkness_bolt', trophy: 'fl14' },
-  { id: 'orb', name: 'Magic Orb', sprite: 'spell_magic_orb', trophy: 'card4' },
+  { id: 'machete', name: 'Machete', sprite: 'weapon_machete', trophy: 'kill-e6' },
+  { id: 'mace', name: 'Mace', sprite: 'weapon_mace', trophy: 'clicks-10000' },
+  { id: 'axe', name: 'Axe', sprite: 'weapon_axe', trophy: 'lap1' },
+  { id: 'throwing', name: 'Goblin Catcher', sprite: 'weapon_throwing_axe', trophy: 'raid-77' },
+  { id: 'spiked', name: 'Consolation Club', sprite: 'weapon_baton_with_spikes', trophy: 'miss-100' },
+  { id: 'hammer', name: 'War Hammer', sprite: 'weapon_hammer', trophy: 'boss-1000' },
+  { id: 'katana', name: 'Katana', sprite: 'weapon_katana', trophy: 'crit-100000' },
+  { id: 'cleaver', name: 'Cleaver', sprite: 'weapon_cleaver', trophy: 'boss-5000' },
+  { id: 'spear', name: 'Spear', sprite: 'weapon_spear', trophy: 'floor-500' },
+  { id: 'redstaff', name: 'Blood Staff', sprite: 'weapon_red_magic_staff', trophy: 'fev-100' },
+  { id: 'duel', name: 'Duelist', sprite: 'weapon_duel_sword', trophy: 'desc-50' },
+  { id: 'greenstaff', name: 'Goblin Scepter', sprite: 'weapon_green_magic_staff', trophy: 'raid-777' },
+  { id: 'waraxe', name: 'War Axe', sprite: 'weapon_waraxe', trophy: 'floor-1000' },
+  { id: 'knight', name: 'Knight\'s Oath', sprite: 'weapon_knight_sword', trophy: 'clutch-20' },
+  { id: 'saw', name: 'Saw Blade', sprite: 'weapon_saw_sword', trophy: 'kill-e7' },
+  { id: 'bighammer', name: 'Maul', sprite: 'weapon_big_hammer', trophy: 'boss-25000' },
+  { id: 'bow', name: 'Rainbow Bow', sprite: 'weapon_bow', trophy: 'rainbow-500' },
+  { id: 'bow2', name: 'Vault Bow', sprite: 'weapon_bow_2', trophy: 'vault-250' },
+  { id: 'doubleaxe', name: 'Twin Axe', sprite: 'weapon_double_axe', trophy: 'desc-250' },
+  { id: 'gem', name: 'Red Gem Blade', sprite: 'weapon_red_gem_sword', trophy: 'champ-10000' },
+  { id: 'arrow', name: 'The Last Arrow', sprite: 'weapon_arrow', trophy: 'clicks-e6' },
+  { id: 'lavish', name: 'Lavish Saber', sprite: 'weapon_lavish_sword', trophy: 'floor-2000' },
+  { id: 'fireball', name: 'Fireball', sprite: 'spell_fireball', trophy: 'tripcard-250' },
+  { id: 'icelance', name: 'Ice Lance', sprite: 'spell_ice_lance', trophy: 'versions-250' },
+  { id: 'anime', name: 'Hand of the Deep', sprite: 'weapon_anime_sword', trophy: 'awk-1' },
+  { id: 'golden', name: 'Golden Sword', sprite: 'weapon_golden_sword', trophy: 'raid-7777' },
+  { id: 'lightbolt', name: 'Light Bolt', sprite: 'spell_light_bolt', trophy: 'awk-25' },
+  { id: 'darkbolt', name: 'Darkness Bolt', sprite: 'spell_darkness_bolt', trophy: 'floor-5000' },
+  { id: 'orb', name: 'Magic Orb', sprite: 'spell_magic_orb', trophy: 'versions-all' },
 ];
 
 // ---------- news ticker ----------

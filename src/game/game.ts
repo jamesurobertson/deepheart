@@ -296,6 +296,8 @@ export interface SaveState {
   runActive: number;
   startedAt: number;
   lastSave: number;
+  /** When you last attacked by hand (0: never), so a reload picks the idle clock up where it was. */
+  lastAttack: number;
   /** Relic levels by id (0 / missing = not found yet). */
   relics: Record<string, number>;
   /** Relic ids in your slots. */
@@ -310,6 +312,9 @@ export interface SaveState {
   expeditions: Expedition[];
   /** A companion has reached EXPEDITION_LEVEL: expeditions are open for good. */
   tripsOpen: boolean;
+  /** Expeditions ever sent, and the cards they've brought home. */
+  tripsSent: number;
+  tripCards: number;
   /** The Heart has been teased (its button showed up, AWAKEN_TEASE floors before it can wake). */
   heartTeased: boolean;
   /** Has the first wake-up (the dungeon was a dream) played? */
@@ -331,7 +336,8 @@ export interface SaveState {
   /** The game version this save was last played on (see GAME_VERSION); none before saves were stamped. */
   version?: string;
   /** Every ascent: how long the run took (seconds), the deepest floor it reached and the souls it paid. */
-  ascents: { time: number; floor: number; souls: number }[];
+  /** Every ascent, and every awakening (`awakening`: its number, `bound`: the bound souls it paid), oldest first. */
+  ascents: { time: number; floor: number; souls: number; awakening?: number; bound?: number }[];
   /** Dan and Victor have told you how collecting works (before your first trade with either). */
   brosMet: boolean;
   /** Who has given you their one spare card: Pip next door, Dan when you had next to none. */
@@ -395,8 +401,8 @@ export function newSave(): SaveState {
     owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], bossSouls: 0, goldBosses: {}, legends: {}, legendOffer: [], legendSpent: 0, legendSeed: freshSeed(), legendRolls: 0, runSeed: freshSeed(), marks: COMPS.map(() => 0), markBest: 0, soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
-    bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(),
-    relics: {}, equipped: [], bossBest: 0, bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
+    bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(), lastAttack: 0,
+    relics: {}, equipped: [], bossBest: 0, bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, tripsSent: 0, tripCards: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, graphics: 'auto' },
   };
 }
@@ -654,8 +660,8 @@ export class Game {
   /** Seconds until the next attack by hand can land. */
   private manualCd = 0;
   /** Seconds since you last attacked by hand, and attacks in the current streak (the Sleeper, the Patient, the
-   *  Unbroken). A fresh load starts attentive. */
-  sinceAttack = 0;
+   *  Unbroken). Picked up from the save's last attack on load. */
+  sinceAttack = IDLE_AFTER;
   streak = 0;
   /** Held down on the battlefield (mouse, finger or Space): attack by hand at MANUAL_RATE until let go. */
   hold: { id: number | null; x: number; y: number } | null = null;
@@ -757,8 +763,11 @@ export class Game {
     // Retired upgrades (the old crit-only ones) drop out.
     s.upgrades = (s.upgrades ?? []).filter((id) => UPG_BY_ID.has(id));
     s.upgradesKnown = s.upgradesKnown.filter((id) => UPG_BY_ID.has(id));
-    // Trophies that no longer exist (retired ones) shouldn't keep counting toward the trophy bonus.
+    // Trophies that no longer exist (retired ones) shouldn't keep counting toward the trophy bonus. When some go, the
+    // ones the save already qualifies for are granted quietly below (the list was rebuilt in October 2026).
+    const trophiesHad = s.trophies?.length ?? 0;
     if (s.trophies) s.trophies = s.trophies.filter((id) => TROPHIES.some((t) => t.id === id));
+    const trophiesRetired = (s.trophies?.length ?? 0) < trophiesHad;
     // Awakenings counted under the retired Heart powers aren't awakenings of the Heart as it is now (every one of those
     // pays at least one bound soul): such a save starts the count over, its heartstones and Heart powers gone with them.
     if (s.awakens > 0 && !s.boundEarned) {
@@ -802,6 +811,8 @@ export class Game {
       s.soulsV2 = true;
     }
     this.trophySet = new Set(s.trophies);
+    this.sinceAttack = s.lastAttack ? Math.max(0, (this.now() - s.lastAttack) / 1000) : IDLE_AFTER;
+    if (trophiesRetired) this.checkTrophies(true);
     // A vault doesn't survive a reload (its chests aren't saved): you're back on the floor.
     s.buffs = s.buffs.filter((b) => b.id !== 'vault');
     // Pick up where you left off on this floor (its monsters respawn, the kills so far still count).
@@ -1048,7 +1059,7 @@ export class Game {
 
   /** Everything that isn't your own clicking, per second: the party and the Phantom Blade (with its cleave). */
   dpsTotal() {
-    return this.dps().plus(this.clickTotal().times(this.autoRate()));
+    return this.dps().plus(this.clickTotal().times(this.autoRate() * this.sleeperMult()));
   }
 
   hasUpgrade(id: string) {
@@ -1147,7 +1158,8 @@ export class Game {
 
   compUnlocked(i: number) {
     if (DEMO && i >= DEMO_COMPANIONS) return false;
-    return this.s.bestFloor >= COMPS[i].floor && this.s.awakens >= (COMPS[i].heart ?? 0);
+    // Floor gates count this awakening's depth: an awakening locks them again until you're back down there.
+    return this.s.cycleBest >= COMPS[i].floor && this.s.awakens >= (COMPS[i].heart ?? 0);
   }
 
   // ---------- floors and monsters ----------
@@ -1663,11 +1675,12 @@ export class Game {
         this.manualCd = 1 / MANUAL_RATE;
         this.streak = this.sinceAttack <= STREAK_GAP ? Math.min(STREAK_CAP, this.streak + 1) : 1;
         this.sinceAttack = 0;
+        this.s.lastAttack = this.now();
       }
     }
     const crit = Math.random() < this.critChance();
     const fever = this.s.buffs.some((b) => b.id === 'fever');
-    const amount = this.clickDamage().times(crit ? this.critMult() : 1);
+    const amount = this.clickDamage().times((crit ? this.critMult() : 1) * (auto ? this.sleeperMult() : 1));
     const others = this.cleave() > 0 ? this.monsters.filter((m) => m !== target) : [];
     this.damage(target, amount, auto ? (crit ? 'autoCrit' : 'auto') : crit ? 'crit' : fever ? 'fever' : 'click', x, y);
     for (const m of others) if (this.monsters.includes(m)) this.damage(m, amount.times(this.cleave()), 'cleave');
@@ -2163,9 +2176,14 @@ export class Game {
     return this.sinceAttack >= IDLE_AFTER;
   }
 
+  /** The Sleeper's boost while idle: the party and the Phantom Blade alike. */
+  sleeperMult() {
+    return this.idle() ? 1 + 0.25 * this.legendLv('sleeper') : 1;
+  }
+
   /** Multipliers that change from moment to moment: the Sleeper while idle, the Unbroken with your streak. */
   private liveMult() {
-    return (this.idle() ? 1 + 0.25 * this.legendLv('sleeper') : 1) * (1 + 0.0001 * this.legendLv('unbroken') * this.streak);
+    return this.sleeperMult() * (1 + 0.0001 * this.legendLv('unbroken') * this.streak);
   }
 
   // ---------- Heartmarks ----------
@@ -2307,6 +2325,7 @@ export class Game {
     s.soulsLifetime += this.cycleSouls();
     s.boundEarned += gained;
     s.awakens++;
+    s.ascents.push({ time: s.runTime, floor: s.maxFloor, souls: 0, awakening: s.awakens, bound: gained });
     if (respec) s.bound = {};
     s.cycleBest = 0;
     s.lastAscent = 0;
@@ -2412,6 +2431,7 @@ export class Game {
     if (!this.canSend(i) || !(floor >= 1 && floor <= this.s.bestFloor)) return false;
     const dps = this.compDps(i);
     this.s.expeditions.push({ comp: i, floor, dps: dps.toString(), start: this.now() });
+    this.s.tripsSent++;
     this.invalidate();
     return true;
   }
@@ -2478,6 +2498,7 @@ export class Game {
     const before = this.events.length;
     for (const f of e.found ?? []) this.giveCard(f.id, f.gold, 'trip', e.floor);
     const cards = this.events.slice(before).filter((ev): ev is Extract<GameEvent, { t: 'card' }> => ev.t === 'card');
+    this.s.tripCards += cards.length;
     this.invalidate();
     this.events.push({ t: 'expedition', comp: i, floor: e.floor, kills, cards: cards.length, gold: cards.filter((c) => c.gold).length });
     this.checkTrophies();
@@ -2749,35 +2770,38 @@ export class Game {
       case 'floor': return s.bestCleared >= r.n;
       case 'kills': return s.kills >= r.n;
       case 'bosses': return s.bosses >= r.n;
-      case 'own': return s.owned[r.comp] >= r.n;
+      case 'level': return s.owned.some((n) => n >= r.n);
+      case 'levelAll': return s.owned.every((n) => n >= r.n);
       case 'clicks': return s.clicks >= r.n;
       case 'crits': return s.crits >= r.n;
       case 'raids': return s.raids >= r.n;
       case 'fevers': return s.fevers >= r.n;
       case 'descents': return s.descents >= r.n;
-      case 'upgrades': return s.upgrades.length >= r.n;
       case 'dps': return this.baseDps().gte(r.n);
       case 'missed': return s.missed >= r.n;
-      case 'relics': return this.relicsFound() >= r.n;
       case 'awakens': return s.awakens >= r.n;
       case 'clutches': return s.clutches >= r.n;
       case 'champions': return s.champions >= r.n;
       case 'vaults': return s.vaults >= r.n;
       case 'rainbows': return s.rainbows >= r.n;
       case 'rampage': return s.rampage >= r.n;
-      case 'stars': return Object.values(s.relics).some((lv) => relicStars(lv) >= r.n);
       case 'cards': return this.cardsFound() >= r.n;
+      case 'versions': return this.cardVersions() >= r.n;
+      case 'boundAll': return BOUND.every((b) => (s.bound[b.id] ?? 0) >= r.n);
+      case 'boundEarned': return s.boundEarned >= r.n;
+      case 'trips': return s.tripsSent >= r.n;
+      case 'tripCards': return s.tripCards >= r.n;
       case 'goldCards': return this.goldCardsFound() >= r.n;
     }
   }
 
-  private checkTrophies() {
+  private checkTrophies(quiet = false) {
     let got = false;
     for (const t of TROPHIES) {
       if (this.trophySet.has(t.id) || !this.trophyMet(t.req)) continue;
       this.trophySet.add(t.id);
       this.s.trophies.push(t.id);
-      this.events.push({ t: 'trophy', id: t.id });
+      if (!quiet) this.events.push({ t: 'trophy', id: t.id });
       got = true;
     }
     if (got) this.invalidate();

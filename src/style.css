@@ -178,6 +178,9 @@ body.compact .rate .short { display: inline; }
 .streak .streak-b { color: var(--soul); }
 .streak .sep { color: var(--faint); }
 .rate.boosted b { color: var(--gold-hi); animation: glowtext 0.8s infinite alternate; }
+.spirit-on { pointer-events: auto; cursor: help; }
+.dps-w.spirit-on, .bank.spirit-on .bank-v { text-decoration: underline dotted var(--soul); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.rate .dps-w.spirit-on b, .dps-w.spirit-on, .bank.spirit-on .bank-v { color: #e2d2ff; }
 
 .floor { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 6px; pointer-events: auto; }
 .floor .btn.icon.sm { width: 34px; height: 34px; min-height: 0; }
@@ -1195,6 +1198,8 @@ body.phone .badge.hot, body.phone .badge.new { animation: none; }
 .bd tr.off th, .bd tr.off td { opacity: 0.45; }
 .bd tr.off td { color: var(--dim); }
 .bd tr.tot { border-top: 2px solid #5a3f2c; }
+.bd tr.asc-awaken { border-top: 2px solid var(--ess); }
+.bd tr.asc-awaken th, .bd tr.asc-awaken td { color: var(--ess); }
 .bd tr.tot th { color: var(--gold-hi); font-weight: 700; }
 .bd tr.tot td { font-size: 24px; color: #fff; }
 .bd.wide { overflow-x: auto; }
