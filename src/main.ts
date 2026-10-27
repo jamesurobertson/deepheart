@@ -67,16 +67,11 @@ const SPEED = import.meta.env.DEV ? Math.max(1, Number(params.get('speed')) || 1
 // ?fps shows frame rate and frame cost in a corner (dev build only).
 const SHOW_FPS = import.meta.env.DEV && params.has('fps');
 
-/** A save from an earlier minor version was found (and set aside): the menu says why the run starts over. */
-let droppedOld = false;
-
 function load(): SaveState | null {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null') as SaveState | null;
-    if (s && olderVersion(s.version)) {
-      droppedOld = true;
-      return null;
-    }
+    // A save from an earlier minor version starts over.
+    if (s && olderVersion(s.version)) return null;
     return s?.v === SAVE_VERSION ? s : null;
   } catch {
     return null;
@@ -364,7 +359,7 @@ async function boot() {
   let acc = 0;
   if (atMenu) {
     await fontsReady();
-    const menu = new TitleMenu(document.body, game, !!saved && game.s.kills > 0, droppedOld, {
+    const menu = new TitleMenu(document.body, game, !!saved && game.s.kills > 0, {
       play: () => {
         menu.close();
         play();
