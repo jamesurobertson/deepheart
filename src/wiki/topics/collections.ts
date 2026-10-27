@@ -32,6 +32,7 @@ const cardsBody = () => {
     <p>Only champions drop gold cards: gold monsters and champion bosses. Goblins have no gold card.</p>
     ${h2('Sets')}
     <p>A zone's cards in one color are a set: its monsters, its mid-boss and its boss (the goblins belong to no set). Each finished set adds +${Math.round(SET_BONUS * 100)}% to all damage, and each finished in gold +${Math.round(GOLD_SET_BONUS * 100)}%. ${ZONES.length * CORRUPTION.length} sets in all, and as many in gold.</p>
+    <p>Sets also start your runs deeper. After an ascent or an awakening, a new run begins past every zone, in the order you meet them, whose set in that zone's color you've finished, and pays the gold those floors would have.</p>
     ${h2('Every card')}
     <p>${versions} versions in all, counting each color plain and gold.</p>
     ${zones.map(({ name, zone }) => {

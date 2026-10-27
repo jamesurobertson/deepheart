@@ -751,7 +751,7 @@ export interface BoundDef {
 const pct25 = (lv: number) => `+${lv * 25}%`;
 export const BOUND: BoundDef[] = [
   { id: 'ogre', zone: 0, what: 'All damage', value: (lv) => `+${lv * 100}%` },
-  { id: 'pitlord', zone: 6, what: 'Souls from champion bosses', value: (lv) => `×${1 + lv * lv}` },
+  { id: 'pitlord', zone: 6, what: 'Souls from champion bosses', value: (lv) => `×${1 + 10 * lv * lv}` },
   { id: 'lich', zone: 1, what: 'Spirit costs', value: (lv) => `−${Math.round((1 - 0.95 ** lv) * 100)}%`, max: 20 },
   { id: 'frost', zone: 7, what: 'The Thinning\'s most', value: (lv) => `−${10 + lv} kills`, max: 5, spirit: 'thinning' },
   { id: 'troll', zone: 2, what: 'The Wither\'s effect', value: pct25, spirit: 'wither' },

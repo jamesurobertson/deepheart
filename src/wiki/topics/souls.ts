@@ -43,9 +43,9 @@ const awakenBody = () => `<p class="lede">Reach floor ${TUNE.awakenFloor} and yo
   ${table(['Bound', 'Boosts', 'Per level', { h: 'Max level', cls: 'num' }, { h: 'Total for level 5', cls: 'num' }], BOUND.map((b) => [
     `<span class="who">${spr(ZONES[b.zone].boss.sprite, 28)}${boundName(b)}</span>`, b.what, b.value(1), b.max ?? '—', b.max !== undefined && b.max < 5 ? '—' : boundTotal(b, 5),
   ]))}
-  <p>The Pit Lord multiplies champion souls by 1 + level²: ×2 at level 1, ×5 at 2, ×10 at 3, ×17 at 4. The Troll Brute can't take a boss below 10% of its health, and the Tomb Golem can't take the champion chance past 100%. The Lich's discount works on summoning and leveling Spirits.</p>
+  <p>The Pit Lord multiplies champion souls by 1 + 10 × level²: ×11 at level 1, ×41 at 2, ×91 at 3, ×161 at 4. The Troll Brute can't take a boss below 10% of its health, and the Tomb Golem can't take the champion chance past 100%. The Lich's discount works on summoning and leveling Spirits.</p>
   ${h2('Champion souls')}
-  <p>Every bound soul you've ever earned makes champion bosses past floor ${TUNE.goldBossFrom} pay a little more, and more the deeper they are: the gain compounds every 10 floors. It grows toward a limit of ${pct(TUNE.pullCap, 0)} per 10 floors.</p>`;
+  <p>Bound souls make champion bosses past floor ${TUNE.goldBossFrom} pay more, and more the deeper they are: the gain compounds every 5 floors. It starts at ${pct(TUNE.pullFloor, 0)} per 5 floors with your first bound soul and grows toward ${pct(TUNE.pullCap, 0)} as you earn more.</p>`;
 
 const marksBody = () => `<p class="lede">Heartmarks are bonus damage that lands on a random companion when you beat a deep zone boss for the first time.</p>
   ${h2('Earning Heartmarks')}

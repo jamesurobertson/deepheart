@@ -15,6 +15,7 @@ import { CARDS, CORRUPTION, LEGENDS, UPGRADES, lapOf, zoneOf } from './game/data
 import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
 import { TitleMenu } from './ui/menu.ts';
 import { PlayRecorder } from './record.ts';
+import { beforeFresh } from './version.ts';
 
 declare global {
   interface Window {
@@ -66,9 +67,16 @@ const SPEED = import.meta.env.DEV ? Math.max(1, Number(params.get('speed')) || 1
 // ?fps shows frame rate and frame cost in a corner (dev build only).
 const SHOW_FPS = import.meta.env.DEV && params.has('fps');
 
+/** A save from before FRESH_FROM was found (and set aside): the menu says why the run starts over. */
+let droppedOld = false;
+
 function load(): SaveState | null {
   try {
     const s = JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null') as SaveState | null;
+    if (s && beforeFresh(s.version)) {
+      droppedOld = true;
+      return null;
+    }
     return s?.v === SAVE_VERSION ? s : null;
   } catch {
     return null;
@@ -356,7 +364,7 @@ async function boot() {
   let acc = 0;
   if (atMenu) {
     await fontsReady();
-    const menu = new TitleMenu(document.body, game, !!saved && game.s.kills > 0, {
+    const menu = new TitleMenu(document.body, game, !!saved && game.s.kills > 0, droppedOld, {
       play: () => {
         menu.close();
         play();

@@ -67,6 +67,8 @@ export class TitleMenu {
   private hasRun: boolean;
   private hooks: MenuHooks;
   private view: 'main' | 'credits' | 'confirm' | 'old' = 'main';
+  /** An older save was set aside: everyone starts fresh on this version. */
+  private freshStart: boolean;
   /** Up and down (or W and S) move through the menu, wrapping round; Enter or Space picks; Escape backs out. While the
    *  stairway has focus (it was clicked), the keys walk your hero there instead. No key reaches the game behind the
    *  menu (Space would attack, U buy an upgrade). */
@@ -94,9 +96,10 @@ export class TitleMenu {
     this.stairs.control(e.key.toLowerCase(), false);
   };
 
-  constructor(root: HTMLElement, game: Game, hasRun: boolean, hooks: MenuHooks) {
+  constructor(root: HTMLElement, game: Game, hasRun: boolean, freshStart: boolean, hooks: MenuHooks) {
     this.game = game;
     this.hasRun = hasRun;
+    this.freshStart = freshStart;
     this.hooks = hooks;
     this.el = document.createElement('div');
     this.el.className = 'title-menu';
@@ -164,6 +167,7 @@ export class TitleMenu {
     const logo = DEMO ? `<div class="mm-stamped">${LOGO}<span class="mm-stamp">DEMO</span></div>` : LOGO;
     const play = this.hasRun ? 'Continue' : DEMO ? 'Play the Demo' : 'New Game';
     return `<div class="mm-head">${HEART}${logo}<p class="mm-tag">AN IDLE DUNGEON CRAWLER</p></div>
+      ${this.freshStart ? '<p class="mm-run">Version 0.10 starts everyone fresh</p>' : ''}
       ${DEMO ? `<a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}Wishlist on Steam</a>` : ''}
       <nav class="mm-list">
         <button type="button" data-mm="${this.hasRun || DEMO ? 'play' : 'new'}"><span>▸</span>${play}</button>${run}
