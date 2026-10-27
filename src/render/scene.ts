@@ -1869,6 +1869,7 @@ export class Scene {
       case 'keep':
         // (The Keep is the UI's own top-down map; down here the floor just empties and waits.)
         this.collectAllLoot(true);
+        this.clearStale(game);
         this.syncParty(game, true);
         break;
       case 'swing':
@@ -2106,6 +2107,43 @@ export class Scene {
   }
 
   /** Rebuild everything from the game state (after loading or descending). */
+  /** Up to the Keep or back: nothing that was mid-flight comes back with you (shots, effects, a goblin, chests,
+   *  monsters the game has let go of, a companion mid-swing). */
+  private clearStale(game: Game) {
+    for (const s of this.shots) {
+      this.scene.remove(s.mesh);
+      s.mesh.traverse((o) => {
+        if (o instanceof THREE.Sprite) o.material.dispose();
+      });
+      (s.mesh.userData.spell as PixelSprite | undefined)?.dispose();
+    }
+    this.shots = [];
+    for (const r of [this.raider, ...this.leaving]) {
+      if (!r) continue;
+      this.scene.remove(r.group);
+      r.sprite.dispose();
+    }
+    this.raider = null;
+    this.leaving = [];
+    for (const c of this.chests) {
+      this.scene.remove(c.group);
+      c.sprite.dispose();
+    }
+    this.chests = [];
+    for (const v of [...this.mons.values()]) if (!game.monsters.some((m) => m.id === v.id)) this.removeView(v);
+    this.heroSwings = [];
+    for (const c of this.party) {
+      c.act = null;
+      c.body.position.copy(c.home);
+    }
+    this.pendingLoot = [];
+    this.clutch = null;
+    this.shake = 0;
+    this.hitstop = 0;
+    // Every effect runs out on its own clock: run them all to the end at once.
+    this.fx.update(1e4);
+  }
+
   rebuild(game: Game) {
     this.collectAllLoot(true);
     this.hold = null;

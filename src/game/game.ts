@@ -176,8 +176,9 @@ export const DESCEND_FLOOR = 100;
  *   first time you reach it in a run, and always on GOLD_BOSS_SURE floors; it pays floor(((floor − 75) / 25)^1.3).
  *   Each soul you keep adds `soulPower` (+10%) to all damage; Legends are the other thing to do with them.
  * - Bound souls a level up, as Clicker Heroes' Ancient Souls: floor(5 × log10(souls earned this cycle)) in all; an
- *   awakening pays what's above the best so far. Every bound soul ever earned pulls champion souls up with depth:
- *   ×(1 + p)^((floor − 100) / 10), p rising toward `pullCap` (`pullRate` of the gap left closes per bound soul).
+ *   awakening pays what's above the best so far. Bound souls pull champion souls up with depth, as Clicker Heroes'
+ *   Transcendent Power: ×(1 + p)^((floor − 100) / 5), p from `pullFloor` with your first bound soul toward `pullCap`
+ *   (1 − e^(−bound / `pullScale`) of the way there). The Pit Lord multiplies them ×(1 + 10·level²), as Ponyboy.
  * - The wall: from floor `wallFrom` monsters get tougher by the same factor every floor, reaching `wall`× the health at
  *   `wallTo` and staying there (Clicker Heroes' wall past zone 500): a run that hasn't awakened slows to a stop on the
  *   way up it; the Bound and bound souls carry you past it.
@@ -188,7 +189,7 @@ export const DESCEND_FLOOR = 100;
  *   further out of reach than the last: the gap souls, Legends and Heartmarks close.
  *   A floor's health and gold are shared across its 25 monsters.
  */
-export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.62, deepGold: 1.15, levelsPerSoul: 2000, goldBossFrom: 100, goldBossChance: 0.25, soulPower: 0.1, deepHp: 1.145, deepFrom: 100, zoneBoss: 1, hpCreep: 0.004, awakenFloor: AWAKEN_FLOOR, pullCap: 0.1, pullRate: 0.03, ogre: 1, wallFrom: 300, wallTo: 400, wall: 1000, wallGrowth: 1.02, costGrowth: COST_GROWTH };
+export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.62, deepGold: 1.15, levelsPerSoul: 2000, goldBossFrom: 100, goldBossChance: 0.25, soulPower: 0.1, deepHp: 1.145, deepFrom: 100, zoneBoss: 1, hpCreep: 0.004, awakenFloor: AWAKEN_FLOOR, pullFloor: 0.02, pullCap: 0.25, pullScale: 187, ogre: 1, wallFrom: 300, wallTo: 400, wall: 1000, wallGrowth: 1.04, costGrowth: COST_GROWTH };
 
 /** How gold on the floor reached the bank: picked up, left too long, swept up leaving the floor, or flown up when
  *  a rainbow portal opens. */
@@ -549,6 +550,7 @@ export type GameEvent =
   | { t: 'tripsOpen'; comp: number }
   | { t: 'tripReady'; comp: number }
   | { t: 'autoHireOpen' }
+  | { t: 'setStart'; floor: number; gold: Decimal }
   /** A hunter found cards out on its trip (kept with it until it's home). */
   | { t: 'tripFind'; comp: number; cards: number; gold: number }
   /** A hunter fights with the party on its floor (on), or goes back to hunting (off). */
@@ -2128,7 +2130,29 @@ export class Game {
     s.goldBosses = {};
     s.runSeed = freshSeed();
     this.invalidate();
-    this.enterFloor(1, true);
+    // Card sets carry a new run past their zones, paying what those floors would have.
+    const start = this.setStart();
+    if (start > 1) {
+      let gold = new Decimal(0);
+      for (let f = 1; f < start; f++) gold = gold.plus(floorGold(f).times(FLOOR_KILLS * TRASH));
+      gold = gold.times(this.goldMult()).ceil();
+      this.earn(gold);
+      s.maxFloor = start;
+      s.cycleBest = Math.max(s.cycleBest, start);
+      this.events.push({ t: 'setStart', floor: start, gold });
+    }
+    this.enterFloor(start, true);
+  }
+
+  /** The floor a new run starts on: past every zone, in the order you meet them, whose card set in that zone's color
+   *  there you've completed (up to the last color's first pass, floor 400). */
+  setStart() {
+    let floor = 1;
+    for (let z = 0; z < ZONES.length * CORRUPTION.length; z++) {
+      if (!this.setDone(z % ZONES.length, Math.floor(z / ZONES.length), false)) break;
+      floor = (z + 1) * 10 + 1;
+    }
+    return floor;
   }
 
   soulsFree() {
@@ -2475,12 +2499,13 @@ export class Game {
 
   /** How hard depth pulls on champion souls: rises toward TUNE.pullCap with every bound soul ever earned. */
   pull() {
-    return TUNE.pullCap * (1 - (1 - TUNE.pullRate) ** this.s.boundEarned);
+    const bound = this.s.boundEarned;
+    return bound ? TUNE.pullFloor + (TUNE.pullCap - TUNE.pullFloor) * (1 - Math.exp(-bound / TUNE.pullScale)) : 0;
   }
 
   /** Champion souls on this floor: the Pit Lord's ×(1 + level²), and the pull of every bound soul, compounding with depth. */
   champSoulMult(floor: number) {
-    return (1 + this.boundLv('pitlord') ** 2) * (1 + this.pull()) ** Math.max(0, (floor - TUNE.goldBossFrom) / 10);
+    return (1 + 10 * this.boundLv('pitlord') ** 2) * (1 + this.pull()) ** Math.max(0, (floor - TUNE.goldBossFrom) / 5);
   }
 
   /** A Spirit working harder for its Bound: +25% per level. */

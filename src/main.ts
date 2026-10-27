@@ -15,6 +15,7 @@ import { CARDS, CORRUPTION, LEGENDS, TROPHIES, UPGRADES, lapOf, zoneOf } from '.
 import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
 import { TitleMenu } from './ui/menu.ts';
 import { PlayRecorder } from './record.ts';
+import { beforeFresh } from './version.ts';
 
 declare global {
   interface Window {
@@ -91,9 +92,16 @@ const store = {
   },
 };
 
+/** A save from before FRESH_FROM was found (and set aside): the menu says why the run starts over. */
+let droppedOld = false;
+
 function load(): SaveState | null {
   try {
     const s = JSON.parse(store.get(SAVE_KEY) ?? 'null') as SaveState | null;
+    if (s && beforeFresh(s.version)) {
+      droppedOld = true;
+      return null;
+    }
     return s?.v === SAVE_VERSION ? s : null;
   } catch {
     return null;
@@ -383,7 +391,7 @@ async function boot() {
   let acc = 0;
   if (atMenu) {
     await fontsReady();
-    const menu = new TitleMenu(document.body, game, !!saved && game.s.kills > 0, {
+    const menu = new TitleMenu(document.body, game, !!saved && game.s.kills > 0, droppedOld, {
       play: () => {
         menu.close();
         play();

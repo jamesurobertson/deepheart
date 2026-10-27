@@ -1101,6 +1101,13 @@ export class Ui {
   handle(ev: GameEvent) {
     const g = this.game;
     switch (ev.t) {
+      case 'keep':
+        // Up to the Keep or back: no numbers, bars or sparks left over from the floor.
+        for (const el of this.pops.splice(0)) el.remove();
+        for (const bar of this.bars.values()) bar.remove();
+        this.bars.clear();
+        this.el.drops.querySelectorAll('.sparks').forEach((el) => el.remove());
+        break;
       case 'click': {
         if (ev.x >= 0) {
           this.swing(ev.x, ev.y, ev.crit);
@@ -1309,6 +1316,7 @@ export class Ui {
         if (ev.on) this.toast(`<b>${esc(COMPS[ev.comp].name)}</b> fights with you on floor ${fmt(g.s.floor)}`, COMPS[ev.comp].sprite);
         break;
       case 'tripsOpen': this.toast('<b>Expeditions</b> are open: the ladder in the Keep', COMPS[ev.comp].sprite, 'trophy'); break;
+      case 'setStart': this.toast(`Card sets: <b>floor ${fmt(ev.floor)}</b> · +${fmt(ev.gold)} gold`, 'imp', 'trophy'); break;
       case 'autoHireOpen': this.toast('<b>Auto hire</b> is open: the toggle above your party', 'knight_m', 'trophy'); break;
       case 'tripReady': this.toast(`<b>${esc(COMPS[ev.comp].name)}</b> can go on expeditions`, COMPS[ev.comp].sprite); break;
       case 'legend': if (ev.summoned) this.toast(`<b>${esc(LEGEND_BY_ID.get(ev.id)!.name)}</b> joins you`, LEGEND_BY_ID.get(ev.id)!.sprite); break;
