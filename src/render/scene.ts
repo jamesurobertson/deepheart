@@ -578,6 +578,7 @@ export class Scene {
     if (band === this.band) return;
     this.band = band;
     this.palette = corrupt(PALETTES[band % PALETTES.length], Math.floor(band / ZONES.length));
+    this.fx.clearGround();
     this.clearRoom();
     this.room = this.buildRoom(band);
     this.scene.add(this.room);
@@ -1953,6 +1954,7 @@ export class Scene {
         // Leaving a floor: any relic still lying there flies to the party (but not one the boss just dropped: the
         // next floor starts the moment a boss dies, and its relic waits on the floor to be picked up there).
         this.collectAllLoot(false, true);
+        this.fx.fadeGround();
         // A cleared floor: whatever's still standing bursts apart with it.
         if (ev.cleared) {
           let any = false;
@@ -2240,6 +2242,7 @@ export class Scene {
     const c = this.cine!;
     c.phase = 'stairs';
     c.t = 0;
+    this.fx.clearGround();
     // Dress the stairwell in the new zone's tiles and light.
     const pal = corrupt(PALETTES[c.zone % PALETTES.length], Math.floor(c.zone / ZONES.length));
     const theme = tilesFor(c.zone);

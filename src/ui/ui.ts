@@ -47,6 +47,8 @@ const RARE_NEWS = 0.15;
 const STAR_WAIT_MS = 1000;
 /** How long your first Heartmark is pointed out. */
 const MARK_TIP_MS = 8000;
+/** How long Flurry is pointed out once it unlocks (it goes as soon as it's used). */
+const FLURRY_TIP_MS = 6000;
 /** How close your hero or the cursor has to come to a coin to pick it up (px). */
 const COIN_REACH = 52;
 /** Coins start leaning toward whoever's collecting from this far out (px). */
@@ -161,12 +163,9 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.ceil(s % 60) %
 
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
 
-/** The companions the demo keeps for the full game. */
-const fullGameOnly = (i: number) => DEMO && i >= DEMO_COMPANIONS;
-
 /** What it takes to meet a companion who hasn't joined yet. */
 const meetText = (def: { floor: number; heart?: number }, cycleBest: number) =>
-  fullGameOnly(COMPS.indexOf(def as (typeof COMPS)[number])) ? 'In the full game'
+  DEMO ? 'In the full game'
     : cycleBest < def.floor ? `Reach floor ${fmt(def.floor)} to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
 
 /** A relic's stars, as little gold glyphs after its name. */
@@ -359,7 +358,7 @@ export class Ui {
         <button class="btn dock-b" data-open="relics" data-tip="dock:relics"${RELICS_ON ? '' : ' hidden'}>${G.relic(3)}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>Ascend</span><em class="badge" hidden></em></button>
         <button class="btn dock-b dock-heart" data-open="heart" data-tip="dock:heart" hidden>${G.heart(3)}<span>The Heart</span><em class="badge bound" hidden></em></button>
-        <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden>${G.door(3)}<span>The Keep</span></button>
+        <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>Stats</span></button>
         <button class="btn dock-b dock-stat blade-rate" data-tip="dock:blade" tabindex="-1">${spriteFit('weapon_knife', 20, 'glyph')}<span>1/s</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu(3)}<span>Options</span></button>
@@ -1284,12 +1283,6 @@ export class Ui {
         }
         break;
       }
-      case 'curse': {
-        const c = CURSE_BY_ID.get(ev.id)!;
-        this.toast(`<b>${esc(c.name)}: tier ${ev.tier} broken</b><small>${esc(c.reward(ev.tier))}</small>`, 'skull', 'trophy');
-        this.hooks.sound('levelup', { vol: 0.6 });
-        break;
-      }
       case 'heal': {
         if (!g.s.settings.numbers) break;
         const s = this.scene.screenOf(ev.id);
@@ -1299,6 +1292,22 @@ export class Ui {
       case 'split': {
         const s = this.scene.screenOf(ev.into[0]) ?? this.scene.screenOf(ev.id);
         if (s) this.pop(s.x, s.y + s.h * 0.2, 'Split!', 'p-mod');
+        break;
+      }
+      default:
+        this.handleFull(ev);
+    }
+  }
+
+  /** Events from the full game's systems: the demo has none of them. */
+  private handleFull(ev: GameEvent) {
+    if (DEMO) return;
+    const g = this.game;
+    switch (ev.t) {
+      case 'curse': {
+        const c = CURSE_BY_ID.get(ev.id)!;
+        this.toast(`<b>${esc(c.name)}: tier ${ev.tier} broken</b><small>${esc(c.reward(ev.tier))}</small>`, 'skull', 'trophy');
+        this.hooks.sound('levelup', { vol: 0.6 });
         break;
       }
       case 'expedition':
@@ -1532,7 +1541,7 @@ export class Ui {
 
   frame(dt: number) {
     const g = this.game;
-    if (g.s.inKeep && !this.keepView) {
+    if (!DEMO && g.s.inKeep && !this.keepView) {
       this.keepView = new KeepView(g, this.root);
       this.keepView.onUse = (id) => this.station(id);
       if (this.arriveAtHeart) this.keepView.arriveAtHeart();
@@ -1679,7 +1688,7 @@ export class Ui {
 
     const pending = g.pendingSouls();
     const ab = this.el.abyssBadge;
-    ab.hidden = pending < 1;
+    ab.hidden = DEMO || pending < 1;
     setText(ab, fmt(pending));
     // Worth it at +50% souls: the genre's rule of thumb for a reset.
     ab.classList.toggle('hot', g.canDescend() && pending >= g.s.souls / 2);
@@ -1705,7 +1714,7 @@ export class Ui {
     // The Keep opens with your first ascent; from then on it's a button away (and the way back down, while you're there).
     this.el.keepBtn.hidden = !g.legendsOpen() || g.inVault() || !!g.raid;
     // Up in the Keep it's the way back down: steps instead of the door.
-    const keepText = g.s.inKeep ? 'Way down' : 'The Keep';
+    const keepText = DEMO ? '' : g.s.inKeep ? 'Way down' : 'The Keep';
     if (this.keepBtnText !== keepText) {
       this.keepBtnText = keepText;
       this.el.keepBtn.innerHTML = `${g.s.inKeep ? G.steps(3) : G.door(3)}<span>${keepText}</span>`;
@@ -1884,7 +1893,7 @@ export class Ui {
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
       row.querySelector('.gen-name')!.innerHTML = `${name}${marks && !locked && !mystery ? ` <span class="marks" data-tip="mark:${i}">${G.heart(1.5)}${marks}</span>` : ''}${q.n > 1 && !locked && !mystery ? ` <small>×${q.n}</small>` : ''}`;
-      row.querySelector('.gen-cost')!.innerHTML = trip ? `<span class="need trip-tag">Expedition · floor ${fmt(trip.floor)}</span>` : locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.cycleBest)}</span>` : gold(q.cost, can ? 'ok' : 'no');
+      row.querySelector('.gen-cost')!.innerHTML = !DEMO && trip ? `<span class="need trip-tag">Expedition · floor ${fmt(trip.floor)}</span>` : locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.cycleBest)}</span>` : gold(q.cost, can ? 'ok' : 'no');
       row.querySelector('.gen-lv')!.textContent = lv ? `Lv ${lv}` : '';
       row.querySelector('.gen-dps')!.textContent = trip ? '' : lv ? `${fmt(g.compDps(i))} dps` : '';
       // Owned traits and the next one only: the rest show up as you buy your way along. Past the last trait, the next
@@ -2131,6 +2140,7 @@ export class Ui {
     if (g.s.clicks < 6) state = 'click';
     else if (g.s.owned.every((n) => n === 0) && g.s.gold.gte(g.compCost(0))) state = firstRun ? 'hire' : 'nudge';
     else if (g.abilityUnlocked('blade') && !g.s.bladeSeen) state = 'blade';
+    else if (g.abilityUnlocked('flurry') && !g.s.flurrySeen) state = 'flurry';
     // The first champion: pointed out until one is slain.
     else if (g.s.champions === 0 && g.monsters.some((m) => m.champ)) state = 'champ';
     // The first champion boss that pays souls, too: by then you've usually met a champion, but not this.
@@ -2167,6 +2177,9 @@ export class Ui {
       if (shown > 8_000) g.s.bladeSeen = true;
     } else if (state === 'rampage') {
       this.pointAt(this.el.abilities.querySelector('[data-ability="rampage"]'));
+    } else if (state === 'flurry') {
+      this.pointAt(this.el.abilities.querySelector('[data-ability="flurry"]'));
+      if (g.abilityCooldown('flurry') > 0 || (this.hintState === 'flurry' && performance.now() - this.tourAt > FLURRY_TIP_MS)) g.s.flurrySeen = true;
     } else if (state === 'auto') {
       this.pointAt(this.el.autoUpg);
       if (this.hintState === 'auto' && performance.now() - this.tourAt > MARK_TIP_MS) g.s.autoTipSeen = true;
@@ -2193,7 +2206,7 @@ export class Ui {
     }
     if (state === this.hintState) return;
     this.hintState = state;
-    const pointing = ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'blade', 'mark', 'auto'].includes(state);
+    const pointing = ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'flurry', 'blade', 'mark', 'auto'].includes(state);
     this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ';
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero');
@@ -2204,12 +2217,13 @@ export class Ui {
         : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>Companions fight for you, even while you're away</small></b>`
           : state === 'level' ? `<b>Keep ${this.touch ? 'tapping' : 'clicking'} to level up<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
             : state === 'blade' ? `<b>Phantom Blade unlocked!<small>It attacks for you, once a second</small></b>`
+            : state === 'flurry' ? `<b>Flurry is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('flurry')}`} to use it</small></b>`
             : state === 'rampage' ? `<b>Rampage is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
             : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it, or press U'}</small></b>`
               : state === 'champ' ? this.champHint()
               : state === 'auto' ? `<b>Auto-buy<small>Traits you've bought before buy themselves</small></b>`
-              : state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
+              : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
               : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
@@ -2310,12 +2324,12 @@ export class Ui {
     if (kind === 'comp') {
       const i = Number(id);
       const def = COMPS[i];
-      if (fullGameOnly(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">${COMPS.length - DEMO_COMPANIONS} more companions join you in the full game.</p>`;
+      if (DEMO && i >= DEMO_COMPANIONS) return '<div class="tt-h"><b>???</b></div><p class="tt-f">More companions join you in the full game.</p>';
       if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. ${meetText(def, g.s.cycleBest)}.</p>`;
       if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">A new companion is on their way. Earn more gold to meet them.</p>`;
       // Away hunting: the trip, not the hire.
       const trip = g.s.expeditions.find((e) => e.comp === i && e.pausedAt === undefined);
-      if (trip) {
+      if (!DEMO && trip) {
         return `<div class="tt-h">${charFit(def.sprite, 30)}<b>${def.name}</b><span class="tt-own">expedition</span></div>
           <dl class="tt-trip"><div><dt>Floor</dt><dd>${trip.floor}</dd></div><div><dt>Kills</dt><dd>${fmt(g.tripKills(trip))}</dd></div>
           <div><dt>Cards found</dt><dd>${fmt(trip.found?.length ?? 0)}</dd></div>
@@ -2366,7 +2380,7 @@ export class Ui {
       const key = this.touch ? '' : ` (or press ${abilityKey(a.id)})`;
       const fever = a.id === 'rampage' ? g.s.buffs.find((b) => b.id === 'fever') : undefined;
       const next = fever ? g.rampageNext() : null;
-      const status = g.away(a.comp)
+      const status = !DEMO && g.away(a.comp)
         ? `The ${comp.name} is on an expedition.`
         : !g.abilityUnlocked(a.id)
         ? `Unlocked by the ${comp.name}.`
@@ -2422,67 +2436,69 @@ export class Ui {
       return `${head}<p class="tt-d">${esc(relicText(d, lv))}</p><p class="tt-gain">Next level: ${esc(relicText(d, lv + 1))}</p><p class="tt-f">“${esc(d.flavor)}”</p>`;
     }
     if (kind === 'note') return `<p class="tt-d">${esc(key.slice(5))}</p>`;
-    if (kind === 'souls') {
-      return `<div class="tt-h"><b>How souls work</b></div>
-        <p class="tt-d">You get them when you ascend:</p>
-        <ul class="tt-l"><li>1 soul for every ${fmt(TUNE.levelsPerSoul)} companion levels you bought this run.</li>
-        <li>Champion bosses (from floor ${fmt(TUNE.goldBossFrom)}) drop souls the first time you beat them each run, more the deeper they are.</li></ul>
-        <p class="tt-d">Each soul you keep adds ${soulPct(1)} damage. Or spend them on Spirits.</p>`;
-    }
-    if (kind === 'respec') {
-      const back = Math.floor(g.s.legendSpent * RESPEC_REFUND);
-      return `<div class="tt-h"><b>Respec</b></div><p class="tt-d">Every Spirit leaves. You get back ${RESPEC_REFUND * 100}% of the souls spent on them.</p>
-        <p class="tt-f">Spent ${G.soul(1.2)} ${fmt(g.s.legendSpent)} · back ${G.soul(1.2)} ${fmt(back)}</p>`;
-    }
-    if (kind === 'bound') {
-      const b = BOUND.find((x) => x.id === id)!;
-      const lv = g.boundLv(b.id);
-      return `<div class="tt-h">${bossFig(b, 30, 36)}<b>${esc(boundName(b))}</b><span class="tt-own">${lv ? `level ${lv}` : 'Bound'}</span></div>${boundDetail(b, lv)}`;
-    }
-    if (kind === 'skill') {
-      const a = ABILITY_BY_ID.get(id as AbilityId)!;
-      const comp = COMPS[a.comp];
-      const lasts = a.id === 'rampage' ? g.rampageDuration() : g.abilityDuration(a.id);
-      const timing = a.kind === 'button' ? `Lasts ${duration(lasts)} · every ${duration(a.cooldown ?? 0)}` : a.kind === 'charge' ? `Lasts ${duration(lasts)}` : 'Always on';
-      return `<div class="tt-h">${charFit(comp.sprite, 30)}<b>${esc(a.name)}</b><span class="tt-own">skill</span></div>
-        <p class="tt-d">${esc(a.desc)}</p>
-        <p class="tt-f">${esc(comp.name)} · level ${traitLevels(a.comp)[a.trait]}<br>${timing}</p>`;
-    }
-    if (kind === 'idle') {
-      const d = LEGEND_BY_ID.get(id as LegendId)!;
-      const lv = g.legendLv(d.id);
-      return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">Spirit · level ${lv}</span></div><p class="tt-d">${esc(d.what)}: ${esc(d.value(lv))}</p>`;
-    }
-    if (kind === 'spirit') {
-      const d = LEGEND_BY_ID.get(id as LegendId)!;
-      const lv = g.legendLv(d.id);
-      const b = BOUND.find((x) => x.spirit === d.id)!;
-      const blv = g.boundLv(b.id);
-      // The Spirit's effect at its level (or level 1, not yet summoned) for its Bound's level now and the next three.
-      const shown = Math.max(1, lv);
-      const rows = Array.from({ length: 4 }, (_, k) => blv + k).map((L) => {
-        const boost = 1 + 0.25 * L;
-        const share = legendShare(shown);
-        const v = d.id === 'wither' ? `−${Math.round(Math.min(0.9, 0.5 * share * boost) * 100)}%`
-          : d.id === 'soulcaller' ? `${Math.round((0.25 + 0.75 * Math.min(1, share * boost)) * 100)}%`
-          : d.id === 'hourglass' ? `+${+(30 * share * boost).toFixed(1)}s`
-          : d.id === 'lure' ? `+${Math.round(200 * share * boost)}%`
-          : `−${Math.min(10 + L, shown)} kills, up to −${10 + L}`;
-        return `<tr${L === blv ? ' class="on"' : ''}><td>${esc(boundName(b))} ${L}</td><td>${v}</td></tr>`;
-      }).join('');
-      return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? `Spirit · level ${lv}` : 'Spirit · not summoned'}</span></div>
-        <p class="od-what">${esc(d.what)} at level ${shown}</p>
-        <table class="od-lv sp-lv">${rows}</table>`;
-    }
-    if (kind === 'legend') {
-      const d = LEGEND_BY_ID.get(id as LegendId)!;
-      const lv = g.legendLv(d.id);
-      return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? `level ${lv}` : KIND_NAME[d.kind]}</span></div>${legendDetail(d, lv)}`;
-    }
-    if (kind === 'mark') {
-      const i = Number(id);
-      const n = g.s.marks[i];
-      return `<div class="tt-h"><b>${n} Heartmark${n === 1 ? '' : 's'}</b></div><p class="tt-d">The ${esc(COMPS[i].name)} deals +${n * MARK_POWER * 100}% damage.</p>`;
+    if (!DEMO) {
+      if (kind === 'souls') {
+        return `<div class="tt-h"><b>How souls work</b></div>
+          <p class="tt-d">You get them when you ascend:</p>
+          <ul class="tt-l"><li>1 soul for every ${fmt(TUNE.levelsPerSoul)} companion levels you bought this run.</li>
+          <li>Champion bosses (from floor ${fmt(TUNE.goldBossFrom)}) drop souls the first time you beat them each run, more the deeper they are.</li></ul>
+          <p class="tt-d">Each soul you keep adds ${soulPct(1)} damage. Or spend them on Spirits.</p>`;
+      }
+      if (kind === 'respec') {
+        const back = Math.floor(g.s.legendSpent * RESPEC_REFUND);
+        return `<div class="tt-h"><b>Respec</b></div><p class="tt-d">Every Spirit leaves. You get back ${RESPEC_REFUND * 100}% of the souls spent on them.</p>
+          <p class="tt-f">Spent ${G.soul(1.2)} ${fmt(g.s.legendSpent)} · back ${G.soul(1.2)} ${fmt(back)}</p>`;
+      }
+      if (kind === 'bound') {
+        const b = BOUND.find((x) => x.id === id)!;
+        const lv = g.boundLv(b.id);
+        return `<div class="tt-h">${bossFig(b, 30, 36)}<b>${esc(boundName(b))}</b><span class="tt-own">${lv ? `level ${lv}` : 'Bound'}</span></div>${boundDetail(b, lv)}`;
+      }
+      if (kind === 'skill') {
+        const a = ABILITY_BY_ID.get(id as AbilityId)!;
+        const comp = COMPS[a.comp];
+        const lasts = a.id === 'rampage' ? g.rampageDuration() : g.abilityDuration(a.id);
+        const timing = a.kind === 'button' ? `Lasts ${duration(lasts)} · every ${duration(a.cooldown ?? 0)}` : a.kind === 'charge' ? `Lasts ${duration(lasts)}` : 'Always on';
+        return `<div class="tt-h">${charFit(comp.sprite, 30)}<b>${esc(a.name)}</b><span class="tt-own">skill</span></div>
+          <p class="tt-d">${esc(a.desc)}</p>
+          <p class="tt-f">${esc(comp.name)} · level ${traitLevels(a.comp)[a.trait]}<br>${timing}</p>`;
+      }
+      if (kind === 'idle') {
+        const d = LEGEND_BY_ID.get(id as LegendId)!;
+        const lv = g.legendLv(d.id);
+        return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">Spirit · level ${lv}</span></div><p class="tt-d">${esc(d.what)}: ${esc(d.value(lv))}</p>`;
+      }
+      if (kind === 'spirit') {
+        const d = LEGEND_BY_ID.get(id as LegendId)!;
+        const lv = g.legendLv(d.id);
+        const b = BOUND.find((x) => x.spirit === d.id)!;
+        const blv = g.boundLv(b.id);
+        // The Spirit's effect at its level (or level 1, not yet summoned) for its Bound's level now and the next three.
+        const shown = Math.max(1, lv);
+        const rows = Array.from({ length: 4 }, (_, k) => blv + k).map((L) => {
+          const boost = 1 + 0.25 * L;
+          const share = legendShare(shown);
+          const v = d.id === 'wither' ? `−${Math.round(Math.min(0.9, 0.5 * share * boost) * 100)}%`
+            : d.id === 'soulcaller' ? `${Math.round((0.25 + 0.75 * Math.min(1, share * boost)) * 100)}%`
+            : d.id === 'hourglass' ? `+${+(30 * share * boost).toFixed(1)}s`
+            : d.id === 'lure' ? `+${Math.round(200 * share * boost)}%`
+            : `−${Math.min(10 + L, shown)} kills, up to −${10 + L}`;
+          return `<tr${L === blv ? ' class="on"' : ''}><td>${esc(boundName(b))} ${L}</td><td>${v}</td></tr>`;
+        }).join('');
+        return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? `Spirit · level ${lv}` : 'Spirit · not summoned'}</span></div>
+          <p class="od-what">${esc(d.what)} at level ${shown}</p>
+          <table class="od-lv sp-lv">${rows}</table>`;
+      }
+      if (kind === 'legend') {
+        const d = LEGEND_BY_ID.get(id as LegendId)!;
+        const lv = g.legendLv(d.id);
+        return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? `level ${lv}` : KIND_NAME[d.kind]}</span></div>${legendDetail(d, lv)}`;
+      }
+      if (kind === 'mark') {
+        const i = Number(id);
+        const n = g.s.marks[i];
+        return `<div class="tt-h"><b>${n} Heartmark${n === 1 ? '' : 's'}</b></div><p class="tt-d">The ${esc(COMPS[i].name)} deals +${n * MARK_POWER * 100}% damage.</p>`;
+      }
     }
     if (kind === 'floor') {
       const mods = g.bossFloor() ? g.bossMods() : [];
@@ -2518,12 +2534,15 @@ export class Ui {
       const text: Record<string, string> = {
         trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length}. Cards ${g.cardVersions()}/${g.cardVersionsTotal()}.`,
         relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
-        abyss: (g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${fmt(g.ascendFloor())}.`),
-        heart: g.canAwaken() ? `Awaken for ${fmt(g.pendingBound())} bound souls` : `Bound souls ${fmt(g.boundFree())}`,
+        abyss: DEMO ? `The way up opens at floor ${fmt(g.ascendFloor())}.`
+          : g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${fmt(g.ascendFloor())}.`,
+        ...(DEMO ? {} : {
+          heart: g.canAwaken() ? `Awaken for ${fmt(g.pendingBound())} bound souls` : `Bound souls ${fmt(g.boundFree())}`,
+          keep: g.s.inKeep ? `Back to floor ${fmt(g.s.floor)}` : 'The Keep',
+        }),
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        keep: g.s.inKeep ? `Back to floor ${fmt(g.s.floor)}` : 'The Keep',
         blade: `Phantom Blade: ${perSec(g.autoRate())} attack${g.autoRate() === 1 ? '' : 's'} a second.`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
@@ -2593,27 +2612,29 @@ export class Ui {
     } else if (name === 'cards') {
       html = head('Cards') + this.troTabs('cards') + this.cardsHtml();
 
-    } else if (name === 'abyss' || name === 'marks') {
+    } else if (DEMO && name === 'abyss') {
+      html = head('Ascend') + this.ascendHtml();
+    } else if (!DEMO && (name === 'abyss' || name === 'marks')) {
       const sub = `${G.soul()} ${fmt(g.soulsFree())} souls · ${soulPct(g.soulsFree())} damage`;
       html = head('Ascend', sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
-    } else if (name === 'bound' && this.boundFocus) {
+    } else if (!DEMO && name === 'bound' && this.boundFocus) {
       const b = BOUND.find((x) => x.id === this.boundFocus)!;
       html = head(esc(boundName(b)), `${boundGlyph()} ${fmt(g.boundFree())} bound souls`) + `<div class="lcards one">${this.boundCard(b)}</div>
         <div class="legend-panel">${boundDetail(b, g.boundLv(b.id))}</div>`;
-    } else if (name === 'legend' && this.legendFocus) {
+    } else if (!DEMO && name === 'legend' && this.legendFocus) {
       const d = LEGEND_BY_ID.get(this.legendFocus)!;
       html = head(esc(d.name), `${G.soul()} ${fmt(g.soulsFree())} souls`) + `<div class="lcards one">${this.legendCard(d)}</div>
         <div class="legend-panel">${legendDetail(d, g.legendLv(d.id))}</div>`;
-    } else if (name === 'trips') {
+    } else if (!DEMO && name === 'trips') {
       const out = g.s.expeditions.length;
       html = head('Expeditions', out ? `${out} out` : '') + this.tripsHtml();
-    } else if (name === 'heart') {
+    } else if (!DEMO && name === 'heart') {
       html = head('The Heart', g.s.awakens ? `${boundGlyph()} ${fmt(g.boundFree())} bound souls · ${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}` : '') + this.heartHtml();
     } else if (name === 'relics') {
       html = head('Relics', `${g.relicsFound()} / ${RELICS.length} found · ${g.s.equipped.length} / ${g.relicSlots()} slots`) + this.relicsHtml();
     } else if (name === 'stats' || name === 'party' || name === 'records' || name === 'ascents') {
       html = head('Stats') + this.statTabs(name) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
-    } else if (name === 'dan' || name === 'victor') {
+    } else if (!DEMO && (name === 'dan' || name === 'victor')) {
       const who = name as Trader;
       html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${who === 'dan' ? 'Dan' : 'Victor'}`, who === 'dan' ? `Trade ${DAN_GIVES} cards for a random card` : `Trade ${VICTOR_GIVES} cards for 1 gold card`) + this.tradeHtml(who);
     } else if (name === 'settings') {
@@ -2636,7 +2657,7 @@ export class Ui {
           <p class="muted">Copy your save code to move it to another browser.</p>
           <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
           <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
-          <div class="set-row"><a class="btn" href="${WIKI_URL}" target="_blank" rel="noopener">Wiki</a>${document.body.classList.contains('at-menu') ? '' : '<button class="btn" data-act="mainMenu">Main menu</button>'}</div>
+          <div class="set-row">${DEMO ? '' : `<a class="btn" href="${WIKI_URL}" target="_blank" rel="noopener">Wiki</a>`}${document.body.classList.contains('at-menu') ? '' : '<button class="btn" data-act="mainMenu">Main menu</button>'}</div>
         </div>`;
     }
     if (soft && (html === this.modalKey || performance.now() < this.modalHold)) return;
@@ -2651,6 +2672,11 @@ export class Ui {
    *  soul, and champion bosses), and either the way up's progress or the Ascend button. */
   private ascendHtml(): string {
     const g = this.game;
+    const locked = `<div class="as-go locked"><small>The way up opens at floor ${fmt(g.ascendFloor())}</small>
+        <span class="as-floor">Floor ${fmt(g.s.maxFloor)} / ${g.ascendFloor()}</span>
+        <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / g.ascendFloor()) * 100)}%"></i></div></div>`;
+    // The demo shows there's a way up, and nothing past it.
+    if (DEMO) return `<div class="ascend">${locked}</div>`;
     const help = '<span class="soul-help" data-tip="souls:" tabindex="0" aria-label="How souls work">?</span>';
     const active = g.s.curse ? CURSE_BY_ID.get(g.s.curse) : undefined;
     const activeLine = active
@@ -2667,9 +2693,7 @@ export class Ui {
         ${mult > 1 ? `<div class="as-row"><span>Soul bonus</span><b>×${+mult.toFixed(2)}</b></div>` : ''}
       </div>`;
     if (!g.descendOpen()) {
-      return `${activeLine}<div class="ascend">${rows}<div class="as-go locked"><small>The way up opens at floor ${fmt(g.ascendFloor())}</small>
-        <span class="as-floor">Floor ${fmt(g.s.maxFloor)} / ${g.ascendFloor()}</span>
-        <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / g.ascendFloor()) * 100)}%"></i></div></div></div>`;
+      return `${activeLine}<div class="ascend">${rows}${locked}</div>`;
     }
     const pending = g.pendingSouls();
     const curse = this.curseChoice ? CURSE_BY_ID.get(this.curseChoice) : undefined;
@@ -2683,6 +2707,7 @@ export class Ui {
   /** The soul shop. Before your first ascent: three Legends asleep as silhouettes (spirits once the way up opens). After:
    *  the offer as spirits, the picked one in full color with its details, a reroll, your Legends as cards, and a respec. */
   private legendsHtml(): string {
+    if (DEMO) return '';
     const g = this.game;
     const offer = g.legendOffer();
     if (!g.legendsOpen()) {
@@ -2741,6 +2766,7 @@ export class Ui {
 
   /** One of your Spirits as a card: its figure, level, what it gives now and next, and its Level up button. */
   private legendCard(d: LegendDef) {
+    if (DEMO) return '';
     const g = this.game;
     const lv = g.legendLv(d.id);
     const cost = g.legendLevelCost(d.id);
@@ -2793,6 +2819,7 @@ export class Ui {
 
   /** Heartmarks: who has them, and moving them around for souls. */
   private marksHtml(): string {
+    if (DEMO) return '';
     const g = this.game;
     const free = g.soulsFree();
     const total = g.marksTotal();
@@ -2816,6 +2843,7 @@ export class Ui {
 
   /** Cursed descents on offer: pick one before ascending. Each shows its rule, its tiers so far and the next reward. */
   private cursesHtml(): string {
+    if (DEMO) return '';
     const g = this.game;
     const open = g.cursesOpen();
     if (!CURSES_ON) return '';
@@ -2848,6 +2876,7 @@ export class Ui {
   private tradeBusy = false;
 
   private openTrade(who: Trader) {
+    if (DEMO) return;
     this.trade = { side: [], got: null, line: pickLine(TRADER_LINES[who][this.tradeHand().length ? 'hello' : 'short']) };
     this.openModal(who);
   }
@@ -2883,6 +2912,7 @@ export class Ui {
   }
 
   private tradeHtml(who: Trader): string {
+    if (DEMO) return '';
     const need = this.tradeNeed(who);
     const name = who === 'dan' ? 'Dan' : 'Victor';
     const { side, got, line } = this.trade;
@@ -3028,11 +3058,12 @@ export class Ui {
 
   private statTabs(on: string) {
     const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
-    return `<nav class="tabs">${tab('stats', 'Bonuses')}${tab('party', 'Companions')}${tab('records', 'Records')}${tab('ascents', 'Ascents')}</nav>`;
+    return `<nav class="tabs">${tab('stats', 'Bonuses')}${tab('party', 'Companions')}${tab('records', 'Records')}${DEMO ? '' : tab('ascents', 'Ascents')}</nav>`;
   }
 
   /** Every ascent so far: its run time, the deepest floor reached and the souls it paid. */
   private ascentsHtml(): string {
+    if (DEMO) return '';
     const list = this.game.s.ascents;
     const clock = (t: number) => [Math.floor(t / 3600), Math.floor((t % 3600) / 60), Math.floor(t % 60)].map((n, i) => (i ? String(n).padStart(2, '0') : String(n))).join(':');
     let ascent = 0;
@@ -3072,13 +3103,13 @@ export class Ui {
     const allRows = [
       mul('Trophies', p.trophies, `${g.s.trophies.length} trophies`),
       mul('Card sets', p.cards, `${g.setsDone(false)} sets · ${g.setsDone(true)} gold sets`, 'Every card of a zone in one color'),
-      mul('Souls', p.souls, `${fmt(g.soulsFree())} kept, ${soulPct(1)} each${g.legendLv('hungry') ? ` + the Hungry Dark ${g.legendLv('hungry')}` : ''}`, 'Ascend to earn souls'),
+      ...(DEMO ? [] : [mul('Souls', p.souls, `${fmt(g.soulsFree())} kept, ${soulPct(1)} each${g.legendLv('hungry') ? ` + the Hungry Dark ${g.legendLv('hungry')}` : ''}`, 'Ascend to earn souls')]),
       relicMul(relicName('shard'), p.shard, 'Legendary relic', 'A legendary relic'),
-      ...(g.s.awakens ? [mul('Ogre Chieftain', p.ogre, `level ${g.boundLv('ogre')}`, 'Bound in the Heart')] : []),
+      ...(!DEMO && g.s.awakens ? [mul('Ogre Chieftain', p.ogre, `level ${g.boundLv('ogre')}`, 'Bound in the Heart')] : []),
     ];
 
     const dps = panel('Party damage', fmt(g.dps()), '/sec', [
-      row('Companions', fmt(baseSum), 'levels × traits × Heartmarks'),
+      row('Companions', fmt(baseSum), DEMO ? 'levels × traits' : 'levels × traits × Heartmarks'),
       ...allRows,
       relicMul(relicName('banner'), p.banner, 'Relic', 'A relic'),
       mul('Party traits', p.party, 'companion traits that lift everyone', 'Some companion traits lift everyone'),
@@ -3090,7 +3121,7 @@ export class Ui {
       relicMul(relicName('whet'), p.whet, 'Relic', 'A relic'),
       row('All-damage bonuses', x(b.all), 'trophies, souls and fury'),
       row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion traits` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`),
-      mul('The Fist', 1 + 0.1 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Spirit'),
+      ...(DEMO ? [] : [mul('The Fist', 1 + 0.1 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Spirit')]),
       mul('Buffs', b.buffClick, buffNames('click'), 'Frenzy'),
       row('During Rampage', x(g.feverMult())),
     ]);
@@ -3103,7 +3134,7 @@ export class Ui {
 
     const goldT = panel('Gold', x(g.goldMult()), '', [
       mul('Companion traits', p.goldUpg, 'gold traits', 'Some companion traits add gold'),
-      mul('The Hoard', 1 + 0.05 * g.legendLv('hoard'), `level ${g.legendLv('hoard')}`, 'A Spirit'),
+      ...(DEMO ? [] : [mul('The Hoard', 1 + 0.05 * g.legendLv('hoard'), `level ${g.legendLv('hoard')}`, 'A Spirit')]),
       relicMul(relicName('purse'), p.goldRelic, 'Relic', 'A relic'),
       mul('Buffs', b.buffGold, buffNames('gold'), 'Gold Rush'),
     ]);
@@ -3118,11 +3149,11 @@ export class Ui {
       row('Modifier strength', pc(g.modBite()), 'how hard Armored and Regenerating bite'),
     ]);
 
-    const souls = panel('Souls', fmt(g.s.souls), '', [
+    const souls = DEMO ? '' : panel('Souls', fmt(g.s.souls), '', [
       row('Unspent', fmt(g.soulsFree())),
       row('An ascent now pays', fmt(g.pendingSouls()), `${fmt(Math.floor(g.runLevels() / TUNE.levelsPerSoul))} from levels, ${fmt(g.s.bossSouls)} from champion bosses`),
       ...(RELICS_ON ? [mul('Soul gain', g.soulGainMult(), g.relic('souls') ? relicName('cage') : '', relicName('cage'))] : []),
-      ...(g.s.awakens ? [mul('Champion souls', g.champSoulMult(g.s.maxFloor), `on floor ${fmt(g.s.maxFloor)}`), row('Bound souls', fmt(g.s.boundEarned), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`)] : []),
+      ...(!DEMO && g.s.awakens ? [mul('Champion souls', g.champSoulMult(g.s.maxFloor), `on floor ${fmt(g.s.maxFloor)}`), row('Bound souls', fmt(g.s.boundEarned), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`)] : []),
     ]);
     return `<div class="st-grid">${dps}${click}${crit}${goldT}${boss}${souls}</div>`;
   }
@@ -3136,10 +3167,10 @@ export class Ui {
     const rows = COMPS.map((c, i) => {
       const lv = g.s.owned[i];
       if (!lv) return '';
-      return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(levelMult(lv))}</td><td>${x(p.tier[i])}</td><td>${g.s.marks[i] ? `${G.heart(1.2)} ${g.s.marks[i]}` : ''}</td><td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? g.compDps(i).div(total).times(100).toNumber().toFixed(1) : 0}%</td></tr>`;
+      return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(levelMult(lv))}</td><td>${x(p.tier[i])}</td>${DEMO ? '' : `<td>${g.s.marks[i] ? `${G.heart(1.2)} ${g.s.marks[i]}` : ''}</td>`}<td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? g.compDps(i).div(total).times(100).toNumber().toFixed(1) : 0}%</td></tr>`;
     }).join('');
-    return `<p class="muted bd-help">Each companion: level × base damage × milestones × traits × Heartmarks, then every all-damage bonus (${x(b.all.times(p.banner * p.party))} right now) on top.</p>
-      <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Milestones</td><td>Traits</td><td>Marks</td><td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
+    return `<p class="muted bd-help">Each companion: level × base damage × milestones × traits${DEMO ? '' : ' × Heartmarks'}, then every all-damage bonus (${x(b.all.times(p.banner * p.party))} right now) on top.</p>
+      <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Milestones</td><td>Traits</td>${DEMO ? '' : '<td>Marks</td>'}<td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
   }
 
   private recordsHtml(): string {
@@ -3149,7 +3180,7 @@ export class Ui {
       ['Floor', `${fmt(s.floor)} (deepest this descent ${fmt(s.maxFloor)})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
       ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses beaten', fmt(s.bosses)],
       ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rainbow Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
-      ['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)], ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ...(RELICS_ON ? [['Relics', `${g.relicsFound()} / ${RELICS.length}`] as [string, string]] : []), ['Cards found', fmt(g.cardsFound())],
+      ...(DEMO ? [] : [['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)]] as [string, string][]), ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ...(RELICS_ON ? [['Relics', `${g.relicsFound()} / ${RELICS.length}`] as [string, string]] : []), ['Cards found', fmt(g.cardsFound())],
       ['This descent', duration(s.runTime)], ['Active', duration(s.runActive), true], ['Idle', duration(Math.max(0, s.runTime - s.runActive)), true],
       ['Time played', duration(s.playTime)], ['Active', duration(s.activeTime), true], ['Idle', duration(Math.max(0, s.playTime - s.activeTime)), true],
     ];
@@ -3157,6 +3188,7 @@ export class Ui {
   }
 
   private tabs(on: 'abyss' | 'marks') {
+    if (DEMO) return '';
     const g = this.game;
     if (!g.marksTotal()) return '';
     return `<nav class="tabs">
@@ -3169,6 +3201,7 @@ export class Ui {
   private tripPick: Record<number, number> = {};
 
   private tripsHtml(): string {
+    if (DEMO) return '';
     const g = this.game;
     const rate = (r: number) => (r >= 10 ? fmt(Math.round(r)) : r.toFixed(r >= 1 ? 1 : 2));
     const rows = COMPS.map((c, i) => {
@@ -3193,6 +3226,7 @@ export class Ui {
   }
 
   private heartHtml(): string {
+    if (DEMO) return '';
     const g = this.game;
     const cycle = g.cycleSouls();
     let bar: string;
@@ -3217,6 +3251,7 @@ export class Ui {
 
   /** One of the Bound as a card: its figure, level, what it gives now and next, and its Level up button. */
   private boundCard(b: BoundDef) {
+    if (DEMO) return '';
     const g = this.game;
     const lv = g.boundLv(b.id);
     const cost = g.boundPrice(b.id);
@@ -3234,6 +3269,7 @@ export class Ui {
 
   /** What a Bound boosts, the Spirit it works through underlined (hover it for what that Spirit does). */
   private boundWhat(b: BoundDef) {
+    if (DEMO) return '';
     if (!b.spirit) return esc(b.what);
     const name = LEGEND_BY_ID.get(b.spirit)!.name;
     return esc(b.what).replace(esc(name), `<span class="spirit-u" data-tip="spirit:${b.spirit}">${esc(name)}</span>`);
@@ -3368,6 +3404,7 @@ export class Ui {
   }
 
   private renderAwakenConfirm() {
+    if (DEMO) return;
     const g = this.game;
     this.modal = 'confirm';
     this.modalKey = 'confirm';
@@ -3401,6 +3438,7 @@ export class Ui {
   }
 
   private doAwaken() {
+    if (DEMO) return;
     const respec = !!this.el.modal.querySelector<HTMLInputElement>('#awaken-respec')?.checked;
     this.playAwakening(respec);
   }
@@ -3416,6 +3454,7 @@ export class Ui {
    * end is the Heart's room in the Keep, with the Bound open.
    */
   private playAwakening(respec: boolean) {
+    if (DEMO) return;
     const g = this.game;
     if (!g.canAwaken() || this.descending) return;
     const first = !g.s.awakens;
@@ -3569,6 +3608,7 @@ export class Ui {
 
 
   private renderDescendConfirm() {
+    if (DEMO) return;
     const g = this.game;
     const pending = g.pendingSouls();
     const away = g.s.expeditions.length;
@@ -3585,6 +3625,7 @@ export class Ui {
   }
 
   private doDescend() {
+    if (DEMO) return;
     const g = this.game;
     this.descending = true;
     this.modal = null;
@@ -3660,6 +3701,7 @@ export class Ui {
 
   /** The Keep's labels over each thing you can use, clickable (walking up to it works too). */
   private keepLabelsFrame() {
+    if (DEMO) return;
     const host = this.el.keepLabels;
     const labels = this.keepView?.labels() ?? null;
     if (!labels) {
@@ -3701,6 +3743,7 @@ export class Ui {
 
   /** Back after time away with the party up in the Keep: nothing happened below. */
   showKeepAway(seconds: number) {
+    if (DEMO) return;
     this.modal = 'offline';
     this.el.modalWrap.hidden = false;
     this.el.modal.className = 'modal pnl m-offline';
@@ -3714,6 +3757,7 @@ export class Ui {
 
   /** Up to the Keep, or back down to the dungeon: a fade through the dark hallway between them. */
   private toggleKeep() {
+    if (DEMO) return;
     const g = this.game;
     if (this.keepFading || this.descending) return;
     const up = !g.s.inKeep;
@@ -3742,12 +3786,13 @@ export class Ui {
   /** A clutch kill's time left, held on the boss clock through the slow motion. */
   private clutchHold: { left: number; max: number; until: number } | null = null;
   /** What the Keep button says now (it swaps its icon when this changes). */
-  private keepBtnText = 'The Keep';
+  private keepBtnText = '';
   /** The Keep's top-down map, while you're up there. */
   private keepView: KeepView | null = null;
 
   /** Your hero walked up to something in the Keep. */
   private station(id: KeepStation) {
+    if (DEMO) return;
     if (this.modal || this.keepFading) return;
     this.hooks.sound('open', { vol: 0.4 });
     if (id.startsWith('offer:')) {
@@ -3772,6 +3817,7 @@ export class Ui {
 
   /** "Squire found 2 cards · Ranger found a gold card". */
   private tellTripFinds() {
+    if (DEMO) return;
     if (!this.tripFinds.size) return;
     const parts = [...this.tripFinds].map(([comp, f]) => {
       const plain = f.cards - f.gold;
@@ -3792,6 +3838,7 @@ export class Ui {
   /** Hunters home: what they found. Called home from the Expeditions window, it shows over that window, which stays
    *  open behind it (and behind the cards) for the next one. */
   private showTripsBack(over = false) {
+    if (DEMO) return;
     const back = this.tripsBack.splice(0);
     const cards = back.flatMap((b) => b.cards);
     const who = back.map((b) => `<p>${charFit(COMPS[b.comp].sprite, 22)} <b>${esc(COMPS[b.comp].name)}</b> · floor ${fmt(b.floor)} · ${fmt(b.kills)} kills</p>`).join('');

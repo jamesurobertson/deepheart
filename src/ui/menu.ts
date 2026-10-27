@@ -165,7 +165,7 @@ export class TitleMenu {
         <button type="button" data-mm="${this.hasRun || DEMO ? 'play' : 'new'}"><span>▸</span>${play}</button>${run}
         ${this.hasRun ? '<button type="button" data-mm="new"><span>▸</span>New Game</button>' : ''}
         <button type="button" data-mm="options"><span>▸</span>Options</button>
-        <a href="${WIKI_URL}" target="_blank" rel="noopener"><span>▸</span>Wiki</a>
+        ${DEMO ? '' : `<a href="${WIKI_URL}" target="_blank" rel="noopener"><span>▸</span>Wiki</a>`}
         <button type="button" data-mm="credits"><span>▸</span>Credits</button>
         ${this.hooks.quit ? '<button type="button" data-mm="quit"><span>▸</span>Quit</button>' : ''}
       </nav>`;

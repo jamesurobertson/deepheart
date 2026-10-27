@@ -380,6 +380,8 @@ export interface SaveState {
   heroTips: number;
   /** Has the Phantom Blade's unlock been pointed out? */
   bladeSeen: boolean;
+  /** Has Flurry, the first skill button, been pointed out? */
+  flurrySeen: boolean;
   rampage: number;
   /** Cards by id: copies per edition (normal, then each corruption; only normal is shown so far), plain and gold, and
    *  the kill (for goblins, the catch) that first dropped each. */
@@ -419,7 +421,9 @@ export interface Expedition {
 }
 
 /** Every card set: one zone in one color, its monsters, mid-boss and boss (the goblins belong to no set). */
-const CARD_SETS = ZONES.flatMap((_, zone) => CORRUPTION.map((_, lap) => ({ zone, lap, cards: CARDS.filter((c) => c.zone === zone && c.where[lap].length > 0).map((c) => c.id) })));
+const CARD_SETS = ZONES.flatMap((_, zone) => CORRUPTION.map((_, lap) => ({ zone, lap, cards: CARDS.filter((c) => c.zone === zone && c.where[lap].length > 0).map((c) => c.id) })))
+  // (The demo's blank zones have no cards.)
+  .filter((set) => set.cards.length);
 
 /** The companions' order before the roster grew to 32 (October 2026): saves without a roster were kept in it. */
 /** What the 24 cost to hire at the time. */
@@ -470,7 +474,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(), lastAttack: 0,
-    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), relics: {}, equipped: [], bossBest: 0, bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, tripReady: [], tripsSent: 0, tripCards: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
+    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), relics: {}, equipped: [], bossBest: 0, bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, tripReady: [], tripsSent: 0, tripCards: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, autoHire: false, graphics: 'auto' },
   };
 }
@@ -870,6 +874,7 @@ export class Game {
     for (const k of ['gold', 'runGold', 'totalGold', 'bestDps'] as const) s[k] = new Decimal(s[k] ?? 0);
     while (s.owned.length < COMPS.length) s.owned.push(0);
     while (s.marks.length < COMPS.length) s.marks.push(0);
+    s.owned.length = s.marks.length = COMPS.length;
     s.bestLevel = COMPS.map((_, i) => Math.max(s.bestLevel?.[i] ?? 0, s.owned[i] ?? 0));
     // The Old Ones were renamed Legends.
     const legacyOld = s as unknown as { oldOnes?: Record<string, number>; oldOffer?: string[]; oldSpent?: number };
@@ -1286,6 +1291,7 @@ export class Game {
 
   /** Up to the Keep, the castle above the dungeon: the floor empties, and nothing happens below until you're back. */
   enterKeep() {
+    if (DEMO) return false;
     if (this.s.inKeep || this.vault) return false;
     this.bankAllDrops();
     this.raid = null;
@@ -2087,6 +2093,7 @@ export class Game {
 
   /** Ascend, optionally into a cursed descent (one of `cursesOpen()`). */
   descend(curse: string | null = null) {
+    if (DEMO) return false;
     // As before awakening, hunters are called home first, so what they found is seen before the run resets.
     if (!this.canDescend() || this.s.expeditions.length) return false;
     const gained = this.pendingSouls();
@@ -2230,6 +2237,7 @@ export class Game {
   }
 
   summonLegend(id: LegendId) {
+    if (DEMO) return false;
     const price = this.summonPrice();
     if (!this.legendOffer().includes(id) || this.soulsFree() < price) return false;
     this.spendSouls(price, true);
@@ -2241,6 +2249,7 @@ export class Game {
   }
 
   rerollLegends() {
+    if (DEMO) return false;
     const price = this.rerollPrice();
     if (!this.legendsOpen() || this.soulsFree() < price || this.legendsOwned() >= LEGENDS.length - OFFER_SIZE) return false;
     this.spendSouls(price, false);
@@ -2253,6 +2262,7 @@ export class Game {
   }
 
   levelLegend(id: LegendId) {
+    if (DEMO) return false;
     const lv = this.legendLv(id);
     if (!lv) return false;
     if (lv >= this.legendMax(id)) return false;
@@ -2271,6 +2281,7 @@ export class Game {
 
   /** Every Legend is let go; RESPEC_REFUND of the souls they took comes back. */
   respecLegends() {
+    if (DEMO) return false;
     const s = this.s;
     if (!this.legendsOwned()) return false;
     s.spentSouls -= Math.floor(s.legendSpent * RESPEC_REFUND);
@@ -2330,6 +2341,7 @@ export class Game {
 
   /** Move one of this companion's Heartmarks to someone else, at random. */
   rerollMark(from: number) {
+    if (DEMO) return false;
     const pool = this.markable().filter((i) => i !== from);
     if (!this.s.marks[from] || !pool.length || this.soulsFree() < MARK_REROLL) return false;
     this.spendSouls(MARK_REROLL, false);
@@ -2343,6 +2355,7 @@ export class Game {
 
   /** Bring one Heartmark to this companion, taken from someone else's at random. */
   moveMarkTo(to: number) {
+    if (DEMO) return false;
     const from = COMPS.map((_, i) => i).filter((i) => i !== to && this.s.marks[i] > 0);
     if (!from.length || !this.compUnlocked(to) || this.soulsFree() < MARK_MOVE) return false;
     this.spendSouls(MARK_MOVE, false);
@@ -2438,6 +2451,7 @@ export class Game {
 
   /** Give up souls, Spirits, Heartmarks and the run for bound souls; `respec` hands back every one spent on the Bound. */
   awaken(respec = false) {
+    if (DEMO) return false;
     // Hunters have to be called home first, so what they found is seen before the cutscene.
     if (!this.canAwaken() || this.s.expeditions.length) return false;
     const s = this.s;
@@ -2490,6 +2504,7 @@ export class Game {
   }
 
   buyBound(id: BoundId) {
+    if (DEMO) return false;
     if (!BOUND_BY_ID.has(id) || this.boundMaxed(id) || this.boundFree() < this.boundPrice(id)) return false;
     this.s.bound[id] = this.boundLv(id) + 1;
     this.invalidate();
@@ -2555,6 +2570,7 @@ export class Game {
 
   /** Send a companion to hunt a floor you've reached; it leaves the party (and takes its traits) until it's back. */
   sendTrip(i: number, floor: number) {
+    if (DEMO) return false;
     floor = Math.floor(floor);
     if (!this.canSend(i) || !(floor >= 1 && floor <= this.s.bestFloor)) return false;
     const dps = this.compDps(i);
@@ -2619,6 +2635,7 @@ export class Game {
 
   /** Bring a hunter home with what it found: every kill rolls for its card, as it would in the dungeon. */
   callHome(i: number) {
+    if (DEMO) return false;
     const k = this.s.expeditions.findIndex((e) => e.comp === i);
     if (k < 0) return false;
     const [e] = this.s.expeditions.splice(k, 1);
@@ -2833,6 +2850,7 @@ export class Game {
   /** Dan: five cards from any sets for a random card from those same sets, each set as likely as its share of
    *  what you gave (three Upper Halls and two Bone Crypts: 60% Upper Halls, 40% Bone Crypts). */
   tradeWithDan(give: string[]) {
+    if (DEMO) return null;
     if (give.length !== DAN_GIVES || give.some((id) => (CARD_BY_ID.get(id)?.zone ?? -1) < 0)) return null;
     const zone = CARD_BY_ID.get(give[Math.floor(Math.random() * give.length)])!.zone;
     const pool = this.tradeable(zone);
@@ -2843,6 +2861,7 @@ export class Game {
 
   /** Victor: ten cards from anywhere for a random gold card. */
   tradeWithVictor(give: string[]) {
+    if (DEMO) return null;
     if (give.length !== VICTOR_GIVES || give.some((id) => CARD_BY_ID.get(id)?.kind === 'goblin')) return null;
     const pool = this.tradeable().filter((c) => c.gold);
     if (!pool.length || !this.takeCards(give)) return null;
@@ -2869,6 +2888,7 @@ export class Game {
 
   /** Someone's one spare card (once each): a plain one from the first two zones, one you don't have if they've got it. */
   giftCard(who: string) {
+    if (DEMO) return null;
     if (this.s.gifts.includes(who)) return null;
     const early = CARDS.filter((c) => c.kind === 'monster' && c.zone <= 1 && c.laps.includes(0));
     const missing = early.filter((c) => !this.cardCount(c.id));

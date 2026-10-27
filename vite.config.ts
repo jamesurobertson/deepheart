@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
+import { demoTrim } from './scripts/demo-trim.ts';
 
 /** The play log on the dev server: the game posts lines to /__log and they're appended to logs/<date>.jsonl. */
 const playLog = (): Plugin => ({
@@ -25,11 +26,15 @@ const playLog = (): Plugin => ({
   },
 });
 
+// The demo (VITE_DEMO=1) is built without the full game: no wiki, and demo-trim takes out its music and art.
+const demo = process.env.VITE_DEMO === '1';
+
 // Relative base so the build works from any folder (e.g. jamesurobertson.com/deepheart/).
 export default defineConfig({
   base: './',
-  plugins: [playLog()],
+  define: { __DEMO__: JSON.stringify(demo) },
+  plugins: [playLog(), ...(demo ? [demoTrim()] : [])],
   build: {
-    rollupOptions: { input: { main: 'index.html', wiki: 'wiki/index.html' } },
+    rollupOptions: { input: demo ? { main: 'index.html' } : { main: 'index.html', wiki: 'wiki/index.html' } },
   },
 });
