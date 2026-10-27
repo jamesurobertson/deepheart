@@ -65,8 +65,8 @@ const CHEST_REACH = 1.1;
 const COIN_SIZE = 1.15;
 
 /** A clutch kill's slow motion: real seconds until the release burst, and until time is back to full speed. */
-const CLUTCH_RELEASE = 0.9;
-const CLUTCH_END = 1.9;
+const CLUTCH_RELEASE = 1.4;
+const CLUTCH_END = 2.4;
 
 /** A relic on the floor: its glow in the rarity's color, how long it waits before flying to the party by itself
  *  (shorter while the staircase is waiting on it), and how long that flight takes. */
@@ -116,6 +116,8 @@ const PARTY_SLOTS: [number, number][] = [
   [-6.2, -1.3], [-6.9, 1.9], [-7.2, -0.3], [-7.4, -2.5], [-8, 2.6], [-8.3, 0.8], [-8.8, -1.4], [-9.3, 1.6],
   // The Heart's recruits fill the gaps.
   [-4.1, 3.7], [-5.5, -3.1], [-6.5, 0.1], [-7.7, 1.3], [-5.2, 3.8], [-8.5, -2.9], [-6.6, -3.2], [-9, 0.2],
+  // The last eight, in the gaps left (each over a unit from its neighbors).
+  [-9.6, 3.7], [-3, -3.2], [-7.1, 3.7], [-9.6, -2.4], [-8.4, 3.7], [-5, -1.2], [-4.2, -3.2], [-7.6, -1.4],
 ];
 
 interface MonView {

@@ -58,4 +58,4 @@ function unlock(trophies) {
   if (changed) client.stats.store();
 }
 
-module.exports = { enabled: APP_ID > 0, prepare, start, unlock };
+module.exports = { enabled: APP_ID > 0, release: APP_ID > 0 && APP_ID !== 480, prepare, start, unlock };

@@ -3,7 +3,7 @@
  * slots the best relics, and prestiges once it stops making progress.
  */
 import Decimal from 'break_infinity.js';
-import { COST_GROWTH, Game, MANUAL_RATE, MARK_MOVE, newSave, TUNE, type GameEvent, type SaveState } from '../src/game/game.ts';
+import { Game, MANUAL_RATE, MARK_MOVE, newSave, TUNE, type GameEvent, type SaveState } from '../src/game/game.ts';
 import { ABILITIES, COMPS, LEGEND_BY_ID, UPG_BY_ID, type BoundId, type LegendId } from '../src/game/data.ts';
 
 export interface Profile {
@@ -211,6 +211,7 @@ export class Sim {
       : profile.descendRatio > 0 && game.pendingSouls() >= Math.max(10, game.s.souls * profile.descendRatio);
     if ((stalled || (profile.ascendEager && worthIt)) && game.canDescend() && (worthIt || game.s.curse)) {
       const souls = game.pendingSouls();
+      game.recallAll();
       this.descents++;
       this.hooks.descend?.(souls, this);
       this.gatherMarks();
@@ -312,7 +313,7 @@ export class Sim {
     for (let i = 0; i < COMPS.length; i++) {
       if (game.s.owned[i] === 0 && game.compUnlocked(i) && i < game.s.revealed && game.s.gold.gte(game.compCost(i))) game.buyComp(i, 1);
     }
-    const step = Math.log10(COST_GROWTH);
+    const step = Math.log10(TUNE.costGrowth);
     for (let pass = 0; pass < 40; pass++) {
       // Score everything once (log10 of gold per point of damage, so absurd numbers still compare), then buy down the
       // list in order: what a player does with the shop open. Re-score only after buying something.
@@ -351,13 +352,13 @@ export class Sim {
           if (DAMAGE_EFFECTS.has(UPG_BY_ID.get(o.upg)!.effect.t)) break;
           continue;
         }
-        // A companion's next level costs ×COST_GROWTH more for the same damage, so it stays ahead of the next option
+        // A companion's next level costs ×TUNE.costGrowth more for the same damage, so it stays ahead of the next option
         // for this many levels: buy them in one go (×10 / Max), capped by the gold.
         const i = o.comp!;
         const next = options[k + 1]?.score ?? Infinity;
         const stays = Number.isFinite(next) ? Math.floor((next - o.score) / step) + 1 : Infinity;
         const first = game.compCost(i);
-        const affordable = Math.floor(game.s.gold.times(COST_GROWTH - 1).div(first).plus(1).log10() / step);
+        const affordable = Math.floor(game.s.gold.times(TUNE.costGrowth - 1).div(first).plus(1).log10() / step);
         const n = Math.max(1, Math.min(stays, affordable, 1000));
         bought = game.buyComp(i, n) || game.buyComp(i, 1) || bought;
       }

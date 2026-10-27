@@ -44,7 +44,7 @@ long tail.
 | `CLUTCH_1` | By a Hair | Beat a boss with 3 seconds or less on the clock. |  | 6m |
 | `CLUTCH_20` | Nerves of Steel | Beat 20 bosses with 3 seconds or less on the clock. |  | 42h |
 | `CLUTCH_100` | Living on the Edge | Beat 100 bosses with 3 seconds or less on the clock. |  | past 300h |
-| `HIRE_ALL` | Full Party | Hire all 24 companions. |  | 50h |
+| `HIRE_ALL` | Full Party | Hire all 32 companions. |  | past 300h |
 | `LEVEL_1000` | Legendary | Get a companion to level 1,000. |  | 23h |
 | `LEVEL_5000` | Immortal | Get a companion to level 5,000. |  | past 300h |
 | `LEVEL_10000` | Beyond | Get a companion to level 10,000. |  | past 300h |

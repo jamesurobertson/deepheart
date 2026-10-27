@@ -14,6 +14,7 @@ import { Sfx, type Track } from './audio/sfx.ts';
 import { CARDS, CORRUPTION, LEGENDS, TROPHIES, UPGRADES, lapOf, zoneOf } from './game/data.ts';
 import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
 import { TitleMenu } from './ui/menu.ts';
+import { PlayRecorder } from './record.ts';
 
 declare global {
   interface Window {
@@ -23,12 +24,15 @@ declare global {
       downloadUpdate(): void;
       saves?: { read(key: string): string | null; write(key: string, text: string): boolean; remove(key: string): boolean };
       trophies?(ids: string[]): void;
+      log?(text: string): void;
     };
   }
 }
 
 const params = new URLSearchParams(location.search);
 const STEAM_TROPHIES = new Set(TROPHIES.filter((t) => t.steam).map((t) => t.id));
+// ?tune={"costGrowth":1.08} (dev only) overrides pacing knobs for a try, as TUNE='{...}' does for the simulator.
+if (import.meta.env.DEV && params.has('tune')) Object.assign(TUNE, JSON.parse(params.get('tune')!));
 // ?slot=name (dev only) keeps a separate save (handy for testing without touching your run).
 /** Where the site is served from ('./' in builds), so asset URLs work in a subfolder. */
 const BASE = import.meta.env.BASE_URL;
@@ -143,6 +147,7 @@ async function boot() {
   };
   /** Up while the main menu is: the fight waits, and nothing is saved (time away is settled when you play). */
   let atMenu = !SKIP_MENU;
+  let recorder: PlayRecorder | null = null;
   const save = () => {
     if (resetting || atMenu) return;
     try {
@@ -415,12 +420,25 @@ async function boot() {
   }, 50);
   setInterval(save, 5000);
   addEventListener('beforeunload', save);
+  // The play log (see record.ts): your own sessions on the dev server and in the desktop app, never test runs.
+  const recording = (import.meta.env.DEV && !navigator.webdriver && !TEST_STATE && !SIM_FLOOR && !QUICK) || !!window.deepheart?.log;
+  recorder = recording
+    ? new PlayRecorder(game, SLOT, (text) => {
+      if (window.deepheart?.log) window.deepheart.log(text);
+      else fetch(`${BASE}__log`, { method: 'POST', body: text, keepalive: true }).catch(() => {});
+    })
+    : null;
+  setInterval(() => {
+    if (!atMenu && !document.hidden) recorder?.second();
+  }, 1000);
+  addEventListener('beforeunload', () => recorder?.flush());
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       hiddenAt = Date.now();
       save();
     } else if (hiddenAt) {
+      recorder?.away((Date.now() - hiddenAt) / 1000);
       catchUp((Date.now() - hiddenAt) / 1000);
       hiddenAt = 0;
       lastTick = Date.now();
@@ -479,6 +497,7 @@ async function boot() {
       scene.handle(ev, game);
       ui.handle(ev);
       playSound(sfx, ev);
+      recorder?.event(ev);
       if (ev.t === 'descend' || ev.t === 'awaken') scene.rebuild(game);
     }
     // Big impacts briefly slow everything down.
@@ -545,7 +564,7 @@ function playSound(sfx: Sfx, ev: GameEvent) {
       // A clutch kill: a deep, slowed boom as time drops, then the hit landing as it lets go.
       if (ev.clutch) {
         sfx.play('mega', { vol: 0.9, rate: 0.55 });
-        setTimeout(() => sfx.play('bosskill', { vol: 0.9, rate: 0.85 }), 900);
+        setTimeout(() => sfx.play('bosskill', { vol: 0.9, rate: 0.85 }), 1400);
       }
       break;
     case 'rampage': sfx.play('mega', { vol: 0.6, rate: 1 + ev.tier * 0.2 }); break;

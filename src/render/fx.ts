@@ -347,6 +347,30 @@ const STAR = (() => {
 const dummy = new THREE.Object3D();
 
 /** Short-lived world effects: chunky pixel bursts, loot beams, lightning. */
+/** The light in a pillar: a bright thin core, soft edges, strongest at the foot and gone by the top. Drawn once. */
+let shaftTex: THREE.CanvasTexture | null = null;
+function shaftTexture() {
+  if (shaftTex) return shaftTex;
+  const w = 64, h = 128;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d')!;
+  const img = g.createImageData(w, h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const across = Math.abs((x + 0.5) / w - 0.5) * 2;
+    const glow = (1 - across) ** 2.2 * 0.55 + Math.max(0, 1 - across * 5) ** 2 * 0.6;
+    // y = 0 is the top: fades in from the top, and softly at the very foot.
+    const rise = ((y + 0.5) / h) ** 1.4 * Math.min(1, (h - y) / 6);
+    const k = (y * w + x) * 4;
+    img.data[k] = img.data[k + 1] = img.data[k + 2] = 255;
+    img.data[k + 3] = Math.round(255 * Math.min(1, glow * rise));
+  }
+  g.putImageData(img, 0, 0);
+  shaftTex = new THREE.CanvasTexture(c);
+  return shaftTex;
+}
+
 export class Fx {
   /** Particles per burst, as a share of the full count (lower on low graphics). */
   scale = 1;
@@ -463,13 +487,16 @@ export class Fx {
     this.stains.splice(i, 1);
   }
 
-  /** Column of light (level-ups, awakenings). */
+  /** Column of light (level-ups, awakenings, boss kills): a sheet facing the camera, brightest at its core and its foot,
+   *  soft at the sides and fading out as it rises. */
   pillar(at: THREE.Vector3, color: THREE.ColorRepresentation, height = 6, dur = 0.9) {
     const mesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.5, 0.7, height, 16, 1, true),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.6), transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
+      new THREE.PlaneGeometry(1.8, height),
+      new THREE.MeshBasicMaterial({ map: shaftTexture(), color: new THREE.Color(color).multiplyScalar(1.3), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
     );
     mesh.position.copy(at).setY(at.y + height / 2);
+    // Over blood and the other marks on the floor (1), under slashes and hits (5 and up).
+    mesh.renderOrder = 3;
     this.scene.add(mesh);
     this.waves.push({ mesh, life: dur, max: dur, grow: 0 });
   }

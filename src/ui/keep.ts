@@ -17,6 +17,10 @@ export type KeepStation = 'stairs' | 'dan' | 'victor' | 'trips' | 'heart' | `off
  *  is the Heart's. */
 const ROOMS: [number, number, number, number][] = [[1, 2, 13, 10], [16, 2, 15, 10], [1, 16, 9, 8], [12, 15, 22, 9], [36, 16, 9, 8], [19, 27, 9, 6]];
 const HALLS: [number, number, number, number][] = [[22, 12, 3, 3], [10, 19, 2, 2], [34, 19, 2, 2], [5, 12, 2, 4], [22, 24, 2, 3]];
+/** How close (in tiles) the hero's middle may come to a wall at its side. */
+const SIDE_GAP = 0.45;
+/** How far (in tiles) the hero's feet stay from a south wall. */
+const SOUTH_GAP = 0.2;
 const W = 47;
 const H = 35;
 
@@ -122,13 +126,17 @@ export class KeepView {
   private cells: string[][];
   private tiles: ReturnType<typeof autotile>;
   private blocked = new Set<string>();
+  /** Floor squares with a south wall's cap drawn along their bottom. */
+  private capped = new Set<string>();
   /** The hero (cell units, feet at the point), the trail it leaves, a path to walk when you click, the camera. */
   private hero = { x: ARRIVE[0] + 0.5, y: ARRIVE[1] + 0.5, left: false, moving: false };
   private trail: { x: number; y: number }[] = [];
   private path: { x: number; y: number }[] = [];
   private cam = { x: 0, y: 0 };
   /** Where each of your party is standing and which way they face (they run to their places, never jump). */
-  private party = new Map<number, { idx: number; x: number; y: number; left: boolean; running: boolean }>();
+  private party = new Map<number, { idx: number; x: number; y: number; left: boolean; running: boolean; arriving?: { x: number; y: number }[] }>();
+  /** Once the party has been placed: anyone joining after that runs in from somewhere out of sight. */
+  private partyPlaced = false;
   private zoom = 3;
   private time = 0;
   /** The station your hero is standing at, ready to use. */
@@ -160,8 +168,13 @@ export class KeepView {
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (this.cells[y + dy]?.[x + dx] === '.') this.cells[y][x] = '#';
     }
     this.tiles = autotile(this.cells);
+    // A south wall's cap is drawn along the bottom of the room's last floor row.
+    for (const t of this.tiles[2]) if (t.name === 'wall_top_mid' && this.cells[t.y]?.[t.x] === '.') this.capped.add(`${t.x},${t.y}`);
     for (const [, x, y, how] of THINGS) if (!how) this.blocked.add(`${x},${y}`);
     // The shrine's obelisk and the Heart's plinth stand in the way; spirits don't (you walk right through them).
+    // The door's posts are two tiles tall: their lower halves stand on the floor in front of the doorway.
+    this.blocked.add('21,27');
+    this.blocked.add('24,27');
     this.blocked.add(`${SHRINE[0]},${SHRINE[1]}`);
     this.blocked.add(`${HEART[0]},${HEART[1]}`);
     for (const p of PEOPLE) this.blocked.add(`${p.x},${p.y}`);
@@ -190,7 +203,14 @@ export class KeepView {
 
   private walkable(x: number, y: number) {
     const cx = Math.floor(x), cy = Math.floor(y);
-    return this.cells[cy]?.[cx] === '.' && !this.blocked.has(`${cx},${cy}`);
+    if (this.cells[cy]?.[cx] !== '.' || this.blocked.has(`${cx},${cy}`)) return false;
+    // Not half over a side wall: the hero (and the party in its footsteps) is a tile wide.
+    const fx = x - cx;
+    if (fx < SIDE_GAP && this.cells[cy][cx - 1] !== '.') return false;
+    if (fx > 1 - SIDE_GAP && this.cells[cy][cx + 1] !== '.') return false;
+    // On the last row before a south wall, the feet stay off the cap along its bottom.
+    if (y - cy > 1 - SOUTH_GAP && this.capped.has(`${cx},${cy}`)) return false;
+    return true;
   }
 
   /** The Bound and where each stands, once you've awakened. */
@@ -296,6 +316,26 @@ export class KeepView {
   }
 
   /** Breadth-first search over the floor, around anything standing in the way. */
+  /** The floor square nearest the hero (by walking) that's just outside the view, for a newcomer to run in from. */
+  private offscreenCell(w: number, h: number) {
+    const half = { x: w / (2 * 16 * this.zoom) + 1, y: h / (2 * 16 * this.zoom) + 1.5 };
+    const out = (x: number, y: number) => Math.abs(x + 0.5 - this.cam.x) > half.x || Math.abs(y + 0.5 - this.cam.y) > half.y;
+    const sx = Math.floor(this.hero.x), sy = Math.floor(this.hero.y);
+    const seen = new Set<string>([`${sx},${sy}`]);
+    const queue: [number, number][] = [[sx, sy]];
+    while (queue.length) {
+      const [x, y] = queue.shift()!;
+      if (out(x, y)) return { x, y };
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const key = `${x + dx},${y + dy}`;
+        if (seen.has(key) || !this.walkable(x + dx + 0.5, y + dy + 0.5)) continue;
+        seen.add(key);
+        queue.push([x + dx, y + dy]);
+      }
+    }
+    return null;
+  }
+
   private route(sx: number, sy: number, tx: number, ty: number) {
     if (!this.walkable(tx + 0.5, ty + 0.5)) return [];
     const prev = new Map<string, string | null>([[`${sx},${sy}`, null]]);
@@ -361,7 +401,9 @@ export class KeepView {
       }
     }
     const cx = Math.floor(hero.x), cy = Math.floor(hero.y);
-    this.near = this.stations().find((st) => st.cells.some(([x, y]) => x === cx && y === cy))?.id ?? null;
+    // Where two stations share a square, the one you're walking to wins, else the smaller one (the ladder by the stairs).
+    const here = this.stations().filter((st) => st.cells.some(([x, y]) => x === cx && y === cy));
+    this.near = (here.find((st) => st.id === this.goal) ?? here.sort((a, b) => a.cells.length - b.cells.length)[0])?.id ?? null;
     if (this.goal && !this.path.length) {
       const goal = this.goal;
       this.goal = null;
@@ -525,7 +567,7 @@ export class KeepView {
     };
     for (const t of this.tiles[0]) tile(atlas.rect(`floor_${worn(t.x, t.y)}`), t.x, t.y);
     for (const t of this.tiles[1]) tile(atlas.rect(t.name), t.x, t.y);
-    for (const t of this.tiles[2]) tile(atlas.rect(t.name), t.x, t.y);
+    for (const t of this.tiles[2]) if (!this.capped.has(`${t.x},${t.y}`)) tile(atlas.rect(t.name), t.x, t.y);
     if (this.game.tripsOpen()) tile(rect('floor_ladder'), LADDER[0], LADDER[1]);
     for (const [name, x, y, how] of THINGS) {
       if (how === 'flat') tile(rect(name, tick), x, y);
@@ -712,7 +754,38 @@ export class KeepView {
     if (heroIndex >= 0) places.set(heroIndex, 0);
     for (const [i, want] of places) {
       let at = this.party.get(i);
-      if (!at) this.party.set(i, (at = { idx: want, x: 0, y: 0, left: false, running: false }));
+      if (!at) {
+        this.party.set(i, (at = { idx: want, x: 0, y: 0, left: false, running: false }));
+        // Hired up here: in from the nearest spot just out of sight, by the way round through the rooms.
+        if (this.partyPlaced) {
+          const goal = this.along(want);
+          const from = this.offscreenCell(w, h);
+          const path = from ? this.route(from.x, from.y, Math.floor(goal.x), Math.floor(goal.y)) : [];
+          if (from && path.length) {
+            at.x = from.x + 0.5;
+            at.y = from.y + 0.5;
+            at.arriving = path;
+          }
+        }
+      }
+      if (at.arriving) {
+        // Running in: along the path, then the last stretch straight to its place in line.
+        const next = at.arriving[0] ?? this.along(at.idx);
+        const dx = next.x - at.x, dy = next.y - at.y, len = Math.hypot(dx, dy);
+        const step = SPEED * 1.6 * dt;
+        at.running = true;
+        if (Math.abs(dx) > 0.01) at.left = dx < 0;
+        if (len <= step) {
+          at.x = next.x;
+          at.y = next.y;
+          if (at.arriving.length) at.arriving.shift();
+          else at.arriving = undefined;
+        } else {
+          at.x += (dx / len) * step;
+          at.y += (dy / len) * step;
+        }
+        continue;
+      }
       const gap = want - at.idx;
       at.running = Math.abs(gap) > 0.6;
       // (Running to catch up: quicker the further there is to go.)
@@ -724,6 +797,7 @@ export class KeepView {
       if (Math.abs(at.x - was) > 0.002) at.left = at.x < was;
     }
     for (const i of this.party.keys()) if (!places.has(i)) this.party.delete(i);
+    this.partyPlaced = true;
     for (const [i, at] of this.party) {
       const hero = i === heroIndex;
       const src = (at.running || (hero && this.hero.moving) ? spriteFrames(`${COMPS[i].sprite}_run`) : null) ?? spriteFrames(COMPS[i].sprite);
@@ -741,6 +815,8 @@ export class KeepView {
       } });
     }
     standing.sort((a, b) => a.y - b.y).forEach((s2) => s2.draw());
+    // A south wall stands in front of the room: its cap goes over anyone right up against it (feet, rings and all).
+    for (const t of this.tiles[2]) if (this.capped.has(`${t.x},${t.y}`)) tile(atlas.rect(t.name), t.x, t.y);
     // The Heart's glow, once it's stirred.
     if (ready || awake) {
       const hx = (HEART[0] + 0.5) * 16, hy = (HEART[1] - 1.1) * 16;

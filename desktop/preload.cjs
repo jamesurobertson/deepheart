@@ -1,4 +1,5 @@
-/** What the game can ask of the desktop app: its save files, Steam achievements, and news of a newer release. */
+/** What the game can ask of the desktop app: its save files, Steam achievements, its play log, and news of a newer
+ *  release. */
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('deepheart', {
@@ -10,4 +11,5 @@ contextBridge.exposeInMainWorld('deepheart', {
     remove: (key) => ipcRenderer.sendSync('save:remove', key),
   },
   trophies: (ids) => ipcRenderer.send('steam:trophies', ids),
+  log: (text) => ipcRenderer.send('log:append', text),
 });

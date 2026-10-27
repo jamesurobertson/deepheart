@@ -32,40 +32,48 @@ export interface CompDef {
 const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, floor = 0, big = false, heart = 0): CompDef =>
   ({ id, name, sprite, cost, dps, attack, flavor, floor, big, heart });
 
-/** Spaced by price: each costs about ×7 the last (one every 4–5 floors against ×1.55 health a floor), the last four
- *  steeper. Once levels pass 200, damage per gold grows about gold^0.82 for everyone (×1.07 a level against ×4 every
- *  25), so damage is set from there: from the Shieldmaiden on, each companion's damage ÷ price^0.82 (with its ×2
- *  traits) is about 12% better than the last, so a new face is the natural pick and Heartmarks or a ×10 at level 1000
- *  can still make an older one the better buy. The first five keep their snappy opening numbers.
- *  The first eighteen carry the first climb to the way up (floor 100); the last six wait deeper, priced for the gold at
- *  their floor, so each starts near level 1 and grows over the next few minutes. */
+/** Prices go by place in the list, whoever stands there. The first twenty-three come with gold: the first five keep
+ *  their snappy opening numbers, then each costs about ×4 the last up to the Archmage. The last nine wait on a floor,
+ *  each priced against the gold on its floor, more of it the deeper it waits (150× the floor's gold at 95, rising to
+ *  30,000× from 450 on: about a minute and a half of killing at full speed), since a deeper one meets a stronger party. Once levels pass 200, damage per gold grows about gold^0.82 for
+ *  everyone (×1.07 a level against ×4 every 25), so damage is set from price: each one's damage ÷ price^0.82 (with its
+ *  ×2 traits) is about 8% better than the one before through the first twenty-three and 12% after, so a new face is
+ *  the natural pick and Heartmarks or a ×10 at level 1000 can still make an older one the better buy. */
 export const COMPS: CompDef[] = [
   // Plain adventurers first; the strange and the enormous come later.
   // The first four are cheap and hit hard, so the party carries the opening and clicking is a bonus.
   c('squire', 'Squire', 'knight_m', 5, 1, 'slash', 'Wants to be a knight so badly. Practices on everything, monsters included.'),
   c('ranger', 'Ranger', 'elf_f', 40, 4, 'arrow', 'Never misses. Well, rarely. Well, sometimes.'),
   c('brawler', 'Dwarf Brawler', 'dwarf_m', 250, 12, 'slash', 'Came for the gold. Stayed for the punching.'),
-  c('apprentice', 'Apprentice', 'wizzard_m', 2000, 50, 'bolt', 'Knows exactly one spell. It is lightning. It is enough.'),
-  c('hunter', 'Lizard Hunter', 'lizard_m', 12_000, 150, 'spear', 'Can smell a monster through three floors of stone.'),
-  c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 80_000, 4600, 'slash', 'Her shield has killed more monsters than her sword.'),
-  c('thief', 'Shadow Thief', 'cr_green_thief', 6e5, 27000, 'knife', 'Throws knives. Takes them back. Takes your purse too, then gives it back.'),
-  c('dancer', 'Blade Dancer', 'elf_m', 4e6, 72000, 'slash', 'Fights like it is a performance. The monsters do not clap.'),
-  c('corsair', 'Corsair Captain', 'cr_pirate_captain', 3e7, 4.2e5, 'bomb', 'Sailed the underground sea. There is an underground sea. Do not ask.'),
-  c('runesmith', 'Runesmith', 'dwarf_f', 2e8, 1.1e6, 'rune', 'Carves runes into the floor. The floor explodes.'),
-  c('paladin', 'Paladin', 'cr_gold_knight', 1.5e9, 1.3e7, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
-  c('stormcaller', 'Stormcaller', 'wizzard_f', 1e10, 3.4e7, 'storm', 'Brought her own weather. Down here, of all places.'),
-  c('venomblade', 'Venomblade', 'lizard_f', 7e10, 3.8e8, 'dark', 'Every blade is poisoned. Every single one. She has a lot.'),
-  c('doctor', 'Plague Doctor', 'doc', 5e11, 1.1e9, 'flask', 'Treats monsters with a strict regimen of dying.'),
-  c('frostimp', 'Frost Imp', 'cr_frost_imp', 4e12, 6.6e9, 'ice', 'Followed you up from the Frozen Vault. Will not leave. Brings its own blizzard.'),
-  c('hollow', 'Hollow Knight', 'pumpkin_dude', 2.5e13, 3.3e10, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.'),
-  c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 2e14, 2e11, 'dark', 'Broke every vow but one: never stop swinging.'),
+  c('apprentice', 'Apprentice', 'wizzard_m', 2_000, 50, 'bolt', 'Knows exactly one spell. It is lightning. It is enough.'),
+  c('gingerbread', 'Gingerbread Man', 'cr_gingerbread', 12_000, 150, 'slash', 'Ran from the oven. Kept running. Ended up down here.'),
+  c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 80_000, 4_600, 'slash', 'Her shield has killed more monsters than her sword.'),
+  c('hunter', 'Lizard Hunter', 'lizard_m', 3.2e5, 3_900, 'spear', 'Can smell a monster through three floors of stone.'),
+  c('thief', 'Shadow Thief', 'cr_green_thief', 1.3e6, 52_000, 'knife', 'Throws knives. Takes them back. Takes your purse too, then gives it back.'),
+  c('corsair', 'Corsair Captain', 'cr_pirate_captain', 5e6, 87_000, 'bomb', 'Sailed the underground sea. There is an underground sea. Do not ask.'),
+  c('runesmith', 'Runesmith', 'dwarf_f', 2e7, 1.5e5, 'rune', 'Carves runes into the floor. The floor explodes.'),
+  c('woodelf', 'Wood Elf', 'ef_elf_f', 7.9e7, 4.9e5, 'arrow', 'Grew up in the Enchanted Grove. Knows which trees bite.'),
+  c('stormcaller', 'Stormcaller', 'wizzard_f', 3.1e8, 1.6e6, 'storm', 'Brought her own weather. Down here, of all places.'),
+  c('dancer', 'Blade Dancer', 'elf_m', 1.2e9, 1.1e7, 'slash', 'Fights like it is a performance. The monsters do not clap.'),
+  c('bard', 'Wandering Bard', 'rm_rocker', 4.9e9, 1.9e7, 'orb', 'Plays one song. Very loud. The monsters leave, some of them in pieces.'),
+  c('venomblade', 'Venomblade', 'lizard_f', 2e10, 1.2e8, 'dark', 'Every blade is poisoned. Every single one. She has a lot.'),
+  c('doctor', 'Plague Doctor', 'doc', 7.7e10, 2.1e8, 'flask', 'Treats monsters with a strict regimen of dying.'),
+  c('cleric', 'Cleric', 'ef_normalcleric', 3.1e11, 7e8, 'light', 'Here to heal the party. Hasn\'t had to yet, so he hits things.'),
+  c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.2e12, 2.3e9, 'ice', 'Followed you up from the Frozen Vault. Will not leave. Brings its own blizzard.'),
+  c('santa', 'Santa', 'cr_santa', 4.8e12, 7.9e9, 'ice', 'Checked the list twice. Everyone down here is on the naughty one.'),
+  c('paladin', 'Paladin', 'cr_gold_knight', 1.9e13, 5.3e10, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
+  c('hollow', 'Hollow Knight', 'pumpkin_dude', 7.6e13, 8.9e10, 'fire', 'Nobody knows what is inside the pumpkin. Nobody asks.'),
+  c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 3e14, 3e11, 'dark', 'Broke every vow but one: never stop swinging.'),
   c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2.5e11, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
-  c('wraith', 'The Count', 'rm_dracula', 2e19, 3.2e15, 'bat', 'Came down for the dark. Stayed for the company.', 95),
-  c('necro', 'Necromancer', 'necromancer', 6e22, 6.4e17, 'skull', 'Used to raise these monsters. Now it lowers them.', 130),
-  c('king', 'Exiled King', 'sd_king', 1.5e24, 2e19, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 190),
-  c('angel', 'Fallen Angel', 'angel', 1e28, 1.5e22, 'light', 'Fell from somewhere bright. Landed swinging.', 240),
-  c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 1.8e28, 6.7e22, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 280, true),
-  c('demon', 'Bound Demon', 'big_demon', 1e32, 1.8e25, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 370, true),
+  c('wraith', 'The Count', 'rm_dracula', 7.4e21, 4.1e17, 'bat', 'Came down for the dark. Stayed for the company.', 95),
+  c('elfqueen', 'Elf Queen', 'ef_highelf_f', 1.1e25, 9.2e19, 'light', 'Left her court for the deep. Brought its manners. Not its mercy.', 130),
+  c('necro', 'Necromancer', 'necromancer', 1.4e29, 1.2e23, 'skull', 'Used to raise these monsters. Now it lowers them.', 190),
+  c('king', 'Exiled King', 'sd_king', 3.5e32, 1.6e26, 'fire', 'Lost his crown, his kingdom and his temper, in that order.', 240),
+  c('elflord', 'Elf Lord', 'ef_highelf_m', 1.9e35, 3.2e28, 'slash', 'A thousand years of swordsmanship. Still practicing.', 280),
+  c('magus', 'Old Magus', 'ef_wizard', 2.9e46, 2.7e37, 'storm', 'Was down here before the dungeon. Says it followed him.', 450),
+  c('angel', 'Fallen Angel', 'angel', 5.1e67, 7.9e54, 'light', 'Fell from somewhere bright. Landed swinging.', 800),
+  c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 1.6e110, 2.5e90, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 1500, true),
+  c('demon', 'Bound Demon', 'big_demon', 1.7e201, 1.5e164, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 3000, true),
 ];
 
 /** A companion's place in the roster, by id (so lists below don't break if the order changes). */
@@ -329,6 +337,14 @@ const TRAIT_PLAN: Record<string, string[]> = {
   angel: ['own', 'own', 'own', 'own', 'own'],
   ogre: ['own', 'boss', 'own', 'boss', 'own'],
   demon: ['own', 'own', 'own', 'own', 'own', 'party', 'own'],
+  gingerbread: ['own', 'own', 'click', 'own'],
+  woodelf: ['own', 'crit2', 'own', 'gold', 'own'],
+  bard: ['own', 'click', 'own', 'boss', 'own'],
+  cleric: ['own', 'own', 'boss', 'own'],
+  santa: ['own', 'gold', 'own', 'own', 'gold'],
+  elfqueen: ['own', 'own', 'crit3', 'own', 'own'],
+  elflord: ['own', 'boss', 'own', 'own', 'own'],
+  magus: ['own', 'own', 'click', 'own', 'own', 'own'],
 };
 /** A companion's trait levels (as many as it has traits). */
 export const traitLevels = (comp: number) => TRAIT_LEVELS.slice(0, TRAIT_PLAN[COMPS[comp].id].length);
@@ -358,6 +374,14 @@ const MILESTONE_NAMES: Record<string, string[]> = {
   angel: ['Fall Guy', 'Grounded', 'Fallen Grace', 'Wing It', 'Halo Effect'],
   ogre: ['Good Boy', 'Pebble Dash', 'Rock Solid', 'Big Softie', 'Boulder Dash'],
   demon: ['Terms and Conditions', 'Blood Pact', 'Hell to Pay', "Devil's Advocate", 'Hellfire', 'Soul Contract', 'Fire Sale'],
+  gingerbread: ['Fresh Out of the Oven', 'Crumb Trail', 'Hard Crust', 'Extra Icing'],
+  woodelf: ['Bark Skin', 'Sharp Eyes', 'Deep Roots', 'Forager', 'Old Growth'],
+  bard: ['Warm-Up Act', 'Encore', 'Power Chord', 'Headliner', 'Farewell Tour'],
+  cleric: ['Morning Prayer', 'Laying On Hands', 'Smite', 'Last Rites'],
+  santa: ['Naughty List', 'Stocking Stuffer', 'Down the Chimney', 'Ho Ho Hold On', 'Coal Delivery'],
+  elfqueen: ['Royal Decree', 'Starlight', 'Keen Edge', 'Silver Court', 'Long Reign'],
+  elflord: ['Ancient Form', 'Old Duel', 'Perfect Stance', 'Thousand Cuts', 'Elder Blade'],
+  magus: ['Star Chart', 'Long Beard', 'Deep Magic', 'Hat Trick', 'Ancient Words', 'Final Spell'],
 };
 export const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
 
@@ -398,6 +422,14 @@ const MILESTONE_FLAVOR: Record<string, string[]> = {
   angel: ['Took the fall. Gave back worse.', 'Literally. Angrily.', 'Not so graceful now. Much more punchy.', 'No plan. Lots of wing.', 'Monsters see it. Then they see nothing.'],
   ogre: ["Yes he is. Who's a good boy? Pebble is.", 'Pebble runs. Things break.', 'Pebble is not small. Pebble is never small.', 'To you. Only to you.', 'Pebble got bigger.'],
   demon: ['Nobody reads them. The monsters should have.', "Mostly the monsters' blood.", "And it's collecting.", 'Argues for violence. Wins.', 'Brought from home.', 'Every companion signed. Nobody read it.', 'Everything must burn.'],
+  gingerbread: ['Still warm. Still angry.', 'Monsters follow it. Monsters regret it.', 'Stale on purpose. Hits harder.', 'Decorated for battle.'],
+  woodelf: ['Tougher than she looks. Woodier, too.', 'Spots the weak point. Then the next one.', 'Stays put. The monsters do not.', 'Finds gold in the moss. Somehow.', 'Older than she looks. Elves are like that.'],
+  bard: ['Opens for the party. Closes for the monsters.', 'Nobody asked. He played anyway.', 'Three notes. All of them loud.', 'Top of the bill. Bottom of the dungeon.', 'Says it is his last. It never is.'],
+  cleric: ['Asks for strength. Gets it.', 'Firmly.', 'Holy, and heavy.', 'Reads them to the monster. Briefly.'],
+  santa: ['Every monster is on it.', 'Fills every pocket with gold.', 'Down the chimney. Down the stairs.', 'Jolly. Until he isn\'t.', 'Delivered hard, and fast.'],
+  elfqueen: ['Monsters are to stop existing. They comply.', 'Shines where torches fail.', 'Finds the gap in any armor.', 'Her court followed her down. Armed.', 'She has outlived every enemy so far.'],
+  elflord: ['Learned it before the dungeon was dug.', 'Has never lost one. Has had many.', 'Does not move. Does not need to.', 'Counts them. Every one.', 'Older than the sword. The sword is very old.'],
+  magus: ['Reads the sky. From underground.', 'Every hair a spell.', 'Older than old magic.', 'Pulls more than rabbits out of it.', 'Nobody speaks them anymore. He shouts them.', 'He keeps saying that.'],
 };
 
 function milestoneName(comp: string, k: number) {
@@ -735,7 +767,7 @@ export const boundCost = (b: BoundDef, lv: number) => (b.id === 'ogre' ? 1 : lv 
 
 export type CardKind = 'monster' | 'mid' | 'boss' | 'goblin';
 
-/** One card per kind of monster, Ragnarok style: no bonus, just the collection. */
+/** One card per kind of monster. A zone's cards in one color are a set, which adds to all damage (see SET_BONUS). */
 export interface CardDef {
   id: string;
   name: string;

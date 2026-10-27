@@ -19,8 +19,8 @@ Fight monsters, hire companions with their gold, push down a dungeon with no bot
 One card for every monster in the dungeon, in every color the zones come back in, and most of them a million-to-one
 drop. Cards spin out of the monster face-down; pick one up and it flips over in a burst of light, straight into your
 collection. Champions drop gold copies, and the gold card of a champion boss is the rarest thing in the dungeon. Send a
-strong companion on an expedition to hunt the floor you want, in real time. Cards do nothing except prove you were
-there.
+strong companion on an expedition to hunt the floor you want, in real time. Finish a zone's cards in one color and the
+set adds +10% to all damage; in gold, +25%.
 
 ## What's down there
 

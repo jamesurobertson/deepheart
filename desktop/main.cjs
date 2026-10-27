@@ -157,6 +157,17 @@ ipcMain.on('save:remove', (e, key) => {
 
 ipcMain.on('steam:trophies', (_e, trophies) => steam.unlock(trophies));
 
+/** The play log (src/record.ts): appended to logs/<date>.jsonl in the app's data folder, for testing; a real Steam
+ *  release keeps none. */
+ipcMain.on('log:append', (_e, text) => {
+  if (steam.release) return;
+  try {
+    const dir = path.join(app.getPath('userData'), 'logs');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(path.join(dir, `${new Date().toISOString().slice(0, 10)}.jsonl`), String(text));
+  } catch { /* a missed log line is no loss */ }
+});
+
 app.whenReady().then(() => {
   protocol.handle('app', (req) => {
     const file = path.normalize(path.join(ROOT, decodeURIComponent(new URL(req.url).pathname)));

@@ -14,7 +14,7 @@ Shown beside the header image; 300 characters at most.
 
 **The dungeon goes down forever. You go down with it.**
 
-Click to fight, and hire companions with the gold that falls. Twenty-four of them, from a squire with a rusty sword to
+Click to fight, and hire companions with the gold that falls. Thirty-two of them, from a squire with a rusty sword to
 things that came down for the dark and stayed for the company. Level them into the thousands. Pick a hero and lead
 them around the room yourself, or sit back and let the party work.
 
@@ -25,8 +25,8 @@ away, the Wither shrinks bosses, the Lure brings treasure goblins faster. Every 
 the eight bosses of the dungeon come back bound to you.
 
 **Every monster has a card.** One for every monster, in every color the zones come back in, and a gold copy from
-champions. Most drops are one in a million. Send a strong companion on an expedition to hunt the floor you want, in
-real time, and see what they bring home.
+champions. Most drops are one in a million, and every zone you finish in a color makes you stronger. Send a strong
+companion on an expedition to hunt the floor you want, in real time, and see what they bring home.
 
 **And the rest**
 

@@ -1,6 +1,6 @@
 import { CARDS, CORRUPTION, CURSORS, LEGENDS, TROPHIES, ZONES, type CardDef, type TrophyDef } from '../../game/data.ts';
 import { ABILITIES, COMPS } from '../../game/data.ts';
-import { AWAKEN_ON, CARD_ODDS, CHAMP_CHANCE, DAN_GIVES, EXPEDITION_LEVEL, FLOOR_KILLS, TRIP_HOURS, VICTOR_GIVES } from '../../game/game.ts';
+import { AWAKEN_ON, CARD_ODDS, CHAMP_CHANCE, DAN_GIVES, EXPEDITION_LEVEL, FLOOR_KILLS, GOLD_SET_BONUS, SET_BONUS, TRIP_HOURS, VICTOR_GIVES } from '../../game/game.ts';
 import { esc, h2, link, pct, table, toc } from '../kit.ts';
 import { spr } from '../sprites.ts';
 import type { Page } from '../pages.ts';
@@ -15,7 +15,7 @@ const cardsBody = () => {
   const versions = CARDS.reduce((n, c) => n + c.laps.length * (c.gold ? 2 : 1), 0);
   const zones = [...ZONES.map((z, i) => ({ name: z.name, zone: i })), { name: 'Treasure goblins', zone: -1 }];
   return `<p class="lede">Every kind of monster has a card. They're a collection: ${CARDS.length} cards, each in the colors of the laps it appears on, plain and gold.</p>
-    ${toc('cards', ['Drop chances', 'Colors', 'Gold cards', 'Every card', ...(AWAKEN_ON ? ['Trading'] : [])])}
+    ${toc('cards', ['Drop chances', 'Colors', 'Gold cards', 'Sets', 'Every card', ...(AWAKEN_ON ? ['Trading'] : [])])}
     ${h2('Drop chances')}
     ${table(['From', 'Chance'], [
       ['A monster', `1 in ${CARD_ODDS.monster.toLocaleString('en-US')}`],
@@ -30,6 +30,8 @@ const cardsBody = () => {
     <p>A card drops in the color of the lap you're on, if that card comes in it: plain on floors 1–80, then ${CORRUPTION.slice(1).map((c) => c.name).join(', ')}. A zone's newcomers only come in the later colors, and only two of its first crowd come back. Goblin cards are plain only.</p>
     ${h2('Gold cards')}
     <p>Only champions drop gold cards: gold monsters and champion bosses. Goblins have no gold card.</p>
+    ${h2('Sets')}
+    <p>A zone's cards in one color are a set: its monsters, its mid-boss and its boss (the goblins belong to no set). Each finished set adds +${Math.round(SET_BONUS * 100)}% to all damage, and each finished in gold +${Math.round(GOLD_SET_BONUS * 100)}%. ${ZONES.length * CORRUPTION.length} sets in all, and as many in gold.</p>
     ${h2('Every card')}
     <p>${versions} versions in all, counting each color plain and gold.</p>
     ${zones.map(({ name, zone }) => {
@@ -81,7 +83,7 @@ const tripsBody = () => `<p class="lede">Send a companion at level ${EXPEDITION_
   <p>Every kill rolls for its card at the usual chance (1 in ${CARD_ODDS.monster.toLocaleString('en-US')} for a monster), with ${link('spirit-collector', 'the Collector')} and ${link('spirit-ronin', 'the Ronin')}. ${pct(CHAMP_CHANCE, 0)} of the kills are champions and roll for gold cards, and on a boss floor champion bosses do. Cards come in the floor's color.</p>
   <p>Up to about 100 floors above your deepest, a strong hunter kills at the sweep limit. Near your deepest it slows down a lot.</p>
   ${h2('Coming home')}
-  <p>A hunter stays out up to ${TRIP_HOURS} hours, time away included, then comes home on its own. You can call one home sooner from the ladder. Ascending calls everyone home, and before awakening you call them home yourself. Each hunter brings what it found so far.</p>`;
+  <p>A hunter stays out up to ${TRIP_HOURS} hours, time away included, then comes home on its own. You can call one home sooner from the ladder. Before ascending or awakening you call everyone home yourself. Each hunter brings what it found so far.</p>`;
 
 export const COLLECTION_PAGES: Page[] = [
   { id: 'cards', group: 'Collections', title: 'Cards', summary: 'Drop chances, colors, gold cards and every card.', body: cardsBody },
