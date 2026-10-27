@@ -9,7 +9,9 @@
     "start": "npm --prefix .. run build && electron .",
     "dist:mac": "npm --prefix .. run build && electron-builder --mac",
     "dist:win": "npm --prefix .. run build && electron-builder --win",
-    "dist:linux": "npm --prefix .. run build && electron-builder --linux"
+    "dist:linux": "npm --prefix .. run build && electron-builder --linux",
+    "start:demo": "npm --prefix .. run build:demo && DEEPHEART_DEMO=1 electron .",
+    "steam:demo": "npm --prefix .. run build:demo && electron-builder --config demo.builder.cjs --mac dir --universal && electron-builder --config demo.builder.cjs --win dir --linux dir --x64"
   },
   "build": {
     "appId": "com.jamesurobertson.deepheart",

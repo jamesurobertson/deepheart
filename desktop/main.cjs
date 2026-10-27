@@ -13,7 +13,9 @@ const RELEASES = 'https://api.github.com/repos/jamesurobertson/deepheart/release
 /** How often a running game checks for a newer release (it also checks on launch). */
 const CHECK_EVERY = 6 * 60 * 60 * 1000;
 
-const ROOT = app.isPackaged ? path.join(process.resourcesPath, 'game') : path.join(__dirname, '..', 'dist');
+/** The demo app (demo.builder.cjs marks its package.json; DEEPHEART_DEMO=1 runs it from ../dist-demo). */
+const DEMO = !!require('./package.json').demo || process.env.DEEPHEART_DEMO === '1';
+const ROOT = app.isPackaged ? path.join(process.resourcesPath, 'game') : path.join(__dirname, '..', DEMO ? 'dist-demo' : 'dist');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
 // Music and sounds start without waiting for a click, as a game should.
@@ -43,8 +45,8 @@ function createWindow() {
     shell.openExternal(url);
     return { action: 'deny' };
   });
-  // Under Steam, Steam does the updating.
-  if (!steam.enabled) {
+  // Under Steam, Steam does the updating. (The demo never offers the full game's releases.)
+  if (!steam.enabled && !DEMO) {
     win.webContents.once('did-finish-load', () => {
       checkForUpdate(win);
       setInterval(() => checkForUpdate(win), CHECK_EVERY);
