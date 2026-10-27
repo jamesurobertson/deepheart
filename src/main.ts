@@ -15,7 +15,7 @@ import { CARDS, CORRUPTION, LEGENDS, TROPHIES, UPGRADES, lapOf, zoneOf } from '.
 import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
 import { TitleMenu } from './ui/menu.ts';
 import { PlayRecorder } from './record.ts';
-import { beforeFresh } from './version.ts';
+import { olderVersion } from './version.ts';
 
 declare global {
   interface Window {
@@ -92,13 +92,13 @@ const store = {
   },
 };
 
-/** A save from before FRESH_FROM was found (and set aside): the menu says why the run starts over. */
+/** A save from an earlier minor version was found (and set aside): the menu says why the run starts over. */
 let droppedOld = false;
 
 function load(): SaveState | null {
   try {
     const s = JSON.parse(store.get(SAVE_KEY) ?? 'null') as SaveState | null;
-    if (s && beforeFresh(s.version)) {
+    if (s && olderVersion(s.version)) {
       droppedOld = true;
       return null;
     }
