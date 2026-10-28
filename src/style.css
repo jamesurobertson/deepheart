@@ -399,9 +399,11 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 
 .ticker {
   position: absolute; left: var(--dock-r, 540px); right: calc(100% - var(--free-w, 100%) + 20px); bottom: 26px;
-  pointer-events: none; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none; text-align: left; text-wrap: balance;
   font: 500 15px/1.2 var(--f-text); color: #cdb8a8; text-shadow: var(--outline); font-style: italic;
 }
+/* A long line wraps onto a second, growing upward from the bottom edge. */
+.ticker span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 @media (max-width: 1260px) { .ticker { display: none; } }
 .ticker span.in { animation: tickerin 11s both; }
 
