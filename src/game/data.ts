@@ -799,7 +799,9 @@ export type TrophyReq =
   | { t: 'rampage'; n: number }
   | { t: 'cards'; n: number }
   | { t: 'versions'; n: number }
-  | { t: 'goldCards'; n: number };
+  | { t: 'goldCards'; n: number }
+  | { t: 'sets'; n: number }
+  | { t: 'goldSets'; n: number };
 
 export interface TrophyDef {
   id: string;
@@ -887,6 +889,12 @@ function buildTrophies(): TrophyDef[] {
     out.push({ id: 'trip-1', name: 'Gone Hunting', desc: 'Send a companion on an expedition.', icon: { sprite: 'floor_ladder', tier: 1 }, req: { t: 'trips', n: 1 } });
     tiers('tripcard', [[25, 'Spoils'], [250, 'Postcards']],
       (n) => `Find ${count(n)} cards on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripCards', n }), 2);
+  }
+  if (!DEMO) {
+    tiers('set', [[1, 'Full Set'], [5, 'Set Collector'], [10, 'Complete Collection']],
+      (n) => `Finish ${n === 1 ? 'a card set' : `${n} card sets`}.`, 'imp', (n) => ({ t: 'sets', n }), 1);
+    tiers('gset', [[1, 'Gold Set'], [5, 'Gilt Edge']],
+      (n) => `Finish ${n === 1 ? 'a gold card set' : `${n} gold card sets`}.`, 'big_demon', (n) => ({ t: 'goldSets', n }), 3);
   }
   const versions = CARDS.reduce((sum, c) => sum + c.laps.length * (c.gold ? 2 : 1), 0);
   out.push(

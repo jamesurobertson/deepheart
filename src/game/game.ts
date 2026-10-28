@@ -2805,6 +2805,8 @@ export class Game {
       case 'trips': return s.tripsSent >= r.n;
       case 'tripCards': return s.tripCards >= r.n;
       case 'goldCards': return this.goldCardsFound() >= r.n;
+      case 'sets': return this.setsDone(false) >= r.n;
+      case 'goldSets': return this.setsDone(true) >= r.n;
     }
   }
 
