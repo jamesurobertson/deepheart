@@ -1107,10 +1107,10 @@ export class Game {
   abilityText(id: AbilityId): string {
     const p = this.c.parts;
     const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
-    if (id === 'crit') return `Your clicks and Phantom Blade can land critical hits: a ${pct(p.critBase + p.critUpg)} chance for ×${+(p.critMultBase + p.critMultUpg).toFixed(2)} damage.`;
-    if (id === 'blade') return `Attacks the front monster for you, ${this.c.autoBase === 1 ? 'once' : `${+this.c.autoBase.toFixed(1)} times`} a second.`;
+    if (id === 'crit') return `Clicks and Phantom Blade have a ${pct(p.critBase + p.critUpg)} chance for ×${+(p.critMultBase + p.critMultUpg).toFixed(2)} damage.`;
+    if (id === 'blade') return `Attacks for you, ${this.c.autoBase === 1 ? 'once' : `${+this.c.autoBase.toFixed(1)} times`} a second.`;
     if (id === 'cleave') return `Your clicks also hit every other monster for ${pct(CLEAVE_BASE * p.cleaveUpg)} damage.`;
-    if (id === 'rampage') return `Charged by attacking. Your party deals ×${+this.feverMult(0).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
+    if (id === 'rampage') return `Builds as you attack. Your party deals ×${+this.feverMult(0).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
     return ABILITY_BY_ID.get(id)!.desc;
   }
 

@@ -506,10 +506,10 @@ export interface AbilityDef {
 /** In the order you're likely to meet them. Each is unlocked by buying one companion trait, and earned again every run.
  *  Cooldowns are uneven (8, 12, 20, 25 and 30 minutes) so they drift apart: lining them all up costs real waiting. */
 export const ABILITIES: AbilityDef[] = [
-  { id: 'blade', name: 'Phantom Blade', desc: 'Attacks the front monster for you, once a second.', kind: 'passive', comp: compIndex('squire'), trait: 0 },
+  { id: 'blade', name: 'Phantom Blade', desc: 'Attacks for you, once a second.', kind: 'passive', comp: compIndex('squire'), trait: 0 },
   { id: 'flurry', name: 'Flurry', desc: 'Clicks for you, 10 times a second.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 8 * 60 },
-  { id: 'crit', name: 'Critical Hits', desc: 'Your clicks and Phantom Blade can land critical hits: a 3% chance for ×2 damage. Sharp-eyed companions raise both.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
-  { id: 'rampage', name: 'Rampage', desc: 'Charged by attacking. Your party deals ×2 damage for 10s.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
+  { id: 'crit', name: 'Critical Hits', desc: 'Clicks and Phantom Blade have a 3% chance for ×2 damage.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
+  { id: 'rampage', name: 'Rampage', desc: 'Builds as you attack. Your party deals ×2 damage for 10s.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
   { id: 'cleave', name: 'Cleave', desc: 'Your clicks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 12 * 60 },
   ...(DEMO ? [] : [
     { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 25 * 60 },
