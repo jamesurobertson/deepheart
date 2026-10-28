@@ -901,7 +901,6 @@ export class Game {
   /** Unlocked while its companion trait is owned this run (or for good, if ABILITIES_KEEP and it was ever found). */
   abilityUnlocked(id: AbilityId) {
     const a = ABILITY_BY_ID.get(id)!;
-    if (this.away(a.comp)) return false;
     return this.owned.has(abilityUpgrade(a)) || (ABILITIES_KEEP && this.s.abilitiesFound.includes(id));
   }
 

@@ -8,6 +8,7 @@ import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, silhouette, sprite, spriteFit, spriteFrames } from './px.ts';
+import { skillIcon } from './icons.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
 
 export interface UiHooks {
@@ -40,6 +41,8 @@ const ARC_FROM = 3;
 /** Little colored labels for boss modifiers. */
 const modChips = (mods: ModId[]) => mods.map((id) => `<em class="mod" style="--mc:${MOD_BY_ID.get(id)!.color}">${MOD_BY_ID.get(id)!.name}</em>`).join('');
 const MAX_COINS = 24;
+/** One pass of the glimmer across a trait you can buy, and its rest before the next (matches .trait.buy::before). */
+const TRAIT_SWEEP_MS = 2600;
 /** How often a rare ticker line (the hints that it's all a dream) is in the running. */
 const RARE_NEWS = 0.15;
 /** The star tip waits until the pointer comes back onto a monster at least this long after someone to switch to is hired. */
@@ -329,7 +332,7 @@ export class Ui {
           <button class="btn icon sm" data-act="floorUp" aria-label="Next floor">${G.right()}</button>
           <button class="btn small auto" data-act="auto" data-tip="auto">Auto</button>
         </div>
-        <div class="fever on" hidden><i></i><span></span><b class="fever-face">${charFit(COMPS[ABILITY_BY_ID.get('rampage')!.comp].sprite, 26)}</b></div>
+        <div class="fever on" hidden><i></i><span></span><b class="fever-face">${skillIcon('rampage', 33)}</b></div>
         <div class="buffs"></div>
       </div>
       <div class="zone-map pnl"><button class="btn icon sm" data-act="zonePrev" aria-label="Earlier floors">${G.left()}</button><div class="floor-map"></div><button class="btn icon sm" data-act="zoneNext" aria-label="Later floors">${G.right()}</button></div>
@@ -350,7 +353,7 @@ export class Ui {
         <button class="btn dock-b dock-heart" data-open="heart" data-tip="dock:heart" hidden>${G.heart(3)}<span>The Heart</span><em class="badge bound" hidden></em></button>
         <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>Stats</span></button>
-        <button class="btn dock-b dock-stat blade-rate" data-tip="dock:blade" tabindex="-1">${spriteFit('weapon_knife', 20, 'glyph')}<span>1/s</span></button>
+        <button class="btn dock-b dock-stat blade-rate" data-tip="dock:blade" tabindex="-1">${skillIcon('blade', 22, 'glyph')}<span>1/s</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu(3)}<span>Options</span></button>
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute" hidden></button>
       </nav>
@@ -408,7 +411,7 @@ export class Ui {
       slot.dataset.ability = a.id;
       if (a.kind === 'passive' && a === column.find((x) => x.kind === 'passive')) slot.dataset.gap = '';
       slot.dataset.tip = `ab:${a.id}`;
-      slot.innerHTML = `${charFit(COMPS[a.comp].sprite, 30)}<span class="ab-fill"></span><span class="ab-time"></span><span class="ab-lock">${G.lock()}</span>${a.kind === 'passive' ? '' : `<span class="ab-key">${abilityKey(a.id)}</span>`}`;
+      slot.innerHTML = `${skillIcon(a.id, 33)}<span class="ab-fill"></span><span class="ab-time"></span><span class="ab-lock">${G.lock()}</span>`;
       this.el.abilities.appendChild(slot);
     }
 
@@ -1811,7 +1814,7 @@ export class Ui {
         chip = document.createElement('div');
         chip.className = `buff ${b.id}`;
         chip.dataset.buff = b.id;
-        chip.innerHTML = `<span class="buff-ico">${ability ? charFit(COMPS[ability.comp].sprite, 24) : spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(b.name)}</b><small></small></span><em class="buff-bar"></em>`;
+        chip.innerHTML = `<span class="buff-ico">${ability ? skillIcon(ability.id, 22) : spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(b.name)}</b><small></small></span><em class="buff-bar"></em>`;
         box.appendChild(chip);
       }
       // Phones only have room for the countdown; the icon says which buff it is.
@@ -1862,7 +1865,7 @@ export class Ui {
       // automatic level bonus.
       const shown = traits.findIndex((st) => st !== 'got');
       const auto = lv > 0 && traits.length && shown < 0 ? `<span class="trait ${levelMult(lv) > 1 ? 'got' : 'later'} auto" data-tip="lvl:${i}">×${milestoneMult(nextMilestone(i, lv))}<small>${nextMilestone(i, lv)}</small></span>` : '';
-      row.querySelector('.traits')!.innerHTML = traits.slice(0, shown < 0 ? traits.length : shown + 1).map((state, k) => {
+      const squares = traits.slice(0, shown < 0 ? traits.length : shown + 1).map((state, k) => {
         const id = `m${i}_${k}`;
         // A star for every trait that isn't ×2 to this companion (skills, party, clicks, gold, bosses, crits, the blade);
         // it stays on traits still to come.
@@ -1871,6 +1874,14 @@ export class Ui {
         const label = state === 'later' ? `<small>${milestoneAt(k)}</small>` : '';
         return `<span class="trait ${state}${ability ? ' ability' : ''}" data-tip="upg:${id}"${state === 'buy' || state === 'reached' ? ` data-trait="${id}"` : ''}>${inner}${label}</span>`;
       }).join('') + auto;
+      // Rebuilt only when the traits change, so the ready one's glimmer isn't restarted by every price or damage tick.
+      const box = row.querySelector<HTMLElement>('.traits')!;
+      if (box.dataset.squares !== squares) {
+        box.innerHTML = squares;
+        box.dataset.squares = squares;
+        // On the page's clock, so a new square picks up the sweep where the last one left off.
+        box.style.setProperty('--sweep-at', `-${Math.round(performance.now() % TRAIT_SWEEP_MS)}ms`);
+      }
     });
   }
 
