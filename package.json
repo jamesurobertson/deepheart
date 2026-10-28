@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "timeline": "node scripts/timeline.ts",
-    "active": "node scripts/active.ts"
+    "active": "node scripts/active.ts",
+    "achievements": "node scripts/achievements.ts"
   },
   "dependencies": {
     "@fontsource/jersey-10": "^5.3.0",
