@@ -31,13 +31,13 @@ const HOW: Record<string, string> = {
   host: 'Each level makes Phantom Legion last 2 seconds longer.',
   soulcaller: 'Raises the chance a boss is a champion boss, from a base of 25% up toward 100%. Champion bosses start on floor 100.',
   lure: 'Treasure goblins come more often, closing in on +200% (three times as often).',
-  collector: 'Raises the chance a kill drops a card, closing in on +100% (twice the chance).',
+  collector: 'Raises the chance a kill drops a card, closing in on +150% (two and a half times the chance).',
   ronin: 'A kill that deals N times a monster\'s health has N times the chance to drop its card (gold cards too), up to 1 + a quarter of its level. Swept floors and time away count; expeditions don\'t.',
   hungry: 'Each soul fed to it adds +11% to all damage, where a kept soul adds +10%. Fed souls only come back with a respec.',
 };
 
 const CAP: Record<string, string> = {
-  hourglass: '+30s', wither: '−50%', restless: '−75%', soulcaller: '100%', lure: '+200%', collector: '+100%', thinning: '−10 kills',
+  hourglass: '+30s', wither: '−50%', restless: '−75%', soulcaller: '100%', lure: '+200%', collector: '+150%', thinning: '−10 kills',
 };
 
 /** A Spirit's level prices in words, with the first few as examples. */

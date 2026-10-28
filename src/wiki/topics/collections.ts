@@ -27,7 +27,7 @@ const cardsBody = () => {
       ['A treasure goblin', `1 in ${CARD_ODDS.goblin.toLocaleString('en-US')}`],
       ['A rainbow goblin', `1 in ${CARD_ODDS.rainbow.toLocaleString('en-US')}`],
     ])}
-    <p>${link(`spirit-${collector.id}`, collector.name)} raises every chance, up to twice. ${link('spirit-ronin', 'The Ronin')} raises it for kills that deal far more than a monster's health. Swept floors roll a card for every kill, and time away rolls them too (plain cards only). ${link('expeditions', 'Expeditions')} roll them for every kill a hunter makes.</p>
+    <p>${link(`spirit-${collector.id}`, collector.name)} raises every chance, up to two and a half times. ${link('spirit-ronin', 'The Ronin')} raises it for kills that deal far more than a monster's health. Swept floors roll a card for every kill, and time away rolls them too (plain cards only). ${link('expeditions', 'Expeditions')} roll them for every kill a hunter makes.</p>
     ${h2('Colors')}
     <p>A card drops in the color of the lap you're on, if that card comes in it: plain on floors 1–80, then ${CORRUPTION.slice(1).map((c) => c.name).join(', ')}. A zone's newcomers only come in the later colors, and only two of its first crowd come back. Goblin cards are plain only.</p>
     ${h2('Gold cards')}

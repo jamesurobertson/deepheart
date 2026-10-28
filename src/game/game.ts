@@ -2600,9 +2600,9 @@ export class Game {
     return lv ? Math.max(1, Math.min(Math.floor(overkill), 1 + lv / 4)) : 1;
   }
 
-  /** The Collector: card chance closing in on ×2. */
+  /** The Collector: card chance closing in on ×2.5. */
   private collectorMult() {
-    return 1 + legendShare(this.legendLv('collector'));
+    return 1 + 1.5 * legendShare(this.legendLv('collector'));
   }
 
   private cardRoll(odds: number, mult = 1) {
