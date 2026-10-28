@@ -24,7 +24,12 @@
     "extraResources": [
       {
         "from": "../dist",
-        "to": "game"
+        "to": "game",
+        "filter": [
+          "**/*",
+          "!og-image.png",
+          "!**/*.woff"
+        ]
       }
     ],
     "mac": {
