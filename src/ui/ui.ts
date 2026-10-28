@@ -629,6 +629,9 @@ export class Ui {
       this.inputAt = performance.now();
       if ((e.target as HTMLElement).closest('input, textarea')) return;
       if (e.key === 'Escape' && this.modal) this.closeModal();
+      // H hides the interface for screenshots; H again or Escape brings it back.
+      if (e.key.toLowerCase() === 'h' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) document.body.classList.toggle('ui-hidden');
+      else if (e.key === 'Escape') document.body.classList.remove('ui-hidden');
       // U buys the cheapest companion trait you can afford.
       if (e.key.toLowerCase() === 'u' && !e.repeat && !this.modal) {
         const next = this.game.shopUpgrades().find((u) => this.game.s.gold.gte(this.game.upgCost(u)));

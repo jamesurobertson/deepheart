@@ -63,6 +63,7 @@ html, body {
 body.grab #stage { cursor: pointer; }
 /* With a mouse, the sprite cursor stands in for the system one everywhere. */
 body.blade-on, body.blade-on * { cursor: none !important; }
+body.ui-hidden #ui { visibility: hidden; pointer-events: none; }
 
 /* The sword cursor: hilt sits just below-right of the pointer, tip toward it; clicks swing it. */
 .blade { position: fixed; left: 0; top: 0; z-index: 9999; pointer-events: none; }
