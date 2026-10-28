@@ -38,9 +38,11 @@ const c = (id: string, name: string, sprite: string, cost: number, dps: number, 
  *  their snappy opening numbers, then each costs about ×4 the last up to the Archmage. The last nine wait on a floor,
  *  each priced against the gold on its floor, more of it the deeper it waits (150× the floor's gold at 95, rising to
  *  30,000× from 450 on: about a minute and a half of killing at full speed), since a deeper one meets a stronger party. Once levels pass 200, damage per gold grows about gold^0.82 for
- *  everyone (×1.07 a level against ×4 every 25), so damage is set from price: each one's damage ÷ price^0.82 (with its
- *  ×2 traits) is about 8% better than the one before through the first twenty-three and 12% after, so a new face is
- *  the natural pick and Heartmarks or a ×10 at level 1000 can still make an older one the better buy. */
+ *  everyone (×1.07 a level against ×4 every 25), so damage is set from price on one smooth curve: from the Shieldmaiden
+ *  on, damage ÷ price^0.82 is about 8% better than the one before through the first twenty-three and 12% after, counted
+ *  as if each had three ×2 traits. So a new face always hits harder than the last, and one whose traits go to the party,
+ *  gold or crits instead ends up weaker on its own. Those with more than three (the Archmage and the late ones) keep the
+ *  numbers they were tuned at; the Archmage sits just above the Oathbreaker. */
 export const COMPS: CompDef[] = [
   // Plain adventurers first; the strange and the enormous come later.
   // The first four are cheap and hit hard, so the party carries the opening and clicking is a bonus.
@@ -49,26 +51,26 @@ export const COMPS: CompDef[] = [
   c('brawler', 'Dwarf Brawler', 'dwarf_m', 250, 12, 'slash', 'Came for the gold. Stayed for the punching.'),
   c('apprentice', 'Apprentice', 'wizzard_m', 2_000, 50, 'bolt', 'Knows one spell. So far nobody has complained.'),
   c('gingerbread', 'Gingerbread Man', 'cr_gingerbread', 12_000, 150, 'slash', 'Ran from the oven. Somehow ended up down here.'),
-  c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 80_000, 4_600, 'slash', 'Her shield has killed more monsters than her sword.'),
-  c('hunter', 'Lizard Hunter', 'lizard_m', 3.2e5, 3_900, 'spear', 'Can smell a monster through three floors of solid stone.'),
-  c('thief', 'Shadow Thief', 'cr_green_thief', 1.3e6, 52_000, 'knife', 'He carries six daggers. Seven would simply be bragging.'),
+  c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 80_000, 1_400, 'slash', 'Her shield has killed more monsters than her sword.'),
+  c('hunter', 'Lizard Hunter', 'lizard_m', 3.2e5, 4_700, 'spear', 'Can smell a monster through three floors of solid stone.'),
+  c('thief', 'Shadow Thief', 'cr_green_thief', 1.3e6, 16_000, 'knife', 'He carries six daggers. Seven would simply be bragging.'),
   // The demo stops at the Shadow Thief: past him, one silhouette for the full game.
   ...(DEMO ? [c('corsair', '???', 'cr_pirate_captain', 5e6, 87_000, 'bomb', '')] : [
-    c('corsair', 'Corsair Captain', 'cr_pirate_captain', 5e6, 87_000, 'bomb', 'Sailed the seven seas. Still confused by stairs.'),
-    c('runesmith', 'Runesmith', 'dwarf_f', 2e7, 1.5e5, 'rune', 'Maybe should be in OSRS. But here we are.'),
-    c('woodelf', 'Wood Elf', 'ef_elf_f', 7.9e7, 4.9e5, 'arrow', 'Grew up in the Enchanted Grove. Has opinions about what you did to it.'),
-    c('stormcaller', 'Stormcaller', 'wizzard_f', 3.1e8, 1.6e6, 'storm', 'Brings her own weather. Down here, of all places.'),
-    c('dancer', 'Blade Dancer', 'elf_m', 1.2e9, 1.1e7, 'slash', 'Fights like it is a performance. Nobody claps.'),
-    c('bard', 'Wandering Bard', 'rm_rocker', 4.9e9, 1.9e7, 'orb', 'We\'re not sure how he got in here.'),
-    c('venomblade', 'Venomblade', 'lizard_f', 2e10, 1.2e8, 'dark', 'Every blade is poisoned. She has a lot.'),
-    c('doctor', 'Plague Doctor', 'doc', 7.7e10, 2.1e8, 'flask', 'Treats monsters with a strict regimen of dying.'),
-    c('cleric', 'Cleric', 'ef_normalcleric', 3.1e11, 7e8, 'light', 'Here to heal the party. Hasn\'t had to yet, so he hits things.'),
-    c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.2e12, 2.3e9, 'ice', 'Came up from the Frozen Vault. Finds the rest of the dungeon too warm.'),
-    c('santa', 'Santa', 'cr_santa', 4.8e12, 7.9e9, 'ice', 'Santa? Is that really you?'),
-    c('paladin', 'Paladin', 'cr_gold_knight', 1.9e13, 5.3e10, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
-    c('hollow', 'Hollow Knight', 'pumpkin_dude', 7.6e13, 8.9e10, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
-    c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 3e14, 3e11, 'dark', 'Has broken every vow but one. Nobody asks which.'),
-    c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2.5e11, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
+    c('corsair', 'Corsair Captain', 'cr_pirate_captain', 5e6, 52_000, 'bomb', 'Sailed the seven seas. Still confused by stairs.'),
+    c('runesmith', 'Runesmith', 'dwarf_f', 2e7, 1.8e5, 'rune', 'Maybe should be in OSRS. But here we are.'),
+    c('woodelf', 'Wood Elf', 'ef_elf_f', 7.9e7, 5.9e5, 'arrow', 'Grew up in the Enchanted Grove. Has opinions about what you did to it.'),
+    c('stormcaller', 'Stormcaller', 'wizzard_f', 3.1e8, 2e6, 'storm', 'Brings her own weather. Down here, of all places.'),
+    c('dancer', 'Blade Dancer', 'elf_m', 1.2e9, 6.4e6, 'slash', 'Fights like it is a performance. Nobody claps.'),
+    c('bard', 'Wandering Bard', 'rm_rocker', 4.9e9, 2.2e7, 'orb', 'We\'re not sure how he got in here.'),
+    c('venomblade', 'Venomblade', 'lizard_f', 2e10, 7.6e7, 'dark', 'Every blade is poisoned. She has a lot.'),
+    c('doctor', 'Plague Doctor', 'doc', 7.7e10, 2.5e8, 'flask', 'Treats monsters with a strict regimen of dying.'),
+    c('cleric', 'Cleric', 'ef_normalcleric', 3.1e11, 8.5e8, 'light', 'Here to heal the party. Hasn\'t had to yet, so he hits things.'),
+    c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.2e12, 2.8e9, 'ice', 'Came up from the Frozen Vault. Finds the rest of the dungeon too warm.'),
+    c('santa', 'Santa', 'cr_santa', 4.8e12, 9.4e9, 'ice', 'Santa? Is that really you?'),
+    c('paladin', 'Paladin', 'cr_gold_knight', 1.9e13, 3.2e10, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
+    c('hollow', 'Hollow Knight', 'pumpkin_dude', 7.6e13, 1.1e11, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
+    c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 3e14, 3.6e11, 'dark', 'Has broken every vow but one. Nobody asks which.'),
+    c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 4e11, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
     c('wraith', 'The Count', 'rm_dracula', 7.4e21, 4.1e17, 'bat', 'We all know who he really is.', 95),
     c('elfqueen', 'Elf Queen', 'ef_highelf_f', 1.1e25, 9.2e19, 'light', 'Left her court for the deep. Still expects a curtsy.', 130),
     c('necro', 'Necromancer', 'necromancer', 1.4e29, 1.2e23, 'skull', 'Used to raise these monsters. Now he lowers them.', 190),
