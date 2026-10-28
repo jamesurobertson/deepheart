@@ -1,4 +1,4 @@
-import { CLUTCH_SECONDS, CORRUPTION, MODS, ZONES, modsFor, zoneName, type MonsterDef } from '../../game/data.ts';
+import { CLUTCH_SECONDS, COMPS, CORRUPTION, MODS, UPGRADES, ZONES, modsFor, zoneName, type MonsterDef } from '../../game/data.ts';
 import {
   BOSS_RESPAWN, BOSS_TIME, CHAMP_BOSS_CHANCE, CHAMP_BOSS_GOLD, CHAMP_BOSS_HP, CHAMP_CHANCE, CHAMP_FLOOR, CHAMP_GOLD, CHAMP_HP, CLUTCH_GOLD,
   DESCEND_FLOOR, DOWNED_SECONDS, FLOOR_KILLS, GOLD_BOSS_SURE, GOLD_WAIT, MAX_DROPS, MAX_ON, RAID_MAX, RAID_MIN, RAID_STAY, RAINBOW_CHANCE,
@@ -31,7 +31,7 @@ const floorsBody = () => `<p class="lede">The dungeon is a stack of floors. Each
   <p>Floors ending in 5 hold a mid-boss and floors ending in 0 a zone boss. A boss comes alone and has to die before its timer runs out. See ${link('bosses', 'Bosses')}.</p>
   <p>Your kills on your deepest floor are kept if you step back to farm, so you pick up where you left off. Kills on any other floor start over.</p>
   ${h2('Zones')}
-  <p>Every ten floors is a zone with its own look, crowd and bosses. There are ${ZONES.length} zones; after the last one they come round again, darker.</p>
+  <p>Every ten floors is a zone with its own look, crowd and bosses. There are ${ZONES.length} zones. After the last one they come around again, darker.</p>
   ${table([{ h: '#', cls: 'c' }, 'Zone', 'Floors', 'Crowd', 'Mid-boss (floor 5)', 'Zone boss (floor 10)'], ZONES.map((z, i) => [
     i + 1, `<b>${z.name}</b>`, `${i * 10 + 1}–${i * 10 + 10}`,
     z.band.map((m) => spr(m.sprite, 22)).join(' '), who(z.mid), who(z.boss),
@@ -48,7 +48,7 @@ const floorsBody = () => `<p class="lede">The dungeon is a stack of floors. Each
   <p>Gold grows about ${pct(goldGrowth(50), 0)} a floor up to floor ${TUNE.deepFrom}, then ${pct(goldGrowth(101), 0)} a floor. An ordinary monster has ${pct(TRASH, 0)} of the floor's health (each kind a little more or less), and a boss pays 20 monsters' worth of gold, a whole floor.</p>
   ${table([{ h: 'Floor', cls: 'c' }, { h: 'Monster health', cls: 'num' }, { h: 'Boss health', cls: 'num' }, { h: 'Monster gold', cls: 'num' }, { h: 'Boss gold', cls: 'num' }],
     SAMPLE_FLOORS.map((f) => [`<b>${f}</b>`, fmt(floorHp(f).times(TRASH)), fmt(bossHp(f)), fmt(floorGold(f).times(TRASH)), fmt(floorGold(f).times(8))]))}
-  <p class="muted">Before gold bonuses, Spirits and boss modifiers. Boss health is shown on every row for comparison; bosses only appear on floors ending in 5 or 0.</p>
+  <p class="muted">Before gold bonuses, Spirits and boss modifiers. Boss health is shown on every row for comparison. Bosses only appear on floors ending in 5 or 0.</p>
   ${h2('Auto and farming')}
   <p>With auto on (the default) you move to the next floor as soon as one is cleared or its boss falls. Turn it off to stay and farm a floor: monsters keep coming, and a beaten boss comes back after ${BOSS_RESPAWN}s. Failing a boss turns auto off. You can jump to any floor you've opened.</p>
   ${h2('Sweeping')}
@@ -97,12 +97,15 @@ const bossesBody = () => `<p class="lede">Every fifth floor is a boss fight agai
   ])}
   <p>Souls from champion bosses are paid when you ${link('souls', 'ascend')}.</p>`;
 
+/** Companions with gold traits, in roster order, and how many each has. */
+const goldTraits = COMPS.map((c, i) => [c.name, UPGRADES.filter((u) => u.req.t === 'owned' && u.req.comp === i && u.effect.t === 'gold').length] as const).filter(([, n]) => n);
+
 const goldBody = () => `<p class="lede">Gold buys companion levels and traits. Every kill drops some, bosses drop a floor's worth, and treasure goblins drop a lot.</p>
   ${h2('Picking it up')}
   <p>A kill's gold drops on the floor as a pile. It banks itself after ${GOLD_WAIT} seconds, or straight away when your hero or your cursor passes near it. At most ${MAX_DROPS} piles lie around at once (the oldest banks itself), and leaving a floor or ascending banks everything.</p>
   ${h2('Gold bonuses')}
   ${table(['Source', 'Bonus'], [
-    ['Gold traits (Shadow Thief ×2, Corsair Captain ×2, Exiled King ×2)', '+50% each, added together (up to +300%)'],
+    [`Gold traits (${goldTraits.map(([name, n]) => `${name} ×${n}`).join(', ')})`, `+50% each, added together (up to +${goldTraits.reduce((sum, [, n]) => sum + 50 * n, 0)}%)`],
     [link('spirit-hoard', 'The Hoard'), '+5% a level'],
     [link('spirit-patient', 'The Patient'), '+50% a level while idle'],
     [link('abilities', 'Treasure Sense'), '×3 for 30 seconds'],

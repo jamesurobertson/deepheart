@@ -79,7 +79,7 @@ function spiritPage(d: LegendDef): Page {
       ${h2(`Leveling ${d.name}`)}
       <p>Summoning ${d.name} costs your current ${link('spirits', 'summon cost', 'Summoning')}. After that, each level costs ${costRule(d)}.
       ${d.kind === 'utility' && CAP[d.id] && d.id !== 'thinning' ? `Its effect closes in on its cap: each level closes a tenth of the gap that's left (${pct(legendShare(1), 0)} of the cap at level 1, ${pct(legendShare(10), 0)} at level 10, ${pct(legendShare(20), 0)} at level 20).` : ''}</p>
-      <p><b>Cost</b> is the souls for that level; <b>Total</b> is every soul spent past the summon to get there.</p>
+      <p><b>Cost</b> is the souls for that level. <b>Total</b> is every soul spent past the summon to get there.</p>
       ${levelTables(d)}
       <div class="clear"></div>`,
   };
@@ -92,10 +92,10 @@ const listBody = () => {
   ];
   const summonRows = SUMMON_COST.map((cost, owned) => [`<b>${owned + 1}</b>`, cost.toLocaleString('en-US'), rerollCost(owned).toLocaleString('en-US')]);
   const totalSummon = SUMMON_COST.slice(0, LEGENDS.length).reduce((a, b) => a + b, 0);
-  return `<p class="lede">Spirits are what you spend souls on. Each one boosts one part of the game, and you level them up with more souls. They stay with you through every ascent; awakening sends them all away.</p>
+  return `<p class="lede">Spirits are what you spend souls on. Each one boosts one part of the game, and you level them up with more souls. They stay with you through every ascent. Awakening sends them all away.</p>
     ${toc('spirits', ['Summoning', 'Leveling', 'All Spirits', 'Respec', 'Kept souls'])}
     ${h2('Summoning')}
-    <p>Spirits open after your first ascent. The summoning circle offers ${OFFER_SIZE} Spirits at a time; pick one and pay the summon cost to bring it in at level 1. Every summon rolls a new offer. You can also reroll the offer for a third of the summon cost, rounded up.</p>
+    <p>Spirits open after your first ascent. The summoning circle offers ${OFFER_SIZE} Spirits at a time. Pick one and pay the summon cost to bring it in at level 1. Every summon rolls a new offer. You can also reroll the offer for a third of the summon cost, rounded up.</p>
     <p>The summon cost depends only on how many Spirits you have. Summoning all ${LEGENDS.length} costs ${totalSummon.toLocaleString('en-US')} souls.</p>
     ${splitTables([{ h: 'Spirit #', cls: 'c' }, { h: 'Summon', cls: 'num' }, { h: 'Reroll', cls: 'num' }], [summonRows.slice(0, 9), summonRows.slice(9)])}
     ${h2('Leveling')}

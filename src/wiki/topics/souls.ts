@@ -15,7 +15,7 @@ const soulsBody = () => `<p class="lede">Reach floor ${DESCEND_FLOOR} and you ca
   ])}
   <p>Souls from both sources are counted up as you play and paid when you ascend. Every run pays them again.</p>
   ${h2('What souls do')}
-  <p>Every soul you haven't spent adds +${pct(TUNE.soulPower, 0)} to all damage: 10 souls is +100%, 50 souls is +500%. Spend them on ${link('spirits', 'Spirits')} or ${link('heartmarks', 'Heartmarks')}; spent souls stop adding damage.</p>
+  <p>Every soul you haven't spent adds +${pct(TUNE.soulPower, 0)} to all damage: 10 souls is +100%, 50 souls is +500%. Spend them on ${link('spirits', 'Spirits')} or ${link('heartmarks', 'Heartmarks')}. Spent souls stop adding damage.</p>
   ${h2('What an ascent keeps')}
   ${table(['Reset', 'Kept'], [[
     'Gold<br>Companion levels and traits<br>Abilities and their cooldowns<br>Buffs and the Rampage meter<br>Your floor (back to 1)',
@@ -39,7 +39,7 @@ const awakenBody = () => `<p class="lede">Reach floor ${TUNE.awakenFloor} and yo
   ]])}
   <p>When you awaken you can also respec the Bound: every bound soul spent on them comes back.</p>
   ${h2('The Bound')}
-  <p>The eight zone bosses, bound in the Heart's room once you've awakened. Each level of the Ogre Chieftain costs 1 bound soul; every other Bound's next level costs one more than its last (1, 2, 3…).</p>
+  <p>The eight zone bosses, bound in the Heart's room once you've awakened. Each level of the Ogre Chieftain costs 1 bound soul. Every other Bound's next level costs one more than its last (1, 2, 3…).</p>
   ${table(['Bound', 'Boosts', 'Per level', { h: 'Max level', cls: 'num' }, { h: 'Total for level 5', cls: 'num' }], BOUND.map((b) => [
     `<span class="who">${spr(ZONES[b.zone].boss.sprite, 28)}${boundName(b)}</span>`, b.what, b.value(1), b.max ?? '—', b.max !== undefined && b.max < 5 ? '—' : boundTotal(b, 5),
   ]))}

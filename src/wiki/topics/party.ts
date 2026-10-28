@@ -54,7 +54,7 @@ const companionsBody = () => `<p class="lede">Companions fight for you. Hire the
     `<a class="who" href="#/${compId(c)}">${spr(c.sprite, 28)}${c.name}</a>`, fmt(c.cost), fmt(c.dps), joins(c), traitsOf(i).length,
   ]))}
   ${h2('Hiring and leveling')}
-  <p>The first level of a companion costs its hire price; each level after costs ×${TUNE.costGrowth} the one before. The next companion in the roster shows up once you've had ${pct(REVEAL_AT, 0)} of its hire price this run. The last six wait on a floor: they join once your deepest floor ever has reached it, and stay available after that.</p>
+  <p>The first level of a companion costs its hire price. Each level after costs ×${TUNE.costGrowth} the one before. The next companion in the roster shows up once you've had ${pct(REVEAL_AT, 0)} of its hire price this run. The last six wait on a floor: they join once your deepest floor ever has reached it, and stay available after that.</p>
   <p>The buy buttons above the roster set how many levels a click buys:</p>
   ${table(['Button', 'Buys'], [
     ['×1, ×10, ×100', 'That many levels'],
@@ -65,21 +65,30 @@ const companionsBody = () => `<p class="lede">Companions fight for you. Hire the
   <p>From level ${LEVEL_BONUS.from}, every ${LEVEL_BONUS.every} levels multiplies that companion's damage by ${LEVEL_BONUS.mult}, and every 1000th level by ${LEVEL_BONUS.thousand} instead. These stack: level 250 is ×${levelMult(250)}.</p>
   ${splitTables([{ h: 'Level', cls: 'c' }, { h: 'Damage ×', cls: 'num' }], [[200, 225, 250, 275, 300, 400, 500].map((lv) => [`<b>${lv}</b>`, fmt(levelMult(lv))]), [750, 1000, 1500, 2000, 3000].map((lv) => [`<b>${lv}</b>`, fmt(levelMult(lv))])])}
   ${h2('Your hero')}
-  <p>One companion is your hero, marked with a star on its row; click the star on another to switch. Your hero leaves the formation, follows your pointer, attacks what you point at, and picks up gold it walks over. It deals the same damage as it would in line.</p>
+  <p>One companion is your hero, marked with a star on its row. Click the star on another to switch. Your hero leaves the formation, follows your pointer, attacks what you point at, and picks up gold it walks over. It deals the same damage as it would in line.</p>
   ${h2('Heartmarks')}
   <p>Each Heartmark on a companion adds +${pct(MARK_POWER, 0)} to its damage. See ${link('heartmarks', 'Heartmarks')}.</p>`;
+
+/** The companions whose traits add to a crit stat, and the total they add. */
+function critTraits(stat: 'chance' | 'add') {
+  const traits = UPGRADES.filter((u) => u.effect.t === 'crit' && u.effect[stat]);
+  const names = COMPS.filter((_, i) => traits.some((u) => u.req.t === 'owned' && u.req.comp === i)).map((c) => c.name).join(', ');
+  return { names, total: traits.reduce((sum, u) => sum + (u.effect.t === 'crit' ? u.effect[stat] ?? 0 : 0), 0) };
+}
+const critChance = critTraits('chance');
+const critDamage = critTraits('add');
 
 const attacksBody = () => `<p class="lede">You attack by clicking, tapping, or holding the button down. Your attacks borrow part of your party's damage.</p>
   ${toc('attacks', ['Attack damage', 'Critical hits', 'Streaks', 'Idle'])}
   ${h2('Attack damage')}
-  <p>An attack deals ${pct(CLICK_DPS, 0)} of your party's damage per second, plus 1% for each click trait you own (there are ten). ${link('spirit-fist', 'The Fist')} multiplies it, and so does Frenzy from a ${link('goblins', 'treasure goblin')}. Rampage and Bloodlust boost the party, not your attacks.</p>
-  <p>You can attack up to ${MANUAL_RATE} times a second; holding the button down attacks at that rate on its own. Flurry and the Phantom Blade aren't limited by it.</p>
+  <p>An attack deals ${pct(CLICK_DPS, 0)} of your party's damage per second, plus 1% for each click trait you own (there are ${UPGRADES.filter((u) => u.effect.t === 'clickDps').length}). ${link('spirit-fist', 'The Fist')} multiplies it, and so does Frenzy from a ${link('goblins', 'treasure goblin')}. Rampage and Bloodlust boost the party, not your attacks.</p>
+  <p>You can attack up to ${MANUAL_RATE} times a second. Holding the button down attacks at that rate on its own. Flurry and the Phantom Blade aren't limited by it.</p>
   ${h2('Critical hits')}
   <p>Once the Ranger unlocks Critical Hits, your attacks, Flurry and the Phantom Blade can crit: a ${pct(BASE_CRIT, 0)} chance for ×${BASE_CRIT_MULT} damage to start. Companions don't crit.</p>
   ${table(['Source', 'Crit chance', 'Crit damage'], [
     ['Base', pct(BASE_CRIT, 0), `×${BASE_CRIT_MULT}`],
-    ['Traits (Ranger, Shadow Thief, Venomblade)', '+19% in all', ''],
-    ['Traits (Lizard Hunter, Blade Dancer, Venomblade)', '', '+6× in all'],
+    [`Traits (${critChance.names})`, `+${pct(critChance.total, 0)} in all`, ''],
+    [`Traits (${critDamage.names})`, '', `+${critDamage.total}× in all`],
     ['War Drums', `+${pct(DRUMS_CRIT, 0)} for its duration`, ''],
     [link('spirit-needle', 'The Needle'), '', '×(1 + 0.15 a level)'],
   ])}
@@ -90,7 +99,7 @@ const attacksBody = () => `<p class="lede">You attack by clicking, tapping, or h
 
 const abilitiesBody = () => {
   const spiritFor = (id: string) => LEGENDS.find((d) => d.lengthens?.ability === id);
-  return `<p class="lede">Abilities come from companion traits. Buying the trait unlocks the ability for the rest of the run; you earn them again after every ascent.</p>
+  return `<p class="lede">Abilities come from companion traits. Buying the trait unlocks the ability for the rest of the run. You earn them again after every ascent.</p>
     ${table(['Ability', 'Unlocked by', 'Kind', 'Lasts', 'Cooldown', 'Longer with'], ABILITIES.map((a) => {
       const c = COMPS[a.comp];
       const u = UPGRADES.find((x) => x.id === `m${a.comp}_${a.trait}`)!;
@@ -111,9 +120,9 @@ const abilitiesBody = () => {
       ['War Drums', `+${pct(DRUMS_CRIT, 0)} crit chance.`],
       ['Phantom Legion', 'Every Phantom Blade attack hits every monster on the floor.'],
     ])}
-    <p>${link('spirit-restless', 'The Restless')} shortens every button cooldown. Cooldowns keep counting down while you're away; ascending resets them.</p>
+    <p>${link('spirit-restless', 'The Restless')} shortens every button cooldown. Cooldowns keep counting down while you're away. Ascending resets them.</p>
     ${h2('Rampage')}
-    <p>Your attacks charge the Rampage meter: ${FEVER_CLICKS} attacks fill it (about a minute of holding the button). Unleash it when it's full and your party deals ×${RAMPAGE_TIERS[0]} damage for ${FEVER_TIME} seconds.</p>
+    <p>Your attacks charge the Rampage meter: ${FEVER_CLICKS} attacks fill it (about a minute of holding the button). Set it off when it's full and your party deals ×${RAMPAGE_TIERS[0]} damage for ${FEVER_TIME} seconds.</p>
     <p>Keep attacking through it: after ${RAMPAGE_STEPS[0]} more attacks it climbs to ×${RAMPAGE_TIERS[1]} and gains ${RAMPAGE_EXTEND} seconds. The meter doesn't charge while a Rampage runs.</p>
     ${table(['Trait (Dwarf Brawler)', 'Effect'], [['Level 75', 'Rampage fills 25% faster'], ['Level 100', 'Rampage lasts 50% longer'], ['Level 125', '+1 to both multipliers']])}
     <p>${link('spirit-lingering', 'The Lingering')} adds a second a level.</p>`;
