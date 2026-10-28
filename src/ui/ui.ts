@@ -13,6 +13,7 @@ import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
 
 export interface UiHooks {
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
+  purr: () => void;
   save: () => void;
   settings: () => void;
   exportSave: () => string;
@@ -1512,6 +1513,7 @@ export class Ui {
     if (!DEMO && g.s.inKeep && !this.keepView) {
       this.keepView = new KeepView(g, this.root);
       this.keepView.onUse = (id) => this.station(id);
+      this.keepView.onPet = () => this.hooks.purr();
       if (this.arriveAtHeart) this.keepView.arriveAtHeart();
       this.arriveAtHeart = false;
     } else if (!g.s.inKeep && this.keepView) {

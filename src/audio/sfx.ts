@@ -29,7 +29,7 @@ export class Sfx {
   private master: GainNode | null = null;
   private raw = new Map<SfxName, ArrayBuffer>();
   private buffers = new Map<SfxName, AudioBuffer>();
-  private last = new Map<SfxName, number>();
+  private last = new Map<SfxName | 'purr', number>();
   private _muted = false;
   /** Has the silent unlock sound been played yet (iOS)? */
   private primed = false;
@@ -258,6 +258,39 @@ export class Sfx {
     g.gain.value = o.vol ?? 1;
     src.connect(g).connect(this.master);
     src.start();
+  }
+
+  /** A cat's purr: low rumble pulsed at about 24 Hz, swelling in and fading out. */
+  purr(seconds = 2.5) {
+    if (!this.ctx || !this.master || this._muted || document.hidden) return;
+    const now = this.ctx.currentTime;
+    if (now - (this.last.get('purr') ?? -9) < seconds * 0.5) return;
+    this.last.set('purr', now);
+    const rate = this.ctx.sampleRate;
+    const noise = this.ctx.createBuffer(1, Math.floor(rate * seconds), rate);
+    const data = noise.getChannelData(0);
+    let low = 0;
+    for (let i = 0; i < data.length; i++) data[i] = low = low * 0.96 + (Math.random() * 2 - 1) * 0.2;
+    const src = this.ctx.createBufferSource();
+    src.buffer = noise;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 260;
+    const pulse = this.ctx.createGain();
+    pulse.gain.value = 0.55;
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 24;
+    const depth = this.ctx.createGain();
+    depth.gain.value = 0.45;
+    lfo.connect(depth).connect(pulse.gain);
+    const env = this.ctx.createGain();
+    env.gain.setValueAtTime(0, now);
+    env.gain.linearRampToValueAtTime(1.6, now + 0.5);
+    env.gain.linearRampToValueAtTime(0, now + seconds);
+    src.connect(filter).connect(pulse).connect(env).connect(this.master);
+    src.start();
+    lfo.start();
+    lfo.stop(now + seconds);
   }
 
   /** One of `${prefix}0..4`, chosen at random. */

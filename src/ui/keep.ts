@@ -51,6 +51,8 @@ const BOUND_AT: Record<BoundId, [number, number]> = {
   troll: [10, 7], golem: [12, 7], thing: [10, 10], ent: [12, 10],
 };
 const PEOPLE: { id: 'dan' | 'victor'; sprite: string; x: number; y: number }[] = [{ id: 'dan', sprite: 'ef_elf_m', x: 3, y: 18 }, { id: 'victor', sprite: 'victor', x: 7, y: 18 }];
+/** Koko, the Keep's black cat: curled up on the Great Hall floor, clear of the ways through. Click to pet. */
+const KOKO: [number, number] = [18, 20];
 /** What each station is, where it's used from (cells you stand on), where its label floats, and (spirits, which you
  *  can walk through) the cells of its body that a click picks it by. */
 type Station = { id: KeepStation; label: string; cells: [number, number][]; tag: [number, number]; body?: [number, number][] };
@@ -155,6 +157,9 @@ export class KeepView {
   keyed = false;
   /** Called when you reach a station you clicked, or click the one you're at. */
   onUse: (id: KeepStation) => void = () => {};
+  /** Called when you pet Koko. */
+  onPet: () => void = () => {};
+  private purringUntil = 0;
 
   constructor(game: Game, host: HTMLElement) {
     this.game = game;
@@ -257,6 +262,7 @@ export class KeepView {
     const [tx, ty] = this.cellAt(e);
     const station = this.stationAt(tx, ty);
     if (station) return this.useOrWalk(station);
+    if (ty === KOKO[1] && tx >= KOKO[0] - 1 && tx <= KOKO[0] + 1) return this.pet();
     this.goal = null;
     this.path = this.route(Math.floor(this.hero.x), Math.floor(this.hero.y), tx, ty);
     this.held = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, at: performance.now(), following: false };
@@ -282,6 +288,11 @@ export class KeepView {
     if (this.held?.following) this.path = [];
     this.held = null;
   };
+
+  private pet() {
+    this.purringUntil = this.time + 2.5;
+    this.onPet();
+  }
 
   /** Use a station you're at, or walk up to it and use it when you get there. */
   useOrWalk(id: KeepStation) {
@@ -739,6 +750,34 @@ export class KeepView {
         g.globalAlpha = 1;
       } });
     });
+    standing.push({ y: KOKO[1] + 1, draw: () => {
+      const purring = this.time < this.purringUntil;
+      const px = Math.round(KOKO[0] * 16 + 4), py = Math.round((KOKO[1] + 1) * 16 - 8);
+      const breathe = Math.sin(this.time * (purring ? 9 : 1.6)) > 0 ? 0 : 1;
+      const blink = purring || this.time % 5 < 0.15;
+      const flick = Math.sin(this.time * 2.2) > 0.6 ? 1 : 0;
+      shadow(KOKO[0] + 0.5, KOKO[1] + 1, 6);
+      g.fillStyle = '#1c1b24';
+      g.fillRect(px + 1, py + 3 + breathe, 8, 5 - breathe);
+      g.fillRect(px + 6, py, 5, 5);
+      g.fillRect(px + 6, py - 1, 1, 1);
+      g.fillRect(px + 10, py - 1, 1, 1);
+      g.fillRect(px - 2, py + 6 - flick, 3, 2);
+      g.fillStyle = '#34323f';
+      g.fillRect(px + 3, py + 3 + breathe, 4, 1);
+      g.fillStyle = '#6f8a5a';
+      if (blink) g.fillRect(px + 7, py + 3, 3, 1);
+      else {
+        g.fillRect(px + 7, py + 2, 1, 2);
+        g.fillRect(px + 9, py + 2, 1, 2);
+      }
+      if (purring) {
+        const t = (this.purringUntil - this.time) / 2.5;
+        g.fillStyle = '#ff8fb0';
+        g.fillRect(px + 8, Math.round(py - 4 - (1 - t) * 8), 2, 1);
+        g.fillRect(px + 8, Math.round(py - 3 - (1 - t) * 8), 1, 1);
+      }
+    } });
     for (const p of PEOPLE) {
       const src = spriteFrames(p.sprite);
       if (!src) continue;

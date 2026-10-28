@@ -139,6 +139,7 @@ async function boot() {
 
   const ui = new Ui(document.getElementById('ui')!, game, scene, {
     sound: (n, o) => sfx.play(n, o),
+    purr: () => sfx.purr(),
     save,
     settings: () => {
       applySettings();
