@@ -8,7 +8,7 @@
 
 ![Deepheart](public/og-image.png)
 
-Fight monsters, hire companions with their gold, and descend the dungeon for souls.
+Fight monsters, hire companions with the gold they earn, and descend the dungeon for souls.
 **Play it at https://jamesurobertson.github.io/deepheart/**, or
 **[download the desktop app](https://github.com/jamesurobertson/deepheart/releases/latest)** for Mac, Windows or Linux.
 
@@ -16,21 +16,22 @@ Fight monsters, hire companions with their gold, and descend the dungeon for sou
 
 ![A champion falls and drops a gold Bog Lurker card, which flips over and flies into the collection](docs/screenshots/card-drop.webp)
 
-One card for every monster in the dungeon, and a ten-thousand-to-one chance of seeing it drop. Cards spin out of the
-monster face-down and land face-up; pick one up and it flips over in a burst of light, straight into your collection.
-Champions drop gold copies. Boss cards are rarer. The gold card of a champion boss, which only turns up on boss floors
-you've already beaten, is the rarest thing in the dungeon. They do nothing except prove you were there.
+One card for every monster in the dungeon, and a gold copy of each. A monster drops its card about once in two
+million kills, a boss once in 500,000, and a champion's gold card once in 250,000. Cards spin out of the monster
+face-down and land face-up. Pick one up and it flips over in a burst of light, straight into your collection.
+Complete a set for +25% damage, or +50% for a gold set. Send a hunter on an expedition to go after the cards you're
+missing.
 
 ## What's down there
 
-- **A party that fights for you.** Hire companions with the gold they earn, level them into the thousands, and pick a
-  hero to lead around the room with your mouse (or a finger).
-- **Relics** from bosses: sixteen of them, each answering a boss modifier or pushing a build.
+- **A party that fights for you.** Hire 32 companions with the gold they earn, level them into the thousands, and
+  pick a hero to lead around the Keep with your mouse (or a finger).
+- **Expeditions.** Send a strong companion to hunt a floor's cards while you play, or while you're away.
 - **Ascend** for souls, **awaken the Heart** for heartstones: two prestige layers, and every run back down is faster
   than the last.
 - **Treasure goblins** that run for the exit with your loot. Every so often one is a rainbow. Catch it and find out.
-- **No bottom.** After floor 80 the zones come back corrupted, then abyssal, hollow, eternal, and the numbers keep
-  climbing past 1e308.
+- **No bottom.** The eight zones come back corrupted, then abyssal, hollow, eternal, and the numbers keep climbing
+  past 1e308.
 
 ## Getting Started
 
@@ -39,8 +40,8 @@ you've already beaten, is the rarest thing in the dungeon. They do nothing excep
 3. Run the development server with `npm run dev`
 
 Add `?slot=name` to the URL to keep a separate save. On the dev server only: `?speed=10` runs the game faster,
-`?cards=often` makes cards drop hundreds of times as often (and champion bosses common), and `?relics=always` makes
-every boss drop a relic.
+`?sim=300` starts from where a nonstop player first reaches floor 300 (in its own slot), and `?cards=often` makes
+cards drop hundreds of times as often (and champion bosses common).
 
 ## Development
 
