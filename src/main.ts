@@ -17,8 +17,10 @@ import { TitleMenu } from './ui/menu.ts';
 import { PlayRecorder } from './record.ts';
 import { olderVersion } from './version.ts';
 import { installCrashScreen } from './crash.ts';
+import { installGamepad } from './ui/gamepad.ts';
 
 installCrashScreen();
+installGamepad();
 
 declare global {
   interface Window {
