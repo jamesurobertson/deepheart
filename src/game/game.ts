@@ -775,7 +775,7 @@ export class Game {
     if (s.soulBossDone === undefined) s.soulBossDone = (s.descents ?? 0) > 0 || (s.bossSouls ?? 0) > 0;
     // Renamed monsters (a card's id is its name): cards and kills pass to the new name. The Rotting Deep's floor-45
     // boss used to be the Bloated Ogre; the Frozen Vault's Frost Imp became the Frost Oni when the two swapped places.
-    for (const [was, now] of [['bloated-ogre', 'sludge-walker'], ['bone-archer', 'skeleton-archer'], ['hooded-bones', 'santa-skeleton'], ['frost-imp', 'frost-oni']]) {
+    for (const [was, now] of [['bloated-ogre', 'sludge-walker'], ['bone-archer', 'skeleton-archer'], ['hooded-bones', 'santa-skeleton'], ['frost-imp', 'frost-oni'], ['tomb-raider', 'masked-looter']]) {
       const old = s.cards?.[was];
       if (old) {
         const card = (s.cards[now] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
@@ -796,6 +796,12 @@ export class Game {
         s.slainLaps[now] = CORRUPTION.map((_, i) => (s.slainLaps[now]?.[i] ?? 0) + (laps[i] ?? 0));
         delete s.slainLaps[was];
       }
+      const champs = s.champSlain[was];
+      if (champs) {
+        s.champSlain[now] = CORRUPTION.map((_, i) => (s.champSlain[now]?.[i] ?? 0) + (champs[i] ?? 0));
+        delete s.champSlain[was];
+      }
+      for (const trip of s.expeditions ?? []) for (const found of trip.found ?? []) if (found.id === was) found.id = now;
       if (s.dreamCards) s.dreamCards = s.dreamCards.map((key) => (key.startsWith(`${was}:`) ? now + key.slice(was.length) : key));
     }
     // Goblin cards used to come in every lap's color; they're plain only now, so later copies move to the plain page.

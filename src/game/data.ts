@@ -69,7 +69,7 @@ export const COMPS: CompDef[] = [
     c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.2e12, 2.8e9, 'ice', 'Came up from the Frozen Vault. Finds the rest of the dungeon too warm.'),
     c('santa', 'Santa', 'cr_santa', 4.8e12, 9.4e9, 'ice', 'Santa? Is that really you?'),
     c('paladin', 'Paladin', 'cr_gold_knight', 1.9e13, 3.2e10, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
-    c('hollow', 'Hollow Knight', 'pumpkin_dude', 7.6e13, 1.1e11, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
+    c('hollow', 'Lantern Knight', 'pumpkin_dude', 7.6e13, 1.1e11, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
     c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 3e14, 3.6e11, 'dark', 'Has broken every vow but one. Nobody asks which.'),
     c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 4e11, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
     c('wraith', 'The Count', 'rm_dracula', 7.4e21, 4.1e17, 'bat', 'We all know who he really is.', 95),
@@ -150,7 +150,7 @@ export const ZONES: ZoneDef[] = [
   ...(DEMO ? Array.from({ length: 5 }, (): ZoneDef => ({ name: '???', tiles: 'halls', band: [m('goblin', '???')], mid: m('goblin', '???'), boss: m('goblin', '???'), lap: [] })) : [
     {
       name: 'The Sunken Tomb', tiles: 'tomb',
-      band: [m('ef_gnollscout', 'Gnoll Scout', 0.9), m('ef_gnollbrute', 'Gnoll Brute', 1.2), m('ef_gnollshaman', 'Gnoll Shaman'), m('masked_orc', 'Tomb Raider')],
+      band: [m('ef_gnollscout', 'Gnoll Scout', 0.9), m('ef_gnollbrute', 'Gnoll Brute', 1.2), m('ef_gnollshaman', 'Gnoll Shaman'), m('masked_orc', 'Masked Looter')],
       mid: m('ef_gnolloverseer', 'Gnoll Overseer'), boss: m('ef_golem', 'Tomb Golem', 1, 0xe8c888),
       lap: [m('cr_pirate', 'Drowned Pirate'), m('cr_pirate_captain', 'Drowned Captain', 1.2), m('cr_skeleton_pirate', 'Bone Corsair')],
     },
@@ -974,7 +974,7 @@ export const NEWS: News[] = [
   ...(DEMO ? [] : [
     { text: "The Stormcaller's forecast: lightning, with a chance of more lightning.", when: (s) => s.owned[compIndex('stormcaller')] > 0 },
     { text: 'The Plague Doctor keeps taking notes on the monsters. And on you.', when: (s) => s.owned[compIndex('doctor')] > 0 },
-    { text: 'The Hollow Knight has not spoken once. He did grin wider today.', when: (s) => s.owned[compIndex('hollow')] > 0 },
+    { text: 'The Lantern Knight has not spoken once. He did grin wider today.', when: (s) => s.owned[compIndex('hollow')] > 0 },
     { text: 'The angel will not say what it fell from.', when: (s) => s.owned[compIndex('angel')] > 0 },
     { text: 'The Necromancer apologizes to each monster before it dies.', when: (s) => s.owned[compIndex('necro')] > 0 },
     { text: 'The Tamed Oni has adopted a slug. Nobody has told him we kill those.', when: (s) => s.owned[compIndex('ogre')] > 0 },
