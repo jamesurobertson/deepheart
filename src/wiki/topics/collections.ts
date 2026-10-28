@@ -25,7 +25,7 @@ const cardsBody = () => {
       ['A treasure goblin', `1 in ${CARD_ODDS.goblin.toLocaleString('en-US')}`],
       ['A rainbow goblin', `1 in ${CARD_ODDS.rainbow.toLocaleString('en-US')}`],
     ])}
-    <p>${link(`spirit-${collector.id}`, collector.name)} raises every chance, up to three times. ${link('spirit-ronin', 'The Ronin')} raises it for kills that deal far more than a monster's health. Swept floors roll a card for every kill, and time away rolls them too (plain cards only). ${link('expeditions', 'Expeditions')} roll them for every kill a hunter makes.</p>
+    <p>${link(`spirit-${collector.id}`, collector.name)} raises every chance, up to twice. ${link('spirit-ronin', 'The Ronin')} raises it for kills that deal far more than a monster's health. Swept floors roll a card for every kill, and time away rolls them too (plain cards only). ${link('expeditions', 'Expeditions')} roll them for every kill a hunter makes.</p>
     ${h2('Colors')}
     <p>A card drops in the color of the lap you're on, if that card comes in it: plain on floors 1–80, then ${CORRUPTION.slice(1).map((c) => c.name).join(', ')}. A zone's newcomers only come in the later colors, and only two of its first crowd come back. Goblin cards are plain only.</p>
     ${h2('Gold cards')}
@@ -81,7 +81,7 @@ const tripsBody = () => `<p class="lede">Send a companion at level ${EXPEDITION_
   ${table(['Companion', 'Takes'], [...new Set(ABILITIES.map((a) => a.comp))].map((i) => [COMPS[i].name, ABILITIES.filter((a) => a.comp === i).map((a) => a.name).join(', ')]))}
   ${h2('What a hunter finds')}
   <p>A hunter fights at its damage per second from when it left. On a plain floor it kills as fast as its damage allows against the floor's monsters, up to the sweep limit of ${FLOOR_KILLS} kills every 0.6 seconds. On a boss floor it fights the boss, up to one every 2 seconds.</p>
-  <p>Every kill rolls for its card at the usual chance (1 in ${CARD_ODDS.monster.toLocaleString('en-US')} for a monster), with ${link('spirit-collector', 'the Collector')} and ${link('spirit-ronin', 'the Ronin')}. ${pct(CHAMP_CHANCE, 0)} of the kills are champions and roll for gold cards, and on a boss floor champion bosses do. Cards come in the floor's color.</p>
+  <p>Every kill rolls for its card at the usual chance (1 in ${CARD_ODDS.monster.toLocaleString('en-US')} for a monster), with ${link('spirit-collector', 'the Collector')} (the Ronin doesn't help on a hunt). ${pct(CHAMP_CHANCE, 0)} of the monsters killed are champions and roll for gold cards. A hunter's bosses are never champions. Cards come in the floor's color.</p>
   <p>Up to about 100 floors above your deepest, a strong hunter kills at the sweep limit. Near your deepest it slows down a lot.</p>
   ${h2('Coming home')}
   <p>A hunter stays out up to ${TRIP_HOURS} hours, time away included, then comes home on its own. You can call one home sooner from the ladder. Before ascending or awakening you call everyone home yourself. Each hunter brings what it found so far.</p>`;

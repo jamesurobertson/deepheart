@@ -98,20 +98,20 @@ export const CHAMP_GOLD = 10;
 export const CHAMP_BOSS_CHANCE = 1 / 20;
 export const CHAMP_BOSS_HP = 3;
 export const CHAMP_BOSS_GOLD = 10;
-/** Card drops: 1 in this many kills (or catches). A 12-hour absence is ~170k kills, so ordinary cards sit at 0.001%;
+/** Card drops: 1 in this many kills (or catches). Hunters kill millions a day, so ordinary cards are very rare per kill;
  *  rainbow goblins are rare enough on their own to keep 1%, the best odds anything gets. */
 /** How many spares each brother wants for one card. */
 export const DAN_GIVES = 5;
 export const VICTOR_GIVES = 10;
-export const CARD_ODDS = { monster: 1_000_000, boss: 250_000, champ: 100_000, champBoss: 10_000, goblin: 10_000, rainbow: 1_000 };
+export const CARD_ODDS = { monster: 2_000_000, boss: 500_000, champ: 250_000, champBoss: 10_000, goblin: 10_000, rainbow: 1_000 };
 /** Expeditions open the first time a companion reaches this level, and only companions at it can go. */
 export const EXPEDITION_LEVEL = 1000;
 /** Auto-hire opens after this many ascents. It brings each companion back up to the best level it has ever had; past
  *  that, their levels are yours to buy. */
 export const AUTO_HIRE_ASCENTS = 3;
 /** A completed card set (one zone in one color) adds this to all damage, and its gold set this more. */
-export const SET_BONUS = 0.1;
-export const GOLD_SET_BONUS = 0.25;
+export const SET_BONUS = 0.25;
+export const GOLD_SET_BONUS = 0.5;
 /** Hours a hunter stays out at most (real time); then it comes home on its own. */
 export const TRIP_HOURS = 24;
 /** Bosses a hunter can kill a second on a boss floor: they come one at a time. */
@@ -2459,17 +2459,15 @@ export class Game {
     return floor;
   }
 
-  /** Card luck on a hunt: the Collector, and the Ronin at the hunt's overkill. */
-  private tripLuck(floor: number, dps: Decimal) {
-    const rate = this.tripRate(floor, dps);
-    const overkill = rate > 0 ? dps.div(this.huntHp(floor).times(rate)).toNumber() : 1;
-    return (1 + 2 * legendShare(this.legendLv('collector'))) * this.overkillMult(overkill) * (this.debugCards ? 500 : 1);
+  /** Card luck on a hunt: the Collector only. The Ronin rewards your own overkill, and a hunt is always overkill. */
+  private tripLuck() {
+    return this.collectorMult() * (this.debugCards ? 500 : 1);
   }
 
   /** Cards a hunter with this damage finds a day on a floor, on average. */
   tripCardsPerDay(floor: number, dps: Decimal) {
     const odds = isBossFloor(floor) ? CARD_ODDS.boss : CARD_ODDS.monster;
-    return (this.tripRate(floor, dps) * 86400 * this.tripLuck(floor, dps)) / odds;
+    return (this.tripRate(floor, dps) * 86400 * this.tripLuck()) / odds;
   }
 
   /** Seconds hunted in all (the time the party spent on its floor doesn't count), up to TRIP_HOURS. */
@@ -2516,7 +2514,7 @@ export class Game {
     const found = (e.found ??= []);
     let cards = 0;
     let gold = 0;
-    this.huntFinds(fresh, e.floor, new Decimal(e.dps), (id, isGold) => {
+    this.huntFinds(fresh, e.floor, (id, isGold) => {
       found.push({ id, gold: isGold });
       cards++;
       if (isGold) gold++;
@@ -2539,11 +2537,11 @@ export class Game {
   private huntedAt = 0;
 
   /** A hunt's kills, in bulk: the floor's mix of monsters (or its boss), CHAMP_CHANCE of them champions rolling gold,
-   *  every card drawn at once at the dungeon's odds, the Collector and the Ronin included. */
-  private huntFinds(kills: number, floor: number, dps: Decimal, find: (id: string, gold: boolean) => void) {
+   *  every card drawn at once at the dungeon's odds, with the Collector. Champion bosses are yours to fight: none on a hunt. */
+  private huntFinds(kills: number, floor: number, find: (id: string, gold: boolean) => void) {
     if (kills <= 0) return;
     const lap = Math.min(lapOf(floor), CORRUPTION.length - 1);
-    const luck = this.tripLuck(floor, dps);
+    const luck = this.tripLuck();
     const roll = (id: string, n: number, champs: number, odds: number, goldOdds: number) => {
       this.s.slain[id] = (this.s.slain[id] ?? 0) + n;
       if (lap) (this.s.slainLaps[id] ??= CORRUPTION.map(() => 0))[lap] += n;
@@ -2552,8 +2550,7 @@ export class Game {
       for (let c = poisson((champs * luck) / goldOdds); c > 0; c--) find(id, true);
     };
     if (isBossFloor(floor)) {
-      const champs = this.championsOn() && floor >= TUNE.goldBossFrom ? Math.round(kills * this.goldBossChance()) : 0;
-      roll(cardId(bossFor(floor).name), kills, champs, CARD_ODDS.boss, CARD_ODDS.champBoss);
+      roll(cardId(bossFor(floor).name), kills, 0, CARD_ODDS.boss, CARD_ODDS.champBoss);
       return;
     }
     const featured = featuredFor(floor);
@@ -2589,14 +2586,19 @@ export class Game {
     return (this.s.slain[id] ?? 0) - (laps ?? []).reduce((a, n) => a + n, 0);
   }
 
-  /** The Ronin: a kill N times over has N× the card chance, up to ×(1 + level). */
+  /** The Ronin: a kill N times over has N× the card chance, up to ×(1 + level ÷ 4). */
   overkillMult(overkill: number) {
     const lv = this.legendLv('ronin');
-    return lv ? Math.max(1, Math.min(Math.floor(overkill), 1 + lv)) : 1;
+    return lv ? Math.max(1, Math.min(Math.floor(overkill), 1 + lv / 4)) : 1;
+  }
+
+  /** The Collector: card chance closing in on ×2. */
+  private collectorMult() {
+    return 1 + legendShare(this.legendLv('collector'));
   }
 
   private cardRoll(odds: number, mult = 1) {
-    odds /= (1 + 2 * legendShare(this.legendLv('collector'))) * mult;
+    odds /= this.collectorMult() * mult;
     return Math.random() * (this.debugCards ? Math.max(1, odds / 500) : odds) < 1;
   }
 
@@ -3112,7 +3114,7 @@ export class Game {
     const featured = featuredFor(floor);
     const band = bandFor(floor);
     const lap = Math.min(lapOf(floor), CORRUPTION.length - 1);
-    let odds = CARD_ODDS.monster / ((1 + 2 * legendShare(this.legendLv('collector'))) * this.overkillMult(overkill));
+    let odds = CARD_ODDS.monster / (this.collectorMult() * this.overkillMult(overkill));
     if (this.debugCards) odds = Math.max(1, odds / 500);
     for (const def of new Set([featured, ...band])) {
       const share = (def.name === featured.name ? 0.5 : 0) + (0.5 * band.filter((d) => d.name === def.name).length) / band.length;
