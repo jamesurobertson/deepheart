@@ -9,6 +9,8 @@ const LAP_COLOR = ['#c9b8a0', ...CORRUPTION.slice(1).map((c) => `#${c.tint.toStr
 const lapName = (lap: number) => (lap ? CORRUPTION[lap].name : 'Plain');
 const dots = (c: CardDef) => c.laps.map((lap) => `<i title="${lapName(lap)}" style="display:inline-block;width:9px;height:9px;margin-right:3px;background:${LAP_COLOR[lap]};box-shadow:0 0 0 2px #0b0710"></i>`).join('');
 const KIND = { monster: 'Monster', mid: 'Mid-boss', boss: 'Zone boss', goblin: 'Goblin' } as const;
+/** The soul glyph the Ascend trophies use (as the game's Ascend button draws it). */
+const SOUL = `<svg viewBox="0 0 7 8" width="21" height="24" shape-rendering="crispEdges" fill="#b38cff" aria-hidden="true">${[[3, 0, 1, 1], [2, 1, 3, 1], [1, 2, 5, 3], [2, 5, 3, 1], [1, 6, 1, 1], [3, 6, 1, 1], [5, 6, 1, 1], [0, 7, 1, 1], [2, 7, 1, 1], [4, 7, 1, 1], [6, 7, 1, 1]].map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}"/>`).join('')}</svg>`;
 const collector = LEGENDS.find((d) => d.id === 'collector')!;
 
 const cardsBody = () => {
@@ -62,7 +64,7 @@ const trophiesBody = () => {
     ${toc('trophies', [...GROUPS.filter(([, kinds]) => trophies.some((t) => kinds.includes(t.req.t))).map(([g]) => g), 'Cursors'])}
     ${GROUPS.map(([group, kinds]) => {
       const list = trophies.filter((t) => kinds.includes(t.req.t));
-      return list.length ? `${h2(group)}${table(['Trophy', 'How'], list.map((t) => [`<span class="who">${spr(t.icon.sprite, 22)}<b>${esc(t.name)}</b></span>`, esc(t.desc)]))}` : '';
+      return list.length ? `${h2(group)}${table(['Trophy', 'How'], list.map((t) => [`<span class="who">${t.icon.sprite === 'soul' ? SOUL : spr(t.icon.sprite, 22)}<b>${esc(t.name)}</b></span>`, esc(t.desc)]))}` : '';
     }).join('')}
     ${h2('Cursors')}
     <p>Cursor skins, picked in Options.</p>

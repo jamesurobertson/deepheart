@@ -63,7 +63,7 @@ function icon(i: Icon, box = 36, badge = true): string {
   // Two companions (a synergy): side by side, a little overlapped.
   if (i.sub) return `<span class="ico pair">${charFit(i.sprite, box * 0.8)}${charFit(i.sub, box * 0.8)}</span>`;
   const tier = badge && i.tier !== undefined ? `<b class="tier" style="--tc:${TIER_COLORS[i.tier]}">${ROMAN[i.tier]}</b>` : '';
-  return `<span class="ico">${spriteFit(i.sprite, box)}${tier}</span>`;
+  return `<span class="ico">${i.sprite === 'soul' ? G.soul(Math.floor(box / 8)) : spriteFit(i.sprite, box)}${tier}</span>`;
 }
 
 /** A monster card as it sits in the collection: one you don't have yet is a dark silhouette. */
@@ -1450,7 +1450,7 @@ export class Ui {
   toast(html: string, spr: string, cls = '') {
     const el = document.createElement('div');
     el.className = `toast pnl ${cls}`;
-    const ico = spr === 'check' ? G.check() : spr === 'close' ? G.close() : spriteFit(spr, 32);
+    const ico = spr === 'check' ? G.check() : spr === 'close' ? G.close() : spr === 'soul' ? G.soul(4) : spriteFit(spr, 32);
     el.innerHTML = `<span class="toast-ico">${ico}</span><span class="toast-t">${html}</span>`;
     this.el.toasts.prepend(el);
     while (this.el.toasts.children.length > 3) this.el.toasts.lastElementChild!.remove();

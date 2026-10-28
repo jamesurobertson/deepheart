@@ -649,7 +649,7 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 
 .tro-grid { display: grid; grid-template-columns: repeat(auto-fill, 48px); gap: 6px; }
 .tro { width: 48px; height: 48px; display: grid; place-items: center; border: 6px solid transparent; border-image: var(--f-cell) 2 fill / 6px stretch; }
-.tro:not(.got) .ico > .px { filter: brightness(0) opacity(0.5); }
+.tro:not(.got) .ico > .px, .tro:not(.got) .ico > .glyph { filter: brightness(0) opacity(0.5); }
 .tro:not(.got) .tier { opacity: 0.3; }
 .tro.got { box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.5); }
 
