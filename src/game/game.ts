@@ -2,11 +2,11 @@ import { DEMO, DEMO_COMPANIONS, DEMO_FIRST_CARD, DEMO_LAST_FLOOR } from '../demo
 import { GAME_VERSION } from '../version.ts';
 import Decimal from 'break_infinity.js';
 import {
-  CARD_BY_ID, COST_GROWTH, CURSES, CURSES_FROM, CURSE_BY_ID, CURSE_FLOORS, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, relicPower, relicStars, BOUND, BOUND_BY_ID, boundCost, RARITY, RELICS, RELIC_BY_ID, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, featuredFor, modsFor, pickMonster,
+  CARD_BY_ID, COST_GROWTH, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, BOUND, BOUND_BY_ID, boundCost, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, featuredFor, modsFor, pickMonster,
   CARDS, CORRUPTION, ZONES, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, levelMult, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
   LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost,
   type AbilityId, type LegendId, type BoundId,
-  type Attack, type Effect, type ModId, type MonsterDef, type RaidReward, type RelicEffect, type Req, type TrophyReq, type UpgDef,
+  type Attack, type Effect, type ModId, type MonsterDef, type RaidReward, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
 
 export const SAVE_VERSION = 2;
@@ -161,9 +161,6 @@ const VAULT_GOBLIN_CHESTS = 0.5;
 const VAULT_RAINBOW_GOBLIN_CHESTS = 6;
 export const BASE_CRIT = 0.03;
 export const BASE_CRIT_MULT = 2;
-/** Relics and cursed descents are set aside while the prestige layers are reworked (their code stays). */
-export const RELICS_ON = false;
-export const CURSES_ON = false;
 export const AWAKEN_ON = true;
 /** The Heart shows itself this many floors before it can first be awakened. */
 export const AWAKEN_TEASE = 50;
@@ -279,9 +276,6 @@ export interface SaveState {
   markBest: number;
   /** Souls earned in earlier awakening cycles. */
   soulsLifetime: number;
-  /** The curse on this descent (null for none), and the reward tier reached under each curse. */
-  curse: string | null;
-  curseTiers: Record<string, number>;
   trophies: string[];
   souls: number;
   spentSouls: number;
@@ -319,12 +313,6 @@ export interface SaveState {
   lastSave: number;
   /** When you last attacked by hand (0: never), so a reload picks the idle clock up where it was. */
   lastAttack: number;
-  /** Relic levels by id (0 / missing = not found yet). */
-  relics: Record<string, number>;
-  /** Relic ids in your slots. */
-  equipped: string[];
-  /** Deepest boss floor ever beaten: beating a deeper zone boss always drops a relic. */
-  bossBest: number;
   /** The Bound's levels by id, and every bound soul awakening has paid (spent or not). */
   bound: Record<string, number>;
   boundEarned: number;
@@ -470,11 +458,11 @@ function reorderRoster(s: SaveState) {
 export function newSave(): SaveState {
   return {
     v: SAVE_VERSION, gold: new Decimal(0), runGold: new Decimal(0), totalGold: new Decimal(0), kills: 0, bosses: 0, clicks: 0, crits: 0,
-    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], bossSouls: 0, goldBosses: {}, legends: {}, legendOffer: [], legendSpent: 0, legendSeed: freshSeed(), legendRolls: 0, runSeed: freshSeed(), marks: COMPS.map(() => 0), markBest: 0, soulsLifetime: 0, curse: null, curseTiers: {}, trophies: [], souls: 0, spentSouls: 0,
+    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], bossSouls: 0, goldBosses: {}, legends: {}, legendOffer: [], legendSpent: 0, legendSeed: freshSeed(), legendRolls: 0, runSeed: freshSeed(), marks: COMPS.map(() => 0), markBest: 0, soulsLifetime: 0, trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(), lastAttack: 0,
-    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), relics: {}, equipped: [], bossBest: 0, bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, tripReady: [], tripsSent: 0, tripCards: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
+    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, tripReady: [], tripsSent: 0, tripCards: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, autoHire: false, graphics: 'auto' },
   };
 }
@@ -544,8 +532,6 @@ export type GameEvent =
   | { t: 'raidEscape'; id: number }
   | { t: 'fever'; on: boolean }
   | { t: 'descend'; souls: number }
-  | { t: 'curse'; id: string; tier: number }
-  | { t: 'relic'; id: string; lv: number; floor: number; equipped: boolean; star: number }
   | { t: 'split'; id: number; into: [number, number] }
   | { t: 'heal'; id: number; amount: Decimal }
   | { t: 'awaken'; bound: number }
@@ -567,7 +553,6 @@ export type GameEvent =
 export interface Parts {
   /** Per companion: tier upgrades and synergies. */
   tier: number[];
-  whet: number;
   blades: number;
   upgrades: number;
   trophies: number;
@@ -577,23 +562,16 @@ export interface Parts {
   /** Party traits (+25% each to every companion, multiplying), and boss traits (added up). */
   party: number;
   boss: number;
-  shard: number;
   /** The Ogre Chieftain (+100% per level). */
   ogre: number;
-  banner: number;
   clickDps: number;
   clickDpsUpg: number;
-  oath: number;
   critBase: number;
   critUpg: number;
-  critRelic: number;
   critMultBase: number;
   critMultUpg: number;
-  critMultRelic: number;
   cleaveUpg: number;
-  cleaveRelic: number;
   goldUpg: number;
-  goldRelic: number;
 }
 
 interface Computed {
@@ -604,7 +582,7 @@ interface Computed {
   /** Per companion before the all-damage bonuses. */
   baseComp: number[];
   parts: Parts;
-  /** Product of the all-damage bonuses (upgrades, trophies, souls, shard, the Ogre Chieftain). */
+  /** Product of the all-damage bonuses (upgrades, trophies, souls, cards, the Ogre Chieftain). */
   all: Decimal;
   click: Decimal;
   crit: number;
@@ -747,8 +725,6 @@ export class Game {
   hold: { id: number | null; x: number; y: number } | null = null;
   /** Where the cursor is over the battlefield (set by the UI while Flurry runs): Flurry hits what you point at. */
   aim: { id: number | null; x: number; y: number } | null = null;
-  /** Testing only (?relics=always): every boss drops a relic, every time. */
-  debugRelics = false;
   /** Testing only (?cards=often): cards drop hundreds of times as often, and champion bosses are common. */
   debugCards = false;
   /** Testing only (?goblin=rainbow): every treasure goblin is a rainbow goblin that opens the vault, and they come often. */
@@ -870,6 +846,13 @@ export class Game {
     delete legacy.abyss;
     delete legacy.abyssLv;
     delete legacy.runSouls;
+    // Relics and cursed descents are gone.
+    const retired = s as unknown as { relics?: unknown; equipped?: unknown; bossBest?: unknown; curse?: unknown; curseTiers?: unknown };
+    delete retired.relics;
+    delete retired.equipped;
+    delete retired.bossBest;
+    delete retired.curse;
+    delete retired.curseTiers;
     // Saved as plain numbers (older saves) or strings (Decimal's JSON form).
     for (const k of ['gold', 'runGold', 'totalGold', 'bestDps'] as const) s[k] = new Decimal(s[k] ?? 0);
     while (s.owned.length < COMPS.length) s.owned.push(0);
@@ -949,42 +932,6 @@ export class Game {
   }
 
 
-  // ---------- cursed descents ----------
-
-  /** This curse's rule is in force (Two Curses brings Iron Wardens and Mending Dark). */
-  curseActive(id: string) {
-    if (!CURSES_ON) return false;
-    const c = this.s.curse;
-    return c === id || (c === 'two' && (id === 'iron' || id === 'mending'));
-  }
-
-  curseTier(id: string) {
-    if (!CURSES_ON) return 0;
-    return this.s.curseTiers[id] ?? 0;
-  }
-
-  /** Curses on offer: none before CURSES_FROM ascents, then a couple, one more every 5 ascents; Two Curses once every
-   *  other curse has been beaten at least once. */
-  cursesOpen() {
-    const d = this.s.descents;
-    if (!CURSES_ON || d < CURSES_FROM) return [];
-    const plain = CURSES.filter((c) => c.id !== 'two');
-    const open = plain.slice(0, Math.min(plain.length, 2 + Math.floor((d - CURSES_FROM) / 5)));
-    if (plain.every((c) => this.curseTier(c.id) > 0)) open.push(CURSE_BY_ID.get('two')!);
-    return open;
-  }
-
-  /** A cursed descent reaching its next reward floor earns that tier for good. */
-  private checkCurse() {
-    const id = this.s.curse;
-    if (!id) return;
-    const tier = this.curseTier(id);
-    if (tier >= CURSE_FLOORS.length || this.s.maxFloor < CURSE_FLOORS[tier]) return;
-    this.s.curseTiers[id] = tier + 1;
-    this.invalidate();
-    this.events.push({ t: 'curse', id, tier: tier + 1 });
-  }
-
   hasTrophy(id: string) {
     return this.trophySet.has(id);
   }
@@ -1007,25 +954,6 @@ export class Game {
 
   boundLv(id: BoundId) {
     return this.s.bound[id] ?? 0;
-  }
-
-  relicLv(id: string) {
-    return this.s.relics[id] ?? 0;
-  }
-
-  relicSlots() {
-    return 3;
-  }
-
-  /** Level of the equipped relic with this effect (0 if none is slotted). */
-  relic(e: RelicEffect) {
-    if (!RELICS_ON) return 0;
-    let lv = 0;
-    for (const id of this.s.equipped) {
-      const d = RELIC_BY_ID.get(id);
-      if (d && d.effect === e) lv += relicPower(this.relicLv(id));
-    }
-    return lv;
   }
 
   /** How much of a boss modifier's bite is left after Warden's Bane (1 → 0.25). */
@@ -1053,7 +981,6 @@ export class Game {
     const s = this.s;
     const effects = this.effects();
     const tier = COMPS.map(() => 1);
-    const whet = 1 + this.relic('click');
     let blades = 1;
     let clickDpsUpg = 0;
     let global = 0;
@@ -1078,37 +1005,35 @@ export class Game {
     }
     // Every multiplier, kept apart so the stats page can show where the numbers come from.
     const parts: Parts = {
-      tier, whet, blades,
+      tier, blades,
       upgrades: 1 + global,
       trophies: this.trophyMult(),
       souls: this.soulMult(),
       cards: 1 + SET_BONUS * this.setsDone(false) + GOLD_SET_BONUS * this.setsDone(true),
       party, boss: 1 + boss,
-      shard: 1 + this.relic('all'),
       ogre: 1 + TUNE.ogre * this.boundLv('ogre'),
-      banner: 1 + 0.5 * this.relic('party'),
-      clickDps: CLICK_DPS + clickDpsUpg + 0.1 * this.relic('oath'),
-      clickDpsUpg, oath: 0.1 * this.relic('oath'),
-      critBase: BASE_CRIT, critUpg, critRelic: Math.min(0.3, 0.02 * this.relic('critChance')),
-      critMultBase: BASE_CRIT_MULT, critMultUpg, critMultRelic: 1 + 0.5 * this.relic('critMult'),
-      cleaveUpg, cleaveRelic: 0.2 * this.relic('cleave'),
-      goldUpg: 1 + gold, goldRelic: 1 + 0.5 * this.relic('gold'),
+      clickDps: CLICK_DPS + clickDpsUpg,
+      clickDpsUpg,
+      critBase: BASE_CRIT, critUpg,
+      critMultBase: BASE_CRIT_MULT, critMultUpg,
+      cleaveUpg,
+      goldUpg: 1 + gold,
     };
-    const all = new Decimal(parts.ogre * parts.upgrades * parts.trophies * parts.souls * parts.cards * parts.shard);
+    const all = new Decimal(parts.ogre * parts.upgrades * parts.trophies * parts.souls * parts.cards);
     // A companion away hunting deals nothing here.
     // (A companion that's away hunting, or locked behind a floor not reached this cycle, deals nothing here.)
     const baseComp = COMPS.map((c, i) => (this.away(i) || !this.compUnlocked(i) ? 0 : c.dps * s.owned[i] * levelMult(s.owned[i]) * tier[i] * (1 + MARK_POWER * s.marks[i])));
-    const perComp = baseComp.map((b) => all.times(b * parts.party * parts.banner));
+    const perComp = baseComp.map((b) => all.times(b * parts.party));
     const dps = perComp.reduce((a, b) => a.plus(b), new Decimal(0));
     const shares = perComp.map((d) => (dps.gt(0) ? d.div(dps).toNumber() : 0));
-    const click = all.times(whet * blades).plus(dps.times(parts.clickDps)).times(1 + 0.1 * this.legendLv('fist'));
+    const click = all.times(blades).plus(dps.times(parts.clickDps)).times(1 + 0.1 * this.legendLv('fist'));
     this.cache = {
       dps, perComp, shares, baseComp, parts, all, click,
-      crit: this.abilityUnlocked('crit') ? parts.critBase + parts.critUpg + parts.critRelic : 0,
-      critMult: (parts.critMultBase + parts.critMultUpg) * parts.critMultRelic * (1 + 0.15 * this.legendLv('needle')),
-      cleave: this.abilityUnlocked('cleave') && this.s.buffs.some((b) => b.id === 'cleave') ? (CLEAVE_BASE + parts.cleaveRelic) * parts.cleaveUpg : 0,
-      gold: parts.goldUpg * parts.goldRelic * (1 + 0.05 * this.legendLv('hoard')),
-      autoBase: AUTO_BASE + [0, 0.5, 1, 2][this.curseTier('silent')] + 0.5 * this.relic('phantom') + effects.reduce((sum, e) => sum + (e.t === 'auto' ? e.add : 0), 0),
+      crit: this.abilityUnlocked('crit') ? parts.critBase + parts.critUpg : 0,
+      critMult: (parts.critMultBase + parts.critMultUpg) * (1 + 0.15 * this.legendLv('needle')),
+      cleave: this.abilityUnlocked('cleave') && this.s.buffs.some((b) => b.id === 'cleave') ? CLEAVE_BASE * parts.cleaveUpg : 0,
+      gold: parts.goldUpg * (1 + 0.05 * this.legendLv('hoard')),
+      autoBase: AUTO_BASE + effects.reduce((sum, e) => sum + (e.t === 'auto' ? e.add : 0), 0),
     };
     return this.cache;
   }
@@ -1143,7 +1068,7 @@ export class Game {
   compNext(i: number) {
     const c = this.c;
     const n = this.s.owned[i];
-    return c.all.times(COMPS[i].dps * ((n + 1) * levelMult(n + 1) - n * levelMult(n)) * c.parts.tier[i] * (1 + MARK_POWER * this.s.marks[i]) * c.parts.party * c.parts.banner);
+    return c.all.times(COMPS[i].dps * ((n + 1) * levelMult(n + 1) - n * levelMult(n)) * c.parts.tier[i] * (1 + MARK_POWER * this.s.marks[i]) * c.parts.party);
   }
 
   clickDamage() {
@@ -1178,14 +1103,14 @@ export class Game {
     return this.c.cleave;
   }
 
-  /** What an ability does right now, with your upgrades and relics counted (whether or not it's unlocked or running). */
+  /** What an ability does right now, with your upgrades counted (whether or not it's unlocked or running). */
   abilityText(id: AbilityId): string {
     const p = this.c.parts;
     const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
-    if (id === 'crit') return `Your clicks and Phantom Blade can land critical hits: a ${pct(p.critBase + p.critUpg + p.critRelic)} chance for ×${+((p.critMultBase + p.critMultUpg) * p.critMultRelic).toFixed(2)} damage.`;
-    if (id === 'blade') return `Attacks the front monster for you, ${this.c.autoBase === 1 ? 'once' : `${+this.c.autoBase.toFixed(1)} times`} a second.`;
-    if (id === 'cleave') return `Your clicks also hit every other monster for ${pct((CLEAVE_BASE + p.cleaveRelic) * p.cleaveUpg)} damage.`;
-    if (id === 'rampage') return `Charged by attacking. Your party deals ×${+this.feverMult(0).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
+    if (id === 'crit') return `Clicks and Phantom Blade have a ${pct(p.critBase + p.critUpg)} chance for ×${+(p.critMultBase + p.critMultUpg).toFixed(2)} damage.`;
+    if (id === 'blade') return `Attacks for you, ${this.c.autoBase === 1 ? 'once' : `${+this.c.autoBase.toFixed(1)} times`} a second.`;
+    if (id === 'cleave') return `Your clicks also hit every other monster for ${pct(CLEAVE_BASE * p.cleaveUpg)} damage.`;
+    if (id === 'rampage') return `Builds as you attack. Your party deals ×${+this.feverMult(0).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
     return ABILITY_BY_ID.get(id)!.desc;
   }
 
@@ -1198,9 +1123,9 @@ export class Game {
     return RAMPAGE_TIERS[tier] + this.rampageBonus();
   }
 
-  /** Added to the Rampage multiplier: the Unstoppable upgrade and the Blood Drum. */
+  /** Added to the Rampage multiplier: the Unstoppable upgrade. */
   private rampageBonus() {
-    let bonus = this.relic('rampage');
+    let bonus = 0;
     for (const e of this.effects()) if (e.t === 'fever' && e.power) bonus += e.power;
     return bonus;
   }
@@ -1245,9 +1170,7 @@ export class Game {
   }
 
   upgCost(u: UpgDef) {
-    // Traits get cheaper by beating A Small Party, everything else by beating Lean Purse.
-    const curse = isTraitId(u.id) ? 1 - 0.1 * this.curseTier('small') : 1 - 0.1 * this.curseTier('lean');
-    return u.cost * curse;
+    return u.cost;
   }
 
   /** Who stands in the party: those hired this run (and the Squire up in the Keep before anyone is). */
@@ -1480,8 +1403,6 @@ export class Game {
   private spawnBoss() {
     const def = bossFor(this.s.floor);
     const mods = [...this.bossMods()];
-    if (this.curseActive('iron') && !mods.includes('armored')) mods.push('armored');
-    if (this.curseActive('mending') && !mods.includes('regen')) mods.push('regen');
     const bite = this.modBite();
     const giant = mods.includes('giant');
     const zone = this.s.floor % 10 === 0 && this.s.floor >= DESCEND_FLOOR ? TUNE.zoneBoss : 1;
@@ -1496,8 +1417,7 @@ export class Game {
     const hp = floorHp(this.s.floor).times(toughness * zone * first * (giant ? 1 + 2 * bite : 1) * champHp * wither);
     const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, champ, ...this.spot(true) };
     this.monsters.push(m);
-    let time = BOSS_TIME + 5 * this.curseTier('fuse') + Math.min(30, 3 * this.relic('time')) + this.bossTimeBonus();
-    if (this.curseActive('fuse')) time *= 0.5;
+    let time = BOSS_TIME + this.bossTimeBonus();
     if (mods.includes('enraged')) time *= 1 - 0.5 * bite;
     if (giant || champHp > 1) time *= 1.5;
     this.bossTimeMax = time;
@@ -1542,12 +1462,12 @@ export class Game {
 
   /** Share of companion damage an armored boss shrugs off. */
   armor() {
-    return 0.75 * 0.7 ** this.relic('pierce') * this.modBite() * (1 - 0.2 * this.curseTier('iron'));
+    return 0.75 * this.modBite();
   }
 
   /** Share of its health a regenerating boss heals per second. */
   regen() {
-    return 0.03 * 0.7 ** this.relic('rot') * this.modBite() * (1 - 0.25 * this.curseTier('mending'));
+    return 0.03 * this.modBite();
   }
 
   monster(id: number) {
@@ -1558,7 +1478,7 @@ export class Game {
   private damage(m: Monster, amount: Decimal, kind: HitKind, x?: number, y?: number): Decimal {
     if (this.downed > 0) return new Decimal(0);
     if (m.boss) {
-      amount = amount.times(this.c.parts.boss * (1 + this.relic('boss')));
+      amount = amount.times(this.c.parts.boss);
       if (kind === 'dps' && m.mods.includes('armored')) {
         // Overkill passed on from a dead monster keeps its full value; only the boss's share is cut.
         amount = amount.times(1 - this.armor());
@@ -1612,7 +1532,7 @@ export class Game {
     }
     if (m.boss && this.monsters.some((x) => x.boss)) return;
     if (m.boss) {
-      // Only a boss beaten for the first time this run drops a relic, pays souls or counts toward trophies, so going
+      // Only a boss beaten for the first time this run pays souls or counts toward trophies, so going
       // back to farm one doesn't.
       const firstWin = this.s.floor >= this.s.maxFloor;
       if (firstWin) this.s.bosses++;
@@ -1636,7 +1556,6 @@ export class Game {
       this.events.push({ t: 'bossWin', floor: this.s.floor, first: firstClear, clutch, souls });
       if (this.s.floor > MARK_FROM && this.s.floor % 10 === 0 && this.s.floor > this.s.markBest) this.giveMark(this.s.floor);
       this.rollCard(this.slay(m.def, this.s.floor, !!m.champ), !!m.champ, 'kill', true, overkill);
-      if (firstWin || this.debugRelics) this.rollRelic(this.s.floor);
       // The demo's last boss always leads down the stairs, where it ends.
       if (this.s.auto || this.demoOver()) this.enterFloor(this.s.floor + 1);
       else this.enterFloor(this.s.floor, false, false, BOSS_RESPAWN);
@@ -1714,7 +1633,6 @@ export class Game {
       s.maxFloor = s.floor + 1;
       s.peakKills = 0;
       s.bestFloor = Math.max(s.bestFloor, s.maxFloor);
-      this.checkCurse();
     }
   }
 
@@ -1768,7 +1686,6 @@ export class Game {
     const target = (id !== null ? this.monster(id) : undefined) ?? this.focus();
     if (!target || this.downed > 0) return new Decimal(0);
     if (!auto) {
-      if (this.curseActive('silent')) return new Decimal(0);
       // Flurry's clicks are on top of your own, so they don't wait for the hand's cooldown.
       if (!flurry) {
         if (this.manualCd > 0) return new Decimal(0);
@@ -1789,10 +1706,9 @@ export class Game {
       this.s.clicks++;
       this.events.push({ t: 'click', crit, x, y });
       if (fever) this.pushRampage();
-      else if (this.rampageUnlocked() && !this.curseActive('norampage')) {
+      else if (this.rampageUnlocked()) {
         let fill = 1 / FEVER_CLICKS;
         for (const e of this.effects()) if (e.t === 'fever' && e.fill) fill *= e.fill;
-        fill *= 1 + 0.2 * this.curseTier('norampage');
         this.s.fervor = Math.min(1, this.s.fervor + fill);
       }
     }
@@ -1903,8 +1819,6 @@ export class Game {
   /** Hire levels of a companion: as many as the buy mode says, or exactly `count`. */
   buyComp(i: number, count?: number) {
     if (!this.compUnlocked(i) || this.away(i)) return false;
-    // A Small Party: six companions at most on this descent.
-    if (this.curseActive('small') && this.s.owned[i] === 0 && this.s.owned.filter((n) => n > 0).length >= 6) return false;
     const { n, cost } = count ? { n: count, cost: this.compCost(i, count) } : this.compQuote(i);
     if (this.s.gold.lt(cost)) return false;
     this.s.gold = this.s.gold.minus(cost);
@@ -1926,7 +1840,6 @@ export class Game {
   buyUpg(id: string) {
     const u = UPG_BY_ID.get(id);
     if (!u || this.owned.has(id)) return false;
-    if (this.curseActive('lean') && !isTraitId(id)) return false;
     const cost = this.upgCost(u);
     if (this.s.gold.lt(cost)) return false;
     this.s.gold = this.s.gold.minus(cost);
@@ -1969,8 +1882,7 @@ export class Game {
   }
 
   shopUpgrades(): UpgDef[] {
-    const lean = this.curseActive('lean');
-    return UPGRADES.filter((u) => !this.owned.has(u.id) && this.reqMet(u.req) && (!u.needs || this.abilityUnlocked(u.needs)) && (!lean || isTraitId(u.id))).sort((a, b) => a.cost - b.cost);
+    return UPGRADES.filter((u) => !this.owned.has(u.id) && this.reqMet(u.req) && (!u.needs || this.abilityUnlocked(u.needs))).sort((a, b) => a.cost - b.cost);
   }
 
   // ---------- treasure goblins ----------
@@ -2044,7 +1956,7 @@ export class Game {
   }
 
   private scheduleRaid() {
-    let f = (1 + 0.3 * this.relic('goblin')) * (1 + 2 * legendShare(this.legendLv('lure')) * this.boundBoost('thing'));
+    let f = (1 + 2 * legendShare(this.legendLv('lure')) * this.boundBoost('thing'));
     for (const e of this.effects()) if (e.t === 'raid' && e.freq) f *= e.freq;
     this.s.raidTimer = this.debugRainbow ? 5 : (RAID_MIN + Math.random() * (RAID_MAX - RAID_MIN)) / f;
   }
@@ -2062,11 +1974,6 @@ export class Game {
 
   // ---------- prestige ----------
 
-  /** Souls a zone boss on this floor pays when beaten (before relics). */
-  soulGainMult() {
-    return (1 + 0.15 * this.relic('souls')) * [1, 1.25, 1.5, 2][this.curseTier('two')];
-  }
-
   /** Companion levels bought this run. */
   runLevels() {
     return this.s.owned.reduce((a, b) => a + b, 0);
@@ -2074,7 +1981,7 @@ export class Game {
 
   /** Souls an ascent would pay right now: this run's levels and gold bosses. */
   pendingSouls() {
-    return Math.floor((Math.floor(this.runLevels() / TUNE.levelsPerSoul) + this.s.bossSouls) * this.soulGainMult());
+    return Math.floor(this.runLevels() / TUNE.levelsPerSoul) + this.s.bossSouls;
   }
 
   /** The boss floor a run has to reach before the way up opens. (After that, an ascent needs new souls, which only
@@ -2088,11 +1995,10 @@ export class Game {
   }
 
   canDescend() {
-    return this.descendOpen() && (this.pendingSouls() >= 1 || this.s.curse !== null);
+    return this.descendOpen() && this.pendingSouls() >= 1;
   }
 
-  /** Ascend, optionally into a cursed descent (one of `cursesOpen()`). */
-  descend(curse: string | null = null) {
+  descend() {
     if (DEMO) return false;
     // As before awakening, hunters are called home first, so what they found is seen before the run resets.
     if (!this.canDescend() || this.s.expeditions.length) return false;
@@ -2103,13 +2009,12 @@ export class Game {
     if (this.s.descents === AUTO_HIRE_ASCENTS) this.events.push({ t: 'autoHireOpen' });
     this.s.lastAscent = Math.max(this.s.lastAscent, this.s.maxFloor);
     this.s.bossSouls = 0;
-    this.s.curse = curse && this.cursesOpen().some((c) => c.id === curse) ? curse : null;
     this.resetRun();
     this.events.push({ t: 'descend', souls: gained });
     return true;
   }
 
-  /** Back to the top: gold, companions and upgrades go; souls, relics and trophies stay. */
+  /** Back to the top: gold, companions and upgrades go; souls and trophies stay. */
   private resetRun() {
     const s = this.s;
     this.bankAllDrops();
@@ -2367,59 +2272,6 @@ export class Game {
     return true;
   }
 
-  // ---------- relics ----------
-
-  /** Chance a boss on this floor drops a relic (a new deepest zone boss always does). */
-  relicChance(floor: number) {
-    if (this.debugRelics) return 1;
-    if (floor % 10 === 0 && floor > this.s.bossBest) return 1;
-    return floor % 10 === 0 ? 0.25 : 0.08;
-  }
-
-  private rollRelic(floor: number) {
-    if (!RELICS_ON && !this.debugRelics) return;
-    const chance = this.relicChance(floor);
-    this.s.bossBest = Math.max(this.s.bossBest, floor);
-    if (Math.random() >= chance) return;
-    // Rarer relics get likelier the deeper you are.
-    const w = [55, 28, 13 + floor / 20, 3 + floor / 25];
-    let roll = Math.random() * w.reduce((a, b) => a + b, 0);
-    let rar = 0;
-    while (rar < 3 && roll >= w[rar]) roll -= w[rar++];
-    const pool = RELICS.filter((x) => x.rarity === rar);
-    const def = pool[Math.floor(Math.random() * pool.length)];
-    this.giveRelic(def.id, floor);
-  }
-
-  giveRelic(id: string, floor = this.s.floor) {
-    const lv = this.relicLv(id) + 1;
-    this.s.relics[id] = lv;
-    const equipped = this.s.equipped.includes(id);
-    this.invalidate();
-    // A new star on this level up (0 if none).
-    const star = relicStars(lv) > relicStars(lv - 1) ? relicStars(lv) : 0;
-    this.events.push({ t: 'relic', id, lv, floor, equipped, star });
-  }
-
-  /** Put a relic in a slot or take it out. Returns false when all slots are full. */
-  toggleRelic(id: string) {
-    const s = this.s;
-    const i = s.equipped.indexOf(id);
-    if (i >= 0) s.equipped.splice(i, 1);
-    else if (this.relicLv(id) > 0 && s.equipped.length < this.relicSlots()) s.equipped.push(id);
-    else return false;
-    this.invalidate();
-    return true;
-  }
-
-  relicsFound() {
-    return RELICS.filter((x) => this.relicLv(x.id) > 0).length;
-  }
-
-  rarityName(id: string) {
-    return RARITY[RELIC_BY_ID.get(id)!.rarity];
-  }
-
   // ---------- awakening ----------
 
   /** Every awakening needs TUNE.awakenFloor reached this cycle, and to pay at least one bound soul. */
@@ -2478,7 +2330,6 @@ export class Game {
     s.marks = COMPS.map(() => 0);
     s.markBest = 0;
     s.bossSouls = 0;
-    s.curse = null;
     this.resetRun();
     this.events.push({ t: 'awaken', bound: gained });
     return true;
@@ -3220,7 +3071,7 @@ export class Game {
   private compGain(i: number, n: number) {
     const c = this.c;
     const lv = this.s.owned[i];
-    return c.all.times(COMPS[i].dps * ((lv + n) * levelMult(lv + n) - lv * levelMult(lv)) * c.parts.tier[i] * (1 + MARK_POWER * this.s.marks[i]) * c.parts.party * c.parts.banner);
+    return c.all.times(COMPS[i].dps * ((lv + n) * levelMult(lv + n) - lv * levelMult(lv)) * c.parts.tier[i] * (1 + MARK_POWER * this.s.marks[i]) * c.parts.party);
   }
 
   /**

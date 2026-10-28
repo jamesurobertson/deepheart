@@ -24,7 +24,6 @@ const sim = new Sim(
   { cps, activeMin, descendRatio, awakenRatio: Number(process.env.AWAKEN ?? 1), stall: Number(process.env.STALL ?? 120), catchRate: 0.05 },
   {
     event(ev, { game, t }) {
-      if (ev.t === 'relic' && process.env.RELICS) console.log(`${duration(t).padStart(8)}  relic ${ev.id} lv${ev.lv} (floor ${ev.floor})`);
       if (ev.t === 'bossFail' && failsLogged++ < 400 && process.env.FAILS) console.log(`${duration(t).padStart(8)}  boss fail floor ${ev.floor} [${game.bossMods(ev.floor).join(',')}]`);
     },
     descend(souls, { game, t, descents }) {
@@ -49,7 +48,7 @@ const sim = new Sim(
       const h = Math.floor(t / 1800) / 2;
       if (h !== lastHour) {
         lastHour = h;
-        console.log(`--- ${h}h: floor ${game.s.floor}/${game.s.maxFloor}, dps ${fmt(game.dps())}, click ${fmt(game.clickDamage())}, gold ${fmt(game.s.gold)}, kills ${game.s.kills}, souls ${game.s.souls}, upg ${game.s.upgrades.length}/${UPGRADES.length}, trophies ${game.s.trophies.length}, relics ${game.relicsFound()} [${game.s.equipped.map((id) => id + game.relicLv(id)).join(' ')}], bound ${game.s.boundEarned}, ${JSON.stringify(game.s.bound)}, lv ${game.s.owned.join(',')}`);
+        console.log(`--- ${h}h: floor ${game.s.floor}/${game.s.maxFloor}, dps ${fmt(game.dps())}, click ${fmt(game.clickDamage())}, gold ${fmt(game.s.gold)}, kills ${game.s.kills}, souls ${game.s.souls}, upg ${game.s.upgrades.length}/${UPGRADES.length}, trophies ${game.s.trophies.length}, bound ${game.s.boundEarned}, ${JSON.stringify(game.s.bound)}, lv ${game.s.owned.join(',')}`);
       }
     },
   },

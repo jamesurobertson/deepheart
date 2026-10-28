@@ -11,7 +11,7 @@ import { Fx, flameTexture, spellTextures } from './fx.ts';
 import { GradeShader, tiltShift } from './post.ts';
 import { buildStairwell, stairPoint } from './stairwell.ts';
 import { CARD_FRAME, CARD_H, CARD_W, cardBackTexture, cardTexture } from './cards.ts';
-import { CARD_BY_ID, COMPS, RELIC_BY_ID, ZONES, corruptionOf, tilesFor, zoneOf, type Attack, type CompDef, type Tiles } from '../game/data.ts';
+import { CARD_BY_ID, COMPS, ZONES, corruptionOf, tilesFor, zoneOf, type Attack, type CompDef, type Tiles } from '../game/data.ts';
 import { TUNE, VAULT_LENGTH, type Game, type GameEvent, type Monster, type VaultChest } from '../game/game.ts';
 
 const WALL_Z = -6;
@@ -68,9 +68,8 @@ const COIN_SIZE = 1.15;
 const CLUTCH_RELEASE = 1.4;
 const CLUTCH_END = 2.4;
 
-/** A relic on the floor: its glow in the rarity's color, how long it waits before flying to the party by itself
- *  (shorter while the staircase is waiting on it), and how long that flight takes. */
-const LOOT_COLORS = [0xc9b8a0, 0x5fa8ff, 0xc77dff, 0xffb13d];
+/** A card on the floor: how long it waits before flying to the party by itself (shorter while the staircase is
+ *  waiting on it), and how long that flight takes. */
 const LOOT_WAIT = 6;
 /** A boss that outlasts its timer winds up and lunges into the party, flipping them all onto their backs; they lie
  *  there a moment, scramble up and run for it (the floor above has them walk back in). Seconds for each part. */
@@ -79,25 +78,20 @@ const FELL = { windup: 0.4, lunge: 0.12, flip: 0.55, lie: 0.8, rise: 0.35 };
 export const FELL_HIT = FELL.windup + FELL.lunge;
 const LOOT_WAIT_STAIRS = 3.5;
 const LOOT_FLY = 0.5;
-/** Seconds a relic spends tumbling out of the boss and landing (it can't be walked over until then), and the angle
- *  it lies at, flat on the floor. */
-const LOOT_LAND = 0.8;
-const LOOT_TILT = Math.PI / 4;
+/** Seconds a card spends spinning out of its monster and landing (it can't be walked over until then), the angle it
+ *  lies at, and its height on the floor in world units. */
+const LOOT_LAND = 1.15;
+const LOOT_TILT = 0.3;
+const LOOT_SIZE = 1.55;
 
-type RelicDrop = Extract<GameEvent, { t: 'relic' }>;
-type CardDrop = Extract<GameEvent, { t: 'card' }>;
-/** Things that drop on the floor to be picked up: relics and monster cards. */
-export type Drop = RelicDrop | CardDrop;
+/** A monster card dropped on the floor to be picked up. */
+export type Drop = Extract<GameEvent, { t: 'card' }>;
 
 interface LootView {
   ev: Drop;
   group: THREE.Group;
   icon: { mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshLambertMaterial>; dispose(): void };
-  /** Height on the floor, in world units, and the angle it lies at. */
-  size: number;
-  tilt: number;
-  /** Seconds in the air before it lands (it can't be walked over until then), and whether it has. */
-  air: number;
+  /** Whether it has landed (it can't be walked over until then). */
   landed: boolean;
   color: THREE.Color;
   ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
@@ -381,11 +375,10 @@ export class Scene {
   private raider: RaiderView | null = null;
   private leaving: RaiderView[] = [];
   private chests: Chest[] = [];
-  /** Relics lying where they dropped, waiting to be picked up (walk over them, click them, or let them fly to you). */
+  /** Cards lying where they dropped, waiting to be picked up (walk over them, click them, or let them fly to you). */
   private loot: LootView[] = [];
   /** Drops that came during a clutch kill's slow motion, set down once it's over. */
   private pendingLoot: { ev: Drop; at: THREE.Vector3 }[] = [];
-  private lastBossAt = new THREE.Vector3(3, 0, 0);
   private lastKillAt = new THREE.Vector3(1, 0, 0);
   /** Called when a drop is picked up (the UI announces it then). */
   onLoot: ((ev: Drop) => void) | null = null;
@@ -410,7 +403,6 @@ export class Scene {
   /** Zone-change interlude: the party leaves, descends a spiral staircase, arrives somewhere new. */
   /** A pause (the loot card is up) before the staircase starts. */
   private hold: { zone: number; t: number } | null = null;
-  private relicDropped = false;
   /** The party beaten by a boss: seconds since its timer ran out, and each one's fall (when the lunge throws them, and
    *  which way). */
   private fall: { t: number; who: Map<number, { at: number; dir: number }> } | null = null;
@@ -880,64 +872,43 @@ export class Scene {
     return at;
   }
 
-  // ---------- relics on the floor ----------
+  // ---------- cards on the floor ----------
 
-  /** Where a drop lands: relics and boss cards where the boss fell, other cards where their monster did (anywhere
+  /** Where a card lands: where its monster fell (anywhere
    *  on the floor for a swept one), a goblin's card where it was caught. */
   private dropSpot(ev: Drop): THREE.Vector3 {
-    if (ev.t === 'relic') return this.lastBossAt.clone();
     if (ev.src === 'raid' && this.raider) return this.raider.group.position.clone().setY(0);
     if (ev.src === 'sweep') return new THREE.Vector3((-1 + Math.random() * 6) * this.squeeze, 0, (-2 + Math.random() * 4) * this.deep);
     return this.lastKillAt.clone();
   }
 
-  /** A relic or card lands, glowing in its color (a relic's rarity, a card's frame). */
+  /** A card lands, glowing in its frame's color. */
   private dropLoot(ev: Drop, at: THREE.Vector3) {
-    let icon: LootView['icon'];
-    let color: THREE.Color;
-    let tier: number;
-    let size: number;
-    let tilt = LOOT_TILT;
-    let air = LOOT_LAND;
-    if (ev.t === 'relic') {
-      const def = RELIC_BY_ID.get(ev.id);
-      if (!def) return;
-      tier = def.rarity;
-      color = new THREE.Color(LOOT_COLORS[def.rarity]);
-      // (Some relic icons are animations, the purse's coin and the bait's chest: they lie there as their first frame.)
-      icon = new PixelSprite(this.atlas.texture, this.atlas.size, [this.atlas.anim(def.icon)[0]], { anchor: 'center' });
-      size = 1.15;
-    } else {
-      const def = CARD_BY_ID.get(ev.id);
-      if (!def) return;
-      tier = ev.gold ? 3 : ['monster', 'mid', 'boss', 'goblin'].indexOf(def.kind);
-      color = new THREE.Color(ev.gold ? CARD_FRAME.gold : CARD_FRAME[def.kind]);
-      const map = cardTexture(this.atlas, def, ev.gold, ev.lap);
-      // Lit by its own picture as well as the room, so the frame keeps its color in the dungeon's warm gloom.
-      const face = (tex: THREE.Texture) => new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.6, color: 0x999999 });
-      const geo = new THREE.PlaneGeometry(CARD_W / CARD_H, 1);
-      const mesh = new THREE.Mesh(geo, face(map));
-      // Two-sided: it spins face-down through the air and lands face-up.
-      const backSide = new THREE.Mesh(geo, face(cardBackTexture()));
-      backSide.rotation.y = Math.PI;
-      mesh.add(backSide);
-      icon = { mesh, dispose: () => { geo.dispose(); mesh.material.dispose(); backSide.material.dispose(); map.dispose(); } };
-      size = 1.55;
-      tilt = 0.3;
-      air = 1.15;
-      if (ev.gold || def.kind !== 'monster') this.fx.pillar(at.clone(), color, 7, 0.7);
-    }
+    const def = CARD_BY_ID.get(ev.id);
+    if (!def) return;
+    const tier = ev.gold ? 3 : ['monster', 'mid', 'boss', 'goblin'].indexOf(def.kind);
+    const color = new THREE.Color(ev.gold ? CARD_FRAME.gold : CARD_FRAME[def.kind]);
+    const map = cardTexture(this.atlas, def, ev.gold, ev.lap);
+    // Lit by its own picture as well as the room, so the frame keeps its color in the dungeon's warm gloom.
+    const face = (tex: THREE.Texture) => new THREE.MeshLambertMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.6, color: 0x999999 });
+    const geo = new THREE.PlaneGeometry(CARD_W / CARD_H, 1);
+    const mesh = new THREE.Mesh(geo, face(map));
+    // Two-sided: it spins face-down through the air and lands face-up.
+    const backSide = new THREE.Mesh(geo, face(cardBackTexture()));
+    backSide.rotation.y = Math.PI;
+    mesh.add(backSide);
+    const icon: LootView['icon'] = { mesh, dispose: () => { geo.dispose(); mesh.material.dispose(); backSide.material.dispose(); map.dispose(); } };
+    if (ev.gold || def.kind !== 'monster') this.fx.pillar(at.clone(), color, 7, 0.7);
     const group = new THREE.Group();
     // Two drops at once land side by side.
     group.position.copy(at).add(new THREE.Vector3(-0.9 * this.loot.length, 0, 0.4 * this.loot.length));
-    icon.mesh.scale.setScalar(size);
-    if (ev.t === 'relic') icon.mesh.material.emissive.setScalar(0.12);
+    icon.mesh.scale.setScalar(LOOT_SIZE);
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55 + tier * 0.06, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.03;
     group.add(ring, icon.mesh);
     this.scene.add(group);
-    this.loot.push({ ev, group, icon, size, tilt, air, landed: false, color, ring, t: 0, fly: -1, from: new THREE.Vector3() });
+    this.loot.push({ ev, group, icon, landed: false, color, ring, t: 0, fly: -1, from: new THREE.Vector3() });
     this.fx.light(group.position.clone().setY(1.2), color, 25 + tier * 10, 0.6, 9);
     if (this.settings.particles) this.fx.burst(group.position.clone().setY(0.5), '#' + color.getHexString(), 12 + tier * 6, 3, 0.07, 8, true);
   }
@@ -957,26 +928,22 @@ export class Scene {
       if (l.fly < 0) {
         // Pops up out of the boss and lands, then bobs, pulses and turns while it waits.
         // It tumbles through the air upright, then settles flat on the floor at an angle, in a pool of its own light.
-        const land = Math.min(1, l.t / l.air);
+        const land = Math.min(1, l.t / LOOT_LAND);
         const settle = Math.max(0, (land - 0.7) / 0.3);
-        const card = l.ev.t === 'card';
-        l.icon.mesh.position.y = land < 1 ? 0.6 * (1 - settle) + 0.05 * settle + Math.sin(land * Math.PI) * (card ? 2.8 : 2.2) : 0.05;
-        // A relic tumbles end over end; a card spins face-down and slows to a stop face-up (5π: from its back to its face).
-        if (card) l.icon.mesh.rotation.set(-Math.PI / 2 * settle, (1 - (1 - (1 - land) ** 3)) * 5 * Math.PI, -l.tilt, 'YXZ');
-        else l.icon.mesh.rotation.set(-Math.PI / 2 * settle, 0, land < 1 ? -land * (Math.PI * 2 + l.tilt) : -l.tilt, 'YXZ');
+        l.icon.mesh.position.y = land < 1 ? 0.6 * (1 - settle) + 0.05 * settle + Math.sin(land * Math.PI) * 2.8 : 0.05;
+        // It spins face-down and slows to a stop face-up (5π: from its back to its face).
+        l.icon.mesh.rotation.set(-Math.PI / 2 * settle, (1 - (1 - (1 - land) ** 3)) * 5 * Math.PI, -LOOT_TILT, 'YXZ');
         if (land >= 1 && !l.landed) {
           l.landed = true;
-          if (card) {
-            const at = l.group.position.clone().setY(0.3);
-            this.fx.light(at, l.color, 30, 0.5, 8);
-            if (this.settings.particles) this.fx.burst(at, '#' + l.color.getHexString(), 18, 3.5, 0.07, 9, true);
-            this.addShake(0.08);
-          }
+          const at = l.group.position.clone().setY(0.3);
+          this.fx.light(at, l.color, 30, 0.5, 8);
+          if (this.settings.particles) this.fx.burst(at, '#' + l.color.getHexString(), 18, 3.5, 0.07, 9, true);
+          this.addShake(0.08);
         }
-        l.icon.mesh.scale.setScalar(l.size * (0.4 + 0.6 * Math.min(1, land * 2)));
+        l.icon.mesh.scale.setScalar(LOOT_SIZE * (0.4 + 0.6 * Math.min(1, land * 2)));
         l.ring.rotation.z += dt * 1.5;
-        if (l.ev.t === 'card' && l.ev.gold && this.settings.particles && Math.random() < dt * 6) this.fx.burst(l.group.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0.15, (Math.random() - 0.5) * 0.8)), '#ffe9a0', 2, 1.2, 0.05, 4, true);
-        l.ring.material.opacity = (0.3 + Math.sin(l.t * 3) * 0.1) * Math.min(1, l.t / l.air);
+        if (l.ev.gold && this.settings.particles && Math.random() < dt * 6) this.fx.burst(l.group.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0.15, (Math.random() - 0.5) * 0.8)), '#ffe9a0', 2, 1.2, 0.05, 4, true);
+        l.ring.material.opacity = (0.3 + Math.sin(l.t * 3) * 0.1) * Math.min(1, l.t / LOOT_LAND);
         // Picked up by walking over it, or it flies to you by itself before long (sooner if the staircase is waiting).
         if (land >= 1 && hero && hero.body.position.distanceTo(l.group.position.clone().setY(0)) < 0.9) this.collectLoot(i);
         else if (l.t > (this.hold ? LOOT_WAIT_STAIRS : LOOT_WAIT)) this.startLootFlight(l);
@@ -1026,7 +993,7 @@ export class Scene {
     for (const l of this.loot) if (!oldOnly || l.t > 0.1) this.startLootFlight(l);
   }
 
-  /** A click or tap on a relic lying on the floor picks it up. */
+  /** A click or tap on a card lying on the floor picks it up. */
   pickLoot(x: number, y: number) {
     const i = this.loot.findIndex((l) => l.fly < 0 && l.landed && this.lootNear(l, x, y));
     if (i < 0) return false;
@@ -1918,7 +1885,6 @@ export class Scene {
       case 'kill': {
         const v = this.mons.get(ev.id);
         if (!v || v.dead >= 0) break;
-        if (v.boss) this.lastBossAt.copy(v.body.position).setY(0);
         this.lastKillAt.copy(v.body.position).setY(0);
         const at = this.burstApart(v);
         if (ev.champ) {
@@ -1936,11 +1902,9 @@ export class Scene {
         }
         break;
       }
-      case 'relic':
       case 'card': {
         // A hunter's cards never touch this floor.
-        if (ev.t === 'card' && ev.src === 'trip') break;
-        if (ev.t === 'relic') this.relicDropped = true;
+        if (ev.src === 'trip') break;
         const at = this.dropSpot(ev);
         if (this.clutch) this.pendingLoot.push({ ev, at });
         else this.dropLoot(ev, at);
@@ -1951,8 +1915,8 @@ export class Scene {
         break;
       case 'floor': {
         if (this.fall) this.endFall();
-        // Leaving a floor: any relic still lying there flies to the party (but not one the boss just dropped: the
-        // next floor starts the moment a boss dies, and its relic waits on the floor to be picked up there).
+        // Leaving a floor: any card still lying there flies to the party (but not one the boss just dropped: the
+        // next floor starts the moment a boss dies, and its card waits on the floor to be picked up there).
         this.collectAllLoot(false, true);
         this.fx.fadeGround();
         // A cleared floor: whatever's still standing bursts apart with it.
@@ -1974,12 +1938,11 @@ export class Scene {
         this.lastFloor = ev.floor;
         if (this.cine) this.cine.zone = z;
         else if (this.hold) this.hold.zone = z;
-        // Let the boss's light, gold and sparks settle (longer if a relic dropped) before the party heads for the stairs.
-        else if ((deeper || demoEnd) && this.settings.cinematics) this.hold = { zone: z, t: this.relicDropped ? 2.8 : 1.6 };
+        // Let the boss's light, gold and sparks settle before the party heads for the stairs.
+        else if ((deeper || demoEnd) && this.settings.cinematics) this.hold = { zone: z, t: 1.6 };
         else if (demoEnd) this.onEnd?.();
         else if (this.clutch) this.pendingBand = z;
         else this.setBand(z);
-        this.relicDropped = false;
         break;
       }
       case 'bossFail': {
@@ -2950,7 +2913,7 @@ export class Scene {
     for (const pr of this.props) pr.update(dt);
     // (Still there while the party heads out to it: the game has moved on to the next floor by then.)
     if (this.hatch) this.hatch.visible = this.lastFloor % 10 === 0 || !!this.hold || this.cine?.phase === 'exit';
-    // (The staircase waits for any relic on the floor to be picked up.)
+    // (The staircase waits for any card on the floor to be picked up.)
     if (this.hold && !this.clutch && !this.loot.length && (this.hold.t -= dt) <= 0) {
       this.startCinematic(this.hold.zone);
       this.hold = null;

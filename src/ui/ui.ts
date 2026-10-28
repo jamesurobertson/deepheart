@@ -1,8 +1,8 @@
 import { morph } from './morph.ts';
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, CURSE_BY_ID, CURSE_FLOORS, CURSES_FROM, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MODS, MOD_BY_ID, NEWS, RARITY, RELICS, RELIC_BY_ID, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, relicStars, relicText, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MOD_BY_ID, NEWS, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { AWAKEN_ON, AWAKEN_TEASE, GOLD_SET_BONUS, SET_BONUS, CURSES_ON, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, RELICS_ON, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { AWAKEN_ON, AWAKEN_TEASE, GOLD_SET_BONUS, SET_BONUS, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
@@ -36,7 +36,6 @@ const GRAPHICS_NAME = { auto: 'Auto', high: 'High', low: 'Low' } as const;
  *  numbers arc out of the monster away from your hero, each landing a little further out, fanning into a rainbow. */
 const STREAK_GAP = 0.25;
 const ARC_FROM = 3;
-const RARITY_COLORS = ['#c9b8a0', '#5fa8ff', '#c77dff', '#ffb13d'];
 
 /** Little colored labels for boss modifiers. */
 const modChips = (mods: ModId[]) => mods.map((id) => `<em class="mod" style="--mc:${MOD_BY_ID.get(id)!.color}">${MOD_BY_ID.get(id)!.name}</em>`).join('');
@@ -168,10 +167,8 @@ const meetText = (def: { floor: number; heart?: number }, cycleBest: number) =>
   DEMO ? 'In the full game'
     : cycleBest < def.floor ? `Reach floor ${fmt(def.floor)} to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
 
-/** A relic's stars, as little gold glyphs after its name. */
 /** A small rate with up to two decimals (1.15, not 1.1); big ones as usual. */
 const perSec = (n: number) => (n < 100 ? String(Math.round(n * 100) / 100) : fmt(n));
-const starsOf = (lv: number) => (relicStars(lv) ? ` <span class="stars">${'★'.repeat(relicStars(lv))}</span>` : '');
 
 function buffText(b: Buff) {
   if (b.id === 'cleave') return 'clicks hit every monster';
@@ -266,7 +263,7 @@ export class Ui {
    *  until you're back in the fight after hiring someone to switch to. */
   private onMonsterAt = 0;
   private starFrom = 0;
-  /** When a clutch kill's slow motion ends (relic cards wait for it). */
+  /** When a clutch kill's slow motion ends (cards wait for it). */
   private cinemaUntil = 0;
   /** Where the mouse is over the battlefield (null when it's off it), and whether Space is held down to attack. */
   private pointer: { x: number; y: number } | null = null;
@@ -302,10 +299,6 @@ export class Ui {
   private pressAt = { x: 0, y: 0 };
   private hudTop = 0;
   private pendingZone = 0;
-  /** Relics found for the first time since the relic screen was last opened. */
-  private newRelics = 0;
-  /** Relics that levelled up since the relic screen was last closed: their level glows once when it opens. */
-  private levelledRelics = new Set<string>();
   private newCards = 0;
   /** The card collection being looked at: which lap's cards, and the gold copies or the ordinary ones. */
   private cardLap = 0;
@@ -314,7 +307,6 @@ export class Ui {
   private offlineCards: Extract<Drop, { t: 'card' }>[] = [];
   /** Boss floors whose boss has been announced this session (it's only announced on a floor never beaten). */
   private bossAnnounced = new Set<number>();
-  private lootTimer = 0;
   private toldAwaken = false;
 
   constructor(root: HTMLElement, game: Game, scene: Scene, hooks: UiHooks) {
@@ -351,11 +343,9 @@ export class Ui {
       <div class="keep-labels"></div>
       <div class="letterbox" aria-hidden="true"></div>
       <div class="banner" hidden><b></b><span></span></div>
-      <div class="loot" hidden></div>
       <div class="ticker"><span></span></div>
       <nav class="dock">
         <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy(3)}<span>Collection</span><em class="badge new" hidden></em></button>
-        <button class="btn dock-b" data-open="relics" data-tip="dock:relics"${RELICS_ON ? '' : ' hidden'}>${G.relic(3)}<span>Relics</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>Ascend</span><em class="badge" hidden></em></button>
         <button class="btn dock-b dock-heart" data-open="heart" data-tip="dock:heart" hidden>${G.heart(3)}<span>The Heart</span><em class="badge bound" hidden></em></button>
         <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden></button>
@@ -391,7 +381,7 @@ export class Ui {
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'),
       autoUpg: q('.auto-upg:not(.auto-hire)'), autoHire: q('.auto-hire'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), heartBtn: q('.dock-heart'), heartBadge: q('.dock-heart .badge'), keepBtn: q('[data-act=keep]'), keepLabels: q('.keep-labels'),
-      relicBadge: q('[data-open=relics] .badge'), cardBadge: q('[data-open=trophies] .badge'), loot: q('.loot'), bladeRate: q('.blade-rate'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
+      cardBadge: q('[data-open=trophies] .badge'), bladeRate: q('.blade-rate'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
     };
 
     COMPS.forEach((c, i) => {
@@ -423,8 +413,8 @@ export class Ui {
     }
 
     this.bind();
-    // A relic's card shows when it's picked up off the floor (the scene sets it down and tells us).
-    this.scene.onLoot = (ev) => (ev.t === 'relic' ? this.showLoot(ev.id, ev.lv, ev.equipped, ev.star) : this.showCard(ev));
+    // A card shows when it's picked up off the floor (the scene sets it down and tells us).
+    this.scene.onLoot = (ev) => this.showCard(ev);
     this.bindSheet();
     this.syncMode();
     this.syncMute();
@@ -752,18 +742,6 @@ export class Ui {
         this.openModal(open.dataset.open!);
         return;
       }
-      const rel = t.closest<HTMLElement>('[data-relic]');
-      if (rel) {
-        if (this.game.toggleRelic(rel.dataset.relic!)) {
-          this.hooks.sound('equip', { vol: 0.5 });
-          this.renderModal();
-          this.refreshTip();
-        } else {
-          this.deny(rel);
-          this.toast('All slots are full. Tap a slotted relic to take it out first.', 'chest_full_open');
-        }
-        return;
-      }
       const bound = t.closest<HTMLElement>('[data-bound]');
       if (bound) {
         const id = bound.dataset.bound as BoundId;
@@ -818,13 +796,6 @@ export class Ui {
       if (here) {
         if (this.game.moveMarkTo(Number(here.dataset.markHere))) this.renderModal();
         else this.deny(here);
-        return;
-      }
-      const curse = t.closest<HTMLElement>('[data-curse]');
-      if (curse) {
-        this.curseChoice = this.curseChoice === curse.dataset.curse ? null : curse.dataset.curse!;
-        this.hooks.sound('toggle', { vol: 0.5 });
-        this.renderModal();
         return;
       }
       const cur = t.closest<HTMLElement>('[data-cursor]');
@@ -1304,12 +1275,6 @@ export class Ui {
     if (DEMO) return;
     const g = this.game;
     switch (ev.t) {
-      case 'curse': {
-        const c = CURSE_BY_ID.get(ev.id)!;
-        this.toast(`<b>${esc(c.name)}: tier ${ev.tier} broken</b><small>${esc(c.reward(ev.tier))}</small>`, 'skull', 'trophy');
-        this.hooks.sound('levelup', { vol: 0.6 });
-        break;
-      }
       case 'expedition':
         this.rowCache[ev.comp] = '';
         this.tripsBack.push({ comp: ev.comp, floor: ev.floor, kills: ev.kills, cards: this.tripCards.splice(0) });
@@ -1709,8 +1674,6 @@ export class Ui {
     this.el.heartBadge.hidden = bound < 1;
     setText(this.el.heartBadge, fmt(bound));
     this.el.heartBadge.classList.toggle('hot', bound > 0 && (!g.s.awakens || bound >= g.s.boundEarned / 4));
-    const rb = this.el.relicBadge;
-    rb.hidden = this.newRelics < 1;
     // The Keep opens with your first ascent; from then on it's a button away (and the way back down, while you're there).
     this.el.keepBtn.hidden = !g.legendsOpen() || g.inVault() || !!g.raid;
     // Up in the Keep it's the way back down: steps instead of the door.
@@ -1720,7 +1683,6 @@ export class Ui {
       this.el.keepBtn.innerHTML = `${g.s.inKeep ? G.steps(3) : G.door(3)}<span>${keepText}</span>`;
     }
     document.body.classList.toggle('in-keep', g.s.inKeep);
-    setText(rb, `+${this.newRelics}`);
     const cb = this.el.cardBadge;
     cb.hidden = this.newCards < 1;
     setText(cb, `+${this.newCards}`);
@@ -1730,7 +1692,7 @@ export class Ui {
     if (rateEl.textContent !== rate) rateEl.textContent = rate;
 
     this.hints();
-    if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'trips', 'stats', 'party', 'records', 'ascents', 'relics'].includes(this.modal) && !this.descending) this.renderModal(true);
+    if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'trips', 'stats', 'party', 'records', 'ascents'].includes(this.modal) && !this.descending) this.renderModal(true);
     if (this.tripsBack.length && (!this.modal || this.modal === 'trips') && !this.descending && !this.keepFading) this.showTripsBack(this.modal === 'trips');
     this.tellTripFinds();
     this.refreshTip();
@@ -2428,13 +2390,6 @@ export class Ui {
           : `Slain ${fmt(inPanel ? g.slainOn(id, view) : g.s.slain[id] ?? 0)}`;
       return `${head}<ul class="tt-l">${lines}</ul>${commonLine}${goldView ? '<p class="tt-d">Drops from champions</p>' : ''}${first ? `<p class="tt-got">${first}</p>` : ''}<p class="tt-f">${tally}</p>`;
     }
-    if (kind === 'rel') {
-      const d = RELIC_BY_ID.get(id)!;
-      const lv = g.relicLv(id);
-      const head = `<div class="tt-h">${spriteFit(d.icon, 32)}<b style="color:${RARITY_COLORS[d.rarity]}">${lv ? esc(d.name) : '???'}</b><span class="tt-own">${RARITY[d.rarity]}${lv ? ` · level ${lv}` : ''}</span></div>`;
-      if (!lv) return `${head}<p class="tt-f">Not found yet. ${d.rarity === 3 ? 'Legendary relics mostly turn up deep down.' : 'Keep killing bosses.'}</p>`;
-      return `${head}<p class="tt-d">${esc(relicText(d, lv))}</p><p class="tt-gain">Next level: ${esc(relicText(d, lv + 1))}</p><p class="tt-f">“${esc(d.flavor)}”</p>`;
-    }
     if (kind === 'note') return `<p class="tt-d">${esc(key.slice(5))}</p>`;
     if (!DEMO) {
       if (kind === 'souls') {
@@ -2533,7 +2488,6 @@ export class Ui {
     if (kind === 'dock') {
       const text: Record<string, string> = {
         trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length}. Cards ${g.cardVersions()}/${g.cardVersionsTotal()}.`,
-        relics: `Relics: ${g.relicsFound()}/${RELICS.length} found. Bosses drop them.`,
         abyss: DEMO ? `The way up opens at floor ${fmt(g.ascendFloor())}.`
           : g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${fmt(g.ascendFloor())}.`,
         ...(DEMO ? {} : {
@@ -2582,7 +2536,6 @@ export class Ui {
 
   openModal(name: string) {
     this.modal = name;
-    if (name === 'relics') this.newRelics = 0;
     if (name === 'cards') this.newCards = 0;
     this.el.modalWrap.hidden = false;
     this.renderModal();
@@ -2593,7 +2546,6 @@ export class Ui {
   closeModal() {
     this.tripsBackDone();
     if (this.modal === 'offline') for (const card of this.offlineCards.splice(0)) this.showCard(card);
-    if (this.modal === 'relics') this.levelledRelics.clear();
     this.modal = null;
     this.el.modalWrap.hidden = true;
     this.hideTip();
@@ -2630,8 +2582,6 @@ export class Ui {
       html = head('Expeditions', out ? `${out} out` : '') + this.tripsHtml();
     } else if (!DEMO && name === 'heart') {
       html = head('The Heart', g.s.awakens ? `${boundGlyph()} ${fmt(g.boundFree())} bound souls · ${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}` : '') + this.heartHtml();
-    } else if (name === 'relics') {
-      html = head('Relics', `${g.relicsFound()} / ${RELICS.length} found · ${g.s.equipped.length} / ${g.relicSlots()} slots`) + this.relicsHtml();
     } else if (name === 'stats' || name === 'party' || name === 'records' || name === 'ascents') {
       html = head('Stats') + this.statTabs(name) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
     } else if (!DEMO && (name === 'dan' || name === 'victor')) {
@@ -2678,30 +2628,20 @@ export class Ui {
     // The demo shows there's a way up, and nothing past it.
     if (DEMO) return `<div class="ascend">${locked}</div>`;
     const help = '<span class="soul-help" data-tip="souls:" tabindex="0" aria-label="How souls work">?</span>';
-    const active = g.s.curse ? CURSE_BY_ID.get(g.s.curse) : undefined;
-    const activeLine = active
-      ? `<p class="curse-now"><b>This descent is cursed: ${esc(active.name)}.</b> ${esc(active.rule)}${g.curseTier(active.id) < CURSE_FLOORS.length ? ` Reach floor ${fmt(CURSE_FLOORS[g.curseTier(active.id)])} for tier ${g.curseTier(active.id) + 1}.` : ' Every tier broken.'}</p>`
-      : '';
     const levels = g.runLevels();
     const per = TUNE.levelsPerSoul;
-    const mult = g.soulGainMult();
     const rows = `<div class="as-rows">
         <div class="as-h">Souls this run ${help}</div>
         <div class="as-row"><span>Companion levels <em>${fmt(levels)}</em></span><b>${G.soul()} ${fmt(Math.floor(levels / per))}</b>
           <div class="as-bar"><i style="width:${((levels % per) / per) * 100}%"></i></div><small>${fmt(levels % per)} / ${fmt(per)}</small></div>
         <div class="as-row"><span>Champion bosses</span><b>${G.soul()} ${fmt(g.s.bossSouls)}</b></div>
-        ${mult > 1 ? `<div class="as-row"><span>Soul bonus</span><b>×${+mult.toFixed(2)}</b></div>` : ''}
       </div>`;
     if (!g.descendOpen()) {
-      return `${activeLine}<div class="ascend">${rows}${locked}</div>`;
+      return `<div class="ascend">${rows}${locked}</div>`;
     }
     const pending = g.pendingSouls();
-    const curse = this.curseChoice ? CURSE_BY_ID.get(this.curseChoice) : undefined;
-    const go = `<button class="btn primary${g.s.descents ? '' : ' big'}" data-act="descend" ${g.canDescend() ? '' : 'disabled'}>Ascend${curse ? ` cursed: ${esc(curse.name)}` : ''}</button>`;
-    const total = g.canDescend() && pending < 1
-      ? '<small>The curse can be lifted: ascend to leave this descent. No new souls yet.</small>'
-      : `<span class="as-total">${G.soul(2.4)} ${fmt(pending)}</span>`;
-    return `${activeLine}<div class="ascend">${rows}<div class="as-go">${total}${go}</div></div>${this.cursesHtml()}`;
+    const go = `<button class="btn primary${g.s.descents ? '' : ' big'}" data-act="descend" ${g.canDescend() ? '' : 'disabled'}>Ascend</button>`;
+    return `<div class="ascend">${rows}<div class="as-go"><span class="as-total">${G.soul(2.4)} ${fmt(pending)}</span>${go}</div></div>`;
   }
 
   /** The soul shop. Before your first ascent: three Legends asleep as silhouettes (spirits once the way up opens). After:
@@ -2835,35 +2775,9 @@ export class Ui {
       <section class="bd wide bd-marks"><table><thead><tr><th>Companion</th><td>Marks</td><td>Damage</td><td></td><td></td></tr></thead>${rows}</table></section>`;
   }
 
-  /** The curse chosen for the next ascent (null: an ordinary descent). */
-  private curseChoice: string | null = null;
   private respecArmed = false;
   /** The Legend picked on the summon pedestals. */
   private legendPick: LegendId | null = null;
-
-  /** Cursed descents on offer: pick one before ascending. Each shows its rule, its tiers so far and the next reward. */
-  private cursesHtml(): string {
-    if (DEMO) return '';
-    const g = this.game;
-    const open = g.cursesOpen();
-    if (!CURSES_ON) return '';
-    if (!open.length) {
-      const left = CURSES_FROM - g.s.descents;
-      return g.s.descents ? `<h3>Cursed descents <span class="muted">open after ${CURSES_FROM} ascents (${left} to go)</span></h3>` : '';
-    }
-    if (this.curseChoice && !open.some((c) => c.id === this.curseChoice)) this.curseChoice = null;
-    const cards = open.map((c) => {
-      const tier = g.curseTier(c.id);
-      const done = tier >= CURSE_FLOORS.length;
-      const pips = CURSE_FLOORS.map((_, k) => (k < tier ? '★' : '☆')).join('');
-      return `<button class="curse${this.curseChoice === c.id ? ' on' : ''}${done ? ' done' : ''}" data-curse="${c.id}">
-        <b>${esc(c.name)} <span class="stars">${pips}</span></b>
-        <small>${esc(c.rule)}</small>
-        <em>${done ? `Beaten: ${esc(c.reward(tier))}` : `Floor ${fmt(CURSE_FLOORS[tier])}: ${esc(c.reward(tier + 1))}`}</em>
-      </button>`;
-    }).join('');
-    return `<h3>Cursed descents <span class="muted">pick one, then ascend</span></h3><div class="curse-grid">${cards}</div>`;
-  }
 
   private troTabs(on: 'trophies' | 'cards') {
     const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
@@ -3096,63 +3010,54 @@ export class Ui {
         <table>${live.map(tr).join('')}</table>
         ${idle.length ? `<p class="st-off">Not active: ${idle.map((r) => `<span${r.note ? ` data-tip="note:${esc(r.note)}"` : ''}>${r.label}</span>`).join(' · ')}</p>` : ''}</section>`;
     };
-    const relicName = (id: string) => RELIC_BY_ID.get(id)!.name;
-    const relicMul = (label: string, v: number | Decimal, note: string, how = '') => (RELICS_ON ? mul(label, v, note, how) : null);
     const baseSum = b.baseComp.reduce((a, v) => a + v, 0);
     const buffNames = (k: 'dps' | 'click' | 'gold') => g.s.buffs.filter((u) => u[k] > 1).map((u) => `${u.name} ×${u[k]}`).join(', ');
     const allRows = [
       mul('Trophies', p.trophies, `${g.s.trophies.length} trophies`),
       mul('Card sets', p.cards, `${g.setsDone(false)} sets · ${g.setsDone(true)} gold sets`, 'Every card of a zone in one color'),
       ...(DEMO ? [] : [mul('Souls', p.souls, `${fmt(g.soulsFree())} kept, ${soulPct(1)} each${g.legendLv('hungry') ? ` + the Hungry Dark ${g.legendLv('hungry')}` : ''}`, 'Ascend to earn souls')]),
-      relicMul(relicName('shard'), p.shard, 'Legendary relic', 'A legendary relic'),
       ...(!DEMO && g.s.awakens ? [mul('Ogre Chieftain', p.ogre, `level ${g.boundLv('ogre')}`, 'Bound in the Heart')] : []),
     ];
 
     const dps = panel('Party damage', fmt(g.dps()), '/sec', [
       row('Companions', fmt(baseSum), DEMO ? 'levels × traits' : 'levels × traits × Heartmarks'),
       ...allRows,
-      relicMul(relicName('banner'), p.banner, 'Relic', 'A relic'),
       mul('Party traits', p.party, 'companion traits that lift everyone', 'Some companion traits lift everyone'),
       mul('Buffs', b.buffDps, buffNames('dps'), 'Rampage, Bloodlust'),
     ]);
 
     const click = panel('Click damage', fmt(g.clickDamage()), '/click', [
       row('Base', '1'),
-      relicMul(relicName('whet'), p.whet, 'Relic', 'A relic'),
       row('All-damage bonuses', x(b.all), 'trophies, souls and fury'),
-      row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion traits` : ''}${p.oath ? ` + ${pc(p.oath)} ${relicName('oath')}` : ''}`),
+      row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion traits` : ''}`),
       ...(DEMO ? [] : [mul('The Fist', 1 + 0.1 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Spirit')]),
       mul('Buffs', b.buffClick, buffNames('click'), 'Frenzy'),
       row('During Rampage', x(g.feverMult())),
     ]);
 
-    const critNote = g.abilityUnlocked('crit') ? `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} companions` : ''}${p.critRelic ? ` + ${pc(p.critRelic)} ${relicName('hawk')}` : ''}` : `Unlocked by the ${COMPS[ABILITY_BY_ID.get('crit')!.comp].name}`;
+    const critNote = g.abilityUnlocked('crit') ? `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} companions` : ''}` : `Unlocked by the ${COMPS[ABILITY_BY_ID.get('crit')!.comp].name}`;
     const crit = panel('Critical hits', g.abilityUnlocked('crit') ? pc(g.critChance()) : '—', g.abilityUnlocked('crit') ? 'chance' : '', [
-      row('Damage', x(g.critMult()), `×${p.critMultBase} base${p.critMultUpg ? ` + ${p.critMultUpg} companions` : ''}${p.critMultRelic > 1 ? ` × ${p.critMultRelic} ${relicName('razor')}` : ''}`),
-      row('Cleave', g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? `10% base${p.cleaveRelic ? ` + ${pc(p.cleaveRelic)} ${relicName('cleaver')}` : ''}${p.cleaveUpg > 1 ? `, ${x(p.cleaveUpg)} from upgrades` : ''}` : g.abilityUnlocked('cleave') ? 'While the Cleave skill runs' : `Unlocked by the ${COMPS[ABILITY_BY_ID.get('cleave')!.comp].name}`, !g.cleave()),
+      row('Damage', x(g.critMult()), `×${p.critMultBase} base${p.critMultUpg ? ` + ${p.critMultUpg} companions` : ''}`),
+      row('Cleave', g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? `10% base${p.cleaveUpg > 1 ? `, ${x(p.cleaveUpg)} from upgrades` : ''}` : g.abilityUnlocked('cleave') ? 'While the Cleave skill runs' : `Unlocked by the ${COMPS[ABILITY_BY_ID.get('cleave')!.comp].name}`, !g.cleave()),
     ], critNote);
 
     const goldT = panel('Gold', x(g.goldMult()), '', [
       mul('Companion traits', p.goldUpg, 'gold traits', 'Some companion traits add gold'),
       ...(DEMO ? [] : [mul('The Hoard', 1 + 0.05 * g.legendLv('hoard'), `level ${g.legendLv('hoard')}`, 'A Spirit')]),
-      relicMul(relicName('purse'), p.goldRelic, 'Relic', 'A relic'),
       mul('Buffs', b.buffGold, buffNames('gold'), 'Gold Rush'),
     ]);
 
     const baseTime = 30;
-    const glass = Math.min(30, 3 * g.relic('time')) + Math.round(g.bossTimeBonus());
-    const boss = panel('Bosses', `${baseTime + glass}s`, 'timer', [
+    const boss = panel('Bosses', `${baseTime + Math.round(g.bossTimeBonus())}s`, 'timer', [
       mul('Damage to bosses', p.boss, 'companion traits', 'Some companion traits hit bosses harder'),
-      relicMul(`Damage to bosses (${relicName('slayer')})`, 1 + g.relic('boss'), 'Relic', 'A relic'),
-      row('Armored blocks', pc(g.armor()), `of companion damage${g.relic('pierce') ? ` (${relicName('pick')} helps)` : ''}`),
-      row('Regenerating heals', `${pc(g.regen())}/s`, g.relic('rot') ? `${relicName('rot')} helps` : 'of its health'),
+      row('Armored blocks', pc(g.armor()), 'of companion damage'),
+      row('Regenerating heals', `${pc(g.regen())}/s`, 'of its health'),
       row('Modifier strength', pc(g.modBite()), 'how hard Armored and Regenerating bite'),
     ]);
 
     const souls = DEMO ? '' : panel('Souls', fmt(g.s.souls), '', [
       row('Unspent', fmt(g.soulsFree())),
       row('An ascent now pays', fmt(g.pendingSouls()), `${fmt(Math.floor(g.runLevels() / TUNE.levelsPerSoul))} from levels, ${fmt(g.s.bossSouls)} from champion bosses`),
-      ...(RELICS_ON ? [mul('Soul gain', g.soulGainMult(), g.relic('souls') ? relicName('cage') : '', relicName('cage'))] : []),
       ...(!DEMO && g.s.awakens ? [mul('Champion souls', g.champSoulMult(g.s.maxFloor), `on floor ${fmt(g.s.maxFloor)}`), row('Bound souls', fmt(g.s.boundEarned), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`)] : []),
     ]);
     return `<div class="st-grid">${dps}${click}${crit}${goldT}${boss}${souls}</div>`;
@@ -3169,7 +3074,7 @@ export class Ui {
       if (!lv) return '';
       return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(levelMult(lv))}</td><td>${x(p.tier[i])}</td>${DEMO ? '' : `<td>${g.s.marks[i] ? `${G.heart(1.2)} ${g.s.marks[i]}` : ''}</td>`}<td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? g.compDps(i).div(total).times(100).toNumber().toFixed(1) : 0}%</td></tr>`;
     }).join('');
-    return `<p class="muted bd-help">Each companion: level × base damage × milestones × traits${DEMO ? '' : ' × Heartmarks'}, then every all-damage bonus (${x(b.all.times(p.banner * p.party))} right now) on top.</p>
+    return `<p class="muted bd-help">Each companion: level × base damage × milestones × traits${DEMO ? '' : ' × Heartmarks'}, then every all-damage bonus (${x(b.all.times(p.party))} right now) on top.</p>
       <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Milestones</td><td>Traits</td>${DEMO ? '' : '<td>Marks</td>'}<td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
   }
 
@@ -3180,7 +3085,7 @@ export class Ui {
       ['Floor', `${fmt(s.floor)} (deepest this descent ${fmt(s.maxFloor)})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
       ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses beaten', fmt(s.bosses)],
       ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rainbow Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
-      ...(DEMO ? [] : [['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)]] as [string, string][]), ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ...(RELICS_ON ? [['Relics', `${g.relicsFound()} / ${RELICS.length}`] as [string, string]] : []), ['Cards found', fmt(g.cardsFound())],
+      ...(DEMO ? [] : [['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)]] as [string, string][]), ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ['Cards found', fmt(g.cardsFound())],
       ['This descent', duration(s.runTime)], ['Active', duration(s.runActive), true], ['Idle', duration(Math.max(0, s.runTime - s.runActive)), true],
       ['Time played', duration(s.playTime)], ['Active', duration(s.activeTime), true], ['Idle', duration(Math.max(0, s.playTime - s.activeTime)), true],
     ];
@@ -3275,53 +3180,6 @@ export class Ui {
     return esc(b.what).replace(esc(name), `<span class="spirit-u" data-tip="spirit:${b.spirit}">${esc(name)}</span>`);
   }
 
-  private relicsHtml(): string {
-    const g = this.game;
-    const slots = Array.from({ length: g.relicSlots() }, (_, i) => {
-      const id = g.s.equipped[i];
-      if (!id) return `<span class="slot empty"><small>Empty</small></span>`;
-      const d = RELIC_BY_ID.get(id)!;
-      return `<button class="slot" data-relic="${id}" data-tip="rel:${id}" style="--rc:${RARITY_COLORS[d.rarity]}">${spriteFit(d.icon, 40)}<i class="lv">${g.relicLv(id)}</i></button>`;
-    }).join('');
-    const cards = RELICS.map((d) => {
-      const lv = g.relicLv(d.id);
-      if (!lv) return `<span class="rel unknown" data-tip="rel:${d.id}" style="--rc:${RARITY_COLORS[d.rarity]}">${spriteFit(d.icon, 32)}<b>???</b><small>${RARITY[d.rarity]}</small></span>`;
-      const on = g.s.equipped.includes(d.id);
-      return `<button class="rel ${on ? 'on' : ''}" data-relic="${d.id}" data-tip="rel:${d.id}" style="--rc:${RARITY_COLORS[d.rarity]}">
-        ${spriteFit(d.icon, 32)}<b>${esc(d.name)}${starsOf(lv)}</b><small><span${this.levelledRelics.has(d.id) ? ' class="lv-up"' : ''}>Level ${lv}</span>${on ? ' · equipped' : ''}</small></button>`;
-    }).join('');
-    const counters = MODS.map((m) => `<li>${modChips([m.id])} ${esc(m.desc)}</li>`).join('');
-    return `<div class="slots">${slots}</div>
-      <p class="muted rel-help">Bosses drop relics the first time you beat them each run: a quarter of zone bosses, some mid-bosses, and always a zone boss deeper than you've been before. Finding one again levels it up. Tap a relic to slot it in or out.</p>
-      <div class="rel-grid">${cards}</div>
-      <h3>Boss modifiers</h3>
-      <ul class="mods-list">${counters}</ul>`;
-  }
-
-  /** The reward card that slides up when a boss drops a relic. */
-  private showLoot(id: string, lv: number, equipped: boolean, star = 0) {
-    const d = RELIC_BY_ID.get(id)!;
-    if (this.modal !== 'relics') {
-      if (lv === 1) this.newRelics++;
-      else this.levelledRelics.add(id);
-    }
-    const el = this.el.loot;
-    el.hidden = false;
-    el.style.setProperty('--rc', RARITY_COLORS[d.rarity]);
-    el.className = `loot r${d.rarity}${star ? ' starred' : ''}`;
-    const head = star ? `Relic star! ${'★'.repeat(star)} · level ${lv}` : lv === 1 ? `New ${RARITY[d.rarity]} relic` : `${RARITY[d.rarity]} relic · level ${lv}`;
-    el.innerHTML = `<span class="loot-ico">${spriteFit(d.icon, 48)}</span><span class="loot-t"><small>${head}</small><b>${esc(d.name)}${starsOf(lv)}</b><em>${esc(relicText(d, lv))}${star ? ' (a quarter stronger)' : ''}${lv === 1 && !equipped ? ' · equip it in Relics' : ''}</em></span>`;
-    void el.offsetWidth;
-    el.classList.add('in');
-    this.hooks.sound(d.rarity >= 2 || star ? 'drop4' : 'drop2', { vol: 0.7 });
-    clearTimeout(this.lootTimer);
-    this.lootTimer = window.setTimeout(() => {
-      el.classList.remove('in');
-      this.lootTimer = window.setTimeout(() => (el.hidden = true), 400);
-    }, 3600);
-  }
-
-  /** A card picked up: it slides up like a relic, and a gold one gets a banner. */
   /** Cards picked up and waiting their turn to be shown (they're shown one at a time). */
   private cardQueue: Extract<Drop, { t: 'card' }>[] = [];
   /** Cards dropped in play and not yet shown, and the card trophies waiting on them. */
@@ -3373,7 +3231,7 @@ export class Ui {
     el.innerHTML = `<i class="cr-rays"></i>
       <div class="cr-card">${ev.gold ? GOLD_DAZZLE : ''}<div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96, ev.lap)}</div></div></div>
       <div class="cr-text"><small>${head}</small><b>${esc(cardName(d.name, ev.lap))} Card${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
-    this.el.loot.parentElement!.appendChild(el);
+    this.el.banner.parentElement!.appendChild(el);
     // The sound lands with the flip.
     setTimeout(() => this.hooks.sound(ev.gold || d.kind !== 'monster' ? 'drop4' : 'drop3', { vol: 0.8 }), 380);
     let done = false;
@@ -3618,7 +3476,6 @@ export class Ui {
     this.el.modal.innerHTML = `<header class="m-head"><h2>Ascend for ${G.soul()} ${fmt(pending)} soul${pending === 1 ? '' : 's'}?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
       <div class="confirm">
         <p>${soulPct(pending)} damage. Gold, companions and floor reset.</p>
-        ${this.curseChoice ? `<p class="omen">The next descent is cursed: ${esc(CURSE_BY_ID.get(this.curseChoice)!.name)}. ${esc(CURSE_BY_ID.get(this.curseChoice)!.rule)}</p>` : ''}
         ${away ? `<p class="aw-away">On expeditions: ${away}</p>` : ''}
         <div class="set-row"><button class="btn" data-act="abyssBack">Not yet</button>${away ? '<button class="btn primary big" data-act="recallAll">Call everyone home</button>' : '<button class="btn primary big" data-act="descendGo">Ascend</button>'}</div>
       </div>`;
@@ -3637,9 +3494,8 @@ export class Ui {
     c.querySelector('span')!.textContent = 'The Keep';
     this.hooks.sound('descend', { vol: 0.8 });
     setTimeout(() => {
-      g.descend(this.curseChoice);
+      g.descend();
       g.enterKeep();
-      this.curseChoice = null;
       this.shown = new Decimal(0);
       this.rowCache.fill('');
       this.floorKey = '';
@@ -3655,11 +3511,11 @@ export class Ui {
 
   /** Desktop app only: a newer release is out. One click downloads it; it can be dismissed until next launch. */
   showUpdate(version: string, download: () => void) {
-    let el = this.el.loot.parentElement!.querySelector<HTMLElement>('.update-pill');
+    let el = this.el.banner.parentElement!.querySelector<HTMLElement>('.update-pill');
     if (!el) {
       el = document.createElement('div');
       el.className = 'update-pill pnl';
-      this.el.loot.parentElement!.appendChild(el);
+      this.el.banner.parentElement!.appendChild(el);
     }
     el.innerHTML = `<span><b>Update available</b> v${esc(version)}</span><button class="btn small primary" data-update="now">Update now</button><button class="btn icon small" data-update="later" aria-label="Dismiss">${G.close()}</button>`;
     const pill = el;

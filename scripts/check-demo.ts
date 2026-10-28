@@ -1,11 +1,11 @@
 /**
  * Looks through a built demo (npm run build:demo) for anything of the full game's: its companions, zones, monsters,
- * Spirits, Bound and curses by name, a few words for its systems, and the music and art the demo leaves out.
+ * Spirits and Bound by name, a few words for its systems, and the music and art the demo leaves out.
  *   node scripts/check-demo.ts [dist-demo]
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ABILITIES, BOUND, COMPS, CURSES, LEGENDS, UPGRADES, ZONES, boundName } from '../src/game/data.ts';
+import { ABILITIES, BOUND, COMPS, LEGENDS, UPGRADES, ZONES, boundName } from '../src/game/data.ts';
 import { DEMO_COMPANIONS, DEMO_LAST_FLOOR } from '../src/demo.ts';
 
 const dir = process.argv[2] ?? 'dist-demo';
@@ -20,7 +20,6 @@ const names = [
   ...ZONES.flatMap((z, i) => [...(i < demoZones.length ? [] : [z.name, ...z.band.map((m) => m.name), z.mid.name, z.boss.name]), ...z.lap.map((m) => m.name)]),
   ...LEGENDS.map((d) => d.name),
   ...BOUND.map(boundName),
-  ...CURSES.map((c) => c.name),
   ...ABILITIES.filter((a) => a.comp >= DEMO_COMPANIONS).map((a) => a.name),
 ];
 const words = ['Awaken', 'Expedition', 'Spirit', 'Heartmark', 'Heartmarks', 'Awakening', 'Awakenings', 'The Keep', 'Bound', 'bound soul', 'Dan', 'Victor'];

@@ -1,6 +1,6 @@
 /**
  * A simulated player for the headless pacing tools: clicks for a while, buys whatever adds the most damage per gold,
- * slots the best relics, and prestiges once it stops making progress.
+ * and prestiges once it stops making progress.
  */
 import Decimal from 'break_infinity.js';
 import { Game, MANUAL_RATE, MARK_MOVE, newSave, TUNE, type GameEvent, type SaveState } from '../src/game/game.ts';
@@ -87,10 +87,6 @@ const DAMAGE_EFFECTS = new Set(['comp', 'party', 'clickDps']);
 
 /** Seconds at most between shop checks while saving up for something. */
 const SHOP_RECHECK = 10;
-
-/** A player's rough relic preference: raw power first, then the answers to boss modifiers. */
-
-const RELIC_PICK = ['shard', 'oath', 'banner', 'slayer', 'whet', 'glass', 'hilt', 'pick', 'rot', 'drum', 'razor', 'hawk', 'cleaver', 'cage', 'purse', 'bait'];
 
 export class Sim {
   readonly game = new Game(newSave());
@@ -180,7 +176,6 @@ export class Sim {
       }
     }
     game.update(dt);
-    if (game.events.some((ev) => ev.t === 'relic')) this.equipRelics();
     if (game.raid && Math.random() < profile.catchRate) game.catchRaid();
     // The Goblin Vault: send the hero in, and have them run chest to chest (about two a second, as the scene's hero does).
     if (game.vaultPick) game.enterVault(Math.max(0, game.heroIndex()));
@@ -209,13 +204,13 @@ export class Sim {
     const worthIt = profile.descendGain !== undefined
       ? this.descentGain() >= profile.descendGain && game.pendingSouls() >= (profile.ascendMin ?? 1)
       : profile.descendRatio > 0 && game.pendingSouls() >= Math.max(10, game.s.souls * profile.descendRatio);
-    if ((stalled || (profile.ascendEager && worthIt)) && game.canDescend() && (worthIt || game.s.curse)) {
+    if ((stalled || (profile.ascendEager && worthIt)) && game.canDescend() && worthIt) {
       const souls = game.pendingSouls();
       game.recallAll();
       this.descents++;
       this.hooks.descend?.(souls, this);
       this.gatherMarks();
-      game.descend(this.pickCurse());
+      game.descend();
       this.afterReset();
       this.feedLegends();
     }
@@ -229,7 +224,6 @@ export class Sim {
       game.awaken(true);
       this.afterReset();
       this.buyBound();
-      this.equipRelics();
     }
     // Hooks see everything this step did, the bot's own purchases and prestiges included.
     for (const ev of game.events) {
@@ -244,15 +238,6 @@ export class Sim {
     this.hooks.tick?.(this);
     game.events.length = 0;
     this.ticks++;
-  }
-
-  /** Every third ascent, try the least-beaten curse on offer (a player dipping into challenges now and then). */
-  private pickCurse() {
-    const { game } = this;
-    if (this.descents % 3 !== 0) return null;
-    const open = game.cursesOpen().filter((c) => game.curseTier(c.id) < 3);
-    open.sort((a, b) => game.curseTier(a.id) - game.curseTier(b.id));
-    return open[0]?.id ?? null;
   }
 
   private afterReset() {
@@ -404,11 +389,5 @@ export class Sim {
     let carrier = 0;
     for (let i = 1; i < COMPS.length; i++) if (game.compDps(i).gt(game.compDps(carrier))) carrier = i;
     while (game.marksTotal() > game.s.marks[carrier] && game.soulsFree() * 0.2 >= MARK_MOVE && game.moveMarkTo(carrier)) { /* keep going */ }
-  }
-
-  private equipRelics() {
-    const { game } = this;
-    game.s.equipped = RELIC_PICK.filter((id) => game.relicLv(id) > 0).slice(0, game.relicSlots());
-    game.invalidate();
   }
 }
