@@ -47,36 +47,36 @@ export const COMPS: CompDef[] = [
   c('squire', 'Squire', 'knight_m', 5, 1, 'slash', 'Wants to be a knight so badly.'),
   c('ranger', 'Ranger', 'elf_f', 40, 4, 'arrow', 'Never misses. Well, rarely. Well, sometimes.'),
   c('brawler', 'Dwarf Brawler', 'dwarf_m', 250, 12, 'slash', 'Came for the gold. Stayed for the punching.'),
-  c('apprentice', 'Apprentice', 'wizzard_m', 2_000, 50, 'bolt', 'Knows exactly one spell. It is lightning. It is enough.'),
+  c('apprentice', 'Apprentice', 'wizzard_m', 2_000, 50, 'bolt', 'Knows one spell. So far nobody has complained.'),
   c('gingerbread', 'Gingerbread Man', 'cr_gingerbread', 12_000, 150, 'slash', 'Ran from the oven. Somehow ended up down here.'),
   c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 80_000, 4_600, 'slash', 'Her shield has killed more monsters than her sword.'),
   c('hunter', 'Lizard Hunter', 'lizard_m', 3.2e5, 3_900, 'spear', 'Can smell a monster through three floors of solid stone.'),
   c('thief', 'Shadow Thief', 'cr_green_thief', 1.3e6, 52_000, 'knife', 'He carries six daggers. Seven would simply be bragging.'),
   // The demo stops at the Shadow Thief: past him, one silhouette for the full game.
   ...(DEMO ? [c('corsair', '???', 'cr_pirate_captain', 5e6, 87_000, 'bomb', '')] : [
-    c('corsair', 'Corsair Captain', 'cr_pirate_captain', 5e6, 87_000, 'bomb', 'Sailed the seven seas. Has never been underground before. Don\'t ask.'),
+    c('corsair', 'Corsair Captain', 'cr_pirate_captain', 5e6, 87_000, 'bomb', 'Sailed the seven seas. Still confused by stairs.'),
     c('runesmith', 'Runesmith', 'dwarf_f', 2e7, 1.5e5, 'rune', 'Maybe should be in OSRS. But here we are.'),
-    c('woodelf', 'Wood Elf', 'ef_elf_f', 7.9e7, 4.9e5, 'arrow', 'Grew up in the Enchanted Grove.'),
+    c('woodelf', 'Wood Elf', 'ef_elf_f', 7.9e7, 4.9e5, 'arrow', 'Grew up in the Enchanted Grove. Has opinions about what you did to it.'),
     c('stormcaller', 'Stormcaller', 'wizzard_f', 3.1e8, 1.6e6, 'storm', 'Brings her own weather. Down here, of all places.'),
     c('dancer', 'Blade Dancer', 'elf_m', 1.2e9, 1.1e7, 'slash', 'Fights like it is a performance. Nobody claps.'),
     c('bard', 'Wandering Bard', 'rm_rocker', 4.9e9, 1.9e7, 'orb', 'We\'re not sure how he got in here.'),
     c('venomblade', 'Venomblade', 'lizard_f', 2e10, 1.2e8, 'dark', 'Every blade is poisoned. She has a lot.'),
     c('doctor', 'Plague Doctor', 'doc', 7.7e10, 2.1e8, 'flask', 'Treats monsters with a strict regimen of dying.'),
     c('cleric', 'Cleric', 'ef_normalcleric', 3.1e11, 7e8, 'light', 'Here to heal the party. Hasn\'t had to yet, so he hits things.'),
-    c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.2e12, 2.3e9, 'ice', 'Followed you up from the Frozen Vault. Doesn\'t seem to want to leave.'),
+    c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.2e12, 2.3e9, 'ice', 'Came up from the Frozen Vault. Finds the rest of the dungeon too warm.'),
     c('santa', 'Santa', 'cr_santa', 4.8e12, 7.9e9, 'ice', 'Santa? Is that really you?'),
     c('paladin', 'Paladin', 'cr_gold_knight', 1.9e13, 5.3e10, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
     c('hollow', 'Hollow Knight', 'pumpkin_dude', 7.6e13, 8.9e10, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
-    c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 3e14, 3e11, 'dark', 'Broke every vow but one: never stop swinging.'),
+    c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 3e14, 3e11, 'dark', 'Has broken every vow but one. Nobody asks which.'),
     c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 2.5e11, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
     c('wraith', 'The Count', 'rm_dracula', 7.4e21, 4.1e17, 'bat', 'We all know who he really is.', 95),
-    c('elfqueen', 'Elf Queen', 'ef_highelf_f', 1.1e25, 9.2e19, 'light', 'Left her court for the deep. Brought its manners. Not its mercy.', 130),
-    c('necro', 'Necromancer', 'necromancer', 1.4e29, 1.2e23, 'skull', 'Used to raise these monsters. Now it lowers them.', 190),
+    c('elfqueen', 'Elf Queen', 'ef_highelf_f', 1.1e25, 9.2e19, 'light', 'Left her court for the deep. Still expects a curtsy.', 130),
+    c('necro', 'Necromancer', 'necromancer', 1.4e29, 1.2e23, 'skull', 'Used to raise these monsters. Now he lowers them.', 190),
     c('king', 'Exiled King', 'sd_king', 3.5e32, 1.6e26, 'fire', 'Lost his crown, his kingdom and his temper. In that order.', 240),
     c('elflord', 'Elf Lord', 'ef_highelf_m', 1.9e35, 3.2e28, 'slash', 'A thousand years of swordsmanship. Still practicing.', 280),
     c('magus', 'Old Magus', 'ef_wizard', 2.9e46, 2.7e37, 'storm', 'Was down here before the dungeon. Says it followed him.', 450),
     c('angel', 'Fallen Angel', 'angel', 5.1e67, 7.9e54, 'light', 'Fell from somewhere, here to stay.', 800),
-    c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 1.6e110, 2.5e90, 'slash', 'Answers to "Pebble". Crushes whatever you point at.', 1500, true),
+    c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 1.6e110, 2.5e90, 'slash', 'Answers to "Pebble." Crushes whatever you point at.', 1500, true),
     c('demon', 'Bound Demon', 'big_demon', 1.7e201, 1.5e164, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 3000, true),
   ]),
 ];
@@ -382,7 +382,7 @@ const MILESTONE_NAMES: Record<string, string[]> = {
     archmage: ['Old School', 'Back in My Day', 'Spell Check', 'Arch Rival', 'Senior Moment', 'Old Magic'],
     wraith: ['First Bite', 'Night Owl', 'Blood Bank', 'Old Blood', 'Count Me In'],
     necro: ['Change of Heart', 'Grave Mistake', 'Dead Serious', 'Bone to Pick', 'Raise the Stakes'],
-    king: ['Royal Pain', 'Throne Away', 'Heavy Is the Head', "King's Ransom", 'Royal Decree', 'Crown Jewels'],
+    king: ['Royal Pain', 'Throne Away', 'Heavy Is the Head', "King's Ransom", 'Royal Tax', 'Crown Jewels'],
     angel: ['Fall Guy', 'Grounded', 'Fallen Grace', 'Wing It', 'Halo Effect'],
     ogre: ['Good Boy', 'Pebble Dash', 'Rock Solid', 'Big Softie', 'Boulder Dash'],
     demon: ['Terms and Conditions', 'Blood Pact', 'Hell to Pay', "Devil's Advocate", 'Hellfire', 'Soul Contract', 'Fire Sale'],
@@ -410,39 +410,39 @@ export function nextMilestone(comp: number, level: number): number {
 
 /** A line of flavor under each of those upgrades. */
 const MILESTONE_FLAVOR: Record<string, string[]> = {
-  squire: ['He practices on everything. Mostly monsters.', 'Up before dawn. Swinging before breakfast.', "The training wheels are off. He's never been faster.", 'Small squire. Big swing.', 'Extra credit, paid in monsters.', 'The paperwork is in. The knighting is any day now.', 'Not official. He says it anyway.'],
-  ranger: ['Closer than last time. That counts.', 'Eight out of ten monsters agree.', 'She hit something two floors down. Probably a monster.', 'Sharp arrows. Sharper comebacks.', "It's the thought that counts. The arrow helps.", 'Never misses now. Almost never.'],
-  brawler: ["He's taking this seriously now. Very seriously.", "Don't mention his height. Or anything.", 'He tells the joke. The monster gets the punch.', 'Every hole he digs has gold in it. Or a monster. Both are fine.', 'Nobody knows how. Nobody wants a demonstration.', 'He was only warming up. The monsters were not.'],
-  apprentice: ["It's a good trick.", 'Mostly sparks. Some genius.', 'Monsters find him shocking.', "Learned a second spell. It's also lightning.", 'Also from the red, the green and the ceiling.'],
-  hunter: ['Feels nothing. Hits everything.', 'Smells fear. Also lunch.', 'Follows it three floors down and back.', 'Gets too close. On purpose.', 'Grows a little every time something dies.'],
-  shieldmaiden: ['Defense is just offense, waiting.', 'The shield meets the face. Meeting adjourned.', "Walls don't usually chase you.", 'Is a good offense. Is also a good shield.', 'She teaches it. Monsters fail it.', 'Everyone behind her fights braver.'],
-  thief: ["Your purse feels lighter. That's normal.", 'The knives come back. So does your gold, mostly.', 'Monsters have pockets. Had.', 'He says it every time. Every knife.', "He's very proud of this price. Don't ask why."],
-  gingerbread: ['Still warm. Still angry.', 'Monsters follow it. Monsters regret it.', 'Stale on purpose. Hits harder.', 'Decorated for battle.'],
+  squire: ['He practices on everything. Mostly monsters.', 'Up before dawn. Swinging before breakfast.', "The training wheels are off. He's never been faster.", 'Small squire. Big swing.', 'Extra credit, paid in monsters.', 'The paperwork is in. Any day now.', 'Not official. He says it anyway.'],
+  ranger: ['Closer than last time. That counts.', 'Eight out of ten monsters agree.', 'She hit something two floors down. Probably a monster.', 'Has a comeback for every monster. Most of them are arrows.', "It's the thought that counts. The arrow helps.", 'Hasn\'t missed in weeks. Don\'t bring it up.'],
+  brawler: ["He's taking this seriously now. Very seriously.", "Don't mention his height. Or anything.", 'He tells the joke. The monster gets the punch.', 'Every hole he digs has gold or a monster in it. He\'s happy either way.', 'Nobody knows how. Nobody wants a demonstration.', 'He was only warming up. The monsters were not.'],
+  apprentice: ["It's a good trick.", 'Heavy on the sparks.', 'Monsters find him shocking.', "Learned a second spell. It's also lightning.", 'Also from the red, the green and the ceiling.'],
+  hunter: ['Hasn\'t blinked since floor one.', 'Smells fear. Also lunch.', 'Follows it three floors down and back.', 'Gets too close. On purpose.', 'Grows a little every time something dies.'],
+  shieldmaiden: ['Her idea of defense is getting there first.', 'The shield meets the face. Meeting adjourned.', "Walls don't usually chase you.", 'Is a good offense. She checked.', 'She teaches it. Monsters fail it.', 'Everyone behind her fights braver.'],
+  thief: ["Your purse feels lighter. That's normal.", 'Counts his daggers every morning. Still six.', 'Monsters have pockets. Had.', 'He says it every time. Nobody\'s laughed yet.', "He's very proud of this price."],
+  gingerbread: ['Still warm, and furious about it.', 'Monsters follow it. Briefly.', 'Stale on purpose. Hits harder.', 'Dressed for battle, in frosting.'],
   ...(DEMO ? {} : {
-    dancer: ["Also the monster's last position.", 'One spin, three slices.', 'The monsters lost. Badly. Fatally.', 'And everything standing on it.', "Don't stand too close. Don't stand at all."],
-    corsair: ['Steady on any floor. Even the wet ones.', "Everything down here is treasure if you're brave enough.", 'The monsters shiver first.', 'Found it. Kept it. Hit things with it.', 'The lower the deck, the bigger the haul.', 'The whole crew hits harder with the wind behind them.'],
-    runesmith: ['Every swing leaves a mark. Some marks explode.', 'The plan: the floor explodes.', "Monsters run. Runes don't care.", "The runes are permanent. The monsters aren't.", 'Literally.', 'Bosses hit the floor. The floor hits back.'],
-    paladin: ['A prayer and a punch.', "Everyone's invited. Nobody leaves.", 'First rule: smite.', 'Purging is easy when you glow.', 'The order is: hit it again.'],
-    stormcaller: ['Her best ideas come with lightning.', 'The monsters are. Permanently.', 'Indoors, somehow.', "She's always at the front of it.", 'Calm in the middle. Chaos everywhere else.', 'The blade keeps getting struck. It likes it.', 'Everyone fights better in her weather.'],
-    venomblade: ["She poisons everything. It's a lot.", 'Theirs, mostly.', 'Monsters bite. She bites back harder.', 'She writes their names on the blades. Then delivers them.', 'Says one thing. Stabs another.', 'She sells it to the party. It works, somehow.'],
-    doctor: ['Also: dying.', 'Terrible. Effective.', 'Comes to you. Unfortunately.', 'Rest. Permanently.', 'For them. Always for them.'],
+    dancer: ["Also the monster's last position.", 'One spin, three slices.', 'The monsters lost. It wasn\'t close.', 'And everything standing on it.', "Don't stand too close. Don't stand at all."],
+    corsair: ['Steady on any floor. Even the wet ones.', 'Anything not nailed down is treasure. He brought a crowbar.', 'The monsters shiver first.', 'Found a chest at the bottom of the sea. Now he hits things with it.', 'The lower the deck, the bigger the haul.', 'The whole crew hits harder with the wind behind them.'],
+    runesmith: ['Every swing leaves a mark. Some marks explode.', 'Step one: carve the floor. Step two: stand back.', "Monsters run. Runes don't care.", "The runes are permanent. The monsters aren't.", 'Ask the floor.', 'Bosses hit the floor. The floor hits back.'],
+    paladin: ['A prayer and a punch.', "Everyone's invited. Nobody leaves.", 'Everyone\'s welcome. Monsters get the full ceremony.', 'Purging is easy when you glow.', 'The order is: hit it again.'],
+    stormcaller: ['Her best ideas come with lightning.', 'The monsters are. Permanently.', 'Rains indoors. Nobody brought an umbrella.', "She's always at the front of it.", 'The only calm spot is right behind her.', 'The blade keeps getting struck. It likes it.', 'Everyone fights better in her weather.'],
+    venomblade: ["Calls it a toxic trait. She's proud of it.", 'Theirs, all over the floor.', 'Monsters bite. She bites back harder.', 'She writes their names on the blades. Then delivers them.', 'Says one thing. Stabs another.', 'She sells it to the party. It works, somehow.'],
+    doctor: ['Agrees with the first one. You\'re dying.', 'Terrible. Effective.', 'Comes to you. Unfortunately.', 'Rest. Permanently.', 'For them. Always for them.'],
     frostimp: ['Snaps. Things. Cold.', "It won't. Ever.", 'Breaks the ice. And the monster.', 'Bites, too.', 'Monsters get it. Then they get frozen.'],
     hollow: ['Reporting for it.', 'Seasonal. Lethal.', "The pumpkin's smile gets wider every fight.", 'Fresh from the patch. Ready to work.', 'Pun intended.'],
-    oathbreaker: ["Doesn't count. Never did.", "Another one. He's keeping count.", 'He read it. Then ignored it.', 'His word means nothing. His sword means everything.', 'Swings first. Never apologises.'],
-    archmage: ['The original school. He built it.', 'Monsters were bigger. He was faster.', 'Every spell checked. Every monster checked out.', "He has one. It's the dungeon.", 'Forgot what he was casting. Cast it anyway. Worked.', 'Older than the dungeon. Stronger, too.'],
-    wraith: ['Polite about it. Mostly.', 'Sleeps all day. Down here it is always night.', 'Every monster makes a deposit.', 'Older than the dungeon. Younger than the Archmage. He checks.', 'Never misses a fight. Never misses a meal.'],
-    necro: ['Used to raise them. Now he lowers them.', 'The monsters made it.', 'About the job. About the dead.', 'With every skeleton he ever raised.', 'And then drive them in.'],
-    king: ["A pain in every monster's neck.", "He's fine about it. Mostly.", 'Heavy is the fist, too.', "Nobody's paying it. He's taking it.", 'All monsters: begone.', 'He kept one crown. It is very heavy. He swings it.'],
-    angel: ['Took the fall. Gave back worse.', 'Literally. Angrily.', 'Not so graceful now. Much more punchy.', 'No plan. Lots of wing.', 'Monsters see it. Then they see nothing.'],
-    ogre: ["Yes he is. Who's a good boy? Pebble is.", 'Pebble runs. Things break.', 'Pebble is not small. Pebble is never small.', 'To you. Only to you.', 'Pebble got bigger.'],
-    demon: ['Nobody reads them. The monsters should have.', "Mostly the monsters' blood.", "And it's collecting.", 'Argues for violence. Wins.', 'Brought from home.', 'Every companion signed. Nobody read it.', 'Everything must burn.'],
-    woodelf: ['Tougher than she looks. Woodier, too.', 'Spots the weak point. Then the next one.', 'Stays put. The monsters do not.', 'Finds gold in the moss. Somehow.', 'Older than she looks. Elves are like that.'],
-    bard: ['Opens for the party. Closes for the monsters.', 'Nobody asked. He played anyway.', 'Three notes. All of them loud.', 'Top of the bill. Bottom of the dungeon.', 'Says it is his last. It never is.'],
+    oathbreaker: ["Doesn't count. Never did.", "Another one. He's keeping count.", 'He read it. Then ignored it.', 'Don\'t take his word for it.', 'Swings first. Never apologizes.'],
+    archmage: ['The original school. He built it.', 'Monsters were bigger. He was faster.', 'Checked every spell twice. The monsters checked out.', "He has one. It's the dungeon.", 'Forgot what he was casting. It worked anyway.', 'The first spell he ever learned. Still the strongest.'],
+    wraith: ['Polite about it. Mostly.', 'Sleeps all day. Down here it is always night.', 'Every monster makes a deposit.', 'Younger than the Archmage, and touchy about it.', 'Never misses a fight. Never misses a meal.'],
+    necro: ['Switched sides. The skeletons took it personally.', 'The monsters made it.', 'About the job. About the dead.', 'With every skeleton he ever raised.', 'And then drive them in.'],
+    king: ["A pain in every monster's neck.", "He's fine about it. Don't bring it up.", 'Heavy is the fist, too.', "Nobody's paying it. He's taking it.", 'Taxes the monsters. Up front.', 'He kept the jewels. They make a decent sling.'],
+    angel: ['Took the fall. Gave back worse.', 'Not allowed back up. Takes it out on the monsters.', 'Less grace, more punching.', 'No plan. Lots of wing.', 'Monsters see it. Then they see nothing.'],
+    ogre: ["Yes he is. Who's a good boy? Pebble is.", 'Pebble runs. Things break.', 'Pebble is not small. Nobody has told Pebble.', 'To you. Only to you.', 'Pebble got bigger.'],
+    demon: ['Nobody reads them. The monsters should have.', 'Signed in blood. Not his.', "And it's collecting.", 'Argues for violence. Wins.', 'Brought from home.', 'Every companion signed. Nobody read it.', 'Everything must burn.'],
+    woodelf: ['Tougher than she looks. Woodier, too.', 'Spots the weak point. Then the next one.', 'Stays put. The monsters do not.', 'Turns over every stone. Some have gold under them.', 'Older than she looks. Elves are like that.'],
+    bard: ['Goes on first. Nobody survives long enough to heckle.', 'Nobody asked. He played anyway.', 'Three notes. All of them loud.', 'Top of the bill. Bottom of the dungeon.', 'Says it\'s his last. It never is.'],
     cleric: ['Asks for strength. Gets it.', 'Firmly.', 'Holy, and heavy.', 'Reads them to the monster. Briefly.'],
-    santa: ['Every monster is on it.', 'Fills every pocket with gold.', 'Down the chimney. Down the stairs.', 'Jolly. Until he isn\'t.', 'Delivered hard, and fast.'],
+    santa: ['Every monster is on it.', 'Fills every pocket with gold.', 'No chimneys down here. He has not let that stop him.', 'Jolly. Until he isn\'t.', 'Straight to the face.'],
     elfqueen: ['Monsters are to stop existing. They comply.', 'Shines where torches fail.', 'Finds the gap in any armor.', 'Her court followed her down. Armed.', 'She has outlived every enemy so far.'],
-    elflord: ['Learned it before the dungeon was dug.', 'Has never lost one. Has had many.', 'Does not move. Does not need to.', 'Counts them. Every one.', 'Older than the sword. The sword is very old.'],
-    magus: ['Reads the sky. From underground.', 'Every hair a spell.', 'Older than old magic.', 'Pulls more than rabbits out of it.', 'Nobody speaks them anymore. He shouts them.', 'He keeps saying that.'],
+    elflord: ['Learned it before the dungeon was dug.', 'Still accepting challengers. None have lasted the afternoon.', 'Hasn\'t moved his feet in a century. Nothing has gotten close enough to make him.', 'Counts them. Every one.', 'Older than the sword. The sword is very old.'],
+    magus: ['Reads the sky. From underground.', 'Every hair a spell.', 'The kind of magic that\'s hard to explain. He won\'t try.', 'Pulls more than rabbits out of it.', 'Nobody speaks them anymore. He shouts them.', 'He keeps saying that.'],
   }),
 };
 
@@ -542,7 +542,7 @@ export const MODS: ModDef[] = [
   { id: 'armored', name: 'Armored', desc: 'Companions deal 75% less damage to it.', color: '#9fb4c8' },
   { id: 'enraged', name: 'Enraged', desc: 'Only half the time to beat it.', color: '#ff6a4a' },
   { id: 'regen', name: 'Regenerating', desc: 'Heals 3% of its health every second.', color: '#7ee07a' },
-  { id: 'split', name: 'Splitting', desc: 'Splits in two when it falls. Both halves have to die in time.', color: '#d58aff' },
+  { id: 'split', name: 'Splitting', desc: 'Splits in two when it dies.', color: '#d58aff' },
   { id: 'giant', name: 'Giant', desc: 'Three times the health, and 50% more time.', color: '#ffc24a' },
 ];
 export const MOD_BY_ID = new Map(MODS.map((d) => [d.id, d]));
@@ -629,10 +629,10 @@ export const LEGENDS: LegendDef[] = DEMO ? [] : [
   o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${lv}`, maxLv: 10 }),
   o({ id: 'haggler', name: 'The Haggler', kind: 'utility', sprite: 'sm_merchant', what: 'Companion level costs', value: (lv) => `−${pct(1 - 0.95 ** lv)}` }),
   o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'sm_kabuki', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`) }),
-  o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Increased chance a boss is a champion boss (starting on floor 100)', value: share(0.75, (n) => pct(0.25 + n)) }),
+  o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Increased chance a boss is a champion (starting on floor 100)', value: share(0.75, (n) => pct(0.25 + n)) }),
   o({ id: 'lure', name: 'The Lure', kind: 'utility', sprite: 'chest_mimic_open', what: 'How often treasure goblins come', value: share(2, (n) => `+${pct(n)}`) }),
   o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'sd_princess', what: 'Card drop chance', value: share(2, (n) => `+${pct(n)}`) }),
-  o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance on overkill kills', value: (lv) => `up to ×${1 + lv}`, note: "A kill that deals N× a monster's health has N× the chance to drop its card (gold cards too), up to the cap. Swept floors and time away count." }),
+  o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance from overkill', value: (lv) => `up to ×${1 + lv}`, note: "A kill that deals N× a monster's health has N× the chance to drop its card (gold cards too), up to the cap. Swept floors and time away count." }),
   o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'sm_geisha', what: 'How long Rampage lasts', ...longer('rampage', 1) }),
   o({ id: 'whirl', name: 'The Whirl', kind: 'utility', sprite: 'ef_ranger', what: 'How long Flurry lasts', ...longer('flurry', 2) }),
   o({ id: 'headsman', name: 'The Headsman', kind: 'utility', sprite: 'sd_knight_heavy', what: 'How long Cleave lasts', ...longer('cleave', 4) }),
@@ -670,7 +670,7 @@ export const BOUND: BoundDef[] = DEMO ? [] : [
   { id: 'ogre', zone: 0, what: 'All damage', value: (lv) => `+${lv * 100}%` },
   { id: 'pitlord', zone: 6, what: 'Souls from champion bosses', value: (lv) => `×${1 + 10 * lv * lv}` },
   { id: 'lich', zone: 1, what: 'Spirit costs', value: (lv) => `−${Math.round((1 - 0.95 ** lv) * 100)}%`, max: 20 },
-  { id: 'frost', zone: 7, what: 'The Thinning\'s most', value: (lv) => `−${10 + lv} kills`, max: 5, spirit: 'thinning' },
+  { id: 'frost', zone: 7, what: 'The Thinning\'s cap', value: (lv) => `−${10 + lv} kills`, max: 5, spirit: 'thinning' },
   { id: 'troll', zone: 2, what: 'The Wither\'s effect', value: pct25, spirit: 'wither' },
   { id: 'golem', zone: 3, what: 'The Soulcaller\'s effect', value: pct25, spirit: 'soulcaller' },
   { id: 'thing', zone: 4, what: 'The Lure\'s effect', value: pct25, spirit: 'lure' },
@@ -822,6 +822,7 @@ function bigWords(n: number): string {
 
 const count = (n: number) => n.toLocaleString('en-US');
 const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
+const times = (n: number) => (n === 1 ? 'once' : `${count(n)} times`);
 
 function buildTrophies(): TrophyDef[] {
   const out: Omit<TrophyDef, 'steam'>[] = [];
@@ -830,10 +831,10 @@ function buildTrophies(): TrophyDef[] {
   const tiers = (prefix: string, list: [number, string][], desc: (n: number) => string, sprite: string, req: (n: number) => TrophyReq, tierFrom = 0) =>
     list.forEach(([n, name], k) => out.push({ id: `${prefix}-${tag(n)}`, name, desc: desc(n), icon: { sprite, tier: Math.min(10, k + tierFrom) }, req: req(n) }));
 
-  tiers('floor', [[10, 'Down the Stairs'], [50, 'The Long Descent'], [100, 'The Underneath'], [400, 'The Bottom?'], [500, 'There Is No Bottom'], [750, 'Older Than Stone'], [1000, 'A Thousand Down'], [1500, 'The Abyss Stares Back'], [2000, 'Two Thousand Fathoms'], [3000, 'Root of the World'], [5000, 'Where the Heart Beats']],
+  tiers('floor', [[10, 'Down the Stairs'], [50, 'The Long Descent'], [100, 'The Underneath'], [400, 'The Bottom?'], [500, 'There Is No Bottom'], [750, 'Geology Gives Up'], [1000, 'A Thousand Down'], [1500, 'No Signal'], [2000, 'Two Thousand Fathoms'], [3000, 'Root of the World'], [5000, 'Where the Heart Beats']],
     (n) => `Clear floor ${count(n)}.`, 'stairs', (n) => ({ t: 'floor', n }));
   if (!DEMO) {
-    [1, 2, 3, 4].forEach((n, k) => out.push({ id: `lap${k}`, name: ['Corruption', 'The Abyss Looks Back', 'Hollowed Out', 'Eternity'][k], desc: `Reach floor ${n * 80 + 1}, where the zones return ${CORRUPTION[n].name.toLowerCase()}.`, icon: { sprite: 'skull', tier: k + 1 }, req: { t: 'floor', n: n * 80 } }));
+    [1, 2, 3, 4].forEach((n, k) => out.push({ id: `lap${k}`, name: ['Corruption', 'The Abyss Stares Back', 'Hollowed Out', 'Eternity'][k], desc: `Reach floor ${n * 80 + 1}, where the zones return ${CORRUPTION[n].name.toLowerCase()}.`, icon: { sprite: 'skull', tier: k + 1 }, req: { t: 'floor', n: n * 80 } }));
   }
   tiers('gold', [[1e9, 'Coin Purse'], [1e24, 'Strongbox'], [1e40, 'Treasury'], [1e60, 'Dragon Hoard'], [1e90, 'Kingdom\'s Ransom'], [1e120, 'Sea of Gold'], [1e160, 'Beyond Counting']],
     (n) => `Collect ${bigWords(n)} gold in total.`, 'coin', (n) => ({ t: 'gold', n }));
@@ -841,27 +842,27 @@ function buildTrophies(): TrophyDef[] {
     (n) => `Reach ${bigWords(n)} damage per second.`, 'weapon_waraxe', (n) => ({ t: 'dps', n }));
   tiers('kill', [[1000, 'Slayer'], [100_000, 'Massacre'], [1e6, 'Extinction Event'], [1e7, 'The Reaper'], [1e8, 'Nothing Left Alive']],
     (n) => `Kill ${count(n)} monsters.`, 'skull', (n) => ({ t: 'kills', n }));
-  tiers('boss', [[10, 'Kingsbane'], [100, 'Tyrant Killer'], [1000, 'Boss Rush'], [5000, 'Nothing Stands'], [25_000, 'Throne of Bones']],
+  tiers('boss', [[10, 'Kingsbane'], [100, 'Tyrant Killer'], [1000, 'Boss Rush'], [5000, 'Serial Regicide'], [25_000, 'Throne of Bones']],
     (n) => `Defeat ${count(n)} bosses.`, 'ogre', (n) => ({ t: 'bosses', n }));
-  tiers('champ', [[1, 'Champion Slayer'], [100, 'Crown Breaker'], [1000, 'Champion of Champions'], [10_000, 'Kingmaker']],
+  tiers('champ', [[1, 'Champion Slayer'], [100, 'Crown Collector'], [1000, 'Champion of Champions'], [10_000, 'Undisputed']],
     (n) => `Slay ${n === 1 ? 'a champion' : `${count(n)} champions`}.`, 'weapon_red_gem_sword', (n) => ({ t: 'champions', n }));
-  tiers('clutch', [[1, 'By a Hair'], [20, 'Nerves of Steel'], [100, 'Living on the Edge']],
+  tiers('clutch', [[1, 'By a Hair'], [20, 'Nerves of Steel'], [100, 'Was That Necessary?']],
     (n) => `Beat ${n === 1 ? 'a boss' : `${n} bosses`} with ${CLUTCH_SECONDS} seconds or less on the clock.`, 'flask_yellow', (n) => ({ t: 'clutches', n }));
   if (!DEMO) {
     out.push({ id: 'hire-all', name: 'Full Party', desc: `Hire all ${COMPS.length} companions.`, icon: { sprite: COMPS[0].sprite, tier: 0 }, req: { t: 'levelAll', n: 1 } });
   }
-  tiers('level', [[1000, 'Legendary'], [2500, 'Mythic'], [5000, 'Immortal'], [10_000, 'Beyond']],
+  tiers('level', [[1000, 'Legendary'], [2500, 'Mythic'], [5000, 'Immortal'], [10_000, 'Overleveled']],
     (n) => `Get a companion to level ${count(n)}.`, COMPS[COMPS.length - 1].sprite, (n) => ({ t: 'level', n }), 1);
-  tiers('levelall', [[500, 'Loyal Company'], [1000, 'Legendary Company'], [2500, 'Immortal Company']],
+  tiers('levelall', [[500, 'Loyal Company'], [1000, 'Legendary Company'], [2500, 'Mythic Company']],
     (n) => `Get every companion to level ${count(n)}.`, COMPS[0].sprite, (n) => ({ t: 'levelAll', n }), 1);
-  tiers('clicks', [[100, 'Tap Tap'], [10_000, 'Clicker'], [100_000, 'Relentless'], [1e6, 'Carpal Tunnel']],
+  tiers('clicks', [[100, 'Tap Tap'], [10_000, 'Clicker'], [100_000, 'Still Clicking'], [1e6, 'Carpal Tunnel']],
     (n) => `Click ${count(n)} times.`, 'weapon_knife', (n) => ({ t: 'clicks', n }));
-  tiers('crit', [[1, 'Critical!'], [10_000, 'Sharp Eye'], [100_000, 'Surgeon'], [1e6, 'Every Hit Counts']],
+  tiers('crit', [[1, 'Critical!'], [10_000, 'Sharp Eye'], [100_000, 'Surgeon'], [1e6, 'Critical Condition']],
     (n) => `Land ${count(n)} critical ${plural(n, 'hit')}.`, 'weapon_katana', (n) => ({ t: 'crits', n }));
-  tiers('fev', [[1, 'Rampage!'], [100, 'Berserker'], [1000, 'Endless Fury']],
-    (n) => `Go on a Rampage ${count(n)} ${plural(n, 'time')}.`, 'flask_big_red', (n) => ({ t: 'fevers', n }));
+  tiers('fev', [[1, 'Rampage!'], [100, 'Berserker'], [1000, 'Anger Issues']],
+    (n) => `Go on a Rampage ${times(n)}.`, 'flask_big_red', (n) => ({ t: 'fevers', n }));
   out.push({ id: 'rampage0', name: 'Bloodrush', desc: 'Keep attacking until a Rampage reaches its top tier.', icon: { sprite: 'flask_big_red', tier: 1 }, req: { t: 'rampage', n: 1 } });
-  tiers('raid', [[1, 'Finders Keepers'], [77, 'Goblin Catcher'], [777, 'Goblin Bane'], [2777, 'No One Escapes'], [7777, 'Treasure Lord']],
+  tiers('raid', [[1, 'Finders Keepers'], [77, 'Red-Handed'], [777, 'Jackpot'], [2777, 'No One Escapes'], [7777, 'Treasure Lord']],
     (n) => `Catch ${n === 1 ? 'a treasure goblin' : `${count(n)} treasure goblins`}.`, 'goblin', (n) => ({ t: 'raids', n }));
   const missed: [number, string, string][] = [
     [1, 'Butterfingers', ''],
@@ -876,16 +877,16 @@ function buildTrophies(): TrophyDef[] {
     (n) => `Catch ${n === 1 ? 'a rainbow goblin' : `${count(n)} rainbow goblins`}.`, 'goblin', (n) => ({ t: 'rainbows', n }), 2);
   tiers('vault', [[1, 'Over the Rainbow'], [25, 'Vault Raider'], [250, 'Goblin Banker']],
     (n) => (n === 1 ? 'Open the Rainbow Vault.' : `Open the Rainbow Vault ${count(n)} times.`), 'chest_full_open', (n) => ({ t: 'vaults', n }));
-  tiers('desc', [[1, 'Up for Air'], [10, 'Return Ticket'], [50, 'The Deep Knows You'], [250, 'Always Back Down']],
-    (n) => `Ascend ${count(n)} ${plural(n, 'time')}.`, 'floor_ladder', (n) => ({ t: 'descents', n }));
+  tiers('desc', [[1, 'Up for Air'], [10, 'Return Ticket'], [50, 'Commuter'], [250, 'Always Back Down']],
+    (n) => `Ascend ${times(n)}.`, 'floor_ladder', (n) => ({ t: 'descents', n }));
   if (!DEMO) {
-    tiers('awk', [[1, 'It Wakes'], [5, 'Heartbeat'], [25, 'Drumming Deep'], [100, 'The Heart Remembers']],
-      (n) => `Awaken the Heart ${count(n)} ${plural(n, 'time')}.`, 'ui_heart_full', (n) => ({ t: 'awakens', n }));
+    tiers('awk', [[1, 'It Wakes'], [5, 'Heartbeat'], [25, 'Snooze Button'], [100, 'Pacemaker']],
+      (n) => `Awaken the Heart ${times(n)}.`, 'ui_heart_full', (n) => ({ t: 'awakens', n }));
     out.push({ id: 'bound-all', name: 'All Eight', desc: 'Wake every one of the Bound.', icon: { sprite: ZONES[ZONES.length - 1].boss.sprite, tier: 1 }, req: { t: 'boundAll', n: 1 } });
-    tiers('bound', [[50, 'Soul Debt'], [250, 'Soul Hoard']],
+    tiers('bound', [[50, 'Soul Debt'], [250, 'Paid in Full']],
       (n) => `Earn ${count(n)} bound souls in total.`, ZONES[0].boss.sprite, (n) => ({ t: 'boundEarned', n }), 2);
     out.push({ id: 'trip-1', name: 'Gone Hunting', desc: 'Send a companion on an expedition.', icon: { sprite: 'floor_ladder', tier: 1 }, req: { t: 'trips', n: 1 } });
-    tiers('tripcard', [[25, 'Spoils'], [250, 'Trophy Hunter']],
+    tiers('tripcard', [[25, 'Spoils'], [250, 'Postcards']],
       (n) => `Find ${count(n)} cards on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripCards', n }), 2);
   }
   const versions = CARDS.reduce((sum, c) => sum + c.laps.length * (c.gold ? 2 : 1), 0);
@@ -896,7 +897,7 @@ function buildTrophies(): TrophyDef[] {
     { id: 'versions-250', name: 'Monster Manual', desc: 'Collect 250 cards.', icon: { sprite: 'imp', tier: 3 }, req: { t: 'versions', n: 250 } },
     { id: 'versions-all', name: 'Every Last Monster', desc: 'Collect every card.', icon: { sprite: 'imp', tier: 4 }, req: { t: 'versions', n: versions } },
     { id: 'gcard-1', name: 'Gilded', desc: 'Find a gold card.', icon: { sprite: 'big_demon', tier: 2 }, req: { t: 'goldCards', n: 1 } },
-    { id: 'gcard-25', name: 'Golden Touch', desc: 'Find 25 different gold cards.', icon: { sprite: 'big_demon', tier: 3 }, req: { t: 'goldCards', n: 25 } },
+    { id: 'gcard-25', name: 'Gold Standard', desc: 'Find 25 different gold cards.', icon: { sprite: 'big_demon', tier: 3 }, req: { t: 'goldCards', n: 25 } },
     { id: 'gcard-all', name: 'Midas Deck', desc: 'Find every gold card.', icon: { sprite: 'big_demon', tier: 4 }, req: { t: 'goldCards', n: CARDS.filter((c) => c.gold).length } },
   );
   return out.map((t) => ({ ...t, steam: !NOT_ON_STEAM.has(t.id) }));
@@ -930,7 +931,7 @@ export const CURSORS: CursorDef[] = [
   { id: 'cleaver', name: 'Cleaver', sprite: 'weapon_cleaver', trophy: 'boss-5000' },
   { id: 'spear', name: 'Spear', sprite: 'weapon_spear', trophy: 'floor-500' },
   { id: 'redstaff', name: 'Blood Staff', sprite: 'weapon_red_magic_staff', trophy: 'fev-100' },
-  { id: 'duel', name: 'Duelist', sprite: 'weapon_duel_sword', trophy: 'desc-50' },
+  { id: 'duel', name: 'Dueling Sword', sprite: 'weapon_duel_sword', trophy: 'desc-50' },
   { id: 'greenstaff', name: 'Goblin Scepter', sprite: 'weapon_green_magic_staff', trophy: 'raid-777' },
   { id: 'waraxe', name: 'War Axe', sprite: 'weapon_waraxe', trophy: 'floor-1000' },
   { id: 'knight', name: 'Knight\'s Oath', sprite: 'weapon_knight_sword', trophy: 'clutch-20' },
@@ -947,7 +948,7 @@ export const CURSORS: CursorDef[] = [
   { id: 'anime', name: 'Hand of the Deep', sprite: 'weapon_anime_sword', trophy: 'awk-1' },
   { id: 'golden', name: 'Golden Sword', sprite: 'weapon_golden_sword', trophy: 'raid-7777' },
   { id: 'lightbolt', name: 'Light Bolt', sprite: 'spell_light_bolt', trophy: 'awk-25' },
-  { id: 'darkbolt', name: 'Darkness Bolt', sprite: 'spell_darkness_bolt', trophy: 'floor-5000' },
+  { id: 'darkbolt', name: 'Dark Bolt', sprite: 'spell_darkness_bolt', trophy: 'floor-5000' },
   { id: 'orb', name: 'Magic Orb', sprite: 'spell_magic_orb', trophy: 'versions-all' },
   // (The demo has fewer trophies: their cursors go with them.)
 ].filter((cursor) => !cursor.trophy || TROPHIES.some((t) => t.id === cursor.trophy));
@@ -966,27 +967,27 @@ export const NEWS: News[] = [
   { text: 'Every monster down here has a card. Nobody remembers printing them.', when: (s) => !s.awakens, rare: true },
   { text: 'The stairs go down. They always go down.', when: (s) => s.floor < 5 },
   { text: 'Your Squire asks if the dungeon has a bottom. You do not answer.', when: (s) => s.owned[compIndex('squire')] > 0 },
-  { text: 'The Ranger once started keeping his kill count tally on the wall. The wall is full.', when: (s) => s.owned[compIndex('ranger')] > 10 },
+  { text: 'The Ranger keeps a tally of her kills on the wall. She has run out of wall.', when: (s) => s.owned[compIndex('ranger')] > 10 },
   { text: 'The dwarf insists on punching the bosses personally.', when: (s) => s.owned[compIndex('brawler')] > 0 },
-  { text: 'The Apprentice set his own beard on fire... again. It still counts as damage.', when: (s) => s.owned[compIndex('apprentice')] > 0 },
+  { text: 'The Apprentice set his beard on fire again. It still counts as damage.', when: (s) => s.owned[compIndex('apprentice')] > 0 },
   { text: 'The Lizard Hunter claims she can hear the dungeon breathing.', when: (s) => s.owned[compIndex('hunter')] > 0 },
-  { text: 'Shieldmaiden reports the shield is "fine". It is mostly dents now.', when: (s) => s.owned[compIndex('shieldmaiden')] > 0 },
+  { text: 'The Shieldmaiden says the shield is "fine." It is more dent than shield.', when: (s) => s.owned[compIndex('shieldmaiden')] > 0 },
   ...(DEMO ? [] : [
-    { text: 'Stormcaller forecasts: lightning, with a chance of more lightning.', when: (s) => s.owned[compIndex('stormcaller')] > 0 },
+    { text: "The Stormcaller's forecast: lightning, with a chance of more lightning.", when: (s) => s.owned[compIndex('stormcaller')] > 0 },
     { text: 'The Plague Doctor keeps taking notes on the monsters. And on you.', when: (s) => s.owned[compIndex('doctor')] > 0 },
     { text: 'The Hollow Knight has not spoken once. He did grin wider today.', when: (s) => s.owned[compIndex('hollow')] > 0 },
     { text: 'The angel will not say what it fell from.', when: (s) => s.owned[compIndex('angel')] > 0 },
     { text: 'The Necromancer apologizes to each monster before it dies.', when: (s) => s.owned[compIndex('necro')] > 0 },
-    { text: 'The Tamed Oni has adopted a slug. Nobody has the heart to tell him.', when: (s) => s.owned[compIndex('ogre')] > 0 },
+    { text: 'The Tamed Oni has adopted a slug. Nobody has told him we kill those.', when: (s) => s.owned[compIndex('ogre')] > 0 },
     { text: 'The demon keeps asking to renegotiate the contract.', when: (s) => s.owned[compIndex('demon')] > 0 },
   ] satisfies News[]),
   { text: 'A goblin was seen running off.', when: (s) => s.raids > 0 },
   { text: 'The goblins have started a union. It meets at the bottom of the dungeon.', when: (s) => s.raids > 10 },
-  { text: 'Bards in the town above sing about you. The songs are getting darker.', when: (s) => s.kills > 1000 },
-  { text: 'The monsters below have started to hear about you...', when: (s) => s.kills > 10000 },
-  { text: 'You see scratched into the wall... "Go deeper."', when: (s) => s.depth > 0 },
+  { text: 'Someone up top has written a song about you. The verses keep getting darker.', when: (s) => s.kills > 1000 },
+  { text: 'The monsters below have heard about you. Several have asked for transfers.', when: (s) => s.kills > 10000 },
+  { text: 'Someone has scratched "Go deeper" into the wall. The handwriting looks like yours.', when: (s) => s.depth > 0 },
   { text: 'You could swear you have walked these floors before.', when: (s) => s.depth > 1 },
-  { text: 'The walls feel almost alive. They pulse, ever so slightly.', when: (s) => s.floor > 70 },
+  { text: 'The walls have a pulse. Everyone has agreed not to mention it.', when: (s) => s.floor > 70 },
   { text: 'The heart below is waiting for you.', when: (s) => s.floor > 100 },
   { text: 'Reminder: the dungeon is not a metaphor. Probably.' },
   { text: 'The torches all lean toward the stairs down.' },

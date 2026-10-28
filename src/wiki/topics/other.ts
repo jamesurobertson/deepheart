@@ -44,7 +44,7 @@ const settingsBody = () => `<p class="lede">Everything in Options.</p>
     ['Blood', 'Blood on hits'],
     ['Zone intros', 'The title card when you enter a new zone'],
     ['Numbers', 'Short (1.23M) or scientific (1.23e6)'],
-    ['Graphics', 'Auto starts on High and steps down if the game runs slowly. High draws everything at full resolution; Low turns off bloom and the tilt-shift blur, lights fewer torches and shows fewer particles and damage numbers'],
+    ['Graphics', 'Auto starts on High and steps down if the game runs slowly. High draws everything at full resolution. Low turns off bloom and the tilt-shift blur, lights fewer torches and shows fewer particles and damage numbers'],
     ['Cursor', `A cursor skin, unlocked by ${link('trophies', 'trophies', 'Cursors')}`],
     ['Export / import', 'Copy your save as text, or load one'],
   ])}`;

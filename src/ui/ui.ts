@@ -2227,7 +2227,7 @@ export class Ui {
       const n = g.champSouls(g.s.floor);
       return `<b>A champion boss!<small>Beat it for ${n} soul${n === 1 ? '' : 's'}. It might drop a gold card.</small></b>`;
     }
-    return champ?.boss ? '<b>A champion boss!<small>Tougher, and it might drop a gold card</small></b>' : '<b>A champion!<small>Tougher and drops gold cards!</small></b>';
+    return champ?.boss ? '<b>A champion boss!<small>Tougher, and it might drop a gold card</small></b>' : '<b>A champion!<small>Tougher, and it might drop a gold card</small></b>';
   }
 
   /** Who the star tip suggests trying as your hero: the first companion you have who isn't your hero already. */
@@ -3028,7 +3028,7 @@ export class Ui {
 
     const click = panel('Click damage', fmt(g.clickDamage()), '/click', [
       row('Base', '1'),
-      row('All-damage bonuses', x(b.all), 'trophies, souls and fury'),
+      row('All-damage bonuses', x(b.all), DEMO ? 'trophies and card sets' : 'trophies, card sets and souls'),
       row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion traits` : ''}`),
       ...(DEMO ? [] : [mul('The Fist', 1 + 0.1 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Spirit')]),
       mul('Buffs', b.buffClick, buffNames('click'), 'Frenzy'),
@@ -3524,7 +3524,7 @@ export class Ui {
       if (act === 'later') pill.remove();
       if (act === 'now') {
         download();
-        pill.innerHTML = `<span><b>Downloading v${esc(version)}</b> Open it and replace Deepheart; your save stays.</span><button class="btn icon small" data-update="later" aria-label="Dismiss">${G.close()}</button>`;
+        pill.innerHTML = `<span><b>Downloading v${esc(version)}</b> Open it and replace Deepheart. Your save stays.</span><button class="btn icon small" data-update="later" aria-label="Dismiss">${G.close()}</button>`;
       }
     };
   }
@@ -3537,7 +3537,7 @@ export class Ui {
     this.hideTip();
     if (this.modal) this.closeModal();
     document.body.classList.add('demo-over');
-    const heroes = g.s.owned.filter((n) => n > 0).length;
+    const met = g.s.owned.filter((n) => n > 0).length;
     const cards = Object.values(g.s.cards).reduce((n, c) => n + c.n.reduce((a, b) => a + (b > 0 ? 1 : 0), 0) + c.gold.reduce((a, b) => a + (b > 0 ? 1 : 0), 0), 0);
     const el = document.createElement('div');
     el.className = 'demo-end';
@@ -3546,8 +3546,8 @@ export class Ui {
       <h1>DEEPHEART</h1>
       <p class="de-lead">Thanks for playing the demo!</p>
       <div class="de-next">${silhouette(COMPS[DEMO_COMPANIONS].sprite, 96, '#2c2233')}<b>???</b></div>
-      <p class="de-more">More heroes wait deeper down.</p>
-      <p class="de-run">You met ${heroes} hero${heroes === 1 ? '' : 'es'} and found ${cards} card${cards === 1 ? '' : 's'}.</p>
+      <p class="de-more">More companions wait deeper down.</p>
+      <p class="de-run">You met ${met} companion${met === 1 ? '' : 's'} and found ${cards} card${cards === 1 ? '' : 's'}.</p>
       <a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}Wishlist on Steam</a>
       <button type="button" class="mm-btn de-menu">Main menu</button>
     </div>`;
