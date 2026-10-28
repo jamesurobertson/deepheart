@@ -792,6 +792,7 @@ export type TrophyReq =
   | { t: 'boundEarned'; n: number }
   | { t: 'trips'; n: number }
   | { t: 'tripCards'; n: number }
+  | { t: 'tripKills'; n: number }
   | { t: 'clutches'; n: number }
   | { t: 'champions'; n: number }
   | { t: 'vaults'; n: number }
@@ -889,6 +890,8 @@ function buildTrophies(): TrophyDef[] {
     out.push({ id: 'trip-1', name: 'Gone Hunting', desc: 'Send a companion on an expedition.', icon: { sprite: 'floor_ladder', tier: 1 }, req: { t: 'trips', n: 1 } });
     tiers('tripcard', [[25, 'Spoils'], [250, 'Postcards']],
       (n) => `Find ${count(n)} cards on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripCards', n }), 2);
+    tiers('tripkill', [[1e4, 'Pest Control'], [1e6, 'Hired Muscle']],
+      (n) => `Defeat ${count(n)} monsters on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripKills', n }), 2);
   }
   if (!DEMO) {
     tiers('set', [[1, 'Full Set'], [5, 'Set Collector'], [10, 'Complete Collection']],

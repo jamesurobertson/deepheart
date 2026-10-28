@@ -52,7 +52,7 @@ const live = (t: TrophyDef) => !(['awakens', 'boundAll', 'boundEarned'].includes
 const GROUPS: [string, TrophyDef['req']['t'][]][] = [
   ['Floors', ['floor']], ['Gold', ['gold']], ['Kills', ['kills']], ['Bosses', ['bosses', 'clutches', 'champions']],
   ['Companions', ['level', 'levelAll']], ['Attacks', ['clicks', 'crits', 'fevers', 'rampage']], ['Damage', ['dps']],
-  ['Goblins', ['raids', 'missed', 'rainbows', 'vaults']], ['Ascents', ['descents']], ['Expeditions', ['trips', 'tripCards']],
+  ['Goblins', ['raids', 'missed', 'rainbows', 'vaults']], ['Ascents', ['descents']], ['Expeditions', ['trips', 'tripCards', 'tripKills']],
   ['Cards', ['cards', 'versions', 'goldCards']], ['Awakening', ['awakens', 'boundAll', 'boundEarned']],
 ];
 
