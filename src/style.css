@@ -1616,3 +1616,9 @@ body.over-act .blade-act { display: block; }
 /* Counting numbers keep their width, so nothing beside them jumps. */
 .tip, .trip-mid, .tt-trip dd { font-variant-numeric: tabular-nums; }
 .skill-u { text-decoration: underline dotted var(--gold-hi); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: help; }
+
+.crash { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(10, 7, 8, 0.96); color: var(--text); font-family: 'Silkscreen', monospace; }
+.crash h1 { margin: 0; font-size: 28px; }
+.crash p { margin: 0 0 6px; color: var(--dim); }
+.crash button { min-width: 160px; padding: 10px 16px; font: inherit; color: var(--text); background: #1c1214; border: 2px solid var(--faint); cursor: pointer; }
+.crash button:hover { border-color: var(--gold-hi); }

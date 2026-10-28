@@ -16,6 +16,9 @@ import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
 import { TitleMenu } from './ui/menu.ts';
 import { PlayRecorder } from './record.ts';
 import { olderVersion } from './version.ts';
+import { installCrashScreen } from './crash.ts';
+
+installCrashScreen();
 
 declare global {
   interface Window {
