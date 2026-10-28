@@ -282,10 +282,9 @@ body.map-in-bar .zone-map, body.in-vault .zone-map { display: none; }
 .fever.on { animation: fevershake 0.15s infinite; }
 .fever.on > i { background: linear-gradient(#fff0a8, #ff9a2e 50%, #ff2a4a); transition: none; }
 .fever.on span { color: #fff6d8; letter-spacing: 1px; }
-/* The Brawler's face at the bar's left end: it's his skill. */
 .fever-face { position: absolute; left: -10px; bottom: -2px; filter: drop-shadow(0 0 1px var(--ink)) drop-shadow(0 0 1px var(--ink)); }
 .fever > span { padding-left: 16px; }
-body.phone .fever-face .px { zoom: 0.6; }
+body.phone .fever-face .icon { zoom: 0.6; }
 
 
 .buffs { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; justify-content: center; }
@@ -507,7 +506,7 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 .gen-mid { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .gen-name { font: 700 18px/1 var(--f-text); color: var(--text); text-shadow: var(--shadow); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gen-name small { font: 400 14px/1 'Silkscreen'; color: var(--gold); }
-.gen-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.gen-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
 /* The star picks your hero: shown on your hero's row, and on the others when you hover them. */
 .gen { position: relative; }
 .gen-hero { position: absolute; left: 3px; top: 3px; display: none; padding: 3px; line-height: 0; color: var(--faint); cursor: pointer;
@@ -520,16 +519,21 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 /* The star where the hint and tooltip mention it: gold and outlined like the real one, not the text's colour. */
 .hint .g-star, .tt-d .g-star { color: var(--gold-hi); vertical-align: 0; filter: drop-shadow(0 1px 0 var(--ink)); }
 /* A companion's traits (levels 10–100), bought right here: owned, ready to buy, reached but too dear, still to come. */
-.traits { display: flex; gap: 3px; margin-top: 2px; }
+/* A long row of traits shrinks its squares a little rather than running under the level. */
+.traits { display: flex; gap: 3px; margin-top: 2px; min-width: 0; }
 .traits:empty { display: none; }
 .trait {
-  position: relative; width: 24px; height: 22px; display: grid; place-items: center; flex: none;
+  position: relative; width: 24px; height: 22px; display: grid; place-items: center; flex: 0 1 24px; min-width: 18px;
   border: 3px solid transparent; border-image: var(--f-cell) 2 fill / 3px stretch;
   font: 400 14px/1 'Jersey 10'; color: var(--faint);
 }
 .trait.got { border-image-source: var(--f-panel); color: var(--text); }
-.trait.got::after { content: ''; position: absolute; right: -4px; top: -4px; width: 6px; height: 6px; background: var(--green); box-shadow: 0 0 0 1px var(--ink); }
-.trait.buy { border-image-source: var(--f-gold); color: var(--gold-hi); box-shadow: 0 0 6px rgba(242, 193, 78, 0.5); cursor: pointer; }
+/* Ready to buy: a light sweeps across it, then rests (TRAIT_SWEEP_MS in ui.ts; --sweep-at keeps every square in step). */
+.trait.buy::before { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgba(255, 250, 225, 0.6) 50%, transparent 65%) no-repeat;
+  background-size: 300% 100%; background-position: 100% 0; animation: trait-sweep 2600ms ease-in-out var(--sweep-at, 0ms) infinite; pointer-events: none; }
+@keyframes trait-sweep { 0% { background-position: 100% 0; } 45%, 100% { background-position: 0% 0; } }
+@media (prefers-reduced-motion: reduce) { .trait.buy::before { animation: none; opacity: 0; } }
+.trait.buy { border-image-source: var(--f-gold); color: var(--gold-hi); box-shadow: 0 0 6px rgba(242, 193, 78, 0.5); cursor: pointer; overflow: hidden; }
 .trait.reached { color: var(--dim); cursor: pointer; }
 .trait.later { opacity: 0.5; }
 .trait.later small { font: 400 13px/1 'Jersey 10'; color: var(--dim); }
@@ -546,7 +550,7 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
   background: linear-gradient(90deg, rgba(10, 6, 8, 0), rgba(10, 6, 8, 0.5));
 }
 .ab { position: relative; width: 52px; height: 52px; display: grid; place-items: center; padding: 0; flex: none; border: 6px solid transparent; border-image: var(--f-cell) 2 fill / 6px stretch; }
-.ab .px { position: relative; }
+.ab .px, .ab .icon { position: relative; }
 .ab[data-gap] { margin-top: 12px; }
 body.phone .ab[data-gap] { margin-top: 0; margin-left: 12px; }
 .ab-fill { position: absolute; inset: 0; background: conic-gradient(rgba(6, 3, 5, 0.78) var(--cd, 0%), transparent 0); pointer-events: none; }
@@ -554,7 +558,7 @@ body.phone .ab[data-gap] { margin-top: 0; margin-left: 12px; }
 .ab-time:empty { display: none; }
 .ab-lock { position: absolute; inset: 0; display: none; place-items: center; background: rgba(6, 3, 5, 0.6); color: var(--faint); }
 .ab.locked .ab-lock { display: grid; }
-.ab.locked .px { filter: brightness(0) drop-shadow(0 0 1px rgba(180, 140, 255, 0.5)); }
+.ab.locked .px, .ab.locked .icon { filter: brightness(0) drop-shadow(0 0 1px rgba(180, 140, 255, 0.5)); }
 .ab.passive { border-image-source: var(--f-panel); }
 .ab.passive::after { content: ''; position: absolute; left: -6px; right: -6px; bottom: -6px; height: 3px; background: var(--soul); }
 .ab.ready { border-image-source: var(--f-gold); box-shadow: 0 0 6px rgba(242, 193, 78, 0.4); }
@@ -565,9 +569,6 @@ body.phone .ab[data-gap] { margin-top: 0; margin-left: 12px; }
 .ab.charging .px { z-index: 1; }
 .ab.charging .ab-fill::after { content: ''; position: absolute; left: 0; right: 0; bottom: var(--cd, 0%); height: 2px; background: #ff7088; }
 .ab.charging .ab-time { color: #ff9aae; }
-.ab-key { position: absolute; left: -7px; top: -7px; min-width: 15px; padding: 1px 3px 0; background: #140e18; font: 400 13px/1 'Jersey 10'; color: var(--dim); text-align: center; box-shadow: 0 0 0 2px var(--ink); pointer-events: none; }
-.ab.locked .ab-key { display: none; }
-@media (pointer: coarse) { .ab-key { display: none; } }
 .ab:not(.ready) { cursor: default; }
 body.compact:not(.phone) .abilities { width: 56px; gap: 4px; padding: 8px 0; }
 body.compact:not(.phone) .ab { width: 46px; height: 46px; }

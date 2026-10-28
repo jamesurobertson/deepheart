@@ -880,7 +880,7 @@ function buildTrophies(): TrophyDef[] {
   tiers('vault', [[1, 'Over the Rainbow'], [25, 'Vault Raider'], [250, 'Goblin Banker']],
     (n) => (n === 1 ? 'Open the Rainbow Vault.' : `Open the Rainbow Vault ${count(n)} times.`), 'chest_full_open', (n) => ({ t: 'vaults', n }));
   tiers('desc', [[1, 'Up for Air'], [10, 'Return Ticket'], [50, 'Commuter'], [250, 'Always Back Down']],
-    (n) => `Ascend ${times(n)}.`, 'floor_ladder', (n) => ({ t: 'descents', n }));
+    (n) => `Ascend ${times(n)}.`, 'spell_magic_orb', (n) => ({ t: 'descents', n }));
   if (!DEMO) {
     tiers('awk', [[1, 'It Wakes'], [5, 'Heartbeat'], [25, 'Snooze Button'], [100, 'Pacemaker']],
       (n) => `Awaken the Heart ${times(n)}.`, 'ui_heart_full', (n) => ({ t: 'awakens', n }));

@@ -77,7 +77,7 @@ const tripsBody = () => `<p class="lede">Send a companion at level ${EXPEDITION_
   ${h2('Opening')}
   <p>Expeditions open the first time any companion reaches level ${EXPEDITION_LEVEL}. The ladder in the Keep's entrance is where you send them.</p>
   ${h2('Sending a hunter')}
-  <p>Any companion at level ${EXPEDITION_LEVEL} or more in this run can go, as many at once as you like. Pick any floor you've reached. While it's away a hunter leaves your party: its damage, its traits and any ability it brings go with it, and it can't be leveled.</p>
+  <p>Any companion at level ${EXPEDITION_LEVEL} or more in this run can go, as many at once as you like. Pick any floor you've reached. While it's away a hunter leaves your party: its damage and its traits go with it, and it can't be leveled. Its skill stays.</p>
   ${table(['Companion', 'Takes'], [...new Set(ABILITIES.map((a) => a.comp))].map((i) => [COMPS[i].name, ABILITIES.filter((a) => a.comp === i).map((a) => a.name).join(', ')]))}
   ${h2('What a hunter finds')}
   <p>A hunter fights at its damage per second from when it left. On a plain floor it kills as fast as its damage allows against the floor's monsters, up to the sweep limit of ${FLOOR_KILLS} kills every 0.6 seconds. On a boss floor it fights the boss, up to one every 2 seconds.</p>
