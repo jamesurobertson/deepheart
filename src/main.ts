@@ -178,8 +178,6 @@ async function boot() {
   // The desktop app says when a newer release is out.
   window.deepheart?.onUpdate((update) => ui.showUpdate(update.version, () => window.deepheart?.downloadUpdate()));
   if (import.meta.env.DEV) {
-    // ?relics=always makes every boss drop a relic.
-    if (params.get('relics') === 'always') game.debugRelics = true;
     // ?cards=often makes cards drop hundreds of times as often, and champion bosses common.
     if (params.get('cards') === 'often') game.debugCards = true;
     // ?goblin=rainbow makes every treasure goblin a rainbow goblin that opens the vault, one every few seconds.

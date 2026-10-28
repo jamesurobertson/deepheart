@@ -210,6 +210,4 @@ export const G = {
   door: (scale = 2) => glyph(7, 8, r(2, 0, 3) + r(1, 1, 5) + r(0, 2, 7, 2) + r(0, 4, 4) + r(5, 4, 2) + r(0, 5, 7, 3), '', scale),
   /** Steps going down, for the way back down from the Keep. */
   steps: (scale = 2) => glyph(7, 7, r(0, 0, 2, 2) + r(0, 2, 4, 2) + r(0, 4, 6, 2) + r(0, 6, 7), '', scale),
-  /** A cut gem, for relics. */
-  relic: (scale = 2) => glyph(7, 6, r(2, 0, 3) + r(1, 1, 5) + r(0, 2, 7) + r(1, 3, 5) + r(2, 4, 3) + r(3, 5), 'g-relic', scale),
 };

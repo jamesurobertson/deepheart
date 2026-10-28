@@ -68,7 +68,7 @@ const sim = new Sim({ cps: MANUAL_RATE, activeMin, descendRatio: 0, awakenRatio:
         power: game.baseDps().plus(click.times((1 + crit * (critMult - 1)) * (clicking + (game.abilityUnlocked('blade') ? autoBase : 0)))),
         nextHire,
         nextHireCost: nextHire >= 0 ? game.compCost(nextHire) : null,
-        trophies: parts.trophies, party: parts.party * parts.banner, tonics: parts.upgrades, souls: parts.souls, boss: parts.boss,
+        trophies: parts.trophies, party: parts.party, tonics: parts.upgrades, souls: parts.souls, boss: parts.boss,
         bossFails: 0,
       });
     }

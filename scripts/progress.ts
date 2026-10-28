@@ -1,7 +1,7 @@
 /**
  * "Something new": the pacing tools' measure of a quiet stretch. A gap is time with nothing you've never had before:
- * a deeper floor, a companion, a relic or relic star, an upgrade, an ability, an Abyss or Heart power level, a curse
- * tier, an ascend milestone, a trophy or a card.
+ * a deeper floor, a companion, an upgrade, an ability, an Abyss or Heart power level, an ascend
+ * milestone, a trophy or a card.
  */
 import { COMPS } from '../src/game/data.ts';
 import type { Game, GameEvent } from '../src/game/game.ts';
@@ -18,7 +18,6 @@ export class Novelty {
   private seen = new Set<string>();
   private best = 0;
   private revealed = 0;
-  private relics = 0;
 
   /** Something new happened at time `t` (in played seconds). */
   fresh(t: number, why: string) {
@@ -38,13 +37,11 @@ export class Novelty {
     else if (ev.t === 'ability' && ev.unlocked) this.first(t, `ab:${ev.id}`, 'new ability');
     else if (ev.t === 'bound') this.first(t, `b:${ev.id}:${ev.lv}`, 'new Bound level');
     else if (ev.t === 'expedition' && ev.cards) this.first(t, `x:${t}`, 'expedition cards');
-    else if (ev.t === 'relic' && ev.star) this.first(t, `s:${ev.id}:${ev.star}`, 'relic star');
-    else if (ev.t === 'curse') this.first(t, `c:${ev.id}:${ev.tier}`, 'curse tier');
     else if (ev.t === 'trophy') this.first(t, `t:${ev.id}`, 'trophy');
     else if (ev.t === 'card' && ev.first) this.first(t, `k:${ev.id}:${ev.gold}`, 'new card');
   }
 
-  /** Depth, companions and relics, checked every tick (cheap comparisons). */
+  /** Depth and companions, checked every tick (cheap comparisons). */
   tick(game: Game, t: number) {
     if (game.s.bestFloor > this.best) {
       this.best = game.s.bestFloor;
@@ -54,13 +51,5 @@ export class Novelty {
       this.revealed = game.s.revealed;
       this.fresh(t, COMPS[this.revealed - 1]?.name ?? 'companion');
     }
-    if (game.relicsFound() > this.relics) {
-      this.relics = game.relicsFound();
-      this.fresh(t, `relic #${this.relics}`);
-    }
-  }
-
-  relicsFound() {
-    return this.relics;
   }
 }

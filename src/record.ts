@@ -76,7 +76,6 @@ export class PlayRecorder {
       case 'card': this.log({ e: 'card', id: ev.id, gold: ev.gold, lap: ev.lap, src: ev.src, first: ev.first }); break;
       case 'keep': this.log({ e: 'keep', on: ev.on }); break;
       case 'trophy': this.log({ e: 'trophy', id: ev.id }); break;
-      case 'curse': this.log({ e: 'curse', id: ev.id, tier: ev.tier }); break;
     }
   }
 

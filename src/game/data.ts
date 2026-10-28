@@ -527,33 +527,6 @@ export const isTraitId = (id: string) => /^m\d+_\d+$/.test(id);
 export const UPG_BY_ID = new Map(UPGRADES.map((u) => [u.id, u]));
 
 
-// ---------- cursed descents ----------
-
-/** A descent under one rule. Reaching floors 40 / 80 / 120 under it earns its reward tiers, for good. */
-export interface CurseDef {
-  id: string;
-  name: string;
-  rule: string;
-  /** The reward at tier 1–3. */
-  reward: (tier: number) => string;
-}
-
-export const CURSE_FLOORS = [40, 80, 120];
-/** Cursed descents open after this many ascents, a couple at a time. */
-export const CURSES_FROM = 5;
-
-export const CURSES: CurseDef[] = DEMO ? [] : [
-  { id: 'silent', name: 'Silent Blades', rule: "You can't attack by hand. The party and the Phantom Blade do everything.", reward: (t) => `Your Phantom Blade gets +${[0, 0.5, 1, 2][t]} attacks a second.` },
-  { id: 'iron', name: 'Iron Wardens', rule: 'Every boss is Armored.', reward: (t) => `Armored bosses block ${[0, 20, 40, 60][t]}% less.` },
-  { id: 'small', name: 'A Small Party', rule: 'Only six companions may join this descent.', reward: (t) => `Companion traits cost ${10 * t}% less.` },
-  { id: 'fuse', name: 'Short Fuse', rule: 'Boss timers are halved.', reward: (t) => `Every boss gives you ${5 * t} more seconds.` },
-  { id: 'norampage', name: 'No Rampage', rule: 'The Rampage meter never fills.', reward: (t) => `Rampage fills ${20 * t}% faster.` },
-  { id: 'mending', name: 'Mending Dark', rule: 'Every boss regenerates.', reward: (t) => `Regenerating bosses heal ${25 * t}% slower.` },
-  { id: 'lean', name: 'Lean Purse', rule: 'No upgrades from the shop: only companions and their traits.', reward: (t) => `Upgrades cost ${10 * t}% less.` },
-  { id: 'two', name: 'Two Curses', rule: 'Every boss is Armored and regenerates.', reward: (t) => `Ascending pays ×${[1, 1.25, 1.5, 2][t]} souls.` },
-];
-export const CURSE_BY_ID = new Map(CURSES.map((c) => [c.id, c]));
-
 // ---------- boss modifiers ----------
 
 export type ModId = 'armored' | 'enraged' | 'regen' | 'split' | 'giant';
@@ -562,17 +535,15 @@ export interface ModDef {
   id: ModId;
   name: string;
   desc: string;
-  /** Relic that answers it. */
-  counter: string;
   color: string;
 }
 
 export const MODS: ModDef[] = [
-  { id: 'armored', name: 'Armored', desc: 'Companions deal 75% less damage to it.', counter: 'pick', color: '#9fb4c8' },
-  { id: 'enraged', name: 'Enraged', desc: 'Only half the time to beat it.', counter: 'glass', color: '#ff6a4a' },
-  { id: 'regen', name: 'Regenerating', desc: 'Heals 3% of its health every second.', counter: 'rot', color: '#7ee07a' },
-  { id: 'split', name: 'Splitting', desc: 'Splits in two when it falls. Both halves have to die in time.', counter: 'cleaver', color: '#d58aff' },
-  { id: 'giant', name: 'Giant', desc: 'Three times the health, and 50% more time.', counter: 'slayer', color: '#ffc24a' },
+  { id: 'armored', name: 'Armored', desc: 'Companions deal 75% less damage to it.', color: '#9fb4c8' },
+  { id: 'enraged', name: 'Enraged', desc: 'Only half the time to beat it.', color: '#ff6a4a' },
+  { id: 'regen', name: 'Regenerating', desc: 'Heals 3% of its health every second.', color: '#7ee07a' },
+  { id: 'split', name: 'Splitting', desc: 'Splits in two when it falls. Both halves have to die in time.', color: '#d58aff' },
+  { id: 'giant', name: 'Giant', desc: 'Three times the health, and 50% more time.', color: '#ffc24a' },
 ];
 export const MOD_BY_ID = new Map(MODS.map((d) => [d.id, d]));
 
@@ -592,76 +563,6 @@ export function modsFor(floor: number): ModId[] {
   // Steps of 2 through a list of 5 visit every modifier before repeating one.
   return Array.from({ length: n }, (_, j) => MOD_ORDER[(k + j * 2) % MOD_ORDER.length]);
 }
-
-// ---------- relics ----------
-
-export type Rarity = 0 | 1 | 2 | 3;
-export const RARITY = ['Common', 'Rare', 'Epic', 'Legendary'] as const;
-
-export type RelicEffect = 'click' | 'party' | 'gold' | 'boss' | 'time' | 'critMult' | 'critChance' | 'pierce' | 'rot' | 'rampage' | 'goblin' | 'souls' | 'phantom' | 'cleave' | 'all' | 'oath';
-
-export interface RelicDef {
-  id: string;
-  name: string;
-  icon: string;
-  rarity: Rarity;
-  effect: RelicEffect;
-  flavor: string;
-}
-
-const r = (id: string, name: string, icon: string, rarity: Rarity, effect: RelicEffect, flavor: string): RelicDef => ({ id, name, icon, rarity, effect, flavor });
-
-/** Boss drops. You keep them forever; finding one again raises its level. */
-export const RELICS: RelicDef[] = [
-  r('whet', 'Whetstone', 'weapon_knife', 0, 'click', 'A little spit, a little stone, a lot of edge.'),
-  r('banner', 'Tattered Banner', 'wall_banner_red', 0, 'party', 'Nobody remembers the army. The banner remembers.'),
-  r('purse', 'Goblin Purse', 'coin', 0, 'gold', 'Still warm. Still jingling. Still somehow full.'),
-  r('slayer', 'Giantslayer', 'weapon_spear', 0, 'boss', 'The bigger they are, the more of them there is to stab.'),
-  r('glass', 'Sandglass', 'flask_yellow', 1, 'time', 'The sand falls up if you ask nicely.'),
-  r('razor', 'Razor Edge', 'weapon_saw_sword', 1, 'critMult', 'Cuts on the way in. Cuts worse on the way out.'),
-  r('hawk', 'Hawk\'s Eye', 'weapon_bow', 1, 'critChance', 'Sees the soft spot. Every monster has one.'),
-  r('pick', 'Armor\u00ADbreaker', 'weapon_big_hammer', 1, 'pierce', 'Plate is just a tin you open.'),
-  r('rot', 'Festering Blade', 'weapon_machete', 1, 'rot', 'Wounds it makes do not close. Ever.'),
-  r('drum', 'Blood Drum', 'flask_big_red', 2, 'rampage', 'Beat it once and the whole party sees red.'),
-  r('bait', 'Golden Bait', 'chest_full_open', 2, 'goblin', 'Goblins cannot resist. Goblins have never resisted anything.'),
-  r('cage', 'Soul Cage', 'skull', 2, 'souls', 'It hums when you go deeper.'),
-  r('hilt', 'Phantom Hilt', 'weapon_katana', 2, 'phantom', 'The sword is gone. The swinging is not.'),
-  r('cleaver', 'Headsman\'s Cleaver', 'weapon_cleaver', 2, 'cleave', 'One swing, many necks.'),
-  r('shard', 'Deepheart Shard', 'ui_heart_full', 3, 'all', 'A splinter of the thing at the bottom. It beats.'),
-  r('oath', 'Oathkeeper', 'weapon_golden_sword', 3, 'oath', 'Your hand, and the strength of everyone behind you.'),
-];
-export const RELIC_BY_ID = new Map(RELICS.map((x) => [x.id, x]));
-
-/** What a relic does at a level, in words. */
-/** Relic levels that earn a star; each star makes the relic a quarter stronger. */
-export const RELIC_STARS = [5, 15, 40, 100];
-export const relicStars = (lv: number) => RELIC_STARS.filter((n) => lv >= n).length;
-/** The level a relic works at: its own level, plus a quarter per star. */
-export const relicPower = (lv: number) => lv + Math.floor((lv * relicStars(lv)) / 4);
-
-export function relicText(def: RelicDef, lv: number): string {
-  const L = Math.max(1, relicPower(lv));
-  switch (def.effect) {
-    case 'click': return `Base click damage ×${1 + L}.`;
-    case 'party': return `Companions deal ×${fmtN(1 + 0.5 * L)} damage.`;
-    case 'gold': return `Monsters drop ×${fmtN(1 + 0.5 * L)} gold.`;
-    case 'boss': return `×${1 + L} damage to bosses.`;
-    case 'time': return `Bosses give you ${Math.min(30, 3 * L)} more seconds.`;
-    case 'critMult': return `Critical hits deal ×${fmtN(1 + 0.5 * L)} damage.`;
-    case 'critChance': return `+${Math.min(30, 2 * L)}% critical hit chance.`;
-    case 'pierce': return `Armored bosses block ${Math.round(75 * 0.7 ** L)}% of companion damage instead of 75%.`;
-    case 'rot': return `Regenerating bosses heal ${fmtN(3 * 0.7 ** L)}% a second instead of 3%.`;
-    case 'rampage': return `Rampage +${L}.`;
-    case 'goblin': return `Treasure goblins show up ${30 * L}% more often.`;
-    case 'souls': return `Ascending earns ${15 * L}% more souls.`;
-    case 'phantom': return `Your Phantom Blade attacks ${fmtN(0.5 * L)} more time${0.5 * L === 1 ? '' : 's'} a second.`;
-    case 'cleave': return `Clicks also hit every other monster for ${20 * L}% damage.`;
-    case 'all': return `All damage ×${1 + L}.`;
-    case 'oath': return `Each click also deals ${10 * L}% of your party's damage per second.`;
-  }
-}
-
-const fmtN = (n: number) => (Math.round(n * 100) / 100).toString();
 
 // ---------- Legends (spending souls) ----------
 
