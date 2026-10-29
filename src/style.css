@@ -130,7 +130,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   border: 6px solid transparent;
   border-image: var(--f-btn) 2 fill / 6px stretch;
   font: 600 16px/1 var(--f-text); color: var(--text); text-shadow: var(--shadow);
-  white-space: nowrap; text-decoration: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; text-decoration: none;
 }
 .btn:hover:not(:disabled) { border-image-source: var(--f-btn-hi); }
 .btn:active:not(:disabled), .btn.on { border-image-source: var(--f-btn-down); transform: translateY(2px); }
@@ -507,8 +507,7 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 .gen-mid { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .gen-name { font: 700 18px/1 var(--f-text); color: var(--text); text-shadow: var(--shadow); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gen-name small { font: 400 14px/1 'Silkscreen'; color: var(--gold); }
-.gen-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: 0 1 auto; min-width: 0; max-width: 45%; }
-.gen-lv, .gen-dps { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gen-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
 /* The star picks your hero: shown on your hero's row, and on the others when you hover them. */
 .gen { position: relative; }
 .gen-hero { position: absolute; left: 3px; top: 3px; display: none; padding: 3px; line-height: 0; color: var(--faint); cursor: pointer;
