@@ -370,7 +370,7 @@ export class KeepView {
   }
 
   /** One frame: walk (keys first, else the clicked path), drag the trail, use stations, draw. */
-  frame(dt: number, keys: { x: number; y: number }, w: number, h: number) {
+  frame(dt: number, keys: { x: number; y: number }, w: number, h: number, zoomW = w) {
     this.time += dt;
     const hero = this.hero;
     let vx = keys.x, vy = keys.y;
@@ -420,7 +420,7 @@ export class KeepView {
       this.goal = null;
       if (this.near === goal) this.onUse(goal);
     }
-    this.draw(dt, w, h);
+    this.draw(dt, w, h, zoomW);
   }
 
   /** Every station right now: the fixed ones, each Spirit on offer in the shrine and each of yours where it stands
@@ -515,7 +515,7 @@ export class KeepView {
     return c;
   }
 
-  private draw(dt: number, w: number, h: number) {
+  private draw(dt: number, w: number, h: number, zoomW: number) {
     const c = this.canvas;
     const dpr = Math.min(2, devicePixelRatio || 1);
     if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
@@ -525,7 +525,7 @@ export class KeepView {
       c.style.height = `${h}px`;
     }
     // About 20 cells across, in whole pixels.
-    this.zoom = Math.max(2, Math.round(w / (20 * 16)));
+    this.zoom = Math.max(2, Math.round(zoomW / (20 * 16)));
     const g = this.g;
     const atlas = uiAtlas();
     if (!atlas) return;

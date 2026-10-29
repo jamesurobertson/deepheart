@@ -276,7 +276,7 @@ export class Ui {
   private heroAim: { x: number; y: number } | null = null;
   private fingerDown = false;
   /** The battlefield's share of the window (left of the party panel / above the phone sheet). */
-  private field = { w: innerWidth, h: innerHeight };
+  private field = { w: innerWidth, h: innerHeight, shownW: innerWidth };
   /** Arrow keys / WASD held down, for steering your hero. */
   private keys = new Set<'up' | 'down' | 'left' | 'right'>();
   /** After steering with the keys the hero ignores the mouse until it moves again (and stays put a moment first). */
@@ -348,6 +348,7 @@ export class Ui {
       <div class="letterbox" aria-hidden="true"></div>
       <div class="banner" hidden><b></b><span></span></div>
       <div class="ticker"><span></span></div>
+      <button class="btn ui-back" data-act="showUi" hidden><kbd>H</kbd>Show interface</button>
       <nav class="dock">
         <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy(3)}<span>Collection</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>Ascend</span><em class="badge" hidden></em></button>
@@ -451,22 +452,46 @@ export class Ui {
     body.toggle('phone', sheet);
     body.toggle('compact', compact);
     const shop = this.el.shop.getBoundingClientRect();
+    // With the interface hidden (H) the party panel is gone, so the fight gets its space.
+    const shopLeft = this.uiHidden ? w : shop.left;
+    const shopTop = this.uiHidden ? h : shop.top;
     // The ability column stands between the fight and the party panel (on a phone it's a row along the bottom instead).
     const column = sheet ? 0 : this.el.abilities.getBoundingClientRect().width;
-    const freeW = sheet ? w : shop.left - column;
-    const freeH = sheet ? shop.top : h;
-    this.field = { w: freeW, h: freeH };
+    const freeW = sheet ? w : shopLeft - column;
+    const freeH = sheet ? shopTop : h;
+    // shownW is the width with the interface up, so hiding it (H) doesn't zoom the Keep.
+    this.field = { w: freeW, h: freeH, shownW: this.uiHidden ? this.field.shownW : freeW };
     this.root.style.setProperty('--free-w', `${freeW}px`);
     // The floor map sits in the top-left corner only when the gold counter, centered over the fight, can't reach it.
     body.toggle('map-in-bar', compact || freeW < 980);
     this.root.style.setProperty('--free-h', `${freeH}px`);
     // The news ticker starts where the dock ends (the dock grows as features are added).
-    const dock = this.root.querySelector('.dock')!.getBoundingClientRect();
+    const dock = this.root.querySelector(this.uiHidden ? '.ui-back' : '.dock')!.getBoundingClientRect();
     this.root.style.setProperty('--dock-r', `${Math.round(dock.right + 20)}px`);
     // Frame the fight below the HUD (the floor bar is the last part that always shows).
     const hud = this.el.floorBox.getBoundingClientRect();
     this.hudTop = compact ? Math.round(hud.bottom + 4) : 0;
-    this.scene.setViewport(sheet ? 0 : w - shop.left + column, sheet ? h - shop.top : 0, this.hudTop);
+    this.scene.setViewport(sheet ? 0 : w - shopLeft + column, sheet ? h - shopTop : 0, this.hudTop);
+  }
+
+  private uiHidden = false;
+  private uiBackTimer = 0;
+
+  /** H: hide the party panel, dock and floor map for a clean view, with a hint that fades until the mouse moves. */
+  private setUiHidden(on: boolean) {
+    if (on === this.uiHidden) return;
+    this.uiHidden = on;
+    document.body.classList.toggle('ui-hidden', on);
+    this.flashUiBack();
+    this.layout();
+  }
+
+  private flashUiBack() {
+    const back = this.root.querySelector<HTMLElement>('.ui-back')!;
+    back.hidden = !this.uiHidden;
+    back.classList.remove('faded');
+    clearTimeout(this.uiBackTimer);
+    if (this.uiHidden) this.uiBackTimer = window.setTimeout(() => back.classList.add('faded'), 2500);
   }
 
   /** Portrait sheet: folded (header only), half (default) or full height. */
@@ -573,6 +598,7 @@ export class Ui {
     addEventListener('pointercancel', letGo);
     addEventListener('blur', letGo);
     addEventListener('pointermove', (e) => {
+      if (this.uiHidden) this.flashUiBack();
       const t = e.target as HTMLElement;
       const over = !t.closest('#ui button, #ui .shop, #ui .pnl') && (this.scene.overMonster(e.clientX, e.clientY) || this.scene.overLoot(e.clientX, e.clientY) || (!!this.game.raid && this.scene.hitRaider(e.clientX, e.clientY)) || (!!this.game.vault && this.scene.hitVaultGoblin(e.clientX, e.clientY) !== null));
       document.body.classList.toggle('grab', over);
@@ -630,8 +656,8 @@ export class Ui {
       if ((e.target as HTMLElement).closest('input, textarea')) return;
       if (e.key === 'Escape' && this.modal) this.closeModal();
       // H hides the interface for screenshots; H again or Escape brings it back.
-      if (e.key.toLowerCase() === 'h' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) document.body.classList.toggle('ui-hidden');
-      else if (e.key === 'Escape') document.body.classList.remove('ui-hidden');
+      if (e.key.toLowerCase() === 'h' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) this.setUiHidden(!this.uiHidden);
+      else if (e.key === 'Escape') this.setUiHidden(false);
       // U buys the cheapest companion trait you can afford.
       if (e.key.toLowerCase() === 'u' && !e.repeat && !this.modal) {
         const next = this.game.shopUpgrades().find((u) => this.game.s.gold.gte(this.game.upgCost(u)));
@@ -1041,6 +1067,7 @@ export class Ui {
       case 'heartBack': this.modal = 'heart'; this.renderModal(); break;
       case 'descendGo': this.doDescend(); break;
       case 'leaveVault': this.game.leaveVault(); break;
+      case 'showUi': this.setUiHidden(false); break;
       case 'abyssBack': this.modal = 'abyss'; this.renderModal(); break;
       case 'tripGo': {
         const i = Number(el.closest<HTMLElement>('[data-hunter]')!.dataset.hunter);
@@ -1527,7 +1554,7 @@ export class Ui {
       const keys = this.modal ? { x: 0, y: 0 } : { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), y: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
       // The Legend picked in the menu is the one lit in the shrine behind it.
       if (this.modal === 'abyss' && this.legendPick) this.keepView.pinned = `offer:${this.legendPick}`;
-      this.keepView.frame(dt, keys, this.field.w, this.field.h);
+      this.keepView.frame(dt, keys, this.field.w, this.field.h, this.field.shownW);
     }
     this.keepLabelsFrame();
     // A held attack keeps to whatever is under the cursor, which changes as monsters move and die even when the mouse
@@ -1622,7 +1649,7 @@ export class Ui {
       this.el.bladeIn.innerHTML = sprite(blade, blade === 'weapon_knife' ? 3 : 2);
     }
     // Measured here, not every frame: reading layout each frame makes the browser redo it.
-    this.scene.heroBlocked = [this.el.dock.getBoundingClientRect()];
+    this.scene.heroBlocked = this.uiHidden ? [] : [this.el.dock.getBoundingClientRect()];
     setText(this.el.dps, fmt(g.dpsTotal()));
     setText(this.el.click, fmt(g.clickTotal()));
     this.el.rate.classList.toggle('boosted', g.s.buffs.some((b) => b.id !== 'fever'));

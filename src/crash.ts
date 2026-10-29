@@ -14,9 +14,13 @@ export function installCrashScreen() {
     const note = document.createElement('p');
     note.textContent = 'Your save is safe.';
     const reload = document.createElement('button');
+    reload.type = 'button';
+    reload.className = 'mm-btn primary';
     reload.textContent = 'Reload';
     reload.onclick = () => location.reload();
     const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'mm-btn';
     copy.textContent = 'Copy details';
     copy.onclick = () => {
       navigator.clipboard?.writeText(details).then(() => (copy.textContent = 'Copied'), () => {});

@@ -63,7 +63,6 @@ html, body {
 body.grab #stage { cursor: pointer; }
 /* With a mouse, the sprite cursor stands in for the system one everywhere. */
 body.blade-on, body.blade-on * { cursor: none !important; }
-body.ui-hidden #ui { visibility: hidden; pointer-events: none; }
 
 /* The sword cursor: hilt sits just below-right of the pointer, tip toward it; clicks swing it. */
 .blade { position: fixed; left: 0; top: 0; z-index: 9999; pointer-events: none; }
@@ -437,6 +436,11 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 /* ---------- dock ---------- */
 
 .dock { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; align-items: flex-end; }
+body.ui-hidden :is(.shop, .dock, .zone-map, .floor-mid .floor-map) { display: none !important; }
+body.ui-hidden .abilities { right: 0; }
+.ui-back { position: absolute; left: 12px; bottom: 12px; z-index: 40; height: 52px; gap: 12px; padding: 4px 16px 4px 12px; font-size: 20px; transition: opacity 0.6s; }
+.ui-back.faded { opacity: 0; }
+.ui-back kbd { display: grid; place-items: center; width: 30px; height: 30px; font: 400 24px/1 'Silkscreen', monospace; color: var(--ink); text-shadow: none; background: linear-gradient(#fff4d6, #e9d6aa); box-shadow: 0 0 0 2px var(--ink), 0 4px 0 2px #8a6a3a; translate: 0 -2px; }
 .dock-b { position: relative; flex-direction: column; min-width: 76px; height: 64px; gap: 4px; padding: 4px 6px; font-size: 14px; }
 /* Drawn at 3× (see the dock in ui.ts): a box that isn't a whole multiple of the pixel grid makes uneven pixels. */
 .dock-b .glyph { color: var(--gold); }
@@ -1618,11 +1622,9 @@ body.over-act .blade-act { display: block; }
 .tip, .trip-mid, .tt-trip dd { font-variant-numeric: tabular-nums; }
 .skill-u { text-decoration: underline dotted var(--gold-hi); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: help; }
 
-.crash { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(10, 7, 8, 0.96); color: var(--text); font-family: 'Silkscreen', monospace; }
-.crash h1 { margin: 0; font-size: 28px; }
-.crash p { margin: 0 0 6px; color: var(--dim); }
-.crash button { min-width: 160px; padding: 10px 16px; font: inherit; color: var(--text); background: #1c1214; border: 2px solid var(--faint); cursor: pointer; }
-.crash button:hover { border-color: var(--gold-hi); }
+.crash { position: fixed; inset: 0; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 16px; background: rgba(10, 7, 8, 0.96); color: var(--text); }
+.crash h1 { margin: 0; font: 400 64px/1 'Jersey 10', monospace; color: var(--text); text-shadow: 0 4px 0 var(--ink); }
+.crash p { margin: 0 0 10px; font: 400 13px/1 'Silkscreen', monospace; letter-spacing: 2px; color: #a8907c; }
 
 /* Controller: the focus ring shows once menu mode is on, and wherever a window or the title menu is up. */
 body.pad-nav :is(button, a, [tabindex="0"]):focus { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
