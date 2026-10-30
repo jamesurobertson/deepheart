@@ -2982,7 +2982,12 @@ export class Scene {
       if (roar && !roar.released) {
         const lit = Math.min(1, Math.max(0, (roar.t - 0.05 - Math.abs(c.body.position.x - roar.at.x) * 0.025) / 0.08));
         c.sprite.rage(lit * 2.5, 0);
-      } else c.sprite.rage(this.fever * flicker + flare * 1.5, heat * (0.65 + 0.35 * Math.sin(this.time * 9 + phase)) * calm);
+      } else {
+        // The rim crackles: each companion's drops out for a frame now and then, out of step with the rest.
+        const step = Math.floor(this.time * 20);
+        const crackle = !this.settings.calm && (Math.abs(Math.sin((step + c.comp * 13.7) * 12.9898) * 43758.5453) % 1) < 0.22 ? 0 : 1;
+        c.sprite.rage(this.fever * flicker + flare * 1.5, heat * (0.65 + 0.35 * Math.sin(this.time * 9 + phase)) * calm * crackle);
+      }
       // On a burst, a hot flash, then red fading out. (Kept dim: a whole party flashing at once blooms to white.)
       const e = c.sprite.mesh.material.emissive;
       if (age < 0.06) e.setRGB(0.6, 0.3, 0.25).multiplyScalar(calm);

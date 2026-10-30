@@ -1,5 +1,5 @@
 /** The game's version, the same as the desktop release's tag (bump both together). */
-export const GAME_VERSION = '0.10.11';
+export const GAME_VERSION = '0.10.12';
 
 /** A save last played on an earlier minor version (or before saves were stamped): it starts over. Minor versions are
  *  the ones that change the game enough to; patches carry saves on. */
