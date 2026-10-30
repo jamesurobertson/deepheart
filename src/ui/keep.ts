@@ -82,8 +82,7 @@ const RISE = 0.6;
 const STAGGER = 0.14;
 /** The menu's arrive easing, cubic-bezier(0.2, 1.5, 0.4, 1): a quick rise that overshoots and settles. */
 const overshoot = (t: number) => 1 + 2.4 * (t - 1) ** 3 + 1.4 * (t - 1) ** 2;
-/** The shrine: the Spirits on offer float here as spirits, big, side by side (their feet on these cells); with none on
- *  offer, a soul-purple obelisk stands in the middle. */
+/** The shrine: the Spirits on offer float here as spirits, big, side by side (their feet on these cells). */
 const SHRINE: [number, number] = [23, 8];
 const SPIRITS: [number, number][] = [[18, 9], [23, 9], [28, 9]];
 /** Where the Spirits you've summoned hang out in the Great Hall, in the order they're listed: spread about the room,
@@ -182,11 +181,10 @@ export class KeepView {
     // A south wall's cap is drawn along the bottom of the room's last floor row.
     for (const t of this.tiles[2]) if (t.name === 'wall_top_mid' && this.cells[t.y]?.[t.x] === '.') this.capped.add(`${t.x},${t.y}`);
     for (const [, x, y, how] of THINGS) if (!how) this.blocked.add(`${x},${y}`);
-    // The shrine's obelisk and the Heart's plinth stand in the way; spirits don't (you walk right through them).
+    // The Heart's plinth stands in the way; spirits don't (you walk right through them).
     // The door's posts are two tiles tall: their lower halves stand on the floor in front of the doorway.
     this.blocked.add('21,27');
     this.blocked.add('24,27');
-    this.blocked.add(`${SHRINE[0]},${SHRINE[1]}`);
     this.blocked.add(`${HEART[0]},${HEART[1]}`);
     for (const p of PEOPLE) this.blocked.add(`${p.x},${p.y}`);
     this.blocked.add(`${KOKO[0]},${KOKO[1]}`);
@@ -711,13 +709,6 @@ export class KeepView {
         const fx = t < 1 ? { dy: (1 - overshoot(t)) * 1.6, alpha: Math.min(1, t / 0.6), sy: 0.2 + 0.8 * overshoot(t), flash: Math.max(0, 1 - t * 1.6) } : undefined;
         spirit(LEGEND_BY_ID.get(id)!.sprite, SPIRITS[k], k, 2, `offer:${id}`, fx);
       });
-    } else {
-      const column = atlas.rect('column');
-      standing.push({ y: SHRINE[1] + 1, draw: () => {
-        g.filter = 'hue-rotate(250deg) saturate(2.2) brightness(1.25)';
-        stand(img, column, SHRINE[0] + 0.5, SHRINE[1] + 1);
-        g.filter = 'none';
-      } });
     }
     // Wisps rising across the shrine.
     standing.push({ y: SHRINE[1] + 1.5, draw: () => {
