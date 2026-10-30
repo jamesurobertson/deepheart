@@ -1604,6 +1604,15 @@ export class Game {
     this.bankAllDrops();
   }
 
+  /** Testing only (the ?quick hour keys, local only): farm the floor you're on for this long, paid as time away is,
+   *  with hunters out on expeditions that much further along. */
+  devSkipTime(seconds: number) {
+    for (const e of this.s.expeditions) if (e.pausedAt === undefined) e.start -= seconds * 1000;
+    if (this.s.lastAttack) this.s.lastAttack -= seconds * 1000;
+    this.bankAllDrops();
+    return this.applyOffline(seconds);
+  }
+
   /** Clear the floor in one go: monsters on the field die as usual, the rest are paid out as if they had. */
   private sweep() {
     const s = this.s;
