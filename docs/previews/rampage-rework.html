@@ -1,0 +1,363 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Rampage Rework</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jersey+10&family=Silkscreen&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* Layout: one column, the two stages stacked like before/after frames from the game, controls between them. */
+  :root {
+    --ink: #120c10;
+    --stone: #1e1519;
+    --edge: #3a2a2a;
+    --text: #f3e6d6;
+    --muted: #a8907c;
+    --blood: #ff3a4f;
+    --gold: #ffd27a;
+    --display: 'Jersey 10', 'Silkscreen', monospace;
+    --label: 'Silkscreen', ui-monospace, monospace;
+    --body: 'Atkinson Hyperlegible', system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  body { background: var(--ink); color: var(--text); font: 16px/1.55 var(--body); }
+  main { max-width: 980px; margin: 0 auto; padding-block: 28px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 22px; }
+  header { display: grid; gap: 6px; }
+  h1 { margin: 0; font: 400 clamp(44px, 9vw, 72px)/0.9 var(--display); letter-spacing: 1px; text-shadow: 0 4px 0 #000; text-wrap: balance; }
+  h1 span { color: var(--blood); }
+  .lede { margin: 0; color: var(--muted); max-width: 62ch; }
+  .stage { display: grid; gap: 8px; }
+  .stage-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .tag { font: 400 13px/1 var(--label); letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .tag b { color: var(--text); font-weight: 400; }
+  .stage.new .tag b { color: var(--blood); }
+  canvas { display: block; width: 100%; max-width: 100%; aspect-ratio: 240 / 64; image-rendering: pixelated; background: var(--stone); border: 2px solid var(--edge); box-shadow: 0 0 0 2px #000; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .btn { appearance: none; cursor: pointer; font: 400 14px/1 var(--label); letter-spacing: 1px; color: var(--text); background: linear-gradient(#3a2722, #2a1d18); border: 2px solid #000; box-shadow: inset 0 0 0 2px #6a4a32, 0 3px 0 #000; padding: 11px 16px; border-radius: 0; }
+  .btn:hover { filter: brightness(1.15); }
+  .btn:active { translate: 0 2px; box-shadow: inset 0 0 0 2px #6a4a32, 0 1px 0 #000; }
+  .btn:focus-visible, .toggle input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: 3px; }
+  .btn.primary { color: #fff3f0; background: linear-gradient(#c8283c, #8a1626); box-shadow: inset 0 0 0 2px #ff7a86, 0 3px 0 #000; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font: 400 13px/1 var(--label); letter-spacing: 1px; color: var(--text); user-select: none; }
+  .toggle input { position: absolute; opacity: 0; pointer-events: none; }
+  .toggle span { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 2px solid var(--edge); background: var(--stone); }
+  .toggle span::before { content: ''; width: 12px; height: 12px; background: #000; box-shadow: inset 0 0 0 2px #6a4a32; }
+  .toggle input:checked + span::before { background: var(--blood); box-shadow: inset 0 0 0 2px #ff9aa4, 0 0 8px var(--blood); }
+  .changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 6px 0 0; padding: 0; list-style: none; }
+  .changes li { min-width: 0; padding: 14px 16px; background: var(--stone); border-left: 3px solid var(--blood); }
+  .changes h2 { margin: 0 0 4px; font: 400 14px/1.2 var(--label); letter-spacing: 1px; color: var(--gold); }
+  .changes p { margin: 0; color: var(--muted); font-size: 15px; }
+  @media (prefers-reduced-motion: reduce) { .btn:active { translate: none; } }
+</style>
+
+<main>
+  <header>
+    <h1>Rampage, <span>reworked</span></h1>
+    <p class="lede">Ten of the companions with the game's own sprites, playing a Rampage on loop: its start, a tier-up halfway through, and its end. The top row is today's effect, the bottom row the new one.</p>
+  </header>
+
+  <section class="stage">
+    <div class="stage-head"><span class="tag"><b>Now</b> · one ring each</span></div>
+    <canvas id="now" width="960" height="256" aria-label="Today's Rampage: a thin red ring flashes around each companion"></canvas>
+  </section>
+
+  <div class="controls">
+    <button class="btn primary" id="go" type="button">Rampage</button>
+    <button class="btn" id="tier" type="button">Tier up</button>
+    <label class="toggle"><input id="eyes" type="checkbox" checked><span>Red eyes</span></label>
+    <label class="toggle"><input id="loop" type="checkbox" checked><span>Loop</span></label>
+  </div>
+
+  <section class="stage new">
+    <div class="stage-head"><span class="tag"><b>New</b> · burst, glow, embers, eyes</span></div>
+    <canvas id="new" width="960" height="256" aria-label="The new Rampage: floor bursts, a red outline glow, rising embers and glowing red eyes"></canvas>
+  </section>
+
+  <ul class="changes">
+    <li><h2>Floor burst</h2><p>A ring blasts out along the floor under each companion, rolling outward from the middle of the party.</p></li>
+    <li><h2>Red outline</h2><p>Every companion gets a pulsing red rim for as long as the Rampage lasts.</p></li>
+    <li><h2>Embers</h2><p>Sparks rise off the party the whole time, twice as many after a tier-up.</p></li>
+    <li><h2>Red eyes</h2><p>Eyes, visor slits and carved pumpkin eyes burn red and glow, then cool back down when it ends.</p></li>
+  </ul>
+</main>
+
+<script>
+const SHEET = 'data:image/png;base64,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';
+const DATA = {"party":[{"name":"Squire","frames":[{"x":0,"y":0,"w":16,"h":28,"eyes":[[8,16],[8,17],[8,18],[10,16],[10,17],[10,18]]},{"x":17,"y":0,"w":16,"h":28,"eyes":[[8,17],[8,18],[8,19],[10,17],[10,18],[10,19]]},{"x":34,"y":0,"w":16,"h":28,"eyes":[[8,18],[8,19],[8,20],[10,18],[10,19],[10,20]]},{"x":51,"y":0,"w":16,"h":28,"eyes":[[8,17],[8,18],[8,19],[10,17],[10,18],[10,19]]}]},{"name":"Ranger","frames":[{"x":68,"y":0,"w":16,"h":28,"eyes":[[6,17],[7,17],[6,18],[7,18],[11,17],[11,18]]},{"x":85,"y":0,"w":16,"h":28,"eyes":[[6,18],[7,18],[6,19],[7,19],[11,18],[11,19]]},{"x":102,"y":0,"w":16,"h":28,"eyes":[[6,19],[7,19],[6,20],[7,20],[11,19],[11,20]]},{"x":119,"y":0,"w":16,"h":28,"eyes":[[6,18],[7,18],[6,19],[7,19],[11,18],[11,19]]}]},{"name":"Dwarf Brawler","frames":[{"x":136,"y":0,"w":16,"h":28,"eyes":[[8,18],[9,18],[8,19],[9,19],[13,18],[13,19]]},{"x":153,"y":0,"w":16,"h":28,"eyes":[[8,19],[9,19],[8,20],[9,20],[13,19],[13,20]]},{"x":170,"y":0,"w":16,"h":28,"eyes":[[8,20],[9,20],[8,21],[9,21],[13,20],[13,21]]},{"x":187,"y":0,"w":16,"h":28,"eyes":[[8,19],[9,19],[8,20],[9,20],[13,19],[13,20]]}]},{"name":"Apprentice","frames":[{"x":204,"y":0,"w":16,"h":28,"eyes":[[7,18],[8,18],[7,19],[8,19],[12,18],[12,19]]},{"x":221,"y":0,"w":16,"h":28,"eyes":[[7,19],[8,19],[7,20],[8,20],[12,19],[12,20]]},{"x":238,"y":0,"w":16,"h":28,"eyes":[[7,20],[8,20],[7,21],[8,21],[12,20],[12,21]]},{"x":255,"y":0,"w":16,"h":28,"eyes":[[7,19],[8,19],[7,20],[8,20],[12,19],[12,20]]}]},{"name":"Gingerbread Man","frames":[{"x":272,"y":0,"w":12,"h":19,"eyes":[[5,6],[6,6],[5,7],[6,7],[10,6],[10,7]]},{"x":285,"y":0,"w":12,"h":19,"eyes":[[5,7],[6,7],[5,8],[6,8],[10,7],[10,8]]},{"x":298,"y":0,"w":12,"h":19,"eyes":[[5,8],[6,8],[5,9],[6,9],[10,8],[10,9]]},{"x":311,"y":0,"w":12,"h":19,"eyes":[[5,7],[6,7],[5,8],[6,8],[10,7],[10,8]]}]},{"name":"Lizard Hunter","frames":[{"x":324,"y":0,"w":16,"h":28,"eyes":[[6,15],[7,15],[6,16],[7,16],[10,15],[10,16]]},{"x":341,"y":0,"w":16,"h":28,"eyes":[[6,16],[7,16],[6,17],[7,17],[10,16],[10,17]]},{"x":358,"y":0,"w":16,"h":28,"eyes":[[6,18],[7,18],[6,19],[7,19],[10,18],[10,19]]},{"x":375,"y":0,"w":16,"h":28,"eyes":[[6,16],[7,16],[6,17],[7,17],[10,16],[10,17]]}]},{"name":"Lantern Knight","frames":[{"x":392,"y":0,"w":16,"h":23,"eyes":[[5,9],[6,9],[7,9],[12,9],[13,9],[5,10],[6,10],[7,10],[8,10],[11,10],[12,10],[13,10]]},{"x":409,"y":0,"w":16,"h":23,"eyes":[[5,9],[6,9],[7,9],[12,9],[13,9],[5,10],[6,10],[7,10],[8,10],[11,10],[12,10],[13,10]]},{"x":426,"y":0,"w":16,"h":23,"eyes":[[5,12],[6,12],[7,12],[12,12],[13,12],[5,13],[6,13],[7,13],[8,13],[11,13],[12,13],[13,13]]},{"x":443,"y":0,"w":16,"h":23,"eyes":[[5,10],[6,10],[7,10],[12,10],[13,10],[5,11],[6,11],[7,11],[8,11],[11,11],[12,11],[13,11]]}]},{"name":"The Count","frames":[{"x":460,"y":0,"w":26,"h":19,"eyes":[[11,5],[12,5],[11,6],[12,6],[15,5],[15,6]]},{"x":0,"y":29,"w":26,"h":19,"eyes":[[11,6],[12,6],[11,7],[12,7],[15,6],[15,7]]},{"x":27,"y":29,"w":26,"h":19,"eyes":[[11,6],[12,6],[11,7],[12,7],[15,6],[15,7]]},{"x":54,"y":29,"w":26,"h":19,"eyes":[[11,5],[12,5],[11,6],[12,6],[15,5],[15,6]]}]},{"name":"Exiled King","frames":[{"x":81,"y":29,"w":15,"h":23,"eyes":[[6,9],[7,9],[11,9],[6,10],[7,10],[11,10]]},{"x":97,"y":29,"w":15,"h":23,"eyes":[[6,10],[7,10],[11,10],[6,11],[7,11],[11,11]]},{"x":113,"y":29,"w":15,"h":23,"eyes":[[6,11],[7,11],[11,11],[6,12],[7,12],[11,12]]},{"x":129,"y":29,"w":15,"h":23,"eyes":[[6,10],[7,10],[11,10],[6,11],[7,11],[11,11]]}]},{"name":"Fallen Angel","frames":[{"x":145,"y":29,"w":16,"h":16,"eyes":[[8,9],[9,9],[12,9],[8,10],[9,10],[12,10]]},{"x":162,"y":29,"w":16,"h":16,"eyes":[[8,10],[9,10],[12,10],[8,11],[9,11],[12,11]]},{"x":179,"y":29,"w":16,"h":16,"eyes":[[8,11],[9,11],[12,11],[8,12],[9,12],[12,12]]},{"x":196,"y":29,"w":16,"h":16,"eyes":[[8,10],[9,10],[12,10],[8,11],[9,11],[12,11]]}]}],"floor":[{"x":213,"y":29},{"x":230,"y":29},{"x":247,"y":29},{"x":264,"y":29},{"x":281,"y":29},{"x":298,"y":29},{"x":315,"y":29},{"x":332,"y":29}]};
+const K = 4, W = 240, H = 64, GROUND = 54;
+const DUR = 8, GAP = 2.2, TIER_AT = 3.6, FADE = 0.6;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const img = new Image();
+img.src = SHEET;
+
+/** Per frame: the sprite, a red and a white silhouette, and a one-pixel red outline, each on its own small canvas. */
+function bake(frame) {
+  const make = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const base = make(frame.w, frame.h);
+  base.getContext('2d').drawImage(img, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
+  const tint = (color) => {
+    const c = make(frame.w, frame.h), g = c.getContext('2d');
+    g.drawImage(base, 0, 0);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = color;
+    g.fillRect(0, 0, frame.w, frame.h);
+    return c;
+  };
+  const red = tint('#ff3a4f'), white = tint('#ffffff');
+  const outline = make(frame.w + 2, frame.h + 2), og = outline.getContext('2d');
+  for (const [dx, dy] of [[0, 1], [2, 1], [1, 0], [1, 2]]) og.drawImage(red, dx, dy);
+  og.globalCompositeOperation = 'destination-out';
+  og.drawImage(base, 1, 1);
+  return { ...frame, base, red, white, outline };
+}
+
+let party = [];
+img.onload = () => {
+  party = DATA.party.map((c, i) => {
+    const frames = c.frames.map(bake);
+    const n = DATA.party.length;
+    const x = Math.round(22 + (i * (W - 44)) / (n - 1));
+    const y = GROUND + (i % 2 ? -5 : 2);
+    return { name: c.name, frames, x, y, phase: (i * 0.37) % 1, order: Math.abs(i - (n - 1) / 2) };
+  });
+  floorTiles = DATA.floor;
+  requestAnimationFrame(tick);
+};
+let floorTiles = [];
+
+const nowCv = document.getElementById('now'), newCv = document.getElementById('new');
+const nowG = nowCv.getContext('2d'), newG = newCv.getContext('2d');
+for (const g of [nowG, newG]) g.imageSmoothingEnabled = false;
+const eyesBox = document.getElementById('eyes'), loopBox = document.getElementById('loop');
+
+// The shared clock: a Rampage runs from `start` for DUR seconds, with tier-ups at the times in `tiers`.
+let clock = 1.2, start = 0, tiers = [TIER_AT];
+const embers = [];
+const rand = (() => { let s = 7; return () => ((s = (s * 16807) % 2147483647) / 2147483647); })();
+function rampage() { start = clock; tiers = loopBox.checked ? [clock + TIER_AT] : []; }
+document.getElementById('go').addEventListener('click', rampage);
+document.getElementById('tier').addEventListener('click', () => { if (on() > 0) tiers.push(clock); else { rampage(); tiers = [clock + 0.6]; } });
+/** 0..1: how much Rampage is on right now (eased in and out). */
+function on() {
+  const t = clock - start;
+  if (t < 0 || t > DUR) return 0;
+  return Math.min(1, t / 0.15, (DUR - t) / FADE);
+}
+
+function drawFloor(g) {
+  let k = 0;
+  for (let y = 0; y < H; y += 16) for (let x = 0; x < W; x += 16) {
+    const t = floorTiles[(x * 7 + y * 13 + (k++ * 5)) % floorTiles.length];
+    g.drawImage(img, t.x, t.y, 16, 16, x * K, y * K, 16 * K, 16 * K);
+  }
+  g.fillStyle = 'rgba(10,6,8,0.55)';
+  g.fillRect(0, 0, W * K, H * K);
+  const fog = g.createLinearGradient(0, 0, 0, H * K);
+  fog.addColorStop(0, 'rgba(8,4,6,0.85)');
+  fog.addColorStop(0.45, 'rgba(8,4,6,0.1)');
+  fog.addColorStop(1, 'rgba(8,4,6,0.45)');
+  g.fillStyle = fog;
+  g.fillRect(0, 0, W * K, H * K);
+}
+
+function frameOf(c, haste) {
+  return c.frames[Math.floor((clock * 6 * haste + c.phase * 4)) % c.frames.length];
+}
+
+function blob(g, x, y, rx, ry, color, alpha) {
+  g.save();
+  g.translate(x * K, y * K);
+  g.scale(1, ry / rx);
+  const grad = g.createRadialGradient(0, 0, 0, 0, 0, rx * K);
+  grad.addColorStop(0, color.replace('A', alpha));
+  grad.addColorStop(1, color.replace('A', 0));
+  g.fillStyle = grad;
+  g.beginPath();
+  g.arc(0, 0, rx * K, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+}
+
+function shakeFor(t) {
+  const hits = [start, ...tiers].map((s) => t - s).filter((d) => d >= 0 && d < 0.35);
+  if (!hits.length || reduced) return [0, 0];
+  const a = Math.max(...hits.map((d) => (0.35 - d) / 0.35)) * 1.6;
+  return [(rand() - 0.5) * a * K, (rand() - 0.5) * a * K];
+}
+
+// ---------- today's effect (what the game draws now) ----------
+function drawNow(g) {
+  const f = on(), t = clock - start;
+  g.save();
+  const [sx, sy] = shakeFor(clock);
+  g.translate(sx, sy);
+  drawFloor(g);
+  for (const c of party) {
+    const fr = frameOf(c, 1 + f);
+    g.drawImage(fr.base, (c.x - fr.w / 2) * K, (c.y - fr.h) * K, fr.w * K, fr.h * K);
+  }
+  g.globalCompositeOperation = 'lighter';
+  // A thin camera-facing ring at chest height, 0.6 s, and one warm shockwave across the room.
+  if (t >= 0 && t < 0.6) {
+    const k = 1 - t / 0.6;
+    for (const c of party) {
+      const r = 16 * (1 + 0.5 * (1 - k));
+      g.strokeStyle = `rgba(255,90,120,${k})`;
+      g.lineWidth = 3.2 * K * (r / 16) * 0.2;
+      g.beginPath();
+      g.arc(c.x * K, (c.y - 14) * K, r * 0.9 * K, 0, Math.PI * 2);
+      g.stroke();
+    }
+  }
+  if (t >= 0 && t < 0.8) {
+    const k = 1 - t / 0.8;
+    g.strokeStyle = `rgba(255,200,120,${k * 0.6})`;
+    g.lineWidth = 2 * K;
+    g.beginPath();
+    g.arc(W / 2 * K, (GROUND - 8) * K, (1 - k) * 160 * K, 0, Math.PI * 2);
+    g.stroke();
+  }
+  g.restore();
+  vignette(g, f * 0.35, 'rgba(255,70,40,A)');
+}
+
+// ---------- the new effect ----------
+function drawNew(g, dt) {
+  const f = on(), t = clock - start;
+  const tierAge = Math.min(...tiers.map((s) => clock - s).filter((d) => d >= 0), Infinity);
+  const tierUp = tiers.some((s) => clock >= s && s >= start && s < start + DUR);
+  const heat = f * (tierUp ? 1.35 : 1);
+  g.save();
+  const [sx, sy] = shakeFor(clock);
+  g.translate(sx, sy);
+  drawFloor(g);
+
+  // Ground glow under everyone, pulsing.
+  g.globalCompositeOperation = 'lighter';
+  for (const c of party) {
+    const pulse = 0.75 + 0.25 * Math.sin(clock * 7 + c.phase * 6);
+    if (heat > 0) blob(g, c.x, c.y, 15, 5, 'rgba(255,40,60,A)', 0.5 * heat * pulse);
+  }
+
+  // Floor bursts: at the start and at each tier-up, rolling outward from the middle of the party.
+  for (const s of [start, ...tiers.filter((x) => x >= start)]) {
+    const big = s !== start;
+    for (const c of party) {
+      const age = clock - s - c.order * 0.045;
+      if (age < 0 || age > 0.65) continue;
+      const k = age / 0.65, ease = 1 - (1 - k) ** 3;
+      const r = (4 + ease * (big ? 30 : 22)) * K;
+      g.save();
+      g.translate(c.x * K, c.y * K);
+      g.scale(1, 0.32);
+      g.shadowColor = '#ff2040';
+      g.shadowBlur = 18;
+      g.strokeStyle = `rgba(255,${big ? 140 : 70},${big ? 90 : 80},${(1 - k) * 0.95})`;
+      g.lineWidth = (1 - k) * 5 * K + 1;
+      g.beginPath();
+      g.arc(0, 0, r, 0, Math.PI * 2);
+      g.stroke();
+      g.restore();
+      if (age < 0.2) blob(g, c.x, c.y - 10, 14, 16, 'rgba(255,60,70,A)', (1 - age / 0.2) * 0.55);
+    }
+    // A spray of sparks off each companion at the burst.
+    if (clock - s >= 0 && clock - s < dt * 1.5) for (const c of party) for (let n = 0; n < (big ? 14 : 9); n++) spawnEmber(c, true);
+  }
+  g.globalCompositeOperation = 'source-over';
+
+  // Companions: outline glow behind, sprite, a flash on the burst, then the eyes.
+  for (const c of party) {
+    const fr = frameOf(c, 1 + f * 0.8);
+    const x0 = c.x - fr.w / 2, y0 = c.y - fr.h;
+    if (heat > 0) {
+      const pulse = 0.65 + 0.35 * Math.sin(clock * 9 + c.phase * 6);
+      g.save();
+      g.globalAlpha = Math.min(1, heat * pulse);
+      g.shadowColor = '#ff2040';
+      g.shadowBlur = 14 * heat;
+      g.drawImage(fr.outline, (x0 - 1) * K, (y0 - 1) * K, (fr.w + 2) * K, (fr.h + 2) * K);
+      g.restore();
+    }
+    g.drawImage(fr.base, x0 * K, y0 * K, fr.w * K, fr.h * K);
+    for (const s of [start, ...tiers.filter((x) => x >= start)]) {
+      const age = clock - s - c.order * 0.045;
+      if (age < 0 || age > 0.35) continue;
+      g.save();
+      g.globalAlpha = age < 0.07 ? 0.9 : (1 - (age - 0.07) / 0.28) * 0.7;
+      g.drawImage(age < 0.07 ? fr.white : fr.red, x0 * K, y0 * K, fr.w * K, fr.h * K);
+      g.restore();
+    }
+    if (eyesBox.checked && f > 0) drawEyes(g, fr, x0, y0, f, tierAge);
+  }
+
+  // Embers, drawn as single pixels that rise and fade.
+  if (heat > 0) for (const c of party) {
+    const rate = (tierUp ? 9 : 4.5) * heat;
+    if (rand() < rate * dt) spawnEmber(c, false);
+  }
+  g.globalCompositeOperation = 'lighter';
+  for (let i = embers.length - 1; i >= 0; i--) {
+    const e = embers[i];
+    e.life -= dt;
+    if (e.life <= 0) { embers.splice(i, 1); continue; }
+    e.vy -= 4 * dt;
+    e.x += (e.vx + Math.sin(clock * 5 + e.seed) * 4) * dt;
+    e.y += e.vy * dt;
+    const a = Math.min(1, e.life / e.max * 1.6);
+    g.fillStyle = e.color.replace('A', a);
+    const s = e.size * K;
+    g.fillRect(Math.round(e.x) * K, Math.round(e.y) * K, s, s);
+  }
+  g.restore();
+  vignette(g, f * (tierUp ? 0.7 : 0.55), 'rgba(200,20,40,A)');
+}
+
+const EMBER_COLORS = ['rgba(255,210,122,A)', 'rgba(255,138,58,A)', 'rgba(255,58,79,A)', 'rgba(255,58,79,A)'];
+function spawnEmber(c, burst) {
+  if (reduced && !burst) return;
+  const max = 0.7 + rand() * 0.7;
+  embers.push({
+    x: c.x + (rand() - 0.5) * 12, y: c.y - rand() * (burst ? 6 : 20),
+    vx: (rand() - 0.5) * (burst ? 40 : 8), vy: -(burst ? 26 + rand() * 30 : 10 + rand() * 14),
+    life: max, max, size: rand() < 0.25 ? 2 : 1, seed: rand() * 10,
+    color: EMBER_COLORS[Math.floor(rand() * EMBER_COLORS.length)],
+  });
+}
+
+/** Eye pixels turn red and glow: brighter for a moment when Rampage starts or tiers up. */
+function drawEyes(g, fr, x0, y0, f, tierAge) {
+  const pop = Math.max(0, 1 - (clock - start) / 0.4, tierAge < 0.4 ? 1 - tierAge / 0.4 : 0);
+  const flicker = 0.85 + 0.15 * Math.sin(clock * 23 + x0);
+  const a = f * flicker;
+  g.save();
+  g.fillStyle = `rgba(255,${Math.round(40 + 120 * pop)},${Math.round(50 + 60 * pop)},${Math.min(1, a + pop)})`;
+  for (const [ex, ey] of fr.eyes) g.fillRect((x0 + ex) * K, (y0 + ey) * K, K, K);
+  g.globalCompositeOperation = 'lighter';
+  const cx = fr.eyes.reduce((s, e) => s + e[0], 0) / fr.eyes.length, cy = fr.eyes.reduce((s, e) => s + e[1], 0) / fr.eyes.length;
+  blob(g, x0 + cx + 0.5, y0 + cy + 0.5, 4 + pop * 4, 3 + pop * 3, 'rgba(255,40,60,A)', 0.55 * a + 0.4 * pop);
+  g.restore();
+}
+
+function vignette(g, amount, color) {
+  if (amount <= 0) return;
+  const grad = g.createRadialGradient(W / 2 * K, H / 2 * K, H * 0.35 * K, W / 2 * K, H / 2 * K, W * 0.62 * K);
+  grad.addColorStop(0, color.replace('A', 0));
+  grad.addColorStop(1, color.replace('A', amount));
+  g.fillStyle = grad;
+  g.fillRect(0, 0, W * K, H * K);
+}
+
+let last = performance.now();
+function tick(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  clock += dt;
+  if (loopBox.checked && clock - start > DUR + GAP) rampage();
+  for (const g of [nowG, newG]) g.imageSmoothingEnabled = false;
+  drawNow(nowG);
+  drawNew(newG, dt);
+  requestAnimationFrame(tick);
+}
+</script>
+
+</body></html>
