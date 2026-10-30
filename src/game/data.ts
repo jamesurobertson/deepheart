@@ -889,11 +889,14 @@ function buildTrophies(): TrophyDef[] {
   tiers('desc', [[1, 'Up for Air'], [10, 'Return Ticket'], [50, 'Commuter'], [250, 'Always Back Down']],
     (n) => `Ascend ${times(n)}.`, 'soul', (n) => ({ t: 'descents', n }));
   if (!DEMO) {
+    const heartFrom = out.length;
     tiers('awk', [[1, 'It Wakes'], [5, 'Heartbeat'], [25, 'Snooze Button'], [100, 'Pacemaker']],
       (n) => `Awaken the Heart ${times(n)}.`, 'ui_heart_full', (n) => ({ t: 'awakens', n }));
     out.push({ id: 'bound-all', name: 'All Eight', desc: 'Wake every one of the Bound.', icon: { sprite: ZONES[ZONES.length - 1].boss.sprite, tier: 1 }, req: { t: 'boundAll', n: 1 } });
     tiers('bound', [[50, 'Soul Debt'], [250, 'Paid in Full']],
       (n) => `Earn ${count(n)} bound souls in total.`, ZONES[0].boss.sprite, (n) => ({ t: 'boundEarned', n }), 2);
+    // The Heart's trophies stay secret until earned, so they don't spoil it.
+    for (const trophy of out.slice(heartFrom)) trophy.hidden = true;
     out.push({ id: 'trip-1', name: 'Gone Hunting', desc: 'Send a companion on an expedition.', icon: { sprite: 'floor_ladder', tier: 1 }, req: { t: 'trips', n: 1 } });
     tiers('tripcard', [[25, 'Spoils'], [250, 'Postcards']],
       (n) => `Find ${count(n)} cards on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripCards', n }), 2);

@@ -24,7 +24,7 @@ descending: there is no bottom.
   your mouse or a finger.
 - Every monster has a card, and a gold copy of each. Complete a set for +25% damage, or +50% for gold.
 - Expeditions. Send a strong companion to hunt a floor's cards while you play, or while you're away.
-- Two prestige layers: ascend for souls, awaken the Heart for heartstones.
+- Two prestige layers: ascend for souls, awaken the Heart for bound souls.
 - Treasure goblins that run for the exit with your loot. Every so often one is a rainbow.
 - No bottom. Eight zones come back corrupted, abyssal, hollow and eternal, and the numbers climb past 1e308.
 
