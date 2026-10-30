@@ -656,12 +656,7 @@ export class Ui {
       // H hides the interface for screenshots; H again or Escape brings it back.
       if (e.key.toLowerCase() === 'h' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) this.setUiHidden(!this.uiHidden);
       else if (e.key === 'Escape') this.setUiHidden(false);
-      // U buys the cheapest companion trait you can afford.
-      if (e.key.toLowerCase() === 'u' && !e.repeat && !this.modal) {
-        const next = this.game.shopUpgrades().find((u) => this.game.s.gold.gte(this.game.upgCost(u)));
-        if (next && this.game.buyUpg(next.id)) this.hideTip();
-      }
-      // 1–9 use the abilities in the column, in order.
+      // The number keys use the abilities in the column, in order.
       if (/^[1-9]$/.test(e.key) && !e.repeat && !this.modal) {
         const id = KEYED[Number(e.key) - 1];
         const slot = id && this.el.abilities.querySelector<HTMLElement>(`[data-ability="${id}"]`);
@@ -2221,7 +2216,7 @@ export class Ui {
             : state === 'flurry' ? `<b>Flurry is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('flurry')}`} to use it</small></b>`
             : state === 'rampage' ? `<b>Rampage is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
-            : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it, or press U'}</small></b>`
+            : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
               : state === 'champ' ? this.champHint()
               : state === 'auto' ? `<b>Auto-buy<small>Traits you've bought before buy themselves</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
@@ -2631,11 +2626,10 @@ export class Ui {
       const cap = (...keys: string[]) => keys.map((k) => `<kbd>${k}</kbd>`).join('');
       const rows: [string, string][] = [
         [cap('W', 'A', 'S', 'D'), 'Move'],
-        [cap('Space'), 'Attack'],
-        [`${cap('1')}–${cap('9')}`, 'Abilities'],
-        [cap('U'), 'Buy the cheapest trait'],
-        ...(DEMO || !g.legendsOpen() ? [] : [[cap('E'), 'Use, in the Keep'] as [string, string]]),
-        [cap('H'), 'Hide the interface'],
+        [`${MOUSE_GLYPH}${cap('Space')}`, 'Attack'],
+        [`${cap('1')}–${cap(String(KEYED.length))}`, 'Abilities'],
+        ...(DEMO || !(g.legendsOpen() || g.s.inKeep) ? [] : [[cap('E'), 'Interact'] as [string, string]]),
+        [cap('H'), 'Hide interface'],
         [cap('Esc'), 'Close'],
         [cap('?'), 'Shortcuts'],
       ];
