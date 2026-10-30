@@ -3,7 +3,7 @@ import { TROPHIES } from '../src/game/data.ts';
 import { Sim, seedRandom, type Profile } from './bot.ts';
 
 const H = 3600;
-const CASUAL: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 1, ascendEager: true, ascendMin: 5, awakenRatio: 0.25, stall: 180, catchRate: 0.03, resetActive: 0, shopEvery: 5 };
+const CASUAL: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 1, ascendEager: false, ascendMin: 5, awakenRatio: 0.25, stall: 180, catchRate: 0.03, resetActive: 0, shopEvery: 5 };
 const AWAY = [4, 4, 15];
 seedRandom(1);
 const hours = Number(process.argv[2] ?? 150);
