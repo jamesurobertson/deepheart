@@ -1,5 +1,8 @@
 # Awakening: Plan
 
+> As built in v0.7.0. Since v0.11.0 the awakening opens at floor 400, at about 20 played hours; the current numbers are
+> in [scaling-analysis.md](scaling-analysis.md).
+
 **Goal:** a second loop above ascending, built on Clicker Heroes' Transcension: a proven structure, with our own
 names, numbers and fiction. Ascents carry the game to about floor 300; awakening takes over when they run out, and
 every cycle after it goes deeper, faster. See also [expeditions-plan.md](expeditions-plan.md).
