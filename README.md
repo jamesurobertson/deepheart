@@ -56,7 +56,7 @@ The project is built with:
 - break_infinity.js (gold, damage and costs go far past 1e308)
 
 `node scripts/balance.ts 8 5 30 0.3` runs a headless pacing sim (hours, clicks/sec, active minutes, descend ratio).
-`npm run timeline` plays a casual player (three 20-minute sessions a day, offline in between) for 300 played hours and checks the long-term timeline: first wall, first ascent, first awakening, every companion met, and never too long without something new, plus the first run's floor times and hourly depth for the first 10 hours. It takes about a minute.
+`npm run timeline` plays a casual player (three 20-minute sessions a day, offline in between, ascending once stuck) for 300 played hours and checks the long-term timeline: first wall, first ascent, the companions met by then, every regular companion met, each late companion in its window, first awakening, and never too long without something new, plus the first run's floor times and hourly depth for the first 10 hours. It takes about a minute. [docs/scaling-analysis.md](docs/scaling-analysis.md) has the current numbers.
 `node scripts/build-atlas.ts` repacks the sprite atlas after adding art.
 `node scripts/card-sound.ts` regenerates the card drop and vault chest sounds.
 
