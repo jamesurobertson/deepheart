@@ -318,6 +318,8 @@ const SHOTS: Partial<Record<Attack, { sprite: string; anim?: boolean; arc: numbe
   ice: { sprite: 'spell_ice_lance', anim: true, arc: 0.15, glow: true },
   light: { sprite: 'spell_light_bolt', anim: true, arc: 0.1, glow: true },
 };
+const HERO_RING_GOLD = new THREE.Color(0xffd070);
+const HERO_RING_RAGE = new THREE.Color(0xff1a30);
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 const BONE = '#b8ae9e';
@@ -3014,6 +3016,8 @@ export class Scene {
     this.lastDt = dt;
     const fever = game.s.buffs.some((b) => b.id === 'fever');
     this.fever += ((fever ? 1 : 0) - this.fever) * Math.min(1, dt * 4);
+    // The hero's ring burns red through a Rampage, like the party's eyes.
+    if (this.heroRing) (this.heroRing.material as THREE.MeshBasicMaterial).color.lerpColors(HERO_RING_GOLD, HERO_RING_RAGE, this.fever);
 
     if (this.cine?.phase !== 'stairs') this.flames.forEach((f, i) => {
       const fl = 0.85 + Math.sin(this.time * 13 + i * 2) * 0.08 + Math.sin(this.time * 7.3 + i) * 0.07;

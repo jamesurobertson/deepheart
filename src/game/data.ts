@@ -793,6 +793,7 @@ export type TrophyReq =
   | { t: 'trips'; n: number }
   | { t: 'tripCards'; n: number }
   | { t: 'tripKills'; n: number }
+  | { t: 'pets'; n: number }
   | { t: 'clutches'; n: number }
   | { t: 'champions'; n: number }
   | { t: 'vaults'; n: number }
@@ -810,6 +811,8 @@ export interface TrophyDef {
   desc: string;
   icon: Icon;
   req: TrophyReq;
+  /** Kept a secret (no name, no how) until you have it. */
+  hidden?: boolean;
 }
 
 /** A round power of ten in words for trophy text ("1 sextillion"), falling back to 1e80 past the named ones. */
@@ -892,6 +895,9 @@ function buildTrophies(): TrophyDef[] {
       (n) => `Find ${count(n)} cards on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripCards', n }), 2);
     tiers('tripkill', [[1e4, 'Pest Control'], [1e6, 'Hired Muscle']],
       (n) => `Defeat ${count(n)} monsters on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripKills', n }), 2);
+    out.push({ id: 'pet-1', name: 'Good Kitty', desc: 'Pet Koko.', icon: { sprite: 'koko', tier: 0 }, req: { t: 'pets', n: 1 } });
+    ([[10, 'Cat Person'], [100, 'Her Favorite'], [1000, "Koko's Human"]] as const).forEach(([n, name], k) =>
+      out.push({ id: `pet-${n}`, name, desc: `Pet Koko ${count(n)} times.`, icon: { sprite: 'koko', tier: k + 1 }, req: { t: 'pets', n }, hidden: true }));
   }
   if (!DEMO) {
     tiers('set', [[1, 'Full Set'], [5, 'Set Collector'], [10, 'Complete Collection']],

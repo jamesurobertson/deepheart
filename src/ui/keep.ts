@@ -1,6 +1,7 @@
 import type { Rect } from '../render/atlas.ts';
 import { BOUND, COMPS, LEGENDS, LEGEND_BY_ID, ZONES, boundName, type BoundId, type LegendId } from '../game/data.ts';
 import type { Game } from '../game/game.ts';
+import { KOKO_EYE, KOKO_FUR, KOKO_ROWS, KOKO_TAIL } from './koko.ts';
 import { spriteFrames, uiAtlas } from './px.ts';
 
 /**
@@ -11,7 +12,7 @@ import { spriteFrames, uiAtlas } from './px.ts';
 
 /** A place to use: the stairs, a trader, the expedition ladder, the Heart, a Spirit on offer in the shrine
  *  (`offer:<id>`), one of yours in the Great Hall (`legend:<id>`) or one of the Bound (`bound:<id>`). */
-export type KeepStation = 'stairs' | 'dan' | 'victor' | 'trips' | 'heart' | `offer:${LegendId}` | `legend:${LegendId}` | `bound:${BoundId}`;
+export type KeepStation = 'stairs' | 'dan' | 'victor' | 'trips' | 'heart' | 'koko' | `offer:${LegendId}` | `legend:${LegendId}` | `bound:${BoundId}`;
 
 /** Floor rectangles (x, y, w, h) for the rooms and the halls between them; the walls grow around them. The first room
  *  is the Heart's. */
@@ -33,7 +34,7 @@ const THINGS: Thing[] = [
   ...([[13, 'red'], [17, 'blue'], [28, 'blue'], [32, 'red']] as const).map(([x, c]): Thing => [`wall_banner_${c}`, x, 14, 'wall']),
   ['wall_banner_green', 2, 15, 'wall'], ['wall_banner_green', 8, 15, 'wall'],
   ['flask_big_red', 3, 20], ['flask_big_blue', 2, 21], ['flask_big_green', 4, 21],
-  ['chest_full_open', 6, 20], ['chest_full_open', 8, 20], ['coin', 7, 20, 'flat'], ['coin', 7, 21, 'flat'],
+  ['chest_full_open', 8, 20],
   ['wall_banner_yellow', 38, 15, 'wall'], ['wall_banner_yellow', 42, 15, 'wall'],
   ['chest_full_open', 40, 19], ['chest_full_open', 37, 22], ['chest_full_open', 43, 22],
   ...[[39, 20], [41, 20], [40, 21], [38, 18], [42, 18], [39, 22], [41, 22]].map(([x, y]): Thing => ['coin', x, y, 'flat']),
@@ -51,8 +52,12 @@ const BOUND_AT: Record<BoundId, [number, number]> = {
   troll: [10, 7], golem: [12, 7], thing: [10, 10], ent: [12, 10],
 };
 const PEOPLE: { id: 'dan' | 'victor'; sprite: string; x: number; y: number }[] = [{ id: 'dan', sprite: 'ef_elf_m', x: 3, y: 18 }, { id: 'victor', sprite: 'victor', x: 7, y: 18 }];
-/** Koko, the Keep's black cat: curled up on the Great Hall floor, clear of the ways through. Click to pet. */
-const KOKO: [number, number] = [18, 20];
+/** Koko, the Keep's cat: sitting by the traders' chest, just below Victor. Walk up and pet her. */
+const KOKO: [number, number] = [6, 20];
+const KOKO_HEART = ['xx.xx', 'xxxxx', '.xxx.', '..x..'];
+/** Seconds a pet lasts (her tail swishing), and how long the little heart floats up for. */
+const PET_TIME = 2.5;
+const HEART_TIME = 1.6;
 /** What each station is, where it's used from (cells you stand on), where its label floats, and (spirits, which you
  *  can walk through) the cells of its body that a click picks it by. */
 type Station = { id: KeepStation; label: string; cells: [number, number][]; tag: [number, number]; body?: [number, number][] };
@@ -61,6 +66,7 @@ const STATIONS: Station[] = [
   { id: 'victor', label: 'Victor', cells: [[6, 18], [7, 19], [8, 18], [7, 17]], tag: [7, 19.55], body: [[7, 18], [7, 17]] },
   // The way down works from anywhere round the stairs, not just on them.
   { id: 'stairs', label: 'Way down', cells: [21, 22, 23, 24, 25].flatMap((x) => [29, 30, 31].map((y): [number, number] => [x, y])), tag: [23, 31.6], body: [[22, 30], [23, 30], [24, 30]] },
+  { id: 'koko', label: 'Koko', cells: [[5, 19], [6, 19], [5, 20], [7, 20], [5, 21], [6, 21], [7, 21]], tag: [KOKO[0], KOKO[1] + 1.55], body: [KOKO, [KOKO[0], KOKO[1] - 1]] },
   { id: 'heart', label: 'The Heart', cells: [[6, 5], [7, 5], [8, 5], [6, 4], [8, 4]], tag: [7, 6.1], body: [[7, 4], [7, 3]] },
 ];
 const TRIPS: Station = { id: 'trips', label: 'Expeditions', cells: [[20, 28], [19, 28], [21, 28], [20, 29], [19, 29], [21, 29]], tag: [20, 29.55], body: [[20, 28]] };
@@ -157,9 +163,9 @@ export class KeepView {
   keyed = false;
   /** Called when you reach a station you clicked, or click the one you're at. */
   onUse: (id: KeepStation) => void = () => {};
-  /** Called when you pet Koko. */
-  onPet: () => void = () => {};
-  private purringUntil = 0;
+  private pettedUntil = 0;
+  /** A heart floating up for each pet: when it set off, where it started beside her head, and seconds per pixel up. */
+  private hearts: { at: number; dx: number; dy: number; pace: number }[] = [];
 
   constructor(game: Game, host: HTMLElement) {
     this.game = game;
@@ -183,9 +189,18 @@ export class KeepView {
     this.blocked.add(`${SHRINE[0]},${SHRINE[1]}`);
     this.blocked.add(`${HEART[0]},${HEART[1]}`);
     for (const p of PEOPLE) this.blocked.add(`${p.x},${p.y}`);
+    this.blocked.add(`${KOKO[0]},${KOKO[1]}`);
     // Everyone comes up the stairs: the party starts wound round the Entrance behind you, as if they'd walked it.
-    for (let k = 0; k < ENTRANCE_WIND.length - 1; k++) {
-      const [ax, ay] = ENTRANCE_WIND[k], [bx, by] = ENTRANCE_WIND[k + 1];
+    // Back from a reload, you stand where you were, the party strung out along the way back to the stairs.
+    const spot = game.s.keepSpot;
+    const back = spot && this.walkable(spot[0] + 0.5, spot[1] + 0.5) ? this.route(spot[0], spot[1], ARRIVE[0], ARRIVE[1]) : [];
+    if (spot && back.length) {
+      this.hero.x = spot[0] + 0.5;
+      this.hero.y = spot[1] + 0.5;
+    }
+    const wind: [number, number][] = [...(back.length ? [[this.hero.x, this.hero.y] as [number, number], ...back.map((p): [number, number] => [p.x, p.y])] : []), ...ENTRANCE_WIND];
+    for (let k = 0; k < wind.length - 1; k++) {
+      const [ax, ay] = wind[k], [bx, by] = wind[k + 1];
       const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / TRAIL_STEP);
       for (let i = 0; i < steps; i++) this.trail.push({ x: ax + ((bx - ax) * i) / steps, y: ay + ((by - ay) * i) / steps });
     }
@@ -262,7 +277,6 @@ export class KeepView {
     const [tx, ty] = this.cellAt(e);
     const station = this.stationAt(tx, ty);
     if (station) return this.useOrWalk(station);
-    if (ty === KOKO[1] && tx >= KOKO[0] - 1 && tx <= KOKO[0] + 1) return this.pet();
     this.goal = null;
     this.path = this.route(Math.floor(this.hero.x), Math.floor(this.hero.y), tx, ty);
     this.held = { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, at: performance.now(), following: false };
@@ -289,9 +303,13 @@ export class KeepView {
     this.held = null;
   };
 
-  private pet() {
-    this.purringUntil = this.time + 2.5;
-    this.onPet();
+  pet() {
+    this.game.petKoko();
+    this.pettedUntil = this.time + PET_TIME;
+    // Pet her again and again and the hearts stack up, each from a little to one side.
+    this.hearts = this.hearts.filter((h) => this.time - h.at < HEART_TIME).slice(-11);
+    const first = !this.hearts.length;
+    this.hearts.push({ at: this.time, dx: first ? 0 : Math.round(Math.random() * 22 - 11), dy: first ? 0 : Math.round(Math.random() * 9), pace: first ? 0.2 : 0.08 + Math.random() * 0.1 });
   }
 
   /** Use a station you're at, or walk up to it and use it when you get there. */
@@ -412,6 +430,8 @@ export class KeepView {
       }
     }
     const cx = Math.floor(hero.x), cy = Math.floor(hero.y);
+    const spot = this.game.s.keepSpot;
+    if (!spot || spot[0] !== cx || spot[1] !== cy) this.game.s.keepSpot = [cx, cy];
     // Where two stations share a square, the one you're walking to wins, else the smaller one (the ladder by the stairs).
     const here = this.stations().filter((st) => st.cells.some(([x, y]) => x === cx && y === cy));
     this.near = (here.find((st) => st.id === this.goal) ?? here.sort((a, b) => a.cells.length - b.cells.length)[0])?.id ?? null;
@@ -452,6 +472,7 @@ export class KeepView {
     if (id === 'stairs') return 'Go down';
     if (id === 'dan' || id === 'victor') return 'Trade';
     if (id === 'trips') return 'Send';
+    if (id === 'koko') return 'Pet';
     if (id === 'heart') return this.game.canAwaken() ? 'Awaken' : 'Open';
     if (id.startsWith('offer:')) return 'Summon';
     return 'Open';
@@ -751,31 +772,28 @@ export class KeepView {
       } });
     });
     standing.push({ y: KOKO[1] + 1, draw: () => {
-      const purring = this.time < this.purringUntil;
-      const px = Math.round(KOKO[0] * 16 + 4), py = Math.round((KOKO[1] + 1) * 16 - 8);
-      const breathe = Math.sin(this.time * (purring ? 9 : 1.6)) > 0 ? 0 : 1;
-      const blink = purring || this.time % 5 < 0.15;
-      const flick = Math.sin(this.time * 2.2) > 0.6 ? 1 : 0;
+      const swishing = this.time < this.pettedUntil;
+      const blink = this.time % 4.3 < 0.15;
+      const px = KOKO[0] * 16 + 3, py = (KOKO[1] + 1) * 16 - KOKO_ROWS.length;
       shadow(KOKO[0] + 0.5, KOKO[1] + 1, 6);
-      g.fillStyle = '#1c1b24';
-      g.fillRect(px + 1, py + 3 + breathe, 8, 5 - breathe);
-      g.fillRect(px + 6, py, 5, 5);
-      g.fillRect(px + 6, py - 1, 1, 1);
-      g.fillRect(px + 10, py - 1, 1, 1);
-      g.fillRect(px - 2, py + 6 - flick, 3, 2);
-      g.fillStyle = '#34323f';
-      g.fillRect(px + 3, py + 3 + breathe, 4, 1);
-      g.fillStyle = '#6f8a5a';
-      if (blink) g.fillRect(px + 7, py + 3, 3, 1);
-      else {
-        g.fillRect(px + 7, py + 2, 1, 2);
-        g.fillRect(px + 9, py + 2, 1, 2);
-      }
-      if (purring) {
-        const t = (this.purringUntil - this.time) / 2.5;
-        g.fillStyle = '#ff8fb0';
-        g.fillRect(px + 8, Math.round(py - 4 - (1 - t) * 8), 2, 1);
-        g.fillRect(px + 8, Math.round(py - 3 - (1 - t) * 8), 1, 1);
+      // Her tip sways (faster just after a pet).
+      const tail = KOKO_TAIL.map(([x, y], k): [number, number] => [x + (k > 5 ? Math.round(Math.sin(this.time * (swishing ? 9 : 2) + (k - 3) * 0.6)) : 0), y]);
+      const body = (color: string | null, ox: number, oy: number) => {
+        KOKO_ROWS.forEach((row, y) => [...row].forEach((ch, x) => {
+          if (ch === '.') return;
+          g.fillStyle = color ?? (ch === 'o' && !blink ? KOKO_EYE : KOKO_FUR);
+          g.fillRect(px + x + ox, py + y + oy, 1, 1);
+        }));
+        g.fillStyle = color ?? KOKO_FUR;
+        for (const [x, y] of tail) g.fillRect(px + x + ox, py + y + oy, 1, 1);
+      };
+      if (this.hover === 'koko' && !this.held) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) body('#fff4d6', dx, dy);
+      body(null, 0, 0);
+      g.fillStyle = '#ff5a7e';
+      for (const heart of this.hearts) {
+        const age = this.time - heart.at;
+        if (age >= HEART_TIME) continue;
+        KOKO_HEART.forEach((row, y) => [...row].forEach((ch, x) => ch === 'x' && g.fillRect(px + heart.dx + x, py - 7 - heart.dy - Math.floor(age / heart.pace) + y, 1, 1)));
       }
     } });
     for (const p of PEOPLE) {

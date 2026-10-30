@@ -141,7 +141,6 @@ async function boot() {
 
   const ui = new Ui(document.getElementById('ui')!, game, scene, {
     sound: (n, o) => sfx.play(n, o),
-    purr: () => sfx.purr(),
     save,
     settings: () => {
       applySettings();
@@ -531,9 +530,9 @@ async function boot() {
       slow = 0.1;
       stage(() => ui.update());
     }
-    // The Keep always has its own tune; the awakening plays in silence.
+    // The Keep and the title screen share their own tune; the awakening plays in silence.
     if (ui.cutscene) sfx.hush();
-    else sfx.music(game.s.inKeep ? 'keep' : trackFor(game));
+    else sfx.music(game.s.inKeep || atMenu ? 'keep' : trackFor(game));
   };
   ui.update();
   requestAnimationFrame(frame);
