@@ -744,6 +744,25 @@ export class Fx {
     this.parts.push({ mesh, vel, pos, life: 1, size, gravity });
   }
 
+  /** Embers drifting up off many spots at once, drawn as one batch: each starts at its own point, in one of `colors`. */
+  embers(points: THREE.Vector3[], colors: string[], size = 0.07) {
+    const n = points.length;
+    if (!n) return;
+    const mesh = new THREE.InstancedMesh(CUBE, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.2, 2.2), transparent: true }), n);
+    const pos = new Float32Array(n * 3);
+    const vel = new Float32Array(n * 3);
+    const c = new THREE.Color();
+    points.forEach((p, i) => {
+      pos.set([p.x, p.y, p.z], i * 3);
+      vel.set([(Math.random() - 0.5) * 0.8, 0.9 + Math.random() * 1.4, (Math.random() - 0.5) * 0.3], i * 3);
+      mesh.setColorAt(i, c.set(colors[Math.floor(Math.random() * colors.length)]));
+    });
+    mesh.instanceColor!.needsUpdate = true;
+    mesh.frustumCulled = false;
+    this.scene.add(mesh);
+    this.parts.push({ mesh, vel, pos, life: 1, size, gravity: -1.5 });
+  }
+
   /** A column of light over dropped loot; brighter and taller with rarity. */
   beam(x: number, z: number, color: string, rarity: number, y = 0) {
     const group = new THREE.Group();

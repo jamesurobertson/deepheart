@@ -8,6 +8,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import type { Atlas, Rect } from './atlas.ts';
 import { PixelSprite, blobShadow } from './sprite.ts';
 import { Fx, flameTexture, spellTextures } from './fx.ts';
+import { eyeMask } from './eyes.ts';
 import { GradeShader, tiltShift } from './post.ts';
 import { buildStairwell, stairPoint } from './stairwell.ts';
 import { CARD_FRAME, CARD_H, CARD_W, cardBackTexture, cardTexture } from './cards.ts';
@@ -169,6 +170,10 @@ interface CompView {
   /** Squash/stretch: negative = crouched (wind-up), positive = stretched (release). */
   stretch: number;
   act: CompAct | null;
+  /** A red glow on the floor underfoot while Rampage is on. */
+  rageGlow: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  /** When the last Rampage burst hit this one (scene time). */
+  burstAt: number;
 }
 
 /** What a companion is in the middle of doing. Melee: dash → strike → back. Ranged: wind-up → fire. */
@@ -287,6 +292,12 @@ function glowTexture(): THREE.Texture {
   return new THREE.CanvasTexture(c);
 }
 
+const RAGE_GLOW_GEO = new THREE.PlaneGeometry(1, 1);
+/** Rampage's roar: real seconds time holds, then till the camera is back. */
+const ROAR_HOLD = 0.35;
+const ROAR_END = ROAR_HOLD + 0.5;
+const EMBERS = ['#ffd27a', '#ff8a3a', '#ff3a4f', '#ff3a4f'];
+
 const SHOT_COLOR: Record<Attack, number> = {
   arrow: 0xffe6b0, bolt: 0x9fe6ff, storm: 0xc9a6ff, slash: 0xffffff, fire: 0xff8a3a, rune: 0x7dffb0, dark: 0xb46aff,
   knife: 0xdfe8f0, spear: 0xe8d8b0, bomb: 0xffb040, orb: 0x7ab8ff, ice: 0xaee8ff, flask: 0x8aff6a, bat: 0xe0506a, skull: 0xc8b8ff, light: 0xfff0a0,
@@ -307,6 +318,8 @@ const SHOTS: Partial<Record<Attack, { sprite: string; anim?: boolean; arc: numbe
   ice: { sprite: 'spell_ice_lance', anim: true, arc: 0.15, glow: true },
   light: { sprite: 'spell_light_bolt', anim: true, arc: 0.1, glow: true },
 };
+const HERO_RING_GOLD = new THREE.Color(0xffd070);
+const HERO_RING_RAGE = new THREE.Color(0xff1a30);
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 const BONE = '#b8ae9e';
@@ -384,7 +397,15 @@ export class Scene {
   onLoot: ((ev: Drop) => void) | null = null;
   private shake = 0;
   private time = 0;
+  private lastDt = 0;
   private fever = 0;
+  /** Rampage bursts waiting to roll out from the middle of the party: scene time each goes off. */
+  private rageBursts: { at: number; c: CompView; big: boolean }[] = [];
+  private eyes: THREE.Texture | null = null;
+  /** Rampage's opening beat: real seconds in, and where the party stands. Time slows, their eyes light one by one
+   *  from the middle out, then it lets go. */
+  private roar: { t: number; at: THREE.Vector3; released: boolean } | null = null;
+  private emberT = 0;
   private hitstop = 0;
   /** A clutch kill's slow-motion moment: real seconds since the kill, and where the boss fell. */
   private clutch: { t: number; at: THREE.Vector3; released: boolean } | null = null;
@@ -823,6 +844,7 @@ export class Scene {
       if (!game.inParty(i) && has) {
         this.scene.remove(has.body);
         has.sprite.dispose();
+        has.rageGlow.material.dispose();
         this.party.splice(this.party.indexOf(has), 1);
       }
     }
@@ -839,19 +861,27 @@ export class Scene {
     const def = COMPS[i];
     const { idle, run } = this.atlas.creature(def.sprite);
     const sprite = new PixelSprite(this.atlas.texture, this.atlas.size, idle, { fps: 6 + Math.random() * 2 });
+    this.eyes ??= eyeMask(this.atlas, COMPS.map((comp) => comp.sprite));
+    sprite.enrage(this.eyes);
     const body = new THREE.Group();
     const inner = new THREE.Group();
     const base = this.compScale(def);
     inner.scale.setScalar(base);
     inner.add(sprite.mesh);
-    body.add(inner, blobShadow(def.big ? 1.6 : 0.9));
+    const rageGlow = new THREE.Mesh(RAGE_GLOW_GEO, new THREE.MeshBasicMaterial({ map: this.glow, color: 0xff2840, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    rageGlow.rotation.x = -Math.PI / 2;
+    rageGlow.position.y = 0.02;
+    rageGlow.scale.set(def.big ? 3.4 : 2.2, def.big ? 1.5 : 1, 1);
+    rageGlow.renderOrder = 2;
+    rageGlow.visible = false;
+    body.add(inner, blobShadow(def.big ? 1.6 : 0.9), rageGlow);
     const [x, z] = PARTY_SLOTS[i % PARTY_SLOTS.length];
     const home = new THREE.Vector3(x, 0, z);
     home.x = x * this.squeeze;
     home.z = Math.max(WALL_Z + HOME_CLEAR, z * this.deep);
     body.position.copy(instant ? home : new THREE.Vector3(-16, 0, z));
     this.scene.add(body);
-    this.party.push({ comp: i, body, inner, sprite, idle, run, cd: Math.random(), home, homeX: x, homeZ: z, base, stretch: 0, act: null });
+    this.party.push({ comp: i, body, inner, sprite, idle, run, cd: Math.random(), home, homeX: x, homeZ: z, base, stretch: 0, act: null, rageGlow, burstAt: -Infinity });
     if (!instant) this.fx.light(home.clone().setY(1.5), 0xffd070, 12, 0.5, 6);
   }
 
@@ -1973,6 +2003,7 @@ export class Scene {
       case 'rampage':
         this.addShake(0.25 + ev.tier * 0.15);
         this.fx.light(new THREE.Vector3(1.5 * this.squeeze, 2, 1), 0xff3050, 30 + ev.tier * 20, 0.8, 14);
+        this.queueRageBursts(true);
         break;
       case 'vaultPick': {
         this.vaultPick = true;
@@ -2059,9 +2090,14 @@ export class Scene {
       }
       case 'fever':
         if (ev.on) {
-          this.fx.shockwave(new THREE.Vector3(3, 0, 0), 10);
-          this.addShake(0.3);
-          for (const c of this.party) this.fx.aura(c.body.position.clone().setY(0.9), 0xff4060, 1, 0.6);
+          const standing = this.party.filter((c) => c.body.visible);
+          const at = standing.reduce((sum, c) => sum.add(c.body.position), new THREE.Vector3()).divideScalar(Math.max(1, standing.length));
+          if (this.settings.cinematics && !this.busy) this.roar = { t: 0, at, released: false };
+          else {
+            this.addShake(0.3);
+            this.fx.light(at.clone().setY(2), 0xff3050, 30, 0.6, 14);
+            this.queueRageBursts(false);
+          }
         }
         break;
       case 'descend':
@@ -2149,6 +2185,16 @@ export class Scene {
     if (this.jackpotT > 0) {
       this.jackpotT -= realDt;
       return 0.3;
+    }
+    const roar = this.roar;
+    if (roar) {
+      roar.t += realDt;
+      if (!roar.released && roar.t >= ROAR_HOLD) {
+        roar.released = true;
+        this.roarRelease(roar.at);
+      }
+      if (roar.t >= ROAR_END) this.roar = null;
+      else if (!roar.released) return 0.15;
     }
     const c = this.clutch;
     if (!c) return 1;
@@ -2897,12 +2943,83 @@ export class Scene {
     this.fx.burst(at, new THREE.Color().setHSL(Math.random(), 0.9, 0.7), 4, 1.6, 0.06, 3, true);
   }
 
+  // ---------- rampage ----------
+
+  /** A burst under every companion, rolling out from the middle of the party a beat apart. */
+  private queueRageBursts(big: boolean) {
+    const standing = this.party.filter((c) => c.body.visible);
+    const mid = standing.reduce((sum, c) => sum + c.body.position.x, 0) / Math.max(1, standing.length);
+    for (const c of standing) this.rageBursts.push({ at: this.time + Math.abs(c.body.position.x - mid) * 0.05, c, big });
+  }
+
+  /** While Rampage is on, everyone burns: eyes red, a red rim and a glow underfoot pulsing, embers rising off them. */
+  private updateRage(game: Game) {
+    for (let i = this.rageBursts.length - 1; i >= 0; i--) {
+      const { at, c, big } = this.rageBursts[i];
+      if (this.time < at) continue;
+      this.rageBursts.splice(i, 1);
+      if (!this.party.includes(c)) continue;
+      c.burstAt = this.time;
+      const size = COMPS[c.comp].big ? 1.5 : 1;
+      this.fx.ring(c.body.position.clone(), big ? 0xff8a5a : 0xff3050, (big ? 2.2 : 1.6) * size, 0.6);
+      if (this.settings.particles) {
+        const chest = c.body.position.clone().setY(0.8 * size);
+        this.fx.burst(chest, big ? '#ffb070' : '#ff4a55', big ? 16 : 10, 5, 0.07, 7, true);
+        this.fx.burst(chest, '#ffd27a', big ? 6 : 4, 3.5, 0.05, 4, true);
+      }
+    }
+    const roar = this.roar;
+    const heat = this.fever * (game.rampageTier ? 1.35 : 1);
+    const calm = this.settings.calm ? 0.5 : 1;
+    const embers: THREE.Vector3[] = [];
+    const emberTick = (this.emberT -= this.lastDt) <= 0;
+    if (emberTick) this.emberT = 0.08;
+    for (const c of this.party) {
+      const phase = c.comp * 2.3;
+      const age = this.time - c.burstAt;
+      const flare = Math.max(0, 1 - age / 0.4);
+      const flicker = 0.85 + 0.15 * Math.sin(this.time * 23 + phase);
+      if (roar && !roar.released) {
+        const lit = Math.min(1, Math.max(0, (roar.t - 0.05 - Math.abs(c.body.position.x - roar.at.x) * 0.025) / 0.08));
+        c.sprite.rage(lit * 2.5, 0);
+      } else c.sprite.rage(this.fever * flicker + flare * 1.5, heat * (0.65 + 0.35 * Math.sin(this.time * 9 + phase)) * calm);
+      // On a burst, a hot flash, then red fading out. (Kept dim: a whole party flashing at once blooms to white.)
+      const e = c.sprite.mesh.material.emissive;
+      if (age < 0.06) e.setRGB(0.6, 0.3, 0.25).multiplyScalar(calm);
+      else if (age < 0.35) e.setRGB(1, 0.1, 0.14).multiplyScalar((1 - (age - 0.06) / 0.29) * 0.45 * calm);
+      else e.setScalar(0);
+      c.rageGlow.visible = heat > 0.01;
+      c.rageGlow.material.opacity = 0.5 * heat * (0.75 + 0.25 * Math.sin(this.time * 7 + phase)) * calm;
+      if (emberTick && this.settings.particles && c.body.visible && heat > 0.2) {
+        const size = COMPS[c.comp].big ? 1.6 : 1;
+        // (About 6 a second each, twice that past a tier-up.)
+        for (let n = Math.floor((game.rampageTier ? 12 : 6) * heat * 0.08 + Math.random()); n > 0; n--) {
+          embers.push(c.body.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8 * size, (0.2 + Math.random() * 1.1) * size, 0.1)));
+        }
+      }
+    }
+    this.fx.embers(embers, EMBERS, 0.07);
+  }
+
+  /** The held breath lets go: a red flare and ring from the middle of the party, then a burst under each of them. */
+  private roarRelease(at: THREE.Vector3) {
+    this.queueRageBursts(false);
+    this.addShake(0.3);
+    this.fx.light(at.clone().setY(2.5), 0xff3050, 50, 0.8, 20);
+    this.fx.ring(at.clone().setY(0.05), 0xff3050, 6, 0.6);
+  }
+
   // ---------- frame ----------
 
   update(dt: number, game: Game) {
     this.time += dt;
+    this.lastDt = dt;
     const fever = game.s.buffs.some((b) => b.id === 'fever');
     this.fever += ((fever ? 1 : 0) - this.fever) * Math.min(1, dt * 4);
+    // (The ease never reaches zero by itself, and any rim at all keeps its black outline on the sprites.)
+    if (!fever && this.fever < 0.01) this.fever = 0;
+    // The hero's ring burns red through a Rampage, like the party's eyes.
+    if (this.heroRing) (this.heroRing.material as THREE.MeshBasicMaterial).color.lerpColors(HERO_RING_GOLD, HERO_RING_RAGE, this.fever);
 
     if (this.cine?.phase !== 'stairs') this.flames.forEach((f, i) => {
       const fl = 0.85 + Math.sin(this.time * 13 + i * 2) * 0.08 + Math.sin(this.time * 7.3 + i) * 0.07;
@@ -2932,6 +3049,7 @@ export class Scene {
         this.updateHero(dt, game);
       }
     }
+    this.updateRage(game);
     this.updateShots(dt);
     this.updateRaiders(dt, game);
     this.updateLoot(dt, game);
@@ -2940,7 +3058,7 @@ export class Scene {
     const buffed = game.s.buffs.some((b) => b.id !== 'fever');
     this.bloom.strength = 0.42 + this.fever * 0.3 + (buffed ? 0.12 : 0);
     this.grade.uniforms.warmth.value = 0.06 + this.fever * 0.08;
-    this.grade.uniforms.vignette.value = 0.55 + this.fever * 0.25;
+    this.grade.uniforms.vignette.value = 0.55 + this.fever * (game.rampageTier ? 0.4 : 0.32);
 
     // In the vault the camera slides down the hall after your hero.
     if (this.inVaultRoom) {
@@ -2963,6 +3081,13 @@ export class Scene {
         const focus = tr.portal.position.clone().setY(1.6);
         this.camera.position.lerp(focus.clone().add(new THREE.Vector3(0, 3, 9)), push * 0.35);
         look.lerp(focus, push * 0.5);
+      }
+      // Rampage's roar: the room dims while time holds, and comes back as it lets go.
+      const roar = this.roar;
+      if (roar) {
+        const inT = Math.min(1, roar.t / ROAR_HOLD);
+        const outT = Math.max(0, (roar.t - ROAR_HOLD) / (ROAR_END - ROAR_HOLD));
+        this.grade.uniforms.vignette.value += inT * inT * (3 - 2 * inT) * (1 - outT * outT * (3 - 2 * outT)) * 0.3;
       }
       // A clutch kill: push in on the fallen boss and drain the color, then let both go with the release.
       const c = this.clutch;

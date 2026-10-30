@@ -119,6 +119,9 @@ export class TitleMenu {
     this.el.addEventListener('click', (e) => this.act((e.target as HTMLElement).closest<HTMLElement>('[data-mm]')?.dataset.mm));
     // The game behind the menu takes a press on the battlefield as an attack: none of the menu's get through.
     for (const ev of ['pointerdown', 'pointerup', 'mousedown']) this.el.addEventListener(ev, (e) => e.stopPropagation());
+    panel.addEventListener('pointerdown', (e) => {
+      if (!(e.target as HTMLElement).closest('button, a, input, textarea, select')) this.stairs.press(e);
+    });
     this.fit();
     addEventListener('resize', this.fit);
     // (Capturing, so the menu sees keys before the game's own listeners do.)
@@ -276,17 +279,20 @@ class Stairs {
     const hero = game.heroIndex();
     const order = owned.length ? [...owned.filter((i) => i === hero), ...owned.filter((i) => i !== hero)] : [0];
     this.party = order.map((i) => ({ frames: spriteFrames(COMPS[i].sprite), run: spriteFrames(`${COMPS[i].sprite}_run`), phase: Math.random() }));
-    canvas.addEventListener('pointerdown', (e) => {
-      if (!this.geo) return;
-      e.preventDefault();
-      canvas.focus({ preventScroll: true });
-      const r = canvas.getBoundingClientRect();
-      const x = ((e.clientX - r.left) * (devicePixelRatio || 1)) / this.geo.S - 8;
-      this.toX = Math.min(this.geo.maxX, Math.max(this.geo.minX, x));
-      this.toY = ((e.clientY - r.top) * (devicePixelRatio || 1)) / this.geo.S;
-    });
+    canvas.addEventListener('pointerdown', (e) => this.press(e));
     canvas.addEventListener('blur', () => this.held.clear());
     this.frame(performance.now());
+  }
+
+  /** A press on the stairway, or anywhere on the menu off its buttons: the keys go to your hero, who walks there. */
+  press(e: PointerEvent) {
+    if (!this.geo) return;
+    e.preventDefault();
+    this.canvas.focus({ preventScroll: true });
+    const r = this.canvas.getBoundingClientRect();
+    const x = ((e.clientX - r.left) * (devicePixelRatio || 1)) / this.geo.S - 8;
+    this.toX = Math.min(this.geo.maxX, Math.max(this.geo.minX, x));
+    this.toY = ((e.clientY - r.top) * (devicePixelRatio || 1)) / this.geo.S;
   }
 
   /** The menu changed its words (to the credits and back): whoever stood on one drops, onto whatever's below now. */

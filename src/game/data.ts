@@ -69,7 +69,7 @@ export const COMPS: CompDef[] = [
     c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.2e12, 2.8e9, 'ice', 'Came up from the Frozen Vault. Finds the rest of the dungeon too warm.'),
     c('santa', 'Santa', 'cr_santa', 4.8e12, 9.4e9, 'ice', 'Santa? Is that really you?'),
     c('paladin', 'Paladin', 'cr_gold_knight', 1.9e13, 3.2e10, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
-    c('hollow', 'Hollow Knight', 'pumpkin_dude', 7.6e13, 1.1e11, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
+    c('hollow', 'Lantern Knight', 'pumpkin_dude', 7.6e13, 1.1e11, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
     c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 3e14, 3.6e11, 'dark', 'Has broken every vow but one. Nobody asks which.'),
     c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 4e11, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
     c('wraith', 'The Count', 'rm_dracula', 7.4e21, 4.1e17, 'bat', 'We all know who he really is.', 95),
@@ -150,7 +150,7 @@ export const ZONES: ZoneDef[] = [
   ...(DEMO ? Array.from({ length: 5 }, (): ZoneDef => ({ name: '???', tiles: 'halls', band: [m('goblin', '???')], mid: m('goblin', '???'), boss: m('goblin', '???'), lap: [] })) : [
     {
       name: 'The Sunken Tomb', tiles: 'tomb',
-      band: [m('ef_gnollscout', 'Gnoll Scout', 0.9), m('ef_gnollbrute', 'Gnoll Brute', 1.2), m('ef_gnollshaman', 'Gnoll Shaman'), m('masked_orc', 'Tomb Raider')],
+      band: [m('ef_gnollscout', 'Gnoll Scout', 0.9), m('ef_gnollbrute', 'Gnoll Brute', 1.2), m('ef_gnollshaman', 'Gnoll Shaman'), m('masked_orc', 'Masked Looter')],
       mid: m('ef_gnolloverseer', 'Gnoll Overseer'), boss: m('ef_golem', 'Tomb Golem', 1, 0xe8c888),
       lap: [m('cr_pirate', 'Drowned Pirate'), m('cr_pirate_captain', 'Drowned Captain', 1.2), m('cr_skeleton_pirate', 'Bone Corsair')],
     },
@@ -634,7 +634,7 @@ export const LEGENDS: LegendDef[] = DEMO ? [] : [
   o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'sm_kabuki', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`) }),
   o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Increased chance a boss is a champion (starting on floor 100)', value: share(0.75, (n) => pct(0.25 + n)) }),
   o({ id: 'lure', name: 'The Lure', kind: 'utility', sprite: 'chest_mimic_open', what: 'How often treasure goblins come', value: share(2, (n) => `+${pct(n)}`) }),
-  o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'sd_princess', what: 'Card drop chance', value: share(1, (n) => `+${pct(n)}`) }),
+  o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'sd_princess', what: 'Card drop chance', value: share(1.5, (n) => `+${pct(n)}`) }),
   o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance from overkill', value: (lv) => `up to ×${+(1 + lv / 4).toFixed(2)}`, note: "A kill that deals N× a monster's health has N× the chance to drop its card." }),
   o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'sm_geisha', what: 'How long Rampage lasts', ...longer('rampage', 1) }),
   o({ id: 'whirl', name: 'The Whirl', kind: 'utility', sprite: 'ef_ranger', what: 'How long Flurry lasts', ...longer('flurry', 2) }),
@@ -792,6 +792,8 @@ export type TrophyReq =
   | { t: 'boundEarned'; n: number }
   | { t: 'trips'; n: number }
   | { t: 'tripCards'; n: number }
+  | { t: 'tripKills'; n: number }
+  | { t: 'pets'; n: number }
   | { t: 'clutches'; n: number }
   | { t: 'champions'; n: number }
   | { t: 'vaults'; n: number }
@@ -799,7 +801,9 @@ export type TrophyReq =
   | { t: 'rampage'; n: number }
   | { t: 'cards'; n: number }
   | { t: 'versions'; n: number }
-  | { t: 'goldCards'; n: number };
+  | { t: 'goldCards'; n: number }
+  | { t: 'sets'; n: number }
+  | { t: 'goldSets'; n: number };
 
 export interface TrophyDef {
   id: string;
@@ -809,6 +813,8 @@ export interface TrophyDef {
   req: TrophyReq;
   /** A Steam achievement too (docs/steam-achievements.md): 75 of them, the tiers close together left out. */
   steam: boolean;
+  /** Kept a secret (no name, no how) until you have it. */
+  hidden?: boolean;
 }
 
 const NOT_ON_STEAM = new Set(['floor-750', 'floor-1500', 'floor-2000', 'gold-e9', 'gold-e40', 'gold-e90', 'gold-e120', 'dps-e6', 'dps-e40', 'dps-e80', 'dps-e150', 'kill-1000', 'kill-100000', 'boss-10', 'boss-5000', 'champ-100', 'levelall-500', 'level-2500', 'clicks-100', 'clicks-100000', 'crit-1', 'crit-10000', 'raid-77', 'raid-2777', 'miss-100', 'miss-1000', 'miss-20000', 'rainbow-50', 'vault-25', 'desc-10', 'fev-100']);
@@ -891,6 +897,17 @@ function buildTrophies(): TrophyDef[] {
     out.push({ id: 'trip-1', name: 'Gone Hunting', desc: 'Send a companion on an expedition.', icon: { sprite: 'floor_ladder', tier: 1 }, req: { t: 'trips', n: 1 } });
     tiers('tripcard', [[25, 'Spoils'], [250, 'Postcards']],
       (n) => `Find ${count(n)} cards on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripCards', n }), 2);
+    tiers('tripkill', [[1e4, 'Pest Control'], [1e6, 'Hired Muscle']],
+      (n) => `Defeat ${count(n)} monsters on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripKills', n }), 2);
+    out.push({ id: 'pet-1', name: 'Good Kitty', desc: 'Pet Koko.', icon: { sprite: 'koko', tier: 0 }, req: { t: 'pets', n: 1 } });
+    ([[10, 'Cat Person'], [100, 'Her Favorite'], [1000, "Koko's Human"]] as const).forEach(([n, name], k) =>
+      out.push({ id: `pet-${n}`, name, desc: `Pet Koko ${count(n)} times.`, icon: { sprite: 'koko', tier: k + 1 }, req: { t: 'pets', n }, hidden: true }));
+  }
+  if (!DEMO) {
+    tiers('set', [[1, 'Full Set'], [5, 'Set Collector'], [10, 'Complete Collection']],
+      (n) => `Finish ${n === 1 ? 'a card set' : `${n} card sets`}.`, 'imp', (n) => ({ t: 'sets', n }), 1);
+    tiers('gset', [[1, 'Gold Set'], [5, 'Gilt Edge']],
+      (n) => `Finish ${n === 1 ? 'a gold card set' : `${n} gold card sets`}.`, 'big_demon', (n) => ({ t: 'goldSets', n }), 3);
   }
   const versions = CARDS.reduce((sum, c) => sum + c.laps.length * (c.gold ? 2 : 1), 0);
   out.push(
@@ -978,7 +995,7 @@ export const NEWS: News[] = [
   ...(DEMO ? [] : [
     { text: "The Stormcaller's forecast: lightning, with a chance of more lightning.", when: (s) => s.owned[compIndex('stormcaller')] > 0 },
     { text: 'The Plague Doctor keeps taking notes on the monsters. And on you.', when: (s) => s.owned[compIndex('doctor')] > 0 },
-    { text: 'The Hollow Knight has not spoken once. He did grin wider today.', when: (s) => s.owned[compIndex('hollow')] > 0 },
+    { text: 'The Lantern Knight has not spoken once. He did grin wider today.', when: (s) => s.owned[compIndex('hollow')] > 0 },
     { text: 'The angel will not say what it fell from.', when: (s) => s.owned[compIndex('angel')] > 0 },
     { text: 'The Necromancer apologizes to each monster before it dies.', when: (s) => s.owned[compIndex('necro')] > 0 },
     { text: 'The Tamed Oni has adopted a slug. Nobody has told him we kill those.', when: (s) => s.owned[compIndex('ogre')] > 0 },
@@ -992,6 +1009,15 @@ export const NEWS: News[] = [
   { text: 'You could swear you have walked these floors before.', when: (s) => s.depth > 1 },
   { text: 'The walls have a pulse. Everyone has agreed not to mention it.', when: (s) => s.floor > 70 },
   { text: 'The heart below is waiting for you.', when: (s) => s.floor > 100 },
+  ...(DEMO ? [] : [
+    { text: 'The floor numbers stopped meaning anything a while ago.', when: (s) => s.floor > 200 },
+    { text: 'A signpost says "Floor 1." Someone has crossed it out twice.', when: (s) => s.floor > 300 },
+    { text: 'The monsters here have never seen the sun. They are not curious.', when: (s) => s.floor > 500 },
+    { text: 'Your shadow has started lagging behind. It looks tired.', when: (s) => s.floor > 800 },
+    { text: 'The stairs have begun to count your steps back to you.', when: (s) => s.floor > 1200 },
+    { text: 'The echoes down here arrive a few seconds late.', when: (s) => s.floor > 2000 },
+    { text: 'The heart skipped a beat and did not mention it.', when: (s) => s.floor > 3000 },
+  ] satisfies News[]),
   { text: 'Reminder: the dungeon is not a metaphor. Probably.' },
   { text: 'The torches all lean toward the stairs down.' },
   { text: 'A monster tried to surrender today. It was killed anyway. Rules are rules.' },

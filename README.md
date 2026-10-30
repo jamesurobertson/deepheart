@@ -8,7 +8,7 @@
 
 ![Deepheart](public/og-image.png)
 
-Fight monsters, hire companions with their gold, push down a dungeon with no bottom, and climb back up for souls.
+Fight monsters, hire companions with the gold they earn, and descend the dungeon for souls.
 **Play it at https://jamesurobertson.github.io/deepheart/**, or
 **[download the desktop app](https://github.com/jamesurobertson/deepheart/releases/latest)** for Mac, Windows or Linux.
 
@@ -16,23 +16,22 @@ Fight monsters, hire companions with their gold, push down a dungeon with no bot
 
 ![A champion falls and drops a gold Bog Lurker card, which flips over and flies into the collection](docs/screenshots/card-drop.webp)
 
-One card for every monster in the dungeon, in every color the zones come back in, and most of them a million-to-one
-drop. Cards spin out of the monster face-down; pick one up and it flips over in a burst of light, straight into your
-collection. Champions drop gold copies, and the gold card of a champion boss is the rarest thing in the dungeon. Send a
-strong companion on an expedition to hunt the floor you want, in real time. Finish a zone's cards in one color and the
-set adds +10% to all damage; in gold, +25%.
+One card for every monster in the dungeon, and a gold copy of each. A monster drops its card about once in two
+million kills, a boss once in 500,000, and a champion's gold card once in 250,000. Cards spin out of the monster
+face-down and land face-up. Pick one up and it flips over in a burst of light, straight into your collection.
+Complete a set for +25% damage, or +50% for a gold set. Send a hunter on an expedition to go after the cards you're
+missing.
 
 ## What's down there
 
-- **A party that fights for you.** Hire companions with the gold they earn, level them into the thousands, and pick a
-  hero to lead around the room with your mouse (or a finger).
-- **Ascend** for souls and summon Spirits; past floor 300, **awaken the Heart** for bound souls and the eight Bound.
-  Two prestige layers, and every run back down is faster than the last.
-- **The Keep**, the castle above the dungeon: walk your hero between the shrines, the Heart and the ladder down.
+- **A party that fights for you.** Hire 32 companions with the gold they earn, level them into the thousands, and
+  pick a hero to lead around the Keep with your mouse (or a finger).
+- **Expeditions.** Send a strong companion to hunt a floor's cards while you play, or while you're away.
+- **Ascend** for souls, **awaken the Heart** for heartstones: two prestige layers, and every run back down is faster
+  than the last.
 - **Treasure goblins** that run for the exit with your loot. Every so often one is a rainbow. Catch it and find out.
-- **No bottom.** After floor 80 the zones come back corrupted, then abyssal, hollow, eternal; past floor 400 there's a
-  wall, and the numbers keep climbing past 1e308.
-- **106 trophies** (75 of them Steam achievements) and 30 cursors to unlock.
+- **No bottom.** The eight zones come back corrupted, then abyssal, hollow, eternal, and the numbers keep climbing
+  past 1e308.
 
 ## Getting Started
 
@@ -41,8 +40,9 @@ set adds +10% to all damage; in gold, +25%.
 3. Run the development server with `npm run dev`
 
 Add `?slot=name` to the URL to keep a separate save. On the dev server only: `?speed=10` runs the game faster,
-`?cards=often` makes cards drop hundreds of times as often (and champion bosses common), and `?state=awaken` or
-`?state=reawaken` opens a test save at the first or a later awakening.
+`?sim=300` starts from where a nonstop player first reaches floor 300 (in its own slot), `?cards=often` makes
+cards drop hundreds of times as often (and champion bosses common), and `?state=awaken` or `?state=reawaken` opens a
+test save at the first or a later awakening.
 
 ## Development
 

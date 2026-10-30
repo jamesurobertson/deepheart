@@ -326,6 +326,9 @@ export interface SaveState {
   /** Expeditions ever sent, and the cards they've brought home. */
   tripsSent: number;
   tripCards: number;
+  tripKills: number;
+  /** Times you've petted Koko. */
+  pets: number;
   /** The Heart has been teased (its button showed up, AWAKEN_TEASE floors before it can wake). */
   heartTeased: boolean;
   /** Has the first wake-up (the dungeon was a dream) played? */
@@ -338,6 +341,8 @@ export interface SaveState {
   autoTipSeen: boolean;
   /** The party is up in the Keep: nothing happens below until they come back down, time away included. */
   inKeep: boolean;
+  /** The square you stand on in the Keep, so a reload puts you back there (cleared each time you come up). */
+  keepSpot: [number, number] | null;
   /** Cards you've got (found, traded or dug up) but not yet seen in the binder, as `id:lap:gold`; they slam in when you look. */
   dreamCards: string[];
   /** Trades made with the brothers. */
@@ -462,7 +467,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(), lastAttack: 0,
-    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, tripReady: [], tripsSent: 0, tripCards: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
+    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, tripReady: [], tripsSent: 0, tripCards: 0, tripKills: 0, pets: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, keepSpot: null, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, autoHire: false, graphics: 'auto' },
   };
 }
@@ -775,7 +780,7 @@ export class Game {
     if (s.soulBossDone === undefined) s.soulBossDone = (s.descents ?? 0) > 0 || (s.bossSouls ?? 0) > 0;
     // Renamed monsters (a card's id is its name): cards and kills pass to the new name. The Rotting Deep's floor-45
     // boss used to be the Bloated Ogre; the Frozen Vault's Frost Imp became the Frost Oni when the two swapped places.
-    for (const [was, now] of [['bloated-ogre', 'sludge-walker'], ['bone-archer', 'skeleton-archer'], ['hooded-bones', 'santa-skeleton'], ['frost-imp', 'frost-oni']]) {
+    for (const [was, now] of [['bloated-ogre', 'sludge-walker'], ['bone-archer', 'skeleton-archer'], ['hooded-bones', 'santa-skeleton'], ['frost-imp', 'frost-oni'], ['tomb-raider', 'masked-looter']]) {
       const old = s.cards?.[was];
       if (old) {
         const card = (s.cards[now] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
@@ -796,6 +801,12 @@ export class Game {
         s.slainLaps[now] = CORRUPTION.map((_, i) => (s.slainLaps[now]?.[i] ?? 0) + (laps[i] ?? 0));
         delete s.slainLaps[was];
       }
+      const champs = s.champSlain[was];
+      if (champs) {
+        s.champSlain[now] = CORRUPTION.map((_, i) => (s.champSlain[now]?.[i] ?? 0) + (champs[i] ?? 0));
+        delete s.champSlain[was];
+      }
+      for (const trip of s.expeditions ?? []) for (const found of trip.found ?? []) if (found.id === was) found.id = now;
       if (s.dreamCards) s.dreamCards = s.dreamCards.map((key) => (key.startsWith(`${was}:`) ? now + key.slice(was.length) : key));
     }
     // Goblin cards used to come in every lap's color; they're plain only now, so later copies move to the plain page.
@@ -1218,6 +1229,7 @@ export class Game {
     this.bankAllDrops();
     this.raid = null;
     this.s.inKeep = true;
+    this.s.keepSpot = null;
     this.enterFloor(this.s.floor, true);
     this.monsters = [];
     this.bossTime = 0;
@@ -1595,6 +1607,15 @@ export class Game {
     }
     s.auto = auto;
     this.bankAllDrops();
+  }
+
+  /** Testing only (the ?quick hour keys, local only): farm the floor you're on for this long, paid as time away is,
+   *  with hunters out on expeditions that much further along. */
+  devSkipTime(seconds: number) {
+    for (const e of this.s.expeditions) if (e.pausedAt === undefined) e.start -= seconds * 1000;
+    if (this.s.lastAttack) this.s.lastAttack -= seconds * 1000;
+    this.bankAllDrops();
+    return this.applyOffline(seconds);
   }
 
   /** Clear the floor in one go: monsters on the field die as usual, the rest are paid out as if they had. */
@@ -2493,6 +2514,7 @@ export class Game {
     for (const f of e.found ?? []) this.giveCard(f.id, f.gold, 'trip', e.floor);
     const cards = this.events.slice(before).filter((ev): ev is Extract<GameEvent, { t: 'card' }> => ev.t === 'card');
     this.s.tripCards += cards.length;
+    this.s.tripKills += kills;
     this.invalidate();
     this.events.push({ t: 'expedition', comp: i, floor: e.floor, kills, cards: cards.length, gold: cards.filter((c) => c.gold).length });
     this.checkTrophies();
@@ -2592,9 +2614,9 @@ export class Game {
     return lv ? Math.max(1, Math.min(Math.floor(overkill), 1 + lv / 4)) : 1;
   }
 
-  /** The Collector: card chance closing in on ×2. */
+  /** The Collector: card chance closing in on ×2.5. */
   private collectorMult() {
-    return 1 + legendShare(this.legendLv('collector'));
+    return 1 + 1.5 * legendShare(this.legendLv('collector'));
   }
 
   private cardRoll(odds: number, mult = 1) {
@@ -2798,8 +2820,18 @@ export class Game {
       case 'boundEarned': return s.boundEarned >= r.n;
       case 'trips': return s.tripsSent >= r.n;
       case 'tripCards': return s.tripCards >= r.n;
+      case 'tripKills': return s.tripKills >= r.n;
+      case 'pets': return s.pets >= r.n;
       case 'goldCards': return this.goldCardsFound() >= r.n;
+      case 'sets': return this.setsDone(false) >= r.n;
+      case 'goldSets': return this.setsDone(true) >= r.n;
     }
+  }
+
+  /** Koko, the Keep's cat, gets a pet. */
+  petKoko() {
+    this.s.pets++;
+    this.checkTrophies();
   }
 
   private checkTrophies(quiet = false) {

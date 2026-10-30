@@ -81,7 +81,8 @@ export class Atlas {
   private pixelCache = new Map<Rect, { x: number; y: number; color: number }[]>();
   private trimCache = new Map<Rect, Rect>();
 
-  private image(): ImageData {
+  /** The whole sheet's pixels, read back once. */
+  image(): ImageData {
     if (!this.data) {
       const img = this.texture.image as HTMLImageElement;
       const c = document.createElement('canvas');

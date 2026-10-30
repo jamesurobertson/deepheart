@@ -75,6 +75,56 @@ export class PixelSprite {
   }
   private gilded = false;
 
+  /** Ready for a Rampage: pixels marked in `eyes` (a sheet-sized mask) can burn red, and the empty pixels bordering
+   *  the sprite can light up as a one-pixel red rim. Both start off; set them with `rage`. */
+  enrage(eyes: THREE.Texture) {
+    const mat = this.mesh.material;
+    const u = {
+      rageEyes: { value: 0 }, rageRim: { value: 0 }, rageMask: { value: eyes },
+      rageTexel: { value: new THREE.Vector2(1 / this.sheet.w, 1 / this.sheet.h) }, rageFrame: { value: new THREE.Vector4() },
+    };
+    this.rageUniforms = u;
+    this.frame = -1;
+    this.show(Math.max(0, Math.floor(this.t * this.fps)) % this.frames.length);
+    mat.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, u);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('void main() {', `uniform float rageEyes, rageRim;
+          uniform sampler2D rageMask;
+          uniform vec2 rageTexel;
+          uniform vec4 rageFrame;
+          float rageAlpha(vec2 q) {
+            // (Off the frame is empty: past its edge lie the neighbors on the sheet.)
+            vec2 lo = min(rageFrame.xy, rageFrame.zw), hi = max(rageFrame.xy, rageFrame.zw);
+            return all(greaterThanEqual(q, lo)) && all(lessThanEqual(q, hi)) ? texture2D(map, q).a : 0.0;
+          }
+          void main() {`)
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          float eyeGlow = texture2D(rageMask, vMapUv).r * rageEyes;
+          float rim = 0.0;
+          // (Off once it's too faint to read as red: below that it's only a black outline.)
+          if (rageRim > 0.1 && diffuseColor.a < 0.5) {
+            float near = max(max(rageAlpha(vMapUv + vec2(rageTexel.x, 0.0)), rageAlpha(vMapUv - vec2(rageTexel.x, 0.0))),
+              max(rageAlpha(vMapUv + vec2(0.0, rageTexel.y)), rageAlpha(vMapUv - vec2(0.0, rageTexel.y))));
+            if (near >= 0.5) { rim = rageRim; diffuseColor = vec4(0.0, 0.0, 0.0, 1.0); }
+          }
+          // (Lit only from within: the room's warm light on top washes the red out to pink.)
+          diffuseColor.rgb *= 1.0 - min(1.0, eyeGlow);`)
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+          totalEmissiveRadiance += vec3(1.1, 0.0, 0.02) * eyeGlow + vec3(0.85, 0.0, 0.03) * rim;`);
+    };
+    mat.customProgramCacheKey = () => 'enraged';
+    mat.needsUpdate = true;
+  }
+  private rageUniforms: { rageEyes: { value: number }; rageRim: { value: number }; rageFrame: { value: THREE.Vector4 } } | null = null;
+
+  /** How hot the eyes burn (past 1 for a flare) and how bright the rim is: 0 is off. */
+  rage(eyes: number, rim: number) {
+    if (!this.rageUniforms) return;
+    this.rageUniforms.rageEyes.value = eyes;
+    this.rageUniforms.rageRim.value = rim;
+  }
+
   /** Silhouette flash (0..1) for hits: white, or a warm glint on gold so a champion under fire stays gold. */
   set flash(v: number) {
     if (this.gilded) this.mesh.material.emissive.setRGB(v * 0.5, v * 0.32, v * 0.05);
@@ -95,6 +145,7 @@ export class PixelSprite {
     uv.setXY(2, u0, v0);
     uv.setXY(3, u1, v0);
     uv.needsUpdate = true;
+    this.rageUniforms?.rageFrame.value.set(u0, v0, u1, v1);
     this.mesh.scale.set(r.w * PX, r.h * PX, 1);
   }
 

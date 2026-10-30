@@ -16,6 +16,11 @@ import { DEMO, DEMO_LAST_FLOOR } from './demo.ts';
 import { TitleMenu } from './ui/menu.ts';
 import { PlayRecorder } from './record.ts';
 import { olderVersion } from './version.ts';
+import { installCrashScreen } from './crash.ts';
+import { installGamepad } from './ui/gamepad.ts';
+
+installCrashScreen();
+installGamepad();
 
 declare global {
   interface Window {
@@ -320,12 +325,39 @@ async function boot() {
     const button = document.createElement('button');
     button.textContent = 'Next floor ▸ (N)';
     button.title = 'Win this floor for everything it pays. Shift: 10 floors.';
-    button.style.cssText = 'position:fixed;left:12px;top:132px;z-index:50;padding:6px 10px;font:14px Silkscreen,monospace;background:#2a1d14;color:#ffd27a;border:2px solid #7a5a2a;border-radius:4px;cursor:pointer';
+    const look = 'padding:6px 10px;font:14px Silkscreen,monospace;background:#2a1d14;color:#ffd27a;border:2px solid #7a5a2a;border-radius:4px;cursor:pointer';
+    button.style.cssText = `position:fixed;left:12px;top:132px;z-index:50;${look}`;
     button.addEventListener('pointerdown', (e) => e.stopPropagation());
     button.addEventListener('click', (e) => next(e.shiftKey ? 10 : 1));
     document.body.appendChild(button);
+    const SKIP_HOURS = [1, 2, 3, 8, 24];
+    const skip = (hours: number) => {
+      if (game.s.inKeep || scene.busy) return;
+      const o = game.devSkipTime(hours * 3600);
+      flushAway();
+      ui.showOffline(o);
+      save();
+    };
+    const skips = document.createElement('div');
+    skips.style.cssText = 'position:fixed;left:12px;top:168px;z-index:50;display:flex;gap:4px';
+    SKIP_HOURS.forEach((hours, k) => {
+      const hourButton = document.createElement('button');
+      hourButton.textContent = `+${hours}h`;
+      hourButton.title = `Farm this floor for ${hours}h (Cmd+${k + 1})`;
+      hourButton.style.cssText = look;
+      hourButton.addEventListener('pointerdown', (e) => e.stopPropagation());
+      hourButton.addEventListener('click', () => skip(hours));
+      skips.appendChild(hourButton);
+    });
+    document.body.appendChild(skips);
     addEventListener('keydown', (e) => {
-      if (e.key.toLowerCase() === 'n' && !e.repeat && !(e.target as HTMLElement).closest('input, textarea')) next(e.shiftKey ? 10 : 1);
+      if (e.repeat || (e.target as HTMLElement).closest('input, textarea')) return;
+      if (e.key.toLowerCase() === 'n') next(e.shiftKey ? 10 : 1);
+      const hours = e.metaKey && SKIP_HOURS[Number(e.code.replace('Digit', '')) - 1];
+      if (hours) {
+        e.preventDefault();
+        skip(hours);
+      }
     });
   }
 
@@ -525,9 +557,9 @@ async function boot() {
       slow = 0.1;
       stage(() => ui.update());
     }
-    // The Keep always has its own tune; the awakening plays in silence.
+    // The Keep and the title screen share their own tune; the awakening plays in silence.
     if (ui.cutscene) sfx.hush();
-    else sfx.music(game.s.inKeep ? 'keep' : trackFor(game));
+    else sfx.music(game.s.inKeep || atMenu ? 'keep' : trackFor(game));
   };
   ui.update();
   requestAnimationFrame(frame);

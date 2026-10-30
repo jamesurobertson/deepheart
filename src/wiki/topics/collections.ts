@@ -3,6 +3,7 @@ import { ABILITIES, COMPS } from '../../game/data.ts';
 import { AWAKEN_ON, CARD_ODDS, CHAMP_CHANCE, DAN_GIVES, EXPEDITION_LEVEL, FLOOR_KILLS, GOLD_SET_BONUS, SET_BONUS, TRIP_HOURS, VICTOR_GIVES } from '../../game/game.ts';
 import { esc, h2, link, pct, table, toc } from '../kit.ts';
 import { spr } from '../sprites.ts';
+import { kokoSvg } from '../../ui/koko.ts';
 import type { Page } from '../pages.ts';
 
 const LAP_COLOR = ['#c9b8a0', ...CORRUPTION.slice(1).map((c) => `#${c.tint.toString(16).padStart(6, '0')}`)];
@@ -27,7 +28,7 @@ const cardsBody = () => {
       ['A treasure goblin', `1 in ${CARD_ODDS.goblin.toLocaleString('en-US')}`],
       ['A rainbow goblin', `1 in ${CARD_ODDS.rainbow.toLocaleString('en-US')}`],
     ])}
-    <p>${link(`spirit-${collector.id}`, collector.name)} raises every chance, up to twice. ${link('spirit-ronin', 'The Ronin')} raises it for kills that deal far more than a monster's health. Swept floors roll a card for every kill, and time away rolls them too (plain cards only). ${link('expeditions', 'Expeditions')} roll them for every kill a hunter makes.</p>
+    <p>${link(`spirit-${collector.id}`, collector.name)} raises every chance, up to two and a half times. ${link('spirit-ronin', 'The Ronin')} raises it for kills that deal far more than a monster's health. Swept floors roll a card for every kill, and time away rolls them too (plain cards only). ${link('expeditions', 'Expeditions')} roll them for every kill a hunter makes.</p>
     ${h2('Colors')}
     <p>A card drops in the color of the lap you're on, if that card comes in it: plain on floors 1–80, then ${CORRUPTION.slice(1).map((c) => c.name).join(', ')}. A zone's newcomers only come in the later colors, and only two of its first crowd come back. Goblin cards are plain only.</p>
     ${h2('Gold cards')}
@@ -48,12 +49,14 @@ const cardsBody = () => {
 
 /** Trophies that belong to systems that aren't in the game yet stay off the list. */
 const live = (t: TrophyDef) => !(['awakens', 'boundAll', 'boundEarned'].includes(t.req.t) && !AWAKEN_ON);
+/** Hidden trophies stay off the wiki's lists too. */
+const listed = (t: TrophyDef) => live(t) && !t.hidden;
 
 const GROUPS: [string, TrophyDef['req']['t'][]][] = [
   ['Floors', ['floor']], ['Gold', ['gold']], ['Kills', ['kills']], ['Bosses', ['bosses', 'clutches', 'champions']],
   ['Companions', ['level', 'levelAll']], ['Attacks', ['clicks', 'crits', 'fevers', 'rampage']], ['Damage', ['dps']],
-  ['Goblins', ['raids', 'missed', 'rainbows', 'vaults']], ['Ascents', ['descents']], ['Expeditions', ['trips', 'tripCards']],
-  ['Cards', ['cards', 'versions', 'goldCards']], ['Awakening', ['awakens', 'boundAll', 'boundEarned']],
+  ['Goblins', ['raids', 'missed', 'rainbows', 'vaults']], ['Ascents', ['descents']], ['Expeditions', ['trips', 'tripCards', 'tripKills']],
+  ['Cards', ['cards', 'versions', 'goldCards']], ['Awakening', ['awakens', 'boundAll', 'boundEarned']], ['The Keep', ['pets']],
 ];
 
 const trophiesBody = () => {
@@ -63,8 +66,8 @@ const trophiesBody = () => {
     <p>There are ${trophies.length} trophies, so +${trophies.length}% in all. Some also unlock a ${link('trophies', 'cursor', 'Cursors')}.</p>
     ${toc('trophies', [...GROUPS.filter(([, kinds]) => trophies.some((t) => kinds.includes(t.req.t))).map(([g]) => g), 'Cursors'])}
     ${GROUPS.map(([group, kinds]) => {
-      const list = trophies.filter((t) => kinds.includes(t.req.t));
-      return list.length ? `${h2(group)}${table(['Trophy', 'How'], list.map((t) => [`<span class="who">${t.icon.sprite === 'soul' ? SOUL : spr(t.icon.sprite, 22)}<b>${esc(t.name)}</b></span>`, esc(t.desc)]))}` : '';
+      const list = trophies.filter((t) => listed(t) && kinds.includes(t.req.t));
+      return list.length ? `${h2(group)}${table(['Trophy', 'How'], list.map((t) => [`<span class="who">${t.icon.sprite === 'soul' ? SOUL : t.icon.sprite === 'koko' ? kokoSvg(22) : spr(t.icon.sprite, 22)}<b>${esc(t.name)}</b></span>`, esc(t.desc)]))}` : '';
     }).join('')}
     ${h2('Cursors')}
     <p>Cursor skins, picked in Options.</p>

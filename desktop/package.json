@@ -1,7 +1,7 @@
 {
   "name": "deepheart-desktop",
   "productName": "Deepheart",
-  "version": "0.10.10",
+  "version": "0.10.11",
   "private": true,
   "description": "Deepheart as a desktop app (Electron), for Steam and for playing offline.",
   "main": "main.cjs",
@@ -30,7 +30,12 @@
     "extraResources": [
       {
         "from": "../dist",
-        "to": "game"
+        "to": "game",
+        "filter": [
+          "**/*",
+          "!og-image.png",
+          "!**/*.woff"
+        ]
       }
     ],
     "mac": {

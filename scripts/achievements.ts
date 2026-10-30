@@ -1,0 +1,14 @@
+/** Prints the trophy list as Steam achievements (API name, display name, description, hidden) for pasting into Steamworks. */
+import { TROPHIES } from '../src/game/data.ts';
+
+const asCsv = process.argv.includes('--csv');
+// (The API name is the one desktop/steam.cjs unlocks: "kill-1000" → "KILL_1000".)
+const rows = TROPHIES.filter((trophy) => trophy.steam).map((trophy) => ({ api: trophy.id.toUpperCase().replace(/[^A-Z0-9]+/g, '_'), name: trophy.name, desc: trophy.desc, hidden: trophy.hidden ? 1 : 0 }));
+if (asCsv) {
+  const quote = (text: string) => `"${text.replace(/"/g, '""')}"`;
+  console.log('api_name,name,description,hidden');
+  for (const row of rows) console.log([row.api, quote(row.name), quote(row.desc), row.hidden].join(','));
+} else {
+  for (const row of rows) console.log(`${row.api}\t${row.name}\t${row.desc}${row.hidden ? '\thidden' : ''}`);
+}
+console.error(`${rows.length} achievements`);

@@ -9,6 +9,7 @@ import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, silhouette, sprite, spriteFit, spriteFrames } from './px.ts';
 import { skillIcon } from './icons.ts';
+import { kokoSvg } from './koko.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
 
 export interface UiHooks {
@@ -63,7 +64,7 @@ function icon(i: Icon, box = 36, badge = true): string {
   // Two companions (a synergy): side by side, a little overlapped.
   if (i.sub) return `<span class="ico pair">${charFit(i.sprite, box * 0.8)}${charFit(i.sub, box * 0.8)}</span>`;
   const tier = badge && i.tier !== undefined ? `<b class="tier" style="--tc:${TIER_COLORS[i.tier]}">${ROMAN[i.tier]}</b>` : '';
-  return `<span class="ico">${i.sprite === 'soul' ? G.soul(Math.floor(box / 8)) : spriteFit(i.sprite, box)}${tier}</span>`;
+  return `<span class="ico">${i.sprite === 'soul' ? G.soul(Math.floor(box / 8)) : i.sprite === 'koko' ? kokoSvg(box) : spriteFit(i.sprite, box)}${tier}</span>`;
 }
 
 /** A monster card as it sits in the collection: one you don't have yet is a dark silhouette. */
@@ -72,6 +73,9 @@ function cardFace(card: (typeof CARDS)[number], state: 'locked' | 'got', gilded 
   const art = cardArt(card, box, state === 'got' && card.id === 'rainbow-goblin' ? 'rainbow' : '', lap);
   return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'locked' ? '???' : esc(card.name)}</span></span>`;
 }
+
+/** The trophies on show: hidden ones only once earned. */
+const shownTrophies = (g: Game) => TROPHIES.filter((t) => !t.hidden || g.hasTrophy(t.id));
 
 const KIND_NAME = { power: 'Power', utility: 'Utility', sink: 'Sink' } as const;
 
@@ -275,7 +279,7 @@ export class Ui {
   private heroAim: { x: number; y: number } | null = null;
   private fingerDown = false;
   /** The battlefield's share of the window (left of the party panel / above the phone sheet). */
-  private field = { w: innerWidth, h: innerHeight };
+  private field = { w: innerWidth, h: innerHeight, shownW: innerWidth };
   /** Arrow keys / WASD held down, for steering your hero. */
   private keys = new Set<'up' | 'down' | 'left' | 'right'>();
   /** After steering with the keys the hero ignores the mouse until it moves again (and stays put a moment first). */
@@ -347,6 +351,7 @@ export class Ui {
       <div class="letterbox" aria-hidden="true"></div>
       <div class="banner" hidden><b></b><span></span></div>
       <div class="ticker"><span></span></div>
+      <button class="ui-back" data-act="showUi" hidden><kbd>H</kbd><span>Show interface</span></button>
       <nav class="dock">
         <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy(3)}<span>Collection</span><em class="badge new" hidden></em></button>
         <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>Ascend</span><em class="badge" hidden></em></button>
@@ -450,11 +455,15 @@ export class Ui {
     body.toggle('phone', sheet);
     body.toggle('compact', compact);
     const shop = this.el.shop.getBoundingClientRect();
+    // With the interface hidden (H) the party panel is gone, so the fight gets its space.
+    const shopLeft = this.uiHidden ? w : shop.left;
+    const shopTop = this.uiHidden ? h : shop.top;
     // The ability column stands between the fight and the party panel (on a phone it's a row along the bottom instead).
     const column = sheet ? 0 : this.el.abilities.getBoundingClientRect().width;
-    const freeW = sheet ? w : shop.left - column;
-    const freeH = sheet ? shop.top : h;
-    this.field = { w: freeW, h: freeH };
+    const freeW = sheet ? w : shopLeft - column;
+    const freeH = sheet ? shopTop : h;
+    // shownW is the width with the interface up, so hiding it (H) doesn't zoom the Keep.
+    this.field = { w: freeW, h: freeH, shownW: this.uiHidden ? this.field.shownW : freeW };
     this.root.style.setProperty('--free-w', `${freeW}px`);
     // The floor map sits in the top-left corner only when the gold counter, centered over the fight, can't reach it.
     body.toggle('map-in-bar', compact || freeW < 980);
@@ -465,7 +474,18 @@ export class Ui {
     // Frame the fight below the HUD (the floor bar is the last part that always shows).
     const hud = this.el.floorBox.getBoundingClientRect();
     this.hudTop = compact ? Math.round(hud.bottom + 4) : 0;
-    this.scene.setViewport(sheet ? 0 : w - shop.left + column, sheet ? h - shop.top : 0, this.hudTop);
+    this.scene.setViewport(sheet ? 0 : w - shopLeft + column, sheet ? h - shopTop : 0, this.hudTop);
+  }
+
+  private uiHidden = false;
+
+  /** H: hide the party panel, dock and floor map for a clean view, with a small way back in the corner. */
+  private setUiHidden(on: boolean) {
+    if (on === this.uiHidden) return;
+    this.uiHidden = on;
+    document.body.classList.toggle('ui-hidden', on);
+    this.root.querySelector<HTMLElement>('.ui-back')!.hidden = !on;
+    this.layout();
   }
 
   /** Portrait sheet: folded (header only), half (default) or full height. */
@@ -628,12 +648,15 @@ export class Ui {
       this.inputAt = performance.now();
       if ((e.target as HTMLElement).closest('input, textarea')) return;
       if (e.key === 'Escape' && this.modal) this.closeModal();
-      // U buys the cheapest companion trait you can afford.
-      if (e.key.toLowerCase() === 'u' && !e.repeat && !this.modal) {
-        const next = this.game.shopUpgrades().find((u) => this.game.s.gold.gte(this.game.upgCost(u)));
-        if (next && this.game.buyUpg(next.id)) this.hideTip();
+      // ? lists the shortcuts.
+      if (e.key === '?' && !e.repeat) {
+        if (this.modal === 'keys') this.closeModal();
+        else if (!this.modal) this.openModal('keys');
       }
-      // 1–9 use the abilities in the column, in order.
+      // H hides the interface for screenshots; H again or Escape brings it back.
+      if (e.key.toLowerCase() === 'h' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) this.setUiHidden(!this.uiHidden);
+      else if (e.key === 'Escape') this.setUiHidden(false);
+      // The number keys use the abilities in the column, in order.
       if (/^[1-9]$/.test(e.key) && !e.repeat && !this.modal) {
         const id = KEYED[Number(e.key) - 1];
         const slot = id && this.el.abilities.querySelector<HTMLElement>(`[data-ability="${id}"]`);
@@ -1037,6 +1060,7 @@ export class Ui {
       case 'heartBack': this.modal = 'heart'; this.renderModal(); break;
       case 'descendGo': this.doDescend(); break;
       case 'leaveVault': this.game.leaveVault(); break;
+      case 'showUi': this.setUiHidden(false); break;
       case 'abyssBack': this.modal = 'abyss'; this.renderModal(); break;
       case 'tripGo': {
         const i = Number(el.closest<HTMLElement>('[data-hunter]')!.dataset.hunter);
@@ -1450,7 +1474,7 @@ export class Ui {
   toast(html: string, spr: string, cls = '') {
     const el = document.createElement('div');
     el.className = `toast pnl ${cls}`;
-    const ico = spr === 'check' ? G.check() : spr === 'close' ? G.close() : spr === 'soul' ? G.soul(4) : spriteFit(spr, 32);
+    const ico = spr === 'check' ? G.check() : spr === 'close' ? G.close() : spr === 'soul' ? G.soul(4) : spr === 'koko' ? kokoSvg(32) : spriteFit(spr, 32);
     el.innerHTML = `<span class="toast-ico">${ico}</span><span class="toast-t">${html}</span>`;
     this.el.toasts.prepend(el);
     while (this.el.toasts.children.length > 3) this.el.toasts.lastElementChild!.remove();
@@ -1522,7 +1546,7 @@ export class Ui {
       const keys = this.modal ? { x: 0, y: 0 } : { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), y: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
       // The Legend picked in the menu is the one lit in the shrine behind it.
       if (this.modal === 'abyss' && this.legendPick) this.keepView.pinned = `offer:${this.legendPick}`;
-      this.keepView.frame(dt, keys, this.field.w, this.field.h);
+      this.keepView.frame(dt, keys, this.field.w, this.field.h, this.field.shownW);
     }
     this.keepLabelsFrame();
     // A held attack keeps to whatever is under the cursor, which changes as monsters move and die even when the mouse
@@ -1617,7 +1641,7 @@ export class Ui {
       this.el.bladeIn.innerHTML = sprite(blade, blade === 'weapon_knife' ? 3 : 2);
     }
     // Measured here, not every frame: reading layout each frame makes the browser redo it.
-    this.scene.heroBlocked = [this.el.dock.getBoundingClientRect()];
+    this.scene.heroBlocked = this.uiHidden ? [] : [this.el.dock.getBoundingClientRect()];
     setText(this.el.dps, fmt(g.dpsTotal()));
     setText(this.el.click, fmt(g.clickTotal()));
     this.el.rate.classList.toggle('boosted', g.s.buffs.some((b) => b.id !== 'fever'));
@@ -2089,7 +2113,6 @@ export class Ui {
     if (auto) {
       if (this.el.autoUpg.textContent !== 'Auto traits') this.el.autoUpg.textContent = 'Auto traits';
       this.el.autoUpg.classList.toggle('on', g.s.settings.autoUpg);
-      this.el.autoUpg.classList.toggle('busy', g.s.settings.autoUpg && g.autoUpgLeft() > 0);
     }
     const hire = g.autoHireOpen();
     this.el.autoHire.hidden = !hire;
@@ -2193,7 +2216,7 @@ export class Ui {
             : state === 'flurry' ? `<b>Flurry is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('flurry')}`} to use it</small></b>`
             : state === 'rampage' ? `<b>Rampage is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
-            : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it, or press U'}</small></b>`
+            : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
               : state === 'champ' ? this.champHint()
               : state === 'auto' ? `<b>Auto-buy<small>Traits you've bought before buy themselves</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
@@ -2498,7 +2521,7 @@ export class Ui {
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it.'}</p>`;
     if (kind === 'dock') {
       const text: Record<string, string> = {
-        trophies: `Trophies ${g.s.trophies.length}/${TROPHIES.length}. Cards ${g.cardVersions()}/${g.cardVersionsTotal()}.`,
+        trophies: `Trophies ${g.s.trophies.length}/${shownTrophies(g).length}. Cards ${g.cardVersions()}/${g.cardVersionsTotal()}.`,
         abyss: DEMO ? `The way up opens at floor ${fmt(g.ascendFloor())}.`
           : g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${fmt(g.ascendFloor())}.`,
         ...(DEMO ? {} : {
@@ -2571,7 +2594,8 @@ export class Ui {
     let html = '';
     if (name === 'trophies') {
       const n = g.s.trophies.length;
-      html = head('Trophies', `${n} / ${TROPHIES.length} · +${n}% damage`) + this.troTabs('trophies') + `<div class="tro-grid">${TROPHIES.map((t) => `<span class="tro ${g.hasTrophy(t.id) ? 'got' : ''}" data-tip="tro:${t.id}">${icon(t.icon, 28)}</span>`).join('')}</div>`;
+      const shown = shownTrophies(g);
+      html = head('Trophies', `${n} / ${shown.length} · +${n}% damage`) + this.troTabs('trophies') + `<div class="tro-grid">${shown.map((t) => `<span class="tro ${g.hasTrophy(t.id) ? 'got' : ''}" data-tip="tro:${t.id}">${icon(t.icon, 28)}</span>`).join('')}</div>`;
     } else if (name === 'cards') {
       html = head('Cards') + this.troTabs('cards') + this.cardsHtml();
 
@@ -2598,6 +2622,18 @@ export class Ui {
     } else if (!DEMO && (name === 'dan' || name === 'victor')) {
       const who = name as Trader;
       html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${who === 'dan' ? 'Dan' : 'Victor'}`, who === 'dan' ? `Trade ${DAN_GIVES} cards for a random card` : `Trade ${VICTOR_GIVES} cards for 1 gold card`) + this.tradeHtml(who);
+    } else if (name === 'keys') {
+      const cap = (...keys: string[]) => keys.map((k) => `<kbd>${k}</kbd>`).join('');
+      const rows: [string, string][] = [
+        [cap('W', 'A', 'S', 'D'), 'Move'],
+        [`${MOUSE_GLYPH}${cap('Space')}`, 'Attack'],
+        [`${cap('1')}–${cap(String(KEYED.length))}`, 'Abilities'],
+        ...(DEMO || !(g.legendsOpen() || g.s.inKeep) ? [] : [[cap('E'), 'Interact'] as [string, string]]),
+        [cap('H'), 'Hide interface'],
+        [cap('Esc'), 'Close'],
+        [cap('?'), 'Shortcuts'],
+      ];
+      html = head('Shortcuts') + `<dl class="keys">${rows.map(([keys, what]) => `<dt>${keys}</dt><dd>${what}</dd>`).join('')}</dl>`;
     } else if (name === 'settings') {
       const s = g.s.settings;
       const tog = (act: string, on: boolean, label: string) => `<button class="btn toggle ${on ? 'on' : ''}" data-act="${act}">${label}: ${on ? 'On' : 'Off'}</button>`;
@@ -2618,7 +2654,7 @@ export class Ui {
           <p class="muted">Copy your save code to move it to another browser.</p>
           <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
           <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
-          <div class="set-row">${DEMO ? '' : `<a class="btn" href="${WIKI_URL}" target="_blank" rel="noopener">Wiki</a>`}${document.body.classList.contains('at-menu') ? '' : '<button class="btn" data-act="mainMenu">Main menu</button>'}</div>
+          <div class="set-row">${DEMO ? '' : `<a class="btn" href="${WIKI_URL}" target="_blank" rel="noopener">Wiki</a>`}<button class="btn" data-open="keys">Shortcuts</button>${document.body.classList.contains('at-menu') ? '' : '<button class="btn" data-act="mainMenu">Main menu</button>'}</div>
         </div>`;
     }
     if (soft && (html === this.modalKey || performance.now() < this.modalHold)) return;
@@ -3096,7 +3132,7 @@ export class Ui {
       ['Floor', `${fmt(s.floor)} (deepest this descent ${fmt(s.maxFloor)})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
       ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses beaten', fmt(s.bosses)],
       ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rainbow Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
-      ...(DEMO ? [] : [['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)]] as [string, string][]), ['Trophies', `${s.trophies.length} / ${TROPHIES.length}`], ['Cards found', fmt(g.cardsFound())],
+      ...(DEMO ? [] : [['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)]] as [string, string][]), ['Trophies', `${s.trophies.length} / ${shownTrophies(g).length}`], ['Cards found', fmt(g.cardsFound())],
       ['This descent', duration(s.runTime)], ['Active', duration(s.runActive), true], ['Idle', duration(Math.max(0, s.runTime - s.runActive)), true],
       ['Time played', duration(s.playTime)], ['Active', duration(s.activeTime), true], ['Idle', duration(Math.max(0, s.playTime - s.activeTime)), true],
     ];
@@ -3661,6 +3697,7 @@ export class Ui {
   private station(id: KeepStation) {
     if (DEMO) return;
     if (this.modal || this.keepFading) return;
+    if (id === 'koko') return this.keepView?.pet();
     this.hooks.sound('open', { vol: 0.4 });
     if (id.startsWith('offer:')) {
       // The one you're standing at is the one picked, ready to summon.

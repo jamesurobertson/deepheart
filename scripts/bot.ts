@@ -85,9 +85,6 @@ export function seedRandom(seed: number) {
 /** Upgrade effects that change what everything else is worth. */
 const DAMAGE_EFFECTS = new Set(['comp', 'party', 'clickDps']);
 
-/** Seconds at most between shop checks while saving up for something. */
-const SHOP_RECHECK = 10;
-
 export class Sim {
   readonly game = new Game(newSave());
   readonly dt: number;
@@ -241,7 +238,6 @@ export class Sim {
   }
 
   private afterReset() {
-    this.saveFor = null;
     this.lastProgress = this.t;
     this.lastMax = 0;
     this.stallSeen = false;
@@ -285,15 +281,8 @@ export class Sim {
     return game.baseDps().plus(game.clickDamage().times(this.hand() + game.autoRate()));
   }
 
-  /** Saving up: the best buy last time cost this much, so there's nothing to decide until the gold is there (re-checked
-   *  every SHOP_RECHECK seconds anyway, and on a new deepest floor, which can bring new upgrades). */
-  private saveFor: { gold: Decimal; until: number; floor: number } | null = null;
-
   private shop() {
     const { game } = this;
-    const wait = this.saveFor;
-    if (wait && game.s.gold.lt(wait.gold) && this.t < wait.until && game.s.maxFloor === wait.floor) return;
-    this.saveFor = null;
     // Like a person, it hires a new face as soon as it can afford one, whatever the numbers say.
     for (let i = 0; i < COMPS.length; i++) {
       if (game.s.owned[i] === 0 && game.compUnlocked(i) && i < game.s.revealed && game.s.gold.gte(game.compCost(i))) game.buyComp(i, 1);
@@ -301,7 +290,8 @@ export class Sim {
     const step = Math.log10(TUNE.costGrowth);
     for (let pass = 0; pass < 40; pass++) {
       // Score everything once (log10 of gold per point of damage, so absurd numbers still compare), then buy down the
-      // list in order: what a player does with the shop open. Re-score only after buying something.
+      // list, skipping what the gold won't cover: the best step among what you can afford, as the game's auto hire
+      // does. Re-score only after buying something.
       const p = this.power();
       const options: { comp?: number; upg?: string; cost: Decimal; score: number }[] = [];
       for (let i = 0; i < COMPS.length; i++) {
@@ -325,11 +315,7 @@ export class Sim {
       let bought = false;
       for (let k = 0; k < options.length; k++) {
         const o = options[k];
-        // The best thing left is out of reach: save up for it rather than settle for something worse.
-        if (o.cost.gt(game.s.gold)) {
-          if (!bought) this.saveFor = { gold: o.cost, until: this.t + SHOP_RECHECK, floor: game.s.maxFloor };
-          break;
-        }
+        if (o.cost.gt(game.s.gold)) continue;
         if (o.upg) {
           if (!game.buyUpg(o.upg)) continue;
           bought = true;
