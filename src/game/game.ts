@@ -178,7 +178,8 @@ export const DESCEND_FLOOR = 100;
  *   (1 − e^(−bound / `pullScale`) of the way there). The Pit Lord multiplies them ×(1 + 10·level²), as Ponyboy.
  * - The wall: from floor `wallFrom` monsters get tougher by the same factor every floor, reaching `wall`× the health at
  *   `wallTo` and staying there (Clicker Heroes' wall past zone 500): a run that hasn't awakened slows to a stop on the
- *   way up it; the Bound and bound souls carry you past it.
+ *   way up it; the Bound and bound souls carry you past it. (Past it health grows no faster than before: a steeper
+ *   climb there outran the Pit Lord and the pull, and every cycle stalled near floor 970.)
  * - The Ogre Chieftain adds `ogre` (×100%) to all damage per level. Zone bosses have `zoneBoss`× the health of mid-bosses.
  * - Up to floor `deepFrom` each floor has about `hpBase`× the health of the last, past it `deepHp`×. A floor's gold
  *   starts at `goldBase` and grows `goldGrowth`× a floor, `deepGold`× past `deepFrom`. Companion damage grows about
@@ -186,7 +187,7 @@ export const DESCEND_FLOOR = 100;
  *   further out of reach than the last: the gap souls, Legends and Heartmarks close.
  *   A floor's health and gold are shared across its 25 monsters.
  */
-export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.62, deepGold: 1.15, levelsPerSoul: 2000, goldBossFrom: 100, goldBossChance: 0.25, soulPower: 0.1, deepHp: 1.145, deepFrom: 100, zoneBoss: 1, hpCreep: 0.004, awakenFloor: AWAKEN_FLOOR, pullFloor: 0.02, pullCap: 0.25, pullScale: 187, ogre: 1, wallFrom: 300, wallTo: 400, wall: 1000, wallGrowth: 1.04, costGrowth: COST_GROWTH };
+export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.62, deepGold: 1.15, levelsPerSoul: 500, goldBossFrom: 100, goldBossChance: 0.25, soulPower: 0.1, deepHp: 1.145, deepFrom: 100, zoneBoss: 1, hpCreep: 0.0005, awakenFloor: AWAKEN_FLOOR, pullFloor: 0.02, pullCap: 0.15, pullScale: 187, ogre: 1, wallFrom: AWAKEN_FLOOR, wallTo: AWAKEN_FLOOR + 100, wall: 1000, costGrowth: COST_GROWTH };
 
 /** How gold on the floor reached the bank: picked up, left too long, swept up leaving the floor, or flown up when
  *  a rainbow portal opens. */
@@ -623,10 +624,9 @@ export function floorHp(f: number): Decimal {
   // Past deepFrom each floor's growth creeps up by hpCreep (in natural log) every 100 floors, so walls steepen the
   // deeper you go and runs settle into steady gains instead of snowballing.
   const n = f - TUNE.deepFrom;
-  // The wall ramps in to its full height at wallTo, and keeps rising wallGrowth× a floor past it.
+  // The wall ramps in to its full height at wallTo.
   const wall = TUNE.wall ** Math.min(1, Math.max(0, (f - TUNE.wallFrom) / (TUNE.wallTo - TUNE.wallFrom)));
-  return floorHp(TUNE.deepFrom).times(Decimal.pow(TUNE.deepHp, n)).times(Decimal.exp((TUNE.hpCreep * n * n) / 200)).times(wall)
-    .times(Decimal.pow(TUNE.wallGrowth, Math.max(0, f - TUNE.wallTo)));
+  return floorHp(TUNE.deepFrom).times(Decimal.pow(TUNE.deepHp, n)).times(Decimal.exp((TUNE.hpCreep * n * n) / 200)).times(wall);
 }
 
 /** Gold for one ordinary monster's worth of a floor (monsters get a share of it, like their health). */

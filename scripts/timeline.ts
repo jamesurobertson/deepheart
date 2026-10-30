@@ -2,7 +2,8 @@
  * The long view: a casual player for hundreds of played hours, checked against the timeline we want.
  *   node scripts/timeline.ts [hours=300] [--seed n] [--dt 0.1]
  * Three 20-minute sessions a day (attacking by hand for the first 2 minutes), away 4h, 4h and overnight in between,
- * paid out by the game's own offline rules. Times below are played time; time away doesn't count.
+ * paid out by the game's own offline rules. It ascends only once stuck, as Clicker Heroes players are told to (one
+ * that ascends at every chance reaches everything later). Times below are played time; time away doesn't count.
  * TUNE='{"deepHp":1.17}' overrides pacing knobs. Exits 1 if any milestone misses its window.
  */
 import { AWAKEN_ON, TUNE } from '../src/game/game.ts';
@@ -17,7 +18,15 @@ const ACTIVE = 2 * 60;
 /** Hours away after each of the day's three sessions. */
 const AWAY = [4, 4, 15];
 
-const CASUAL: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 1, ascendEager: true, ascendMin: 5, awakenRatio: 0.25, stall: 180, catchRate: 0.03, resetActive: 0, shopEvery: 5 };
+const CASUAL: Profile = { cps: 5, activeMin: 0, descendRatio: 0, descendGain: 1, ascendEager: false, ascendMin: 5, awakenRatio: 0.25, stall: 180, catchRate: 0.03, resetActive: 0, shopEvery: 5 };
+
+/** Companions that come with gold alone; the rest wait on a floor. */
+const REGULARS = COMPS.filter((c) => !c.floor).length;
+/** When each late companion should first be met, in played hours. */
+const LATE_WINDOWS: Record<string, [number, number]> = {
+  wraith: [16, 23], elfqueen: [17, 24], necro: [24, 36], king: [30, 45], elflord: [40, 58],
+  magus: [55, 80], angel: [72, 105], ogre: [100, 145], demon: [140, 200],
+};
 
 /** The longest quiet stretch allowed, by when it starts. */
 const quietLimit = (start: number) => (start < 10 * H ? 20 * 60 : start < 100 * H ? H : 3 * H);
@@ -51,7 +60,6 @@ let floorAt1h: number | null = null;
 let firstAscent: number | null = null;
 let firstAwaken: number | null = null;
 let ascentsToAwaken: number | null = null;
-let allMet: number | null = null;
 /** Deepest floor at the end of every 20-hour window, and every 10 hours for the curve. */
 const windows: number[] = [];
 const curve: [number, number][] = [];
@@ -92,7 +100,6 @@ const sim = new Sim(CASUAL, {
         metAt[i] = t;
       }
     });
-    if (allMet === null && met.size === COMPS.length) allMet = t;
     if (allCardsAt === null && game.s.bestFloor >= ALL_CARDS_FLOOR) allCardsAt = t;
     if (crossed(20 * H)) {
       windows.push(game.s.bestFloor);
@@ -124,20 +131,44 @@ const played = (s: number) => (s < H ? duration(s) : `${Math.floor(s / H)}h ${Ma
 const t = (s: number | null) => (s === null ? 'never' : played(s));
 const within = (s: number | null, lo: number, hi: number) => (s !== null && s >= lo && s <= hi ? 'PASS' : 'FAIL');
 const reach = (s: number | null, hi: number) => s === null && sim.t < hi;
-/** Longest stretch without meeting someone new, until the whole party is met. */
+/** Longest stretch without meeting someone new, before the first awakening and after it (until the party is complete,
+ *  or the run ends). */
 const meetTimes = [0, ...metAt.filter((x) => x !== undefined).sort((a, b) => a - b)];
-const meetWait = Math.max(...meetTimes.slice(1).map((x, i) => x - meetTimes[i]));
+if (met.size < COMPS.length) meetTimes.push(sim.t);
+const awakeAt = firstAwaken ?? sim.t;
+// A wait counts as after the awakening if it ends after it (the one across the awakening is long on purpose). The
+// longest before it is the gap after the Plague Doctor that makes the first ascent pay (Clicker Heroes' Dread Knight wall).
+const waits = meetTimes.slice(1).map((x, i) => ({ to: x, gap: x - meetTimes[i] }));
+const meetWaitBefore = Math.max(0, ...waits.filter((w) => w.to <= awakeAt).map((w) => w.gap));
+const meetWaitAfter = Math.max(0, ...waits.filter((w) => w.to > awakeAt).map((w) => w.gap));
+const regularsMet = metAt.slice(0, REGULARS).every((x) => x !== undefined) ? Math.max(...metAt.slice(0, REGULARS)) : null;
 const ms: Milestone[] = [
   { name: 'First wall (a boss you fail)', window: '5m–25m', result: t(firstWall), status: within(firstWall, 5 * 60, 25 * 60) },
   { name: 'Deepest floor at 1h', window: '30–60', result: String(floorAt1h), status: floorAt1h >= 30 && floorAt1h <= 60 ? 'PASS' : 'FAIL' },
   // (Bosses became walls in October 2026, at the cost of a slower first climb: these three windows moved with it.)
   { name: 'First ascent', window: '2h–4h30m', result: t(firstAscent), status: within(firstAscent, 2 * H, 4.5 * H) },
   { name: 'Companions met by the first ascent', window: '16–19', result: String(metAtFirstAscent ?? 'no ascent'), status: metAtFirstAscent !== null && metAtFirstAscent >= 16 && metAtFirstAscent <= 19 ? 'PASS' : 'FAIL' },
-  { name: 'All 24 companions met', window: '6h–10h', result: t(allMet), status: reach(allMet, 10 * H) ? 'REPORT' : within(allMet, 6 * H, 10 * H) },
-  { name: 'Longest wait for a new companion', window: 'under 2h', result: allMet === null ? 'party not complete' : played(meetWait), status: allMet !== null && meetWait < 2 * H ? 'PASS' : reach(allMet, 10 * H) ? 'REPORT' : 'FAIL' },
-  { name: `Every card can drop (floor ${ALL_CARDS_FLOOR})`, window: '5h–10h', result: t(allCardsAt), status: reach(allCardsAt, 10 * H) ? 'REPORT' : within(allCardsAt, 5 * H, 10 * H) },
-  // (Moved from 20h–26h when the trophy list went from 394 to 106 in October 2026: less trophy damage, slower on purpose.)
-  { name: 'First awakening', window: '35h–45h', result: !AWAKEN_ON ? 'switched off' : firstAwaken === null ? t(firstAwaken) : `${t(firstAwaken)} (${ascentsToAwaken} ascents)`, status: !AWAKEN_ON || reach(firstAwaken, 45 * H) ? 'REPORT' : within(firstAwaken, 35 * H, 45 * H) },
+  { name: `All ${REGULARS} regular companions met`, window: '14h–22h', result: t(regularsMet), status: reach(regularsMet, 22 * H) ? 'REPORT' : within(regularsMet, 14 * H, 22 * H) },
+  (() => {
+    // The late ones on the curve Clicker Heroes' heroes follow: two before the awakening, then gaps that widen.
+    const late = COMPS.map((c, i) => ({ c, i, when: LATE_WINDOWS[c.id] })).filter((x) => x.when);
+    const off = late.filter(({ i, when: [lo, hi] }) => metAt[i] === undefined ? sim.t >= hi * H : metAt[i] < lo * H || metAt[i] > hi * H);
+    return {
+      name: 'Late companions on schedule', window: late.map(({ c, when: [lo, hi] }) => `${c.name} ${lo}–${hi}h`).join(', '),
+      result: off.length ? `off: ${off.map(({ c, i }) => `${c.name} ${t(metAt[i] ?? null)}`).join(', ')}` : 'ok',
+      status: off.length ? 'FAIL' : late.some(({ i }) => metAt[i] === undefined) ? 'REPORT' : 'PASS',
+    } as Milestone;
+  })(),
+  {
+    name: 'Longest wait for a new companion', window: 'under 12h to the awakening, 70h after',
+    result: `${played(meetWaitBefore)} before, ${played(meetWaitAfter)} after`,
+    status: meetWaitBefore < 12 * H && meetWaitAfter < 70 * H ? 'PASS' : 'FAIL',
+  },
+  // (Was 5h–10h before the awakening moved from floor 300 to 400 and the first cycle slowed to about 20 hours.)
+  { name: `Every card can drop (floor ${ALL_CARDS_FLOOR})`, window: '10h–20h', result: t(allCardsAt), status: reach(allCardsAt, 20 * H) ? 'REPORT' : within(allCardsAt, 10 * H, 20 * H) },
+  // (35h–45h was only ever met by a sim that hoarded gold; since it spends like auto hire, about three weeks at an hour
+  // a day, which is where Clicker Heroes players say their first Transcension lands.)
+  { name: 'First awakening', window: '16h–25h', result: !AWAKEN_ON ? 'switched off' : firstAwaken === null ? t(firstAwaken) : `${t(firstAwaken)} (${ascentsToAwaken} ascents)`, status: !AWAKEN_ON || reach(firstAwaken, 25 * H) ? 'REPORT' : within(firstAwaken, 16 * H, 25 * H) },
   (() => {
     const done = cycles.filter((c) => c.back !== null);
     const slowest = Math.max(0, ...done.map((c) => c.back!));

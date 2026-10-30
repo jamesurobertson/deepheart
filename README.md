@@ -27,7 +27,7 @@ missing.
 - **A party that fights for you.** Hire 32 companions with the gold they earn, level them into the thousands, and
   pick a hero to lead around the Keep with your mouse (or a finger).
 - **Expeditions.** Send a strong companion to hunt a floor's cards while you play, or while you're away.
-- **Ascend** for souls and summon Spirits; past floor 300, **awaken the Heart** for bound souls and the eight Bound.
+- **Ascend** for souls and summon Spirits; past floor 400, **awaken the Heart** for bound souls and the eight Bound.
   Two prestige layers, and every run back down is faster than the last.
 - **The Keep**, the castle above the dungeon: walk your hero between the Spirits' shrine, the Heart, the traders and
   Koko the cat.
