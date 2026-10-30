@@ -46,6 +46,10 @@ const TRIP_PAUSE = 0.35;
 const TRIP_STEP_IN = 0.55;
 const TRIP_FLASH = 0.5;
 const TRIP_ARRIVE = 0.7;
+/** How far a rainbow portal opens from anything against the wall (its outer ring is about 1.5 wide either side). */
+const PORTAL_CLEAR = 1.9;
+/** Where the torches hang along the back wall. */
+const TORCH_XS = [-12, -2, 6, 14];
 
 /** A zone's palette on a later lap: torches, light and stone pulled toward the lap's color, the dark a shade deeper. */
 function corrupt(p: Palette, lap: number): Palette {
@@ -399,6 +403,8 @@ export class Scene {
   private time = 0;
   private lastDt = 0;
   private fever = 0;
+  /** The Rampage's heat this frame (hotter past a tier-up), for anything drawn outside the party. */
+  private rageHeat = 0;
   /** Rampage bursts waiting to roll out from the middle of the party: scene time each goes off. */
   private rageBursts: { at: number; c: CompView; big: boolean }[] = [];
   private eyes: THREE.Texture | null = null;
@@ -451,6 +457,8 @@ export class Scene {
   private pan = 0;
   /** The vault's way out, at the far end of the hall. */
   private exitPortal: THREE.Group | null = null;
+  /** Where columns, the fountain and torches stand along the back wall (x). */
+  private wallClutter: number[] = [];
   /** Where the last treasure goblin was caught. */
   private caughtAt = new THREE.Vector3();
   /** The huge rainbow that rises from a caught rainbow goblin while you choose (timed in real seconds: the world is slowed). */
@@ -752,7 +760,10 @@ export class Scene {
 
     // Columns (or statues) along the back wall, in front of the brick.
     const pillars = sewer ? [a.rect('sewer_pillar_1'), a.rect('sewer_pillar_2')] : pre ? [a.rect(`${pre}statue_1`), a.rect(`${pre}statue_2`)] : [a.rect('column')];
-    [-13, -5.5, 2, 9.5].forEach((x, i) => {
+    const pillarXs = [-13, -5.5, 2, 9.5];
+    // What stands against the wall, for a rainbow portal to open clear of: columns, the fountain and the torches.
+    this.wallClutter = [...pillarXs, fountainX + 0.5, ...TORCH_XS.map((x) => x - 0.5)];
+    pillarXs.forEach((x, i) => {
       const pr = pillars[i % pillars.length];
       floor.face(x - 0.5, 0, WALL_Z + 0.35, pr, pr.w / 16, pre || sewer ? pr.h / 16 : 3);
     });
@@ -811,7 +822,7 @@ export class Scene {
       }
     }
     this.flames = [];
-    [-12, -2, 6, 14].forEach((x, i) => {
+    TORCH_XS.forEach((x, i) => {
       const f = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 0.8), this.flameMat);
       f.position.set(x - 0.5, 4.3, WALL_Z + 0.1);
       group.add(f);
@@ -2281,6 +2292,8 @@ export class Scene {
       const { run } = a.creature(def.sprite);
       const w = new PixelSprite(a.texture, a.size, run, { fps: 10 });
       w.mesh.scale.multiplyScalar(this.compScale(def) * 0.96);
+      // (The game stands still on the stairs, so a Rampage the party went down in is still burning at the bottom.)
+      if (this.fever > 0.01 && this.eyes) w.enrage(this.eyes);
       // Each switchback runs under the flight just walked down, which would hide them; draw them over the steps
       // instead, the near one of each pair last.
       w.mesh.material.depthTest = false;
@@ -2359,6 +2372,13 @@ export class Scene {
         w.mesh.rotation.set(0, 0, 0);
         c.shadows[i].position.set(p.x, p.y + 0.02, p.z + 0.15 - side * 0.45);
         w.update(dt);
+        if (this.fever > 0.01) {
+          this.burn(w, i);
+          // (About 6 embers a second each, as in the fight.)
+          if (this.settings.particles && this.rageHeat > 0.2 && Math.random() < dt * 6 * this.rageHeat) {
+            this.fx.embers([w.mesh.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.8, 0.2 + Math.random() * 1.1, 0.1))], EMBERS, 0.07);
+          }
+        }
       });
       // Side-on view of the stairway, following the column down.
       const head = stairPoint(Math.min(lead - 2, 1 + c.t * pan + Math.min(tail, 4)));
@@ -2803,6 +2823,16 @@ export class Scene {
     return group;
   }
 
+  /** The stretch of back wall nearest x with nothing standing against it, wide enough for a portal (its rings reach
+   *  about 1.5 to either side, and a column cutting through the oval looks broken). */
+  private portalSpot(x: number) {
+    for (let step = 0; step <= 300; step++) {
+      const at = x + (step % 2 ? 1 : -1) * Math.ceil(step / 2) * 0.1;
+      if (this.wallClutter.every((c) => Math.abs(c - at) >= PORTAL_CLEAR)) return at;
+    }
+    return x;
+  }
+
   /** A portal's swirl: the doorway cycles the rainbow and breathes, throwing off colored sparks. */
   private animatePortal(portal: THREE.Group, dt: number) {
     const disc = portal.getObjectByName('disc') as THREE.Mesh | undefined;
@@ -2846,7 +2876,7 @@ export class Scene {
   private startTrip(into: boolean) {
     if (this.trip) this.disposeGroup(this.trip.portal);
     const hero = this.party.find((c) => c.comp === this.vaultHero);
-    const portal = this.rainbowPortal(hero ? hero.body.position.x : 0);
+    const portal = this.rainbowPortal(this.portalSpot(hero ? hero.body.position.x : 0));
     portal.scale.setScalar(0.01);
     this.scene.add(portal);
     this.trip = { into, phase: 'go', t: 0, portal, reached: -1 };
@@ -2969,7 +2999,7 @@ export class Scene {
       }
     }
     const roar = this.roar;
-    const heat = this.fever * (game.rampageTier ? 1.35 : 1);
+    const heat = (this.rageHeat = this.fever * (game.rampageTier ? 1.35 : 1));
     const calm = this.settings.calm ? 0.5 : 1;
     const embers: THREE.Vector3[] = [];
     const emberTick = (this.emberT -= this.lastDt) <= 0;
@@ -2978,16 +3008,10 @@ export class Scene {
       const phase = c.comp * 2.3;
       const age = this.time - c.burstAt;
       const flare = Math.max(0, 1 - age / 0.4);
-      const flicker = 0.85 + 0.15 * Math.sin(this.time * 23 + phase);
       if (roar && !roar.released) {
         const lit = Math.min(1, Math.max(0, (roar.t - 0.05 - Math.abs(c.body.position.x - roar.at.x) * 0.025) / 0.08));
         c.sprite.rage(lit * 2.5, 0);
-      } else {
-        // The rim crackles: each companion's drops out for a frame now and then, out of step with the rest.
-        const step = Math.floor(this.time * 20);
-        const crackle = !this.settings.calm && (Math.abs(Math.sin((step + c.comp * 13.7) * 12.9898) * 43758.5453) % 1) < 0.22 ? 0 : 1;
-        c.sprite.rage(this.fever * flicker + flare * 1.5, heat * (0.65 + 0.35 * Math.sin(this.time * 9 + phase)) * calm * crackle);
-      }
+      } else this.burn(c.sprite, c.comp, flare * 1.5);
       // On a burst, a hot flash, then red fading out. (Kept dim: a whole party flashing at once blooms to white.)
       const e = c.sprite.mesh.material.emissive;
       if (age < 0.06) e.setRGB(0.6, 0.3, 0.25).multiplyScalar(calm);
@@ -3004,6 +3028,17 @@ export class Scene {
       }
     }
     this.fx.embers(embers, EMBERS, 0.07);
+  }
+
+  /** A Rampage on one sprite: eyes burning (plus `flare`) and the red rim, which crackles: each companion's drops out
+   *  for a frame now and then, out of step with the rest. */
+  private burn(sprite: PixelSprite, key: number, flare = 0) {
+    const phase = key * 2.3;
+    const flicker = 0.85 + 0.15 * Math.sin(this.time * 23 + phase);
+    const step = Math.floor(this.time * 20);
+    const crackle = !this.settings.calm && (Math.abs(Math.sin((step + key * 13.7) * 12.9898) * 43758.5453) % 1) < 0.22 ? 0 : 1;
+    const calm = this.settings.calm ? 0.5 : 1;
+    sprite.rage(this.fever * flicker + flare, this.rageHeat * (0.65 + 0.35 * Math.sin(this.time * 9 + phase)) * calm * crackle);
   }
 
   /** The held breath lets go: a red flare and ring from the middle of the party, then a burst under each of them. */

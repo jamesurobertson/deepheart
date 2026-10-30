@@ -35,10 +35,18 @@ export interface CompDef {
 const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, floor = 0, big = false, heart = 0): CompDef =>
   ({ id, name, sprite, cost, dps, attack, flavor, floor, big, heart });
 
-/** Prices go by place in the list, whoever stands there. The first twenty-three come with gold: the first five keep
- *  their snappy opening numbers, then each costs about ×4 the last up to the Archmage. The last nine wait on a floor,
- *  each priced against the gold on its floor, more of it the deeper it waits (150× the floor's gold at 95, rising to
- *  30,000× from 450 on: about a minute and a half of killing at full speed), since a deeper one meets a stronger party. Once levels pass 200, damage per gold grows about gold^0.82 for
+/** Prices go by place in the list, whoever stands there, spaced as Clicker Heroes spaces its heroes. The first
+ *  twenty-three come with gold, each priced against the floor they should arrive on. The first sixteen cost 5 monsters'
+ *  gold there: the demo's eight by
+ *  floor 30, then one every 8 floors to the Plague Doctor at 94. Then a gap, as after Clicker Heroes' Frostleaf: the
+ *  next seven cost 30,000 monsters' gold on floors 125 to 300 (a minute and a half of killing there, weeks of farming
+ *  from where the first run levels off), so the first run stops near floor 120 and only souls reach them, about one an
+ *  ascent before the awakening. The last nine wait on a floor, each
+ *  priced against the gold on its floor, more of it the deeper it waits (150× the floor's gold at 95, rising to 30,000×
+ *  from 450 on: about a minute and a half of killing at full speed), since a deeper one meets a stronger party. Their
+ *  floors come from the pacing sim (a player who ascends when stuck): two before the awakening, then gaps that widen
+ *  from about 8 to 45 played hours.
+ *  Once levels pass 200, damage per gold grows about gold^0.82 for
  *  everyone (×1.07 a level against ×4 every 25), so damage is set from price on one smooth curve: from the Shieldmaiden
  *  on, damage ÷ price^0.82 is about 8% better than the one before through the first twenty-three and 12% after, counted
  *  as if each had three ×2 traits. So a new face always hits harder than the last, and one whose traits go to the party,
@@ -57,30 +65,30 @@ export const COMPS: CompDef[] = [
   c('thief', 'Shadow Thief', 'cr_green_thief', 1.3e6, 16_000, 'knife', 'He carries six daggers. Seven would simply be bragging.'),
   // The demo stops at the Shadow Thief: past him, one silhouette for the full game.
   ...(DEMO ? [c('corsair', '???', 'cr_pirate_captain', 5e6, 87_000, 'bomb', '')] : [
-    c('corsair', 'Corsair Captain', 'cr_pirate_captain', 5e6, 52_000, 'bomb', 'Sailed the seven seas. Still confused by stairs.'),
-    c('runesmith', 'Runesmith', 'dwarf_f', 2e7, 1.8e5, 'rune', 'Maybe should be in OSRS. But here we are.'),
-    c('woodelf', 'Wood Elf', 'ef_elf_f', 7.9e7, 5.9e5, 'arrow', 'Grew up in the Enchanted Grove. Has opinions about what you did to it.'),
-    c('stormcaller', 'Stormcaller', 'wizzard_f', 3.1e8, 2e6, 'storm', 'Brings her own weather. Down here, of all places.'),
-    c('dancer', 'Blade Dancer', 'elf_m', 1.2e9, 6.4e6, 'slash', 'Fights like it is a performance. Nobody claps.'),
-    c('bard', 'Wandering Bard', 'rm_rocker', 4.9e9, 2.2e7, 'orb', 'We\'re not sure how he got in here.'),
-    c('venomblade', 'Venomblade', 'lizard_f', 2e10, 7.6e7, 'dark', 'Every blade is poisoned. She has a lot.'),
-    c('doctor', 'Plague Doctor', 'doc', 7.7e10, 2.5e8, 'flask', 'Treats monsters with a strict regimen of dying.'),
-    c('cleric', 'Cleric', 'ef_normalcleric', 3.1e11, 8.5e8, 'light', 'Here to heal the party. Hasn\'t had to yet, so he hits things.'),
-    c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.2e12, 2.8e9, 'ice', 'Came up from the Frozen Vault. Finds the rest of the dungeon too warm.'),
-    c('santa', 'Santa', 'cr_santa', 4.8e12, 9.4e9, 'ice', 'Santa? Is that really you?'),
-    c('paladin', 'Paladin', 'cr_gold_knight', 1.9e13, 3.2e10, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
-    c('hollow', 'Lantern Knight', 'pumpkin_dude', 7.6e13, 1.1e11, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
-    c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 3e14, 3.6e11, 'dark', 'Has broken every vow but one. Nobody asks which.'),
-    c('archmage', 'Archmage', 'cr_wizard', 1.2e15, 4e11, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
-    c('wraith', 'The Count', 'rm_dracula', 7.4e21, 4.1e17, 'bat', 'We all know who he really is.', 95),
-    c('elfqueen', 'Elf Queen', 'ef_highelf_f', 1.1e25, 9.2e19, 'light', 'Left her court for the deep. Still expects a curtsy.', 130),
-    c('necro', 'Necromancer', 'necromancer', 1.4e29, 1.2e23, 'skull', 'Used to raise these monsters. Now he lowers them.', 190),
-    c('king', 'Exiled King', 'sd_king', 3.5e32, 1.6e26, 'fire', 'Lost his crown, his kingdom and his temper. In that order.', 240),
-    c('elflord', 'Elf Lord', 'ef_highelf_m', 1.9e35, 3.2e28, 'slash', 'A thousand years of swordsmanship. Still practicing.', 280),
-    c('magus', 'Old Magus', 'ef_wizard', 2.9e46, 2.7e37, 'storm', 'Was down here before the dungeon. Says it followed him.', 450),
-    c('angel', 'Fallen Angel', 'angel', 5.1e67, 7.9e54, 'light', 'Fell from somewhere, here to stay.', 800),
-    c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 1.6e110, 2.5e90, 'slash', 'Answers to "Pebble." Crushes whatever you point at.', 1500, true),
-    c('demon', 'Bound Demon', 'big_demon', 1.7e201, 1.5e164, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 3000, true),
+    c('corsair', 'Corsair Captain', 'cr_pirate_captain', 2.8e8, 1.4e6, 'bomb', 'Sailed the seven seas. Still confused by stairs.'),
+    c('runesmith', 'Runesmith', 'dwarf_f', 1.3e10, 3.6e7, 'rune', 'Maybe should be in OSRS. But here we are.'),
+    c('woodelf', 'Wood Elf', 'ef_elf_f', 6.4e11, 9.5e8, 'arrow', 'Grew up in the Enchanted Grove. Has opinions about what you did to it.'),
+    c('stormcaller', 'Stormcaller', 'wizzard_f', 3e13, 2.5e10, 'storm', 'Brings her own weather. Down here, of all places.'),
+    c('dancer', 'Blade Dancer', 'elf_m', 1.4e15, 6e11, 'slash', 'Fights like it is a performance. Nobody claps.'),
+    c('bard', 'Wandering Bard', 'rm_rocker', 6.8e16, 1.6e13, 'orb', 'We\'re not sure how he got in here.'),
+    c('venomblade', 'Venomblade', 'lizard_f', 3.2e18, 4.1e14, 'dark', 'Every blade is poisoned. She has a lot.'),
+    c('doctor', 'Plague Doctor', 'doc', 1.5e20, 1e16, 'flask', 'Treats monsters with a strict regimen of dying.'),
+    c('cleric', 'Cleric', 'ef_normalcleric', 7.3e28, 1.5e23, 'light', 'Here to heal the party. Hasn\'t had to yet, so he hits things.'),
+    c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.2e30, 1.7e24, 'ice', 'Came up from the Frozen Vault. Finds the rest of the dungeon too warm.'),
+    c('santa', 'Santa', 'cr_santa', 3.9e31, 3.1e25, 'ice', 'Santa? Is that really you?'),
+    c('paladin', 'Paladin', 'cr_gold_knight', 1.3e33, 5.7e26, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
+    c('hollow', 'Lantern Knight', 'pumpkin_dude', 4.2e34, 1.1e28, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
+    c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 1.4e36, 2.1e29, 'dark', 'Has broken every vow but one. Nobody asks which.'),
+    c('archmage', 'Archmage', 'cr_wizard', 4.6e37, 1.3e30, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
+    c('wraith', 'The Count', 'rm_dracula', 5.5e38, 2.9e31, 'bat', 'We all know who he really is.', 335),
+    c('elfqueen', 'Elf Queen', 'ef_highelf_f', 1.2e41, 1.4e33, 'light', 'Left her court for the deep. Still expects a curtsy.', 370),
+    c('necro', 'Necromancer', 'necromancer', 6.5e76, 1.5e62, 'skull', 'Used to raise these monsters. Now he lowers them.', 950),
+    c('king', 'Exiled King', 'sd_king', 1.3e104, 7.7e84, 'fire', 'Lost his crown, his kingdom and his temper. In that order.', 1400),
+    c('elflord', 'Elf Lord', 'ef_highelf_m', 2.3e125, 2.3e102, 'slash', 'A thousand years of swordsmanship. Still practicing.', 1750),
+    c('magus', 'Old Magus', 'ef_wizard', 5.7e158, 3.1e129, 'storm', 'Was down here before the dungeon. Says it followed him.', 2300),
+    c('angel', 'Fallen Angel', 'angel', 1.2e186, 9.2e151, 'light', 'Fell from somewhere, here to stay.', 2750),
+    c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 2.1e207, 1.1e170, 'slash', 'Answers to "Pebble." Crushes whatever you point at.', 3100, true),
+    c('demon', 'Bound Demon', 'big_demon', 5e240, 3.5e196, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 3650, true),
   ]),
 ];
 
@@ -649,7 +657,7 @@ export const LEGEND_BY_ID = new Map(LEGENDS.map((d) => [d.id, d]));
 // ---------- awakening ----------
 
 /** Awakening first opens at this deepest floor. */
-export const AWAKEN_FLOOR = 300;
+export const AWAKEN_FLOOR = 400;
 /** A boss beaten with this many seconds or fewer left is a clutch kill. */
 export const CLUTCH_SECONDS = 3;
 
