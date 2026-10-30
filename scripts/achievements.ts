@@ -2,7 +2,8 @@
 import { TROPHIES } from '../src/game/data.ts';
 
 const asCsv = process.argv.includes('--csv');
-const rows = TROPHIES.map((trophy) => ({ api: `TROPHY_${trophy.id.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}`, name: trophy.name, desc: trophy.desc, hidden: trophy.hidden ? 1 : 0 }));
+// (The API name is the one the Steam build unlocks: "kill-1000" → "KILL_1000".)
+const rows = TROPHIES.map((trophy) => ({ api: trophy.id.toUpperCase().replace(/[^A-Z0-9]+/g, '_'), name: trophy.name, desc: trophy.desc, hidden: trophy.hidden ? 1 : 0 }));
 if (asCsv) {
   const quote = (text: string) => `"${text.replace(/"/g, '""')}"`;
   console.log('api_name,name,description,hidden');
