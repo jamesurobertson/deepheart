@@ -102,7 +102,8 @@ export class PixelSprite {
         .replace('#include <map_fragment>', `#include <map_fragment>
           float eyeGlow = texture2D(rageMask, vMapUv).r * rageEyes;
           float rim = 0.0;
-          if (rageRim > 0.0 && diffuseColor.a < 0.5) {
+          // (Off once it's too faint to read as red: below that it's only a black outline.)
+          if (rageRim > 0.1 && diffuseColor.a < 0.5) {
             float near = max(max(rageAlpha(vMapUv + vec2(rageTexel.x, 0.0)), rageAlpha(vMapUv - vec2(rageTexel.x, 0.0))),
               max(rageAlpha(vMapUv + vec2(0.0, rageTexel.y)), rageAlpha(vMapUv - vec2(0.0, rageTexel.y))));
             if (near >= 0.5) { rim = rageRim; diffuseColor = vec4(0.0, 0.0, 0.0, 1.0); }

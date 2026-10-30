@@ -3016,6 +3016,8 @@ export class Scene {
     this.lastDt = dt;
     const fever = game.s.buffs.some((b) => b.id === 'fever');
     this.fever += ((fever ? 1 : 0) - this.fever) * Math.min(1, dt * 4);
+    // (The ease never reaches zero by itself, and any rim at all keeps its black outline on the sprites.)
+    if (!fever && this.fever < 0.01) this.fever = 0;
     // The hero's ring burns red through a Rampage, like the party's eyes.
     if (this.heroRing) (this.heroRing.material as THREE.MeshBasicMaterial).color.lerpColors(HERO_RING_GOLD, HERO_RING_RAGE, this.fever);
 
