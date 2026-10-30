@@ -21,7 +21,7 @@ them around the room yourself, or sit back and let the party work.
 **Ascend.** When the floors stop giving, climb back up. Souls summon Spirits: the Sleeper hits harder while you're
 away, the Wither shrinks bosses, the Lure brings treasure goblins faster. Every run back down is quicker than the last.
 
-**Awaken the Heart.** Past floor 300, something under the Keep starts beating. Give up everything for bound souls, and
+**Awaken the Heart.** Past floor 350, something under the Keep starts beating. Give up everything for bound souls, and
 the eight bosses of the dungeon come back bound to you.
 
 **Every monster has a card.** One in every color the zones come back in, and a gold copy from
