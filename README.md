@@ -34,7 +34,7 @@ missing.
 - **Treasure goblins** that run for the exit with your loot. Every so often one is a rainbow. Catch it and find out.
 - **No bottom.** The eight zones come back corrupted, then abyssal, hollow, eternal, and the numbers keep climbing
   past 1e308.
-- **117 trophies** and 30 cursors to unlock.
+- **117 trophies** (86 of them Steam achievements) and 30 cursors to unlock.
 
 ## Getting Started
 
