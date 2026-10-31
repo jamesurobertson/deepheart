@@ -59,7 +59,7 @@ export const COMPS: CompDef[] = [
   c('ranger', 'Ranger', 'elf_f', 40, 4, 'arrow', 'Never misses. Well, rarely. Well, sometimes.'),
   c('brawler', 'Dwarf Brawler', 'dwarf_m', 250, 12, 'slash', 'Came for the gold. Stayed for the punching.'),
   c('apprentice', 'Apprentice', 'wizzard_m', 2_000, 50, 'bolt', 'Knows one spell. So far nobody has complained.'),
-  c('gingerbread', 'Gingerbread Man', 'cr_gingerbread', 12_000, 150, 'slash', 'Ran from the oven. Somehow ended up down here.'),
+  c('gingerbread', 'G Man', 'cr_gingerbread', 12_000, 150, 'slash', 'Ran from the oven. Somehow ended up down here.'),
   c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 80_000, 1_400, 'slash', 'Her shield has killed more monsters than her sword.'),
   c('hunter', 'Lizard Hunter', 'lizard_m', 3.2e5, 4_700, 'spear', 'Can smell a monster through three floors of solid stone.'),
   c('thief', 'Shadow Thief', 'cr_green_thief', 1.3e6, 16_000, 'knife', 'He carries six daggers. Seven would simply be bragging.'),

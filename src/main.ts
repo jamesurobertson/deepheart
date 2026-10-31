@@ -237,6 +237,26 @@ async function boot() {
       scene.rebuild(game);
       save();
     }
+    // ?state=rampage: a strong party with Rampage charged, a couple of floors short of a zone's end (for the stairs).
+    // Built the first time; every load after charges Rampage again and goes back to that floor.
+    if (TEST_STATE === 'rampage') {
+      const s = game.s;
+      if (!s.rampageSlot) {
+        s.owned = s.owned.map(() => 300);
+        s.gold = new Decimal('1e300');
+        for (const u of UPGRADES) if (/^m\d+_\d+$/.test(u.id)) game.buyUpg(u.id);
+        s.gold = new Decimal(0);
+        game.invalidate();
+        let f = 1;
+        while (floorHp(f + 1).times(10).lt(game.dps().times(20))) f++;
+        f = Math.max(8, f - (f % 10) - 2);
+        Object.assign(s, { maxFloor: f, bestFloor: Math.max(s.bestFloor, f), bestCleared: Math.max(s.bestCleared, f - 1), auto: true, revealed: s.owned.length, rampageSlot: f });
+      }
+      s.fervor = 1;
+      game.goFloor(s.rampageSlot ?? s.floor);
+      scene.rebuild(game);
+      save();
+    }
     // ?state=trophies: every trophy unlocked (the rest of the save as you left it). Rebuilt on every load.
     if (TEST_STATE === 'trophies') {
       game.devAllTrophies();

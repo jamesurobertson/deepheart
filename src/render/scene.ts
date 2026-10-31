@@ -48,12 +48,14 @@ const TRIP_FLASH = 0.5;
 const TRIP_ARRIVE = 0.7;
 /** How far a rainbow portal opens from anything against the wall (its outer ring is about 1.5 wide either side). */
 const PORTAL_CLEAR = 1.9;
-/** Going down: seconds between one companion setting off for the stairs and the next, how fast they walk there and
- *  sink down them, and the longest it all takes before the fade. */
+/** Going down: seconds between one companion setting off for the stairs and the next (all of them set off within
+ *  EXIT_SETOFF, however big the party), how fast they walk there and sink down them, and the longest it all takes
+ *  before the fade (a safety net: it waits for everyone). */
 const EXIT_STAGGER = 0.07;
-const EXIT_WALK = 9;
+const EXIT_SETOFF = 0.9;
+const EXIT_WALK = 11;
 const EXIT_SINK = 6;
-const EXIT_MAX = 3.2;
+const EXIT_MAX = 6;
 
 /** This player's rooms, new each run: the save's start time and how many runs it's had. */
 /** A wall from the floor down to `bottom`, in whole tiles from the top (the last one cut short): each piece's top and
@@ -93,6 +95,14 @@ const STAIRS_STEPS = 11;
 const STAIRS_DROP = 0.4;
 const STAIRS_DEEP = STAIRS_STEPS * STAIRS_DROP;
 /** The deeper the step, the darker: a black wash over each tread. */
+/** A coin on the floor: out of the monster in an arc (`from` to `to` over `dur`), a bounce, then it lies and glints,
+ *  leaning toward whoever comes to pick it up. */
+interface CoinView { sprite: PixelSprite; from: THREE.Vector3; to: THREE.Vector3; t: number; dur: number; peak: number; lean: THREE.Vector3; leanNow: THREE.Vector3; phase: number }
+/** Coins at the monsters' scale, so they sit among them on the floor. */
+const COIN_SCALE = 1.2;
+/** A coin lying flat, face up (its first frame; the same array every time, so `play` keeps it without restarting). */
+const COIN_FACE: Rect[] = [];
+
 /** How far (in tiles) in front of the stairs' top a monster has to come before it can be hit. */
 const HIT_FROM = 3.5;
 /** Where monsters start up the stairs: just out of sight with the interface up, not all the way down, and across the
@@ -524,6 +534,8 @@ export class Scene {
   private exitPortal: THREE.Group | null = null;
   /** Where columns, the fountain and torches stand along the back wall (x). */
   private wallClutter: number[] = [];
+  /** Gold lying on the floor, by the pile it belongs to (a kill's gold; see the UI's coin piles). */
+  private coins = new Map<number, CoinView[]>();
   /** Monsters still coming up the stairs, not to be picked by the pointer yet. */
   private held = new Set<number>();
   /** Set when the interface comes back: the hero walks out from under it (see updateHero). */
@@ -542,7 +554,7 @@ export class Scene {
   /** The demo stops on the stairs down into this zone: they fade to black and stay there, and `onEnd` is called. */
   endBefore = -1;
   onEnd: (() => void) | null = null;
-  private cine: { phase: 'exit' | 'stairs' | 'arrive' | 'end'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[]; queue: CompView[]; gone: number } | null = null;
+  private cine: { phase: 'exit' | 'stairs' | 'arrive' | 'end'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[]; queue: CompView[]; down: Set<CompView>; gone: number } | null = null;
   /** Black card in front of the camera for fades. */
   private fade: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   /** The floor we were last on: stepping down into a new zone plays the staircase. */
@@ -1945,6 +1957,89 @@ export class Scene {
     return { x: rect.left + (p.x * 0.5 + 0.5) * rect.width, y: rect.top + (-p.y * 0.5 + 0.5) * rect.height };
   }
 
+  /** A kill's gold bursts out of monster `from` onto the floor around it: one coin, or a handful for a big one.
+   *  False if the monster isn't in view to drop it. */
+  dropCoins(pile: number, from: number, big: boolean) {
+    const v = this.mons.get(from);
+    if (!v) return false;
+    const frames = this.atlas.anim('coin');
+    COIN_FACE[0] = frames[0];
+    const start = v.body.position.clone().setY(v.height * 0.4);
+    const list = Array.from({ length: big ? 5 : 1 }, (_, k): CoinView => {
+      const angle = big ? (k / 5) * Math.PI * 2 + Math.random() * 0.6 : Math.random() * Math.PI * 2;
+      const reach = big ? 1.1 + Math.random() * 0.8 : 0.45 + Math.random() * 0.65;
+      const to = new THREE.Vector3(start.x + Math.cos(angle) * reach, 0, Math.max(WALL_Z + 0.8, start.z + Math.sin(angle) * reach * 0.6));
+      to.y = this.fx.floorY(to.x, to.z);
+      const sprite = new PixelSprite(this.atlas.texture, this.atlas.size, frames, { fps: 12 });
+      sprite.mesh.scale.multiplyScalar(COIN_SCALE);
+      sprite.mesh.position.copy(start);
+      this.scene.add(sprite.mesh);
+      return { sprite, from: start.clone(), to, t: 0, dur: 0.62 + Math.random() * 0.16, peak: 1.2 + Math.random() * 0.8, lean: new THREE.Vector3(), leanNow: new THREE.Vector3(), phase: Math.random() * 6 };
+    });
+    this.coins.set(pile, list);
+    return true;
+  }
+
+  /** Your hero and the pointer sweep up gold near them: each coin leans toward the nearest of `collectors` once it's
+   *  within `magnet` pixels, and the pile is taken (true) when any coin is within `reach`. */
+  sweepCoins(pile: number, collectors: { x: number; y: number }[], reach: number, magnet: number) {
+    const list = this.coins.get(pile);
+    if (!list) return false;
+    let take = false;
+    for (const c of list) {
+      const at = this.toScreen(c.to.clone().setY(c.to.y + 0.25));
+      let near = collectors[0];
+      for (const p of collectors) if (Math.hypot(at.x - p.x, at.y - p.y) < Math.hypot(at.x - near.x, at.y - near.y)) near = p;
+      const d = Math.hypot(at.x - near.x, at.y - near.y);
+      if (d < reach) take = true;
+      const pull = d < magnet ? 0.4 * (1 - d / magnet) : 0;
+      const spot = pull ? this.floorAt(near.x, near.y) : null;
+      c.lean.copy(spot ? spot.sub(c.to).setY(0).multiplyScalar(pull) : new THREE.Vector3());
+    }
+    return take;
+  }
+
+  /** A pile picked up (or banked): its coins go, and where each was on screen comes back (for the flight to the bank). */
+  takeCoins(pile: number): { x: number; y: number }[] {
+    const list = this.coins.get(pile) ?? [];
+    this.coins.delete(pile);
+    return list.map((c) => {
+      const at = this.toScreen(c.sprite.mesh.position.clone().setY(c.sprite.mesh.position.y + 0.25));
+      this.scene.remove(c.sprite.mesh);
+      c.sprite.dispose();
+      return at;
+    });
+  }
+
+  private updateCoins(dt: number) {
+    for (const list of this.coins.values()) for (const c of list) {
+      c.t += dt;
+      const k = Math.min(1, c.t / c.dur);
+      const p = c.sprite.mesh.position;
+      if (k < 0.75) {
+        // The arc out, spinning.
+        const u = k / 0.75;
+        p.lerpVectors(c.from, c.to, u);
+        p.y = c.from.y * (1 - u) + c.to.y * u + Math.sin(u * Math.PI) * c.peak;
+        c.sprite.update(dt);
+      } else {
+        // One small bounce, then lying still and glinting: a warm glow now and then (not brighter color, which bloomed to
+        // white).
+        const b = Math.min(1, (k - 0.75) / 0.25);
+        c.leanNow.lerp(c.lean, Math.min(1, dt * 10));
+        p.copy(c.to).add(c.leanNow);
+        p.y = c.to.y + Math.sin(b * Math.PI) * 0.22;
+        if (k < 1) c.sprite.update(dt);
+        else {
+          // Face up once it's down (left mid-spin, a coin edge-on is a pale sliver).
+          c.sprite.play(COIN_FACE);
+          const glint = Math.max(0, Math.sin(this.time * 4.4 + c.phase)) ** 3;
+          c.sprite.mesh.material.emissive.setRGB(0.28 * glint, 0.18 * glint, 0.02 * glint);
+        }
+      }
+    }
+  }
+
   /** Screen position of a monster's head (for numbers and health bars), and its on-screen height. */
   /** Middle of the monster field on screen, for news about the whole floor. */
   fieldScreen() {
@@ -2377,7 +2472,7 @@ export class Scene {
     // The queue for the stairs: your hero first, then whoever's nearest.
     const to = this.stairsAt();
     const queue = [...this.party].sort((x, y) => (x.comp === this.heroComp ? -1 : y.comp === this.heroComp ? 1 : x.body.position.distanceTo(to) - y.body.position.distanceTo(to)));
-    this.cine = { phase: 'exit', t: 0, zone, walkers: [], shadows: [], well: null, flames: [], queue, gone: 0 };
+    this.cine = { phase: 'exit', t: 0, zone, walkers: [], shadows: [], well: null, flames: [], queue, down: new Set(), gone: 0 };
   }
 
   private descend() {
@@ -2476,13 +2571,16 @@ export class Scene {
       let down = 0;
       c.queue.forEach((p, i) => {
         const b = p.body.position;
-        if (c.t > i * EXIT_STAGGER) {
+        if (c.t > i * Math.min(EXIT_STAGGER, EXIT_SETOFF / c.queue.length)) {
           const lane = STAIRS_LANES[0] + ((i * 0.37) % 1) * (STAIRS_LANES[1] - STAIRS_LANES[0]);
-          const onFlight = b.x >= sx - 0.4 && Math.abs(b.z - lane) < 0.2;
+          // (Once at the top it's on its way down: checked by where it stands, one stopping just short of the top
+          // stood there for good.)
+          const onFlight = c.down.has(p);
           const to = onFlight ? { x: sx + STAIRS_W - 0.2, z: lane } : { x: sx - 0.3, z: lane };
           const dx = to.x - b.x, dz = to.z - b.z;
           const d = Math.hypot(dx, dz);
-          if (d > 0.15) {
+          if (!onFlight && d <= 0.15) c.down.add(p);
+          else if (d > 0.15) {
             const step = Math.min(d, dt * EXIT_WALK);
             b.x += (dx / d) * step;
             b.z += (dz / d) * step;
@@ -3263,6 +3361,7 @@ export class Scene {
     this.updateShots(dt);
     this.updateRaiders(dt, game);
     this.updateLoot(dt, game);
+    this.updateCoins(dt);
     this.fx.update(dt);
 
     const buffed = game.s.buffs.some((b) => b.id !== 'fever');

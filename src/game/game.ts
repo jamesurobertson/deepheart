@@ -325,6 +325,8 @@ export interface SaveState {
   expeditions: Expedition[];
   /** A companion has reached EXPEDITION_LEVEL: expeditions are open for good. */
   tripsOpen: boolean;
+  /** Dev only (?state=rampage): the floor that test slot goes back to on every load. */
+  rampageSlot?: number;
   /** You've used the expedition ladder in the Keep (its label says what it's for until then). */
   ladderSeen: boolean;
   /** Companions who have ever reached the expedition level (each gets one toast saying so). */

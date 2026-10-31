@@ -7,6 +7,8 @@ interface Particle {
   life: number;
   size: number;
   gravity: number;
+  /** Where they come to rest (the room's floor; none for ones that start below it, down the stairwell). */
+  floor: number;
 }
 
 interface Beam {
@@ -860,7 +862,7 @@ export class Fx {
     }
     mesh.frustumCulled = false;
     this.scene.add(mesh);
-    this.parts.push({ mesh, vel, pos, life: 1, size, gravity });
+    this.parts.push({ mesh, vel, pos, life: 1, size, gravity, floor: at.y < 0 ? -Infinity : 0.05 });
   }
 
   /** Embers drifting up off many spots at once, drawn as one batch: each starts at its own point, in one of `colors`. */
@@ -879,7 +881,7 @@ export class Fx {
     mesh.instanceColor!.needsUpdate = true;
     mesh.frustumCulled = false;
     this.scene.add(mesh);
-    this.parts.push({ mesh, vel, pos, life: 1, size, gravity: -1.5 });
+    this.parts.push({ mesh, vel, pos, life: 1, size, gravity: -1.5, floor: points.some((p) => p.y < 0) ? -Infinity : 0.05 });
   }
 
   /** A column of light over dropped loot; brighter and taller with rarity. */
@@ -1221,8 +1223,8 @@ export class Fx {
         p.pos[o] += p.vel[o] * dt;
         p.pos[o + 1] += p.vel[o + 1] * dt;
         p.pos[o + 2] += p.vel[o + 2] * dt;
-        if (p.pos[o + 1] < 0.05) {
-          p.pos[o + 1] = 0.05;
+        if (p.pos[o + 1] < p.floor) {
+          p.pos[o + 1] = p.floor;
           p.vel[o + 1] *= -0.3;
           p.vel[o] *= 0.6;
         }

@@ -12,7 +12,8 @@ const PALETTES: Record<string, Record<string, string>> = {
   chest: { a: '#6a3e1e', b: '#b07040', c: '#f2c14e', e: '#fff2a8' },
   drum: { a: '#c8432a', b: '#f4e0c0', c: '#9a5f30', d: '#f2c14e' },
 };
-const ART: Record<Exclude<AbilityId, 'crit' | 'rampage'>, [string, string[]]> = {
+const ART: Record<Exclude<AbilityId, 'crit'>, [string, string[]]> = {
+  rampage: ['flame', ['....a....', '...aa....', '...aaa...', '..aabaa..', '.aabbba..', '.abbcbba.', '.abcccba.', '..abcba..', '...aaa...']],
   blade: ['purple', ['.......bb', '......bab', '.....bab.', '....bab..', '.c.bab...', '..cab....', '..cc.....', '.c..c....', 'c........']],
   // Two Phantom Blades crossed, the one behind a shade darker.
   legion: ['purple', ['gg.....bb', 'ghg...bab', '.ghg.bab.', '..ghbab..', '.c.bab.d.', '..cabhd..', '..cc.dd..', '.c..c..d.', 'c.......d']],
@@ -24,8 +25,8 @@ const ART: Record<Exclude<AbilityId, 'crit' | 'rampage'>, [string, string[]]> = 
 };
 
 const drawn = new Map<string, string>();
-/** Skills drawn with a sprite from the sheet instead (the same as their trophies). */
-const SPRITE_SKILLS: Partial<Record<AbilityId, string>> = { crit: 'weapon_katana', rampage: 'flask_big_red' };
+/** Skills drawn with a sprite from the sheet instead (the same as its trophies). */
+const SPRITE_SKILLS: Partial<Record<AbilityId, string>> = { crit: 'weapon_katana' };
 
 /** A skill's icon as crisp SVG, `size` pixels square (22 is 2×, 33 is 3×). */
 export function skillIcon(id: AbilityId, size = 22, cls = ''): string {
