@@ -1947,44 +1947,13 @@ export class Ui {
 
   /** A kill's gold: it bursts out of the monster, bounces to a stop and glints on the floor until it's swept up (or flies
    *  to the bank by itself). Bosses and champions spray a handful of coins; picking up any of them takes the pile. */
-  private coinPiles = new Map<number, { coins: { el: HTMLElement; x: number; y: number }[]; gold: Decimal; landsAt: number }>();
+  private coinPiles = new Map<number, { gold: Decimal; landsAt: number }>();
   private pickCombo = 0;
   private pickAt = 0;
 
   private dropCoins(id: number, from: number, big: boolean, value: Decimal) {
-    const at = this.scene.screenOf(from);
-    if (!at) return;
-    const sx = at.x;
-    const sy = at.y + at.h * 0.4;
-    const coins = Array.from({ length: big ? 5 : 1 }, (_, k) => {
-      const angle = big ? (k / 5) * Math.PI * 2 + Math.random() * 0.6 : Math.random() * Math.PI * 2;
-      const reach = big ? 50 + Math.random() * 40 : 20 + Math.random() * 30;
-      const x = sx + Math.cos(angle) * reach;
-      const y = at.y + at.h * 0.9 + Math.sin(angle) * reach * 0.35;
-      const el = document.createElement('i');
-      el.className = 'drop spinning';
-      el.innerHTML = sprite('coin', 3);
-      el.style.left = `${x}px`;
-      el.style.top = `${y}px`;
-      this.el.drops.appendChild(el);
-      // Out of the monster in an arc, a hard landing, one small bounce, then it settles and glints.
-      const dx = sx - x;
-      const dy = sy - y;
-      const peak = 60 + Math.random() * 40;
-      const anim = el.animate([
-        { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.5) rotate(0deg)` },
-        { transform: `translate(calc(-50% + ${dx * 0.45}px), calc(-50% + ${dy * 0.45 - peak}px)) scale(1.15) rotate(200deg)`, offset: 0.45 },
-        { transform: 'translate(-50%, -50%) scale(1) rotate(360deg)', offset: 0.75 },
-        { transform: 'translate(-50%, calc(-50% - 9px)) scale(1)', offset: 0.87 },
-        { transform: 'translate(-50%, -50%) scale(1)' },
-      ], { duration: 620 + Math.random() * 160, easing: 'cubic-bezier(.3,.6,.5,1)' });
-      anim.onfinish = () => {
-        el.classList.remove('spinning');
-        el.classList.add('landed');
-      };
-      return { el, x, y };
-    });
-    this.coinPiles.set(id, { coins, gold: value, landsAt: performance.now() + 300 });
+    // (The coins themselves are on the floor in the scene, under whoever stands over them.)
+    if (this.scene.dropCoins(id, from, big)) this.coinPiles.set(id, { gold: value, landsAt: performance.now() + 300 });
   }
 
   /** When the mouse or keys were last used (the vault's hero sees itself out after a long while without). */
@@ -1998,20 +1967,7 @@ export class Ui {
     if (this.modal || !collectors.length) return;
     const now = performance.now();
     for (const [id, pile] of this.coinPiles) {
-      if (now < pile.landsAt) continue;
-      let take = false;
-      for (const c of pile.coins) {
-        // Each coin answers to whichever collector is nearest.
-        let near = collectors[0];
-        for (const p of collectors) if (Math.hypot(c.x - p.x, c.y - p.y) < Math.hypot(c.x - near.x, c.y - near.y)) near = p;
-        const { x, y } = near;
-        const d = Math.hypot(c.x - x, c.y - y);
-        if (d < COIN_REACH) take = true;
-        // Within the magnet's pull, coins lean toward the collector, more the closer it is.
-        const pull = d < COIN_MAGNET ? 0.4 * (1 - d / COIN_MAGNET) : 0;
-        c.el.style.translate = pull ? `${(x - c.x) * pull}px ${(y - c.y) * pull}px` : '';
-      }
-      if (take) this.game.collectGold(id);
+      if (now >= pile.landsAt && this.scene.sweepCoins(id, collectors, COIN_REACH, COIN_MAGNET)) this.game.collectGold(id);
     }
   }
 
@@ -2074,18 +2030,12 @@ export class Ui {
       this.pickAt = now;
       this.hooks.sound('coins', { vol: 0.35, rate: 1 + this.pickCombo * 0.06 });
     }
-    if (by === 'hand' || by === 'time') {
-      const first = pile.coins[0];
-      this.pop(first.x, first.y - 18, `+${fmt(pile.gold)}`, 'p-pick');
-    }
-    for (const c of pile.coins) {
-      const r = c.el.getBoundingClientRect();
-      c.el.remove();
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      if (by === 'hand') this.sparkle(cx, cy);
+    const spots = this.scene.takeCoins(id);
+    if ((by === 'hand' || by === 'time') && spots.length) this.pop(spots[0].x, spots[0].y - 18, `+${fmt(pile.gold)}`, 'p-pick');
+    for (const { x, y } of spots) {
+      if (by === 'hand') this.sparkle(x, y);
       // Leaving a floor banks everything at once: a few coins make the trip, not all of them.
-      if (by !== 'all' || this.flights.length < 6) this.coinFly(cx, cy, 1, pile.gold.div(pile.coins.length));
+      if (by !== 'all' || this.flights.length < 6) this.coinFly(x, y, 1, pile.gold.div(spots.length));
     }
   }
 

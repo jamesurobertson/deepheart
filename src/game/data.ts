@@ -59,7 +59,7 @@ export const COMPS: CompDef[] = [
   c('ranger', 'Ranger', 'elf_f', 40, 4, 'arrow', 'Never misses. Well, rarely. Well, sometimes.'),
   c('brawler', 'Dwarf Brawler', 'dwarf_m', 250, 12, 'slash', 'Came for the gold. Stayed for the punching.'),
   c('apprentice', 'Apprentice', 'wizzard_m', 2_000, 50, 'bolt', 'Knows one spell. So far nobody has complained.'),
-  c('gingerbread', 'Gingerbread Man', 'cr_gingerbread', 12_000, 150, 'slash', 'Ran from the oven. Somehow ended up down here.'),
+  c('gingerbread', 'G Man', 'cr_gingerbread', 12_000, 150, 'slash', 'Ran from the oven. Somehow ended up down here.'),
   c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 80_000, 1_400, 'slash', 'Her shield has killed more monsters than her sword.'),
   c('hunter', 'Lizard Hunter', 'lizard_m', 3.2e5, 4_700, 'spear', 'Can smell a monster through three floors of solid stone.'),
   c('thief', 'Shadow Thief', 'cr_green_thief', 1.3e6, 16_000, 'knife', 'He carries six daggers. Seven would simply be bragging.'),
@@ -869,7 +869,7 @@ function buildTrophies(): TrophyDef[] {
     out.push({ id: 'hire-all', name: 'Full Party', desc: `Hire all ${COMPS.length} companions.`, icon: { sprite: COMPS[0].sprite, tier: 0 }, req: { t: 'levelAll', n: 1 } });
   }
   tiers('level', [[1000, 'Legendary'], [2500, 'Mythic'], [5000, 'Immortal'], [10_000, 'Overleveled']],
-    (n) => `Get a companion to level ${count(n)}.`, COMPS[COMPS.length - 1].sprite, (n) => ({ t: 'level', n }), 1);
+    (n) => `Get a companion to level ${count(n)}.`, COMPS[compIndex('paladin')].sprite, (n) => ({ t: 'level', n }), 1);
   tiers('levelall', [[500, 'Loyal Company'], [1000, 'Legendary Company'], [2500, 'Mythic Company']],
     (n) => `Get every companion to level ${count(n)}.`, COMPS[0].sprite, (n) => ({ t: 'levelAll', n }), 1);
   tiers('clicks', [[100, 'Tap Tap'], [10_000, 'Clicker'], [100_000, 'Still Clicking'], [1e6, 'Carpal Tunnel']],
@@ -891,7 +891,7 @@ function buildTrophies(): TrophyDef[] {
   ];
   missed.forEach(([n, name, joke], k) => out.push({ id: `miss-${n}`, name, desc: `Let ${n === 1 ? 'a treasure goblin' : `${count(n)} treasure goblins`} get away.${joke}`, icon: { sprite: 'goblin', tier: k }, req: { t: 'missed', n } }));
   tiers('rainbow', [[1, 'Double Rainbow'], [50, 'Chasing Rainbows'], [500, 'End of the Rainbow']],
-    (n) => `Catch ${n === 1 ? 'a rainbow goblin' : `${count(n)} rainbow goblins`}.`, 'goblin', (n) => ({ t: 'rainbows', n }), 2);
+    (n) => `Catch ${n === 1 ? 'a rainbow goblin' : `${count(n)} rainbow goblins`}.`, 'goblin_rainbow', (n) => ({ t: 'rainbows', n }), 2);
   tiers('vault', [[1, 'Over the Rainbow'], [25, 'Vault Raider'], [250, 'Goblin Banker']],
     (n) => (n === 1 ? 'Open the Rainbow Vault.' : `Open the Rainbow Vault ${count(n)} times.`), 'chest_full_open', (n) => ({ t: 'vaults', n }));
   tiers('desc', [[1, 'Up for Air'], [10, 'Return Ticket'], [50, 'Commuter'], [250, 'Always Back Down']],
@@ -918,7 +918,7 @@ function buildTrophies(): TrophyDef[] {
     tiers('set', [[1, 'Full Set'], [5, 'Set Collector'], [10, 'Complete Collection']],
       (n) => `Finish ${n === 1 ? 'a card set' : `${n} card sets`}.`, 'imp', (n) => ({ t: 'sets', n }), 1);
     tiers('gset', [[1, 'Gold Set'], [5, 'Gilt Edge']],
-      (n) => `Finish ${n === 1 ? 'a gold card set' : `${n} gold card sets`}.`, 'big_demon', (n) => ({ t: 'goldSets', n }), 3);
+      (n) => `Finish ${n === 1 ? 'a gold card set' : `${n} gold card sets`}.`, 'imp_gilded', (n) => ({ t: 'goldSets', n }), 3);
   }
   const versions = CARDS.reduce((sum, c) => sum + c.laps.length * (c.gold ? 2 : 1), 0);
   out.push(
@@ -927,9 +927,9 @@ function buildTrophies(): TrophyDef[] {
     { id: 'card-all', name: 'Bestiary', desc: 'Find every monster card.', icon: { sprite: 'imp', tier: 2 }, req: { t: 'cards', n: CARDS.length } },
     { id: 'versions-250', name: 'Monster Manual', desc: 'Collect 250 cards.', icon: { sprite: 'imp', tier: 3 }, req: { t: 'versions', n: 250 } },
     { id: 'versions-all', name: 'Every Last Monster', desc: 'Collect every card.', icon: { sprite: 'imp', tier: 4 }, req: { t: 'versions', n: versions } },
-    { id: 'gcard-1', name: 'Gilded', desc: 'Find a gold card.', icon: { sprite: 'big_demon', tier: 2 }, req: { t: 'goldCards', n: 1 } },
-    { id: 'gcard-25', name: 'Gold Standard', desc: 'Find 25 different gold cards.', icon: { sprite: 'big_demon', tier: 3 }, req: { t: 'goldCards', n: 25 } },
-    { id: 'gcard-all', name: 'Midas Deck', desc: 'Find every gold card.', icon: { sprite: 'big_demon', tier: 4 }, req: { t: 'goldCards', n: CARDS.filter((c) => c.gold).length } },
+    { id: 'gcard-1', name: 'Gilded', desc: 'Find a gold card.', icon: { sprite: 'imp_gilded', tier: 2 }, req: { t: 'goldCards', n: 1 } },
+    { id: 'gcard-25', name: 'Gold Standard', desc: 'Find 25 different gold cards.', icon: { sprite: 'imp_gilded', tier: 3 }, req: { t: 'goldCards', n: 25 } },
+    { id: 'gcard-all', name: 'Midas Deck', desc: 'Find every gold card.', icon: { sprite: 'imp_gilded', tier: 4 }, req: { t: 'goldCards', n: CARDS.filter((c) => c.gold).length } },
   );
   return out.map((t) => ({ ...t, steam: !NOT_ON_STEAM.has(t.id) }));
 }

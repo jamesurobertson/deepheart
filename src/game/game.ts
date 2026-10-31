@@ -325,6 +325,8 @@ export interface SaveState {
   expeditions: Expedition[];
   /** A companion has reached EXPEDITION_LEVEL: expeditions are open for good. */
   tripsOpen: boolean;
+  /** Dev only (?state=rampage): the floor that test slot goes back to on every load. */
+  rampageSlot?: number;
   /** You've used the expedition ladder in the Keep (its label says what it's for until then). */
   ladderSeen: boolean;
   /** Companions who have ever reached the expedition level (each gets one toast saying so). */
@@ -501,6 +503,8 @@ export interface Monster {
   z: number;
   /** Seconds until it reaches its spot; companions only hit monsters that have arrived. */
   arrive: number;
+  /** Still walking out of the stairwell on screen (the view holds `arrive` up until it's out; a boss's clock waits). */
+  held?: boolean;
   /** Boss modifiers. */
   mods: ModId[];
   /** One half of a boss that split. */
@@ -1710,7 +1714,9 @@ export class Game {
 
   /** Click a monster (or, if it's gone, whatever's in front). `x, y` are screen coords for numbers. */
   click(id: number | null, x: number, y: number, auto = false, flurry = false) {
-    const target = (id !== null ? this.monster(id) : undefined) ?? this.focus();
+    // (One still coming up the stairs can't be hit yet: the click goes to the front monster, as on empty floor.)
+    const picked = id !== null ? this.monster(id) : undefined;
+    const target = (picked && picked.arrive <= 0 ? picked : undefined) ?? this.focus();
     if (!target || this.downed > 0) return new Decimal(0);
     if (!auto) {
       // Flurry's clicks are on top of your own, so they don't wait for the hand's cooldown.
@@ -1725,7 +1731,7 @@ export class Game {
     const crit = Math.random() < this.critChance();
     const fever = this.s.buffs.some((b) => b.id === 'fever');
     const amount = this.clickDamage().times((crit ? this.critMult() : 1) * (auto ? this.sleeperMult() : 1));
-    const others = this.cleave() > 0 ? this.monsters.filter((m) => m !== target) : [];
+    const others = this.cleave() > 0 ? this.monsters.filter((m) => m !== target && m.arrive <= 0) : [];
     this.damage(target, amount, auto ? (crit ? 'autoCrit' : 'auto') : crit ? 'crit' : fever ? 'fever' : 'click', x, y);
     for (const m of others) if (this.monsters.includes(m)) this.damage(m, amount.times(this.cleave()), 'cleave');
     if (crit) this.s.crits++;
@@ -2841,6 +2847,13 @@ export class Game {
     this.checkTrophies();
   }
 
+  /** Testing only (?state=trophies, local only): every trophy, as if each had been earned. */
+  devAllTrophies() {
+    this.s.trophies = TROPHIES.map((t) => t.id);
+    this.trophySet = new Set(this.s.trophies);
+    this.invalidate();
+  }
+
   private checkTrophies(quiet = false) {
     let got = false;
     for (const t of TROPHIES) {
@@ -2944,7 +2957,7 @@ export class Game {
     this.companionsFight(dt);
 
     // Boss timer.
-    if (!vault && this.bossFloor() && this.bossTime > 0) {
+    if (!vault && this.bossFloor() && this.bossTime > 0 && !this.monsters.some((m) => m.boss && m.held && m.arrive > 0)) {
       this.bossTime -= dt;
       if (this.bossTime <= 0) this.bossFailed();
     } else if (this.downed > 0 && (this.downed -= dt) <= 0) this.enterFloor(Math.max(1, s.floor - 1), false, false, REGROUP_SECONDS);

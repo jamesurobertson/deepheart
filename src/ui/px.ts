@@ -128,6 +128,9 @@ export function keepDoor(scale = 1): string {
 
 /** A sprite's visible pixels at the largest integer scale that fits a `box`-pixel square, so every icon fills its box alike. */
 export function spriteFit(name: string, box: number, cls = ''): string {
+  // A rainbow goblin (it cycles through every color, as in the dungeon) and a gold one of anything.
+  if (name.endsWith('_rainbow')) return spriteFit(name.slice(0, -8), box, `${cls} rainbow`);
+  if (name.endsWith('_gilded')) return spriteFit(name.slice(0, -7), box, `${cls} gilded`);
   const own = DRAWN[name];
   if (own) return drawn(own, Math.max(1, Math.floor(box / Math.max(own.rows.length, own.rows[0].length))), cls);
   const full = rectFor(name);

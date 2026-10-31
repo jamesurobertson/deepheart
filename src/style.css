@@ -379,6 +379,10 @@ body.in-vault .hud-top .floor, body.in-vault .hud-top .rate { visibility: hidden
 body.phone .vault-pick > b { font-size: 36px; }
 body.phone .vp-face { width: 76px; min-height: 80px; }
 @keyframes rainbow { from { filter: hue-rotate(0deg) saturate(1.6); } to { filter: hue-rotate(360deg) saturate(1.6); } }
+/* Icons: a rainbow goblin cycling through the colors, and a gold copy of a monster (the gold cards). */
+.px.rainbow { animation: rainbow 2s linear infinite; }
+.px.gilded { filter: sepia(1) saturate(3.2) hue-rotate(-8deg) brightness(1.12) contrast(1.05); }
+@media (prefers-reduced-motion: reduce) { .px.rainbow { animation: none; filter: hue-rotate(200deg) saturate(1.6); } }
 .raid-mark.rainbow b { animation: rainbow 0.8s linear infinite; }
 .pop.p-floor { font-size: 30px; color: var(--gold-hi); white-space: nowrap; text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 0 0 16px rgba(255, 210, 100, 0.8); animation-name: popgold; animation-duration: 1.3s; z-index: 3; }
 .floor.advance { animation: flooradvance 0.7s ease-out; }
@@ -422,7 +426,7 @@ body.ui-hidden .ticker { left: 180px; right: 180px; text-align: center; }
 .pop.p-gold.p-sweep { font-size: 30px; white-space: nowrap; }
 .coin-fly { position: absolute; pointer-events: none; z-index: 4; filter: drop-shadow(0 0 5px rgba(255, 210, 100, 0.95)); }
 /* A coin spins (squashes edge-on and back) while it's in the air. */
-.coin-fly .px, .drop.spinning .px { animation: coinspin 0.32s linear infinite; }
+.coin-fly .px { animation: coinspin 0.32s linear infinite; }
 @keyframes coinspin { 50% { transform: scaleX(0.15); } }
 
 /* Over the damage numbers, so a monster's health still reads under a flurry of hits. */
@@ -598,14 +602,8 @@ body.compact:not(.phone) .ab.always[data-gap]::before { top: -15px; }
 body.phone .abilities { bottom: auto; right: auto; left: calc(6px + var(--safe-l)); width: auto; height: auto; top: calc(var(--free-h) - 56px); flex-direction: row; padding: 0; background: none; }
 body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 
-/* Gold lying on the floor: sweep the cursor near it to grab it, or it flies to the bank by itself. */
+/* Sparks where gold is picked up (the gold itself lies on the floor in the scene). */
 .drops { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
-.drop { position: absolute; display: flex; transform: translate(-50%, -50%); filter: drop-shadow(0 0 4px rgba(255, 200, 80, 0.75)); transition: translate 0.15s ease-out; }
-.drop.landed { animation: dropglint 1.4s ease-in-out infinite alternate; }
-@keyframes dropglint {
-  from { filter: drop-shadow(0 0 3px rgba(255, 200, 80, 0.6)); transform: translate(-50%, -50%); }
-  to { filter: drop-shadow(0 0 9px rgba(255, 225, 120, 1)) brightness(1.25); transform: translate(-50%, calc(-50% - 3px)); }
-}
 .sparks { position: absolute; width: 0; height: 0; }
 .sparks b {
   position: absolute; left: -2px; top: -2px; width: 4px; height: 4px; background: var(--gold-hi);
@@ -613,7 +611,7 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 }
 @keyframes spark { to { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; } }
 .pop.p-pick { font-size: 20px; color: var(--gold-hi); animation-name: popgold; animation-duration: 0.8s; z-index: 3; }
-@media (prefers-reduced-motion: reduce) { .drop.landed, .sparks b, .coin-fly .px, .drop.spinning .px { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sparks b, .coin-fly .px { animation: none; } }
 .gen-lv { font: 400 28px/1 'Jersey 10'; color: rgba(241, 228, 204, 0.55); text-shadow: var(--shadow); font-weight: 400; }
 .gen-dps { font: 400 18px/1 'Jersey 10'; color: var(--dim); text-shadow: var(--shadow); }
 .gen.can .gen-lv { color: var(--text); }
