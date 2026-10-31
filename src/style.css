@@ -442,7 +442,8 @@ body.ui-hidden .abilities { right: 0; }
 .ui-back span { font: 400 18px/1 'Jersey 10'; color: #fff; letter-spacing: 0.5px; }
 .ui-back:hover { filter: brightness(1.15); }
 @media (prefers-reduced-motion: reduce) { .ui-back kbd { animation: none; } }
-.dock-b { position: relative; flex-direction: column; min-width: 76px; height: 64px; gap: 4px; padding: 4px 6px; font-size: 14px; }
+/* Labels pinned to the bottom, so they line up however tall the icon above (the Keep's door and stairs are sprites). */
+.dock-b { position: relative; flex-direction: column; justify-content: flex-end; min-width: 76px; height: 74px; gap: 4px; padding: 4px 6px 8px; font-size: 14px; }
 /* Drawn at 3× (see the dock in ui.ts): a box that isn't a whole multiple of the pixel grid makes uneven pixels. */
 .dock-b .glyph { color: var(--gold); }
 .dock-b .glyph.g-soul { color: var(--soul); }
@@ -626,7 +627,10 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 
 /* ---------- tooltip ---------- */
 
-.tip { position: fixed; left: 0; top: 0; z-index: 30; width: 300px; pointer-events: none !important; padding: 8px 12px 10px; background: none; }
+/* As wide as its words, up to 300px (a two-word tip shouldn't sit in a box built for a paragraph). */
+.tip { position: fixed; left: 0; top: 0; z-index: 30; width: max-content; max-width: 300px; pointer-events: none !important; padding: 8px 12px 10px; background: none; }
+.px-stack { display: inline-flex; flex-direction: column; }
+.px-row { display: inline-flex; align-items: flex-end; }
 .tt-h { display: flex; align-items: center; gap: 8px; }
 .tt-h b { font: 700 18px/1.1 var(--f-text); color: var(--gold-hi); text-shadow: var(--shadow); flex: 1; }
 .tt-own { font: 400 11px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; }
@@ -951,7 +955,7 @@ body.compact .buff small { font-size: 14px; }
 
 /* Buttons: an icon row. Top-right on portrait phones, bottom-left otherwise. */
 body.compact .dock { left: calc(8px + var(--safe-l)); bottom: calc(8px + var(--safe-b)); gap: 4px; }
-body.compact .dock-b { min-width: 0; width: 42px; height: 42px; padding: 0; }
+body.compact .dock-b { min-width: 0; width: 42px; height: 42px; padding: 0; justify-content: center; }
 body.compact .dock-b span { display: none; }
 body.compact .dock .mute { display: none; }
 body.compact .badge { top: -10px; right: -12px; font-size: 15px; padding: 1px 4px; }

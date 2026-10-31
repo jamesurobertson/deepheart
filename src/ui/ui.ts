@@ -7,7 +7,7 @@ import type { Drop, Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
-import { G, cardArt, charFit, silhouette, sprite, spriteFit, spriteFrames } from './px.ts';
+import { G, cardArt, charFit, keepDoor, silhouette, sprite, spriteFit, spriteFrames } from './px.ts';
 import { skillIcon } from './icons.ts';
 import { kokoSvg } from './koko.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
@@ -1707,11 +1707,11 @@ export class Ui {
     this.el.heartBadge.classList.toggle('hot', bound > 0 && (!g.s.awakens || bound >= g.s.boundEarned / 4));
     // The Keep opens with your first ascent; from then on it's a button away (and the way back down, while you're there).
     this.el.keepBtn.hidden = !g.legendsOpen() || g.inVault() || !!g.raid;
-    // Up in the Keep it's the way back down: steps instead of the door.
+    // Up in the Keep it's the way back down: the dungeon's stairs tile instead of the Keep's door.
     const keepText = DEMO ? '' : g.s.inKeep ? 'Way down' : 'The Keep';
     if (this.keepBtnText !== keepText) {
       this.keepBtnText = keepText;
-      this.el.keepBtn.innerHTML = `${g.s.inKeep ? G.steps(3) : G.door(3)}<span>${keepText}</span>`;
+      this.el.keepBtn.innerHTML = `${g.s.inKeep ? sprite('floor_stairs', 2) : keepDoor()}<span>${keepText}</span>`;
     }
     document.body.classList.toggle('in-keep', g.s.inKeep);
     const cb = this.el.cardBadge;
@@ -2452,7 +2452,7 @@ export class Ui {
         const comp = COMPS[a.comp];
         const lasts = a.id === 'rampage' ? g.rampageDuration() : g.abilityDuration(a.id);
         const timing = a.kind === 'button' ? `Lasts ${duration(lasts)} · every ${duration(a.cooldown ?? 0)}` : a.kind === 'charge' ? `Lasts ${duration(lasts)}` : 'Always on';
-        return `<div class="tt-h">${charFit(comp.sprite, 30)}<b>${esc(a.name)}</b><span class="tt-own">skill</span></div>
+        return `<div class="tt-h">${skillIcon(a.id, 30)}<b>${esc(a.name)}</b><span class="tt-own">skill</span></div>
           <p class="tt-d">${esc(a.desc)}</p>
           <p class="tt-f">${esc(comp.name)} · level ${traitLevels(a.comp)[a.trait]}<br>${timing}</p>`;
       }
@@ -2524,19 +2524,21 @@ export class Ui {
     }
     if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it.'}</p>`;
     if (kind === 'dock') {
+      // (A tip that only says the button's name is for small screens, where the dock shows icons without labels.)
+      const named = document.body.classList.contains('compact');
       const text: Record<string, string> = {
         trophies: `Trophies ${g.s.trophies.length}/${shownTrophies(g).length}. Cards ${g.cardVersions()}/${g.cardVersionsTotal()}.`,
         abyss: DEMO ? `The way up opens at floor ${fmt(g.ascendFloor())}.`
           : g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${fmt(g.ascendFloor())}.`,
         ...(DEMO ? {} : {
           heart: g.canAwaken() ? `Awaken for ${fmt(g.pendingBound())} bound souls` : `Bound souls ${fmt(g.boundFree())}`,
-          keep: g.s.inKeep ? `Back to floor ${fmt(g.s.floor)}` : 'The Keep',
+          keep: g.s.inKeep ? `Back to floor ${fmt(g.s.floor)}` : named ? 'The Keep' : '',
         }),
-        stats: 'Your numbers, and where every bonus comes from.',
-        settings: 'Sound, visuals and saves.',
+        stats: named ? 'Stats' : '',
+        settings: named ? 'Options' : '',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
       };
-      return `<p class="tt-d">${text[id]}</p>`;
+      return text[id] ? `<p class="tt-d">${text[id]}</p>` : '';
     }
     return '';
   }

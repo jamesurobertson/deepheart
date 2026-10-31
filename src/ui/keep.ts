@@ -41,7 +41,6 @@ const THINGS: Thing[] = [
   ['wall_banner_yellow', 38, 15, 'wall'], ['wall_banner_yellow', 42, 15, 'wall'],
   ['chest_full_open', 40, 19], ['chest_full_open', 37, 22], ['chest_full_open', 43, 22],
   ...[[39, 20], [41, 20], [40, 21], [38, 18], [42, 18], [39, 22], [41, 22]].map(([x, y]): Thing => ['coin', x, y, 'flat']),
-  ['doors_frame_left', 19, 26, 'wall'], ['doors_leaf_open', 20, 26, 'wall'], ['doors_frame_right', 22, 26, 'wall'], ['doors_frame_top', 20, 24, 'wall'],
   ['wall_banner_red', 3, 1, 'wall'], ['wall_banner_red', 11, 1, 'wall'],
 ];
 /** The way down: a flight of steps in the entrance room going down from left to right into the east wall, like the
@@ -55,6 +54,12 @@ const onStairs = (x: number, feet: number) => {
   return i >= 0 && i < STAIRS.steps && feet > STAIRS.y && feet <= STAIRS.y + STAIRS.wide + 0.2 ? { step: i, depth: stairDepth(i) } : null;
 };
 const STAIR_CELLS = Array.from({ length: STAIRS.steps }, (_, i) => Array.from({ length: STAIRS.wide }, (_, j): [number, number] => [STAIRS.x + i, STAIRS.y + j])).flat();
+/** Doors, set into the wall at the foot of a corridor (where its left side is, and the row its top is on): the Keep's
+ *  entrance, and the way up to the Heart, shut until the Heart first stirs (its button shows in the dock). */
+const ENTRANCE_DOOR: [number, number] = [20, 25];
+const HEART_DOOR: [number, number] = [5, 14];
+/** While it's shut: the doorway, so no one walks onto the door. */
+const HEART_DOOR_SHUT = new Set([0, 1].flatMap((x) => [0, 1].map((y) => `${HEART_DOOR[0] + x},${HEART_DOOR[1] + y}`)));
 /** The ladder hunters climb down on expeditions (shown once expeditions are open). */
 const LADDER: [number, number] = [27, 27];
 /** The Heart stands on its plinth here; the Bound around the room once you've awakened. */
@@ -205,9 +210,6 @@ export class KeepView {
       else this.blocked.add(`${x},${y}`);
     }
     // The Heart's plinth stands in the way; spirits don't (you walk right through them).
-    // The door's posts are two tiles tall: their lower halves stand on the floor in front of the doorway.
-    this.blocked.add('19,27');
-    this.blocked.add('22,27');
     this.blocked.add(`${HEART[0]},${HEART[1]}`);
     for (const p of PEOPLE) this.blocked.add(`${p.x},${p.y}`);
     this.blocked.add(`${KOKO[0]},${KOKO[1]}`);
@@ -245,6 +247,7 @@ export class KeepView {
   private walkable(x: number, y: number) {
     const cx = Math.floor(x), cy = Math.floor(y);
     if (this.cells[cy]?.[cx] !== '.' || this.blocked.has(`${cx},${cy}`)) return false;
+    if (!this.game.s.heartTeased && HEART_DOOR_SHUT.has(`${cx},${cy}`)) return false;
     // Not half over a side wall: the hero (and the party in its footsteps) is a tile wide.
     const fx = x - cx;
     if (fx < SIDE_GAP && this.cells[cy][cx - 1] !== '.') return false;
@@ -553,6 +556,19 @@ export class KeepView {
     });
   }
 
+  /** A door in the wall at `at` (its left side, its top row): only the stone jambs of the frame sprites (the rest of
+   *  them is brick, which stood out in front of the wall), the door, and the cap of its arch. */
+  private drawDoor(g: CanvasRenderingContext2D, img: CanvasImageSource, atlas: Atlas, [x, y]: [number, number], open: boolean) {
+    const left = atlas.rect('doors_frame_left');
+    const right = atlas.rect('doors_frame_right');
+    const door = atlas.rect(open ? 'doors_leaf_open' : 'doors_leaf_closed');
+    const cap = atlas.rect('doors_frame_top');
+    g.drawImage(img, left.x + 12, left.y, 4, left.h, x * 16 - 4, y * 16, 4, left.h);
+    g.drawImage(img, right.x, right.y, 4, right.h, (x + 2) * 16, y * 16, 4, right.h);
+    g.drawImage(img, door.x, door.y, door.w, door.h, x * 16, y * 16, door.w, door.h);
+    g.drawImage(img, cap.x, cap.y + cap.h - 3, cap.w, 3, x * 16, y * 16 - 3, cap.w, 3);
+  }
+
   /** A banner's blue cloth run soul-purple, drawn once and kept: only its colored pixels change, not the brick behind. */
   private souls = new Map<string, HTMLCanvasElement>();
   private soulCloth(img: CanvasImageSource, r: Rect) {
@@ -736,6 +752,8 @@ export class KeepView {
         if (r) g.drawImage(this.soulCloth(img, r), x * 16, y * 16);
       }
     }
+    this.drawDoor(g, img, atlas, ENTRANCE_DOOR, true);
+    this.drawDoor(g, img, atlas, HEART_DOOR, this.game.s.heartTeased);
     // Everything standing, back to front: things, Dan and Victor, then your party (the hero leading).
     const standing: { y: number; draw: () => void }[] = [];
     for (const [name, x, y, how] of THINGS) {
