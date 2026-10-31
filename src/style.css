@@ -379,6 +379,10 @@ body.in-vault .hud-top .floor, body.in-vault .hud-top .rate { visibility: hidden
 body.phone .vault-pick > b { font-size: 36px; }
 body.phone .vp-face { width: 76px; min-height: 80px; }
 @keyframes rainbow { from { filter: hue-rotate(0deg) saturate(1.6); } to { filter: hue-rotate(360deg) saturate(1.6); } }
+/* Icons: a rainbow goblin cycling through the colors, and a gold copy of a monster (the gold cards). */
+.px.rainbow { animation: rainbow 2s linear infinite; }
+.px.gilded { filter: sepia(1) saturate(3.2) hue-rotate(-8deg) brightness(1.12) contrast(1.05); }
+@media (prefers-reduced-motion: reduce) { .px.rainbow { animation: none; filter: hue-rotate(200deg) saturate(1.6); } }
 .raid-mark.rainbow b { animation: rainbow 0.8s linear infinite; }
 .pop.p-floor { font-size: 30px; color: var(--gold-hi); white-space: nowrap; text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 0 0 16px rgba(255, 210, 100, 0.8); animation-name: popgold; animation-duration: 1.3s; z-index: 3; }
 .floor.advance { animation: flooradvance 0.7s ease-out; }

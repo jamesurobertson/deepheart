@@ -93,6 +93,8 @@ const STAIRS_STEPS = 11;
 const STAIRS_DROP = 0.4;
 const STAIRS_DEEP = STAIRS_STEPS * STAIRS_DROP;
 /** The deeper the step, the darker: a black wash over each tread. */
+/** How far (in tiles) in front of the stairs' top a monster has to come before it can be hit. */
+const HIT_FROM = 3.5;
 /** Where monsters start up the stairs: just out of sight with the interface up, not all the way down, and across the
  *  stretch of it beside the fight. */
 const STAIRS_SPAWN_X = 13;
@@ -522,6 +524,8 @@ export class Scene {
   private exitPortal: THREE.Group | null = null;
   /** Where columns, the fountain and torches stand along the back wall (x). */
   private wallClutter: number[] = [];
+  /** Monsters still coming up the stairs, not to be picked by the pointer yet. */
+  private held = new Set<number>();
   /** Set when the interface comes back: the hero walks out from under it (see updateHero). */
   private heroReturn = false;
   /** This room's columns, doors, torches and stairs. */
@@ -1141,8 +1145,9 @@ export class Scene {
   private updateParty(dt: number, game: Game) {
     // On a floor you badly outclass, monsters die the moment they arrive, so the party also goes for the ones still
     // walking in: it's seen fighting them down the room instead of standing idle. (Only the look: damage is the sim's.)
+    // Never one still coming up the stairs, though: that can't be fought yet.
     const arrived = game.monsters.filter((m) => m.arrive <= 0);
-    const targets = arrived.length ? arrived : game.monsters;
+    const targets = arrived.length ? arrived : game.monsters.filter((m) => !m.held);
     const focus = targets[0];
     const haste = 1 + this.fever;
     const hero = game.heroIndex();
@@ -1736,6 +1741,7 @@ export class Scene {
   }
 
   private removeView(v: MonView) {
+    this.held.delete(v.id);
     this.scene.remove(v.body);
     for (const o of v.body.children) if (o instanceof THREE.Mesh && o.userData.ownGeometry) o.geometry.dispose();
     v.sprite.dispose();
@@ -1776,8 +1782,17 @@ export class Scene {
         p.add(d.multiplyScalar(Math.min(1, (v.boss ? 2.5 : 6) * dt / len)));
         v.sprite.play(v.run);
       } else v.sprite.play(v.idle);
-      // Up the stairwell's steps on the way out of it.
+      // Up the stairwell's steps on the way out of it. Not to be hit till it's a step or two out onto the floor, so you
+      // always see it come up, however quickly it dies.
       p.y = this.wellY(p.x, p.z);
+      const m = game.monster(v.id);
+      if (m) {
+        // (Or once at its spot, if that's short of the line.)
+        m.held = !this.inVaultRoom && p.x > Math.max(this.layout.stairs.x - HIT_FROM, v.target.x + 0.3);
+        if (m.held) m.arrive = Math.max(m.arrive, 0.05);
+        if (m.held) this.held.add(v.id);
+        else this.held.delete(v.id);
+      }
       v.squash = Math.max(0, v.squash - dt * 4);
       v.knock = Math.max(0, v.knock - dt * 2.5);
       v.hopV -= 30 * dt;
@@ -1955,7 +1970,8 @@ export class Scene {
     let best: number | null = null;
     let bestD = Infinity;
     for (const v of this.mons.values()) {
-      if (v.dead >= 0 || v.born < 0.5) continue;
+      // (Not one still coming up the stairs: it can't be hit yet.)
+      if (v.dead >= 0 || v.born < 0.5 || this.held.has(v.id)) continue;
       const s = this.screenOf(v.id)!;
       const cy = s.y + s.h * 0.5;
       const dx = Math.max(0, Math.abs(x - s.x) - s.h * 0.35);
@@ -2579,7 +2595,7 @@ export class Scene {
     const views = (list: Monster[]) => list.map((m) => this.mons.get(m.id)).filter((v): v is MonView => !!v && v.dead < 0 && v.born >= 1);
     // As with the party: when everything dies on arrival, the hero goes for what's still walking in.
     const arrivedLive = views(game.monsters.filter((m) => m.arrive <= 0));
-    const live = arrivedLive.length ? arrivedLive : views(game.monsters);
+    const live = arrivedLive.length ? arrivedLive : views(game.monsters.filter((m) => !m.held));
     const nearest = (from: THREE.Vector3) => live.reduce<MonView | null>((best, v) => (!best || v.body.position.distanceToSquared(from) < best.body.position.distanceToSquared(from) ? v : best), null);
     /** Beside a monster rather than on top of it, on the side the hero is coming from. */
     const besideOf = (v: MonView) => {

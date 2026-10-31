@@ -237,6 +237,11 @@ async function boot() {
       scene.rebuild(game);
       save();
     }
+    // ?state=trophies: every trophy unlocked (the rest of the save as you left it). Rebuilt on every load.
+    if (TEST_STATE === 'trophies') {
+      game.devAllTrophies();
+      save();
+    }
     // ?state=awaken: deep enough to Awaken for the first time, with a binder full of cards (lots of spares to trade,
     // a few gold, a handful new since you last woke), or none with &cards=0. ?state=reawaken: the same, having awakened once already.
     // Rebuilt on every load, so you can Awaken, reload and do it again.
