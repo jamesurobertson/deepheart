@@ -50,8 +50,8 @@ const RARE_NEWS = 0.15;
 const STAR_WAIT_MS = 1000;
 /** How long your first Heartmark is pointed out. */
 const MARK_TIP_MS = 8000;
-/** How long Flurry is pointed out once it unlocks (it goes as soon as it's used). */
-const FLURRY_TIP_MS = 6000;
+/** How long a new skill is pointed out once it unlocks (one you press goes as soon as it's used). */
+const SKILL_TIP_MS = 6000;
 /** How close your hero or the cursor has to come to a coin to pick it up (px). */
 const COIN_REACH = 52;
 /** Coins start leaning toward whoever's collecting from this far out (px). */
@@ -165,7 +165,14 @@ const KEYED = ABILITIES.filter((a) => a.kind !== 'passive').map((a) => a.id);
 const abilityKey = (id: AbilityId) => KEYED.indexOf(id) + 1;
 
 /** "4:05" for a cooldown. */
-const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.ceil(s % 60) % 60).padStart(2, '0')}`;
+/** The same words for a finger: "click" in tooltips (and the game's copy) reads "tap" on a touch screen. */
+const tapWords = (html: string) => html.replace(/\b([Cc])lick(s|ed|ing)?\b/g, (_, c: string, end = '') => `${c === 'C' ? 'T' : 't'}ap${end === 'ed' ? 'ped' : end === 'ing' ? 'ping' : end}`);
+/** The ✦ on a trait square, drawn as that square where a hint names it. */
+const TRAIT_KEY = '<span class="hint-trait">✦</span>';
+const clock = (s: number) => {
+  const whole = Math.ceil(s);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+};
 
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
 
@@ -358,7 +365,6 @@ export class Ui {
         <button class="btn dock-b dock-heart" data-open="heart" data-tip="dock:heart" hidden>${G.heart(3)}<span>The Heart</span><em class="badge bound" hidden></em></button>
         <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>Stats</span></button>
-        <button class="btn dock-b dock-stat blade-rate" data-tip="dock:blade" tabindex="-1">${skillIcon('blade', 22, 'glyph')}<span>1/s</span></button>
         <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu(3)}<span>Options</span></button>
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute" hidden></button>
       </nav>
@@ -368,7 +374,7 @@ export class Ui {
         <header class="shop-head"><h2>Your Party</h2><span class="shop-autos"><button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden></button><button class="btn small auto-upg auto-hire" data-act="autoHire" data-tip="shop:hire" hidden></button></span><span class="sheet-grip" aria-hidden="true"></span></header>
         <div class="modes">
           <span>Hire</span>
-          <button class="btn mode" data-mode="1">×1</button><button class="btn mode" data-mode="10">×10</button><button class="btn mode" data-mode="100">×100</button><button class="btn mode" data-mode="next" data-tip="shop:next">Next</button><button class="btn mode" data-mode="-1">Max</button>
+          <button class="btn mode" data-mode="1">×1</button><button class="btn mode" data-mode="10">×10</button><button class="btn mode" data-mode="25">×25</button><button class="btn mode" data-mode="100">×100</button><button class="btn mode" data-mode="next" data-tip="shop:next">Next</button><button class="btn mode" data-mode="-1">Max</button>
         </div>
         <div class="gens"></div>
       </aside>
@@ -389,7 +395,7 @@ export class Ui {
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'),
       autoUpg: q('.auto-upg:not(.auto-hire)'), autoHire: q('.auto-hire'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), heartBtn: q('.dock-heart'), heartBadge: q('.dock-heart .badge'), keepBtn: q('[data-act=keep]'), keepLabels: q('.keep-labels'),
-      cardBadge: q('[data-open=trophies] .badge'), bladeRate: q('.blade-rate'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
+      cardBadge: q('[data-open=trophies] .badge'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
     };
 
     COMPS.forEach((c, i) => {
@@ -407,11 +413,11 @@ export class Ui {
       this.rowCache.push('');
     });
 
-    // Skills you press first (top to bottom matches keys 1–9), then the always-on ones after a gap. The Phantom Blade
-    // shows in the dock instead.
-    const column = [...ABILITIES.filter((a) => a.kind !== 'passive'), ...ABILITIES.filter((a) => a.kind === 'passive' && a.id !== 'blade')];
+    // Skills you press first (top to bottom matches keys 1–9), then the always-on ones below a rule. Those aren't
+    // buttons: nothing happens on a click.
+    const column = [...ABILITIES.filter((a) => a.kind !== 'passive'), ...ABILITIES.filter((a) => a.kind === 'passive')];
     for (const a of column) {
-      const slot = document.createElement('button');
+      const slot = document.createElement(a.kind === 'passive' ? 'div' : 'button');
       slot.className = 'ab locked';
       slot.dataset.ability = a.id;
       if (a.kind === 'passive' && a === column.find((x) => x.kind === 'passive')) slot.dataset.gap = '';
@@ -486,6 +492,7 @@ export class Ui {
     document.body.classList.toggle('ui-hidden', on);
     this.root.querySelector<HTMLElement>('.ui-back')!.hidden = !on;
     this.layout();
+    if (!on) this.scene.bringHeroIntoView();
   }
 
   /** Portrait sheet: folded (header only), half (default) or full height. */
@@ -722,6 +729,7 @@ export class Ui {
       }
       const ability = t.closest<HTMLElement>('[data-ability]');
       if (ability) {
+        if (ABILITY_BY_ID.get(ability.dataset.ability as AbilityId)!.kind === 'passive') return;
         if (this.game.useAbility(ability.dataset.ability as AbilityId)) this.refreshTip();
         else this.deny(ability);
         return;
@@ -756,7 +764,7 @@ export class Ui {
       }
       const mode = t.closest<HTMLElement>('[data-mode]');
       if (mode) {
-        this.game.s.settings.buyMode = mode.dataset.mode === 'next' ? 'next' : (Number(mode.dataset.mode) as 1 | 10 | 100 | -1);
+        this.game.s.settings.buyMode = mode.dataset.mode === 'next' ? 'next' : (Number(mode.dataset.mode) as 1 | 10 | 25 | 100 | -1);
         this.hooks.sound('toggle', { vol: 0.5 });
         this.syncMode();
         this.rowCache.fill('');
@@ -1105,16 +1113,9 @@ export class Ui {
         this.bars.clear();
         this.el.drops.querySelectorAll('.sparks').forEach((el) => el.remove());
         break;
-      case 'click': {
-        if (ev.x >= 0) {
-          this.swing(ev.x, ev.y, ev.crit);
-          break;
-        }
-        const f = g.focus();
-        const s = f && this.scene.screenOf(f.id);
-        if (s) this.swing(s.x, s.y + s.h * 0.4, ev.crit);
+      case 'click':
+        this.swing();
         break;
-      }
       case 'hit': {
         if (!g.s.settings.numbers && ev.kind !== 'crit' && ev.kind !== 'autoCrit') break;
         const s = this.scene.screenOf(ev.id);
@@ -1245,7 +1246,7 @@ export class Ui {
         this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 });
         break;
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
-      case 'fever': if (ev.on) this.banner(`RAMPAGE ×${fmt(g.feverMult())}!`, `Keep attacking for ×${fmt(g.rampageNext()?.mult ?? g.feverMult())}`, 'rampage'); break;
+      case 'fever': if (ev.on) this.banner(`RAMPAGE ×${fmt(g.feverMult())}!`, `Keep ${this.touch ? 'tapping' : 'clicking'} for ×${fmt(g.rampageNext()?.mult ?? g.feverMult())}`, 'rampage'); break;
       case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, 'Full power', `rampage tier${ev.tier}`); break;
       case 'vaultPick': this.showVaultPick(); break;
       case 'vault':
@@ -1330,18 +1331,12 @@ export class Ui {
     }
   }
 
-  /** Swing the sword cursor and mark the spot. */
-  private swing(x: number, y: number, crit = false) {
+  /** Swing the sword cursor. */
+  private swing() {
     const b = this.el.bladeIn;
     b.classList.remove('swing');
     void b.offsetWidth;
     b.classList.add('swing');
-    const ring = document.createElement('i');
-    ring.className = `click-ring${crit ? ' crit' : ''}`;
-    ring.style.left = `${x}px`;
-    ring.style.top = `${y}px`;
-    ring.onanimationend = () => ring.remove();
-    this.el.pops.appendChild(ring);
   }
 
   private zoneBanner(floor: number) {
@@ -1559,6 +1554,15 @@ export class Ui {
       if (at) mark.style.transform = `translate(${at.x}px, ${at.y}px)`;
       mark.style.visibility = at ? 'visible' : 'hidden';
     }
+    // The hints under a monster (the first click, a champion) move every frame, right with it.
+    if (this.hintState === 'click' || this.hintState === 'champ') {
+      const target = this.hintState === 'click' ? g.focus() : (g.monsters.find((m) => m.champ && m.boss) ?? g.monsters.find((m) => m.champ));
+      const s = target && this.scene.screenOf(target.id);
+      // (A champion boss can stand taller than the screen: keep the hint on it.)
+      if (s) this.el.hint.style.transform = `translate(${s.x}px, ${this.hintState === 'champ' ? Math.min(s.y + s.h + 16, innerHeight - 120) : s.y + s.h + 16}px)`;
+      // Nothing to point at yet (monsters still coming up the stairs).
+      this.el.hint.style.visibility = s ? 'visible' : 'hidden';
+    }
     // Flurry clicks wherever you point, like holding the attack down.
     const flurry = g.s.buffs.some((b) => b.id === 'flurry');
     g.aim = flurry && this.pointer && !this.modal ? { id: this.scene.pick(this.pointer.x, this.pointer.y), ...this.pointer } : null;
@@ -1665,7 +1669,7 @@ export class Ui {
     if (fever) {
       this.el.feverBar.style.width = `${(fever.t / fever.dur) * 100}%`;
       const next = g.rampageNext();
-      const label = next ? `×${fmt(g.feverMult())} · keep attacking!` : `×${fmt(g.feverMult())}!`;
+      const label = next ? `×${fmt(g.feverMult())} · keep ${this.touch ? 'tapping' : 'clicking'}!` : `×${fmt(g.feverMult())}!`;
       if (this.el.feverLabel.textContent !== label) this.el.feverLabel.textContent = label;
     }
 
@@ -1713,10 +1717,6 @@ export class Ui {
     const cb = this.el.cardBadge;
     cb.hidden = this.newCards < 1;
     setText(cb, `+${this.newCards}`);
-    this.el.bladeRate.hidden = !g.abilityUnlocked('blade');
-    const rate = `${perSec(g.autoRate())}/s`;
-    const rateEl = this.el.bladeRate.lastElementChild!;
-    if (rateEl.textContent !== rate) rateEl.textContent = rate;
 
     this.hints();
     if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'trips', 'stats', 'party', 'records', 'ascents'].includes(this.modal) && !this.descending) this.renderModal(true);
@@ -1815,9 +1815,10 @@ export class Ui {
       this.el.floorBox.classList.toggle('urgent', g.bossTime < 8);
     } else {
       const need = g.killsNeeded();
-      const k = Math.min(need, s.floorKills);
+      const cleared = s.floor < s.maxFloor || s.floorKills >= need;
+      const k = cleared ? need : s.floorKills;
       this.el.floorBar.style.width = `${(k / need) * 100}%`;
-      setText(this.el.floorBarT, s.floorKills >= need ? 'Cleared' : `${k} / ${need}`);
+      setText(this.el.floorBarT, cleared ? 'Cleared' : `${k} / ${need}`);
       this.el.floorBox.classList.remove('urgent');
     }
   }
@@ -1933,11 +1934,12 @@ export class Ui {
       const state = !g.abilityUnlocked(id) ? 'locked' : a.kind === 'passive' ? 'passive' : buff ? 'active' : charging ? 'charging' : cd > 0 ? 'cooling' : 'ready';
       if (slot.dataset.state !== state) {
         slot.dataset.state = state;
-        slot.className = `ab ${state}`;
+        slot.className = `ab ${state}${a.kind === 'passive' ? ' always' : ''}`;
       }
       const fill = buff && state === 'active' ? 1 - buff.t / buff.dur : state === 'cooling' ? cd / (a.cooldown ?? 1) : state === 'charging' ? g.s.fervor : 0;
       slot.style.setProperty('--cd', `${fill * 100}%`);
-      const time = buff && state === 'active' ? `${Math.ceil(buff.t)}s` : state === 'cooling' ? clock(cd) : state === 'charging' ? `${Math.floor(g.s.fervor * 100)}%` : '';
+      const time = buff && state === 'active' ? `${Math.ceil(buff.t)}s` : state === 'cooling' ? clock(cd) : state === 'charging' ? `${Math.floor(g.s.fervor * 100)}%`
+        : state === 'passive' && id === 'blade' ? `${perSec(g.autoRate())}/s` : '';
       const label = slot.querySelector('.ab-time')!;
       if (label.textContent !== time) label.textContent = time;
     }
@@ -2132,11 +2134,12 @@ export class Ui {
     const noUpgrades = g.s.upgradesKnown.length === 0;
     const upgradeRow = noUpgrades ? this.rows.findIndex((row) => row.querySelector('.trait.buy')) : -1;
     const starOpen = g.s.heroTips === 1 && g.s.owned.filter((n) => n > 0).length >= 2;
+    // A skill just unlocked, not yet pointed out (in the column's order).
+    const newSkill = ABILITIES.find((a) => g.abilityUnlocked(a.id) && !this.skillSeen(a.id));
     this.starFrom = starOpen ? this.starFrom || performance.now() : 0;
     if (g.s.clicks < 6) state = 'click';
     else if (g.s.owned.every((n) => n === 0) && g.s.gold.gte(g.compCost(0))) state = firstRun ? 'hire' : 'nudge';
-    else if (g.abilityUnlocked('blade') && !g.s.bladeSeen) state = 'blade';
-    else if (g.abilityUnlocked('flurry') && !g.s.flurrySeen) state = 'flurry';
+    else if (newSkill) state = `skill:${newSkill.id}`;
     // The first champion: pointed out until one is slain.
     else if (g.s.champions === 0 && g.monsters.some((m) => m.champ)) state = 'champ';
     // The first champion boss that pays souls, too: by then you've usually met a champion, but not this.
@@ -2168,14 +2171,12 @@ export class Ui {
       if (shown > 15_000) g.s.heroTips = 2;
     } else if (state === 'hire' || state === 'level') {
       this.pointAt(this.rows[0]);
-    } else if (state === 'blade') {
-      this.pointAt(this.el.bladeRate);
-      if (shown > 8_000) g.s.bladeSeen = true;
+    } else if (state.startsWith('skill:')) {
+      const id = state.slice(6) as AbilityId;
+      this.pointAt(this.el.abilities.querySelector(`[data-ability="${id}"]`));
+      if (shown > SKILL_TIP_MS || (ABILITY_BY_ID.get(id)!.kind === 'button' && g.abilityCooldown(id) > 0)) this.skillSeen(id, true);
     } else if (state === 'rampage') {
       this.pointAt(this.el.abilities.querySelector('[data-ability="rampage"]'));
-    } else if (state === 'flurry') {
-      this.pointAt(this.el.abilities.querySelector('[data-ability="flurry"]'));
-      if (g.abilityCooldown('flurry') > 0 || (this.hintState === 'flurry' && performance.now() - this.tourAt > FLURRY_TIP_MS)) g.s.flurrySeen = true;
     } else if (state === 'auto') {
       this.pointAt(this.el.autoUpg);
       if (this.hintState === 'auto' && performance.now() - this.tourAt > MARK_TIP_MS) g.s.autoTipSeen = true;
@@ -2186,23 +2187,9 @@ export class Ui {
     } else if (state === 'upgrade') {
       this.pointAt(this.rows[upgradeRow].querySelector('.trait.buy'));
     }
-    if (state === 'champ') {
-      const champ = g.monsters.find((m) => m.champ && m.boss) ?? g.monsters.find((m) => m.champ);
-      const s = champ && this.scene.screenOf(champ.id);
-      // (A champion boss can stand taller than the screen: keep the hint on it.)
-      if (s) this.el.hint.style.transform = `translate(${s.x}px, ${Math.min(s.y + s.h + 16, innerHeight - 120)}px)`;
-      this.el.hint.style.visibility = s ? 'visible' : 'hidden';
-    }
-    if (state === 'click') {
-      const f = g.focus();
-      const s = f && this.scene.screenOf(f.id);
-      if (s) this.el.hint.style.transform = `translate(${s.x}px, ${s.y + s.h + 16}px)`;
-      // Nothing to point at yet (monsters still coming up the stairs).
-      this.el.hint.style.visibility = s ? 'visible' : 'hidden';
-    }
     if (state === this.hintState) return;
     this.hintState = state;
-    const pointing = ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'flurry', 'blade', 'mark', 'auto'].includes(state);
+    const pointing = state.startsWith('skill:') || ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'mark', 'auto'].includes(state);
     this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ';
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero');
@@ -2212,17 +2199,34 @@ export class Ui {
       : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click their ${G.star()} to switch</small></b>`
         : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>Companions fight for you, even while you're away</small></b>`
           : state === 'level' ? `<b>Keep ${this.touch ? 'tapping' : 'clicking'} to level up<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
-            : state === 'blade' ? `<b>Phantom Blade unlocked!<small>It attacks for you, once a second</small></b>`
-            : state === 'flurry' ? `<b>Flurry is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('flurry')}`} to use it</small></b>`
+            : state.startsWith('skill:') ? this.skillHint(state.slice(6) as AbilityId)
             : state === 'rampage' ? `<b>Rampage is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
             : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
               : state === 'champ' ? this.champHint()
               : state === 'auto' ? `<b>Auto-buy<small>Traits you've bought before buy themselves</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
-              : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep attacking</small></b>`;
+              : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`;
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
+  }
+
+  /** A skill just unlocked: its name, and how to use it (or that it's always on). */
+  private skillHint(id: AbilityId) {
+    const a = ABILITY_BY_ID.get(id)!;
+    const how = a.kind === 'button' ? `<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey(id)}`} to use it</small>` : a.kind === 'passive' ? '<small>Always on</small>' : '';
+    return `<b>${esc(a.name)} unlocked!${how}</b>`;
+  }
+
+  /** Whether a skill's unlock has been pointed out (or, with `mark`, note that it has). */
+  private skillSeen(id: AbilityId, mark = false) {
+    const s = this.game.s;
+    if (mark) {
+      if (id === 'blade') s.bladeSeen = true;
+      else if (id === 'flurry') s.flurrySeen = true;
+      else if (!s.skillsSeen.includes(id)) s.skillsSeen.push(id);
+    }
+    return id === 'blade' ? s.bladeSeen : id === 'flurry' ? s.flurrySeen : s.skillsSeen.includes(id);
   }
 
   /** What the first trait on offer does, in the words of the hint that points at it. */
@@ -2230,9 +2234,9 @@ export class Ui {
     const id = `m${row}_0`;
     const skill = ABILITY_BY_UPGRADE.get(id);
     const press = this.touch ? 'Tap' : 'Click';
-    if (skill) return `${press} the ✦ to unlock the ${esc(skill.name)}`;
+    if (skill) return `${press} the ${TRAIT_KEY} to unlock the ${esc(skill.name)}`;
     const u = UPG_BY_ID.get(id);
-    return u?.effect.t === 'comp' ? `${press} the ×2 to double ${esc(COMPS[row].name)}'s damage` : `${press} the ✦: ${esc(u?.desc ?? '')}`;
+    return u?.effect.t === 'comp' ? `${press} the <span class="hint-trait">×2</span> to double ${esc(COMPS[row].name)}'s damage` : `${press} the ${TRAIT_KEY}: ${esc(u?.desc ?? '')}`;
   }
 
   /** Moves the hint's arrow onto something in the party panel: beside it when there's room to its left (the panel on the
@@ -2293,7 +2297,7 @@ export class Ui {
       if (!a) return this.hideTip();
       this.tipAnchor = a;
     }
-    const html = this.tipHtml(this.tipKey);
+    const html = this.touch ? tapWords(this.tipHtml(this.tipKey)) : this.tipHtml(this.tipKey);
     if (!html) return this.hideTip();
     const tip = this.el.tip;
     if (tip.innerHTML !== html) tip.innerHTML = html;
@@ -2380,13 +2384,13 @@ export class Ui {
         ? `The ${comp.name} is on an expedition.`
         : !g.abilityUnlocked(a.id)
         ? `Unlocked by the ${comp.name}.`
-        : a.kind === 'passive' ? 'Always on.'
-          : fever ? (next ? `×${fmt(g.feverMult())}. Keep attacking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
+        : a.kind === 'passive' ? ''
+          : fever ? (next ? `×${fmt(g.feverMult())}. Keep clicking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
             : a.kind === 'charge' && g.s.fervor < 1 ? `${Math.floor(g.s.fervor * 100)}% charged.`
               : cd > 0 ? `Ready again in ${duration(cd)}.` : `Ready. Click to use it${key}.`;
       const timing = a.kind === 'button' ? `<ul class="tt-l"><li>Lasts ${+g.abilityDuration(a.id).toFixed(1)}s · cooldown ${duration(a.cooldown ?? 0)}</li></ul>` : '';
       return `<div class="tt-h"><b>${esc(a.name)}</b><span class="tt-own">${a.kind === 'passive' ? 'always on' : this.touch ? 'ability' : `key ${abilityKey(a.id)}`}</span></div>
-        <p class="tt-d">${esc(g.abilityText(a.id))}</p>${timing}<p class="tt-f">${status}</p>`;
+        <p class="tt-d">${esc(g.abilityText(a.id))}</p>${timing}${status ? `<p class="tt-f">${status}</p>` : ''}`;
     }
     if (kind === 'tro') {
       const t = TROPHIES.find((x) => x.id === id)!;
@@ -2531,7 +2535,6 @@ export class Ui {
         stats: 'Your numbers, and where every bonus comes from.',
         settings: 'Sound, visuals and saves.',
         mute: g.s.settings.muted ? 'Unmute' : 'Mute',
-        blade: `Phantom Blade: ${perSec(g.autoRate())} attack${g.autoRate() === 1 ? '' : 's'} a second.`,
       };
       return `<p class="tt-d">${text[id]}</p>`;
     }
@@ -3613,10 +3616,10 @@ export class Ui {
       document.body.classList.remove('over-act');
       return;
     }
-    const ids = labels.map((l) => `${l.id}:${l.verb}`).join(' ');
+    const ids = labels.map((l) => `${l.id}:${l.verb}:${l.tip ?? ''}`).join(' ');
     if (host.dataset.ids !== ids) {
       host.dataset.ids = ids;
-      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}</b><em class="kp"><kbd>E</kbd>${MOUSE_GLYPH}<span>${esc(l.verb)}</span></em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
+      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}${l.tip ? `<small>${esc(l.tip)}</small>` : ''}</b><em class="kp"><kbd>E</kbd>${MOUSE_GLYPH}<span>${esc(l.verb)}</span></em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
       // Clicking a label walks you over and uses it when you get there.
       host.querySelectorAll<HTMLElement>('[data-station]').forEach((b) => {
         b.addEventListener('click', (e) => {
@@ -3634,8 +3637,12 @@ export class Ui {
     }
     labels.forEach((l, i) => {
       const el = host.children[i] as HTMLElement;
-      el.style.transform = `translate(${Math.round(l.x)}px, ${Math.round(l.y)}px)`;
       el.hidden = !l.shown || l.x < -60 || l.x > this.field.w + 60;
+      // Kept inside the view (a long one by the edge would run under the party panel); its arrow still points home.
+      const half = el.hidden ? 0 : el.offsetWidth / 2;
+      const x = half ? Math.max(half + 6, Math.min(this.field.w - half - 6, l.x)) : l.x;
+      el.style.transform = `translate(${Math.round(x)}px, ${Math.round(l.y)}px)`;
+      el.style.setProperty('--arrow-x', `${Math.round(l.x - x)}px`);
       el.classList.toggle('near', this.keepView?.near === l.id);
       el.classList.toggle('keyed', !!this.keepView?.keyed);
       el.classList.toggle('hover', this.keepView?.hover === l.id);
@@ -3706,9 +3713,15 @@ export class Ui {
     } else if (id.startsWith('legend:')) {
       this.legendFocus = id.slice(7) as LegendId;
       this.openModal('legend');
-    } else if (id === 'stairs') this.toggleKeep();
+    } else if (id === 'stairs') {
+      // Using the stairs themselves: the party walks down them first. (The dock's button goes straight down.)
+      if (!this.keepView?.goDown(() => this.toggleKeep())) this.toggleKeep();
+    }
     else if (id === 'dan' || id === 'victor') this.openTrade(id);
-    else if (id === 'trips') this.openModal('trips');
+    else if (id === 'trips') {
+      this.game.s.ladderSeen = true;
+      this.openModal('trips');
+    }
     else if (id === 'heart') this.openModal('heart');
     else if (id.startsWith('bound:')) {
       this.boundFocus = id.slice(6) as BoundId;

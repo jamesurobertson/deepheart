@@ -13,11 +13,11 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type Image, readPng, writePng } from './png.ts';
 
-/** Tight box around the opaque pixels of a region. */
-function bbox(img: Image, x0 = 0, y0 = 0, w = img.w, h = img.h) {
+/** Tight box around the opaque pixels of a region (from `alpha` up). */
+function bbox(img: Image, x0 = 0, y0 = 0, w = img.w, h = img.h, alpha = 1) {
   let minX = Infinity, minY = Infinity, maxX = -1, maxY = -1;
   for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
-    if (img.data[(y * img.w + x) * 4 + 3] > 0) {
+    if (img.data[(y * img.w + x) * 4 + 3] >= alpha) {
       minX = Math.min(minX, x); maxX = Math.max(maxX, x);
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
     }
@@ -52,9 +52,10 @@ const ZONE_TILES: [string, [number, number]][] = [
 for (const [zone, file] of [['jungle', 'omnibo_jungledungeon - copia.png'], ['tomb', 'omnibo_dessert_dungeon.png']] as const) {
   const img = readPng(join(SRC, 'omniboy/custom-dungeon-tileset', file));
   for (const [name, [x, y]] of ZONE_TILES) add(`${zone}_${name}`, img, x, y);
-  // Tall statues: take whatever is drawn in their columns.
+  // Tall statues: what's drawn in their columns, down to the foot of the statue (the sheet has a floor tile under one
+  // and a soft shadow under the other, which made them look like they float).
   for (const [k, col] of [[1, 6], [2, 7]]) {
-    const b = bbox(img, col * 16, 0, 16, 48);
+    const b = bbox(img, col * 16, 0, 16, 34, 128);
     if (b) add(`${zone}_statue_${k}`, img, b.x, b.y, b.w, b.h);
   }
 }

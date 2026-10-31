@@ -71,9 +71,7 @@ export class PixelSprite {
     };
     mat.customProgramCacheKey = () => 'gilded';
     mat.needsUpdate = true;
-    this.gilded = true;
   }
-  private gilded = false;
 
   /** Ready for a Rampage: pixels marked in `eyes` (a sheet-sized mask) can burn red, and the empty pixels bordering
    *  the sprite can light up as a one-pixel red rim. Both start off; set them with `rage`. */
@@ -123,12 +121,6 @@ export class PixelSprite {
     if (!this.rageUniforms) return;
     this.rageUniforms.rageEyes.value = eyes;
     this.rageUniforms.rageRim.value = rim;
-  }
-
-  /** Silhouette flash (0..1) for hits: white, or a warm glint on gold so a champion under fire stays gold. */
-  set flash(v: number) {
-    if (this.gilded) this.mesh.material.emissive.setRGB(v * 0.5, v * 0.32, v * 0.05);
-    else this.mesh.material.emissive.setScalar(v);
   }
 
   private show(i: number) {
