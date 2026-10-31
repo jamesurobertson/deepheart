@@ -147,6 +147,9 @@ export const RAINBOW_HAUL = 3;
 export const VAULT_CHESTS = 40;
 /** How far down the hall the chests go (in the floor's units; the fight's floor is about -9 to 9). */
 export const VAULT_LENGTH = 62;
+/** Where a boss that rises through the floor comes up: always the same spot, since its zone's rooms are broken open
+ *  there from the first floor. (On a tile corner once the scene spreads the fight out, so its grates sit on the grid.) */
+export const RISING_SPOT = { x: 2.78, z: 0 };
 const RAINBOW_CHEST_WEIGHT = 10;
 /** Everything in the vault together, in a floor's monster gold: about what its old room of hoarders paid. */
 export const VAULT_PAY = 800;
@@ -220,7 +223,7 @@ export interface Settings {
   numbers: boolean;
   notation: 'short' | 'sci';
   /** Levels per hire: a fixed count, up to the next milestone, or as many as you can afford (-1). */
-  buyMode: 1 | 10 | 100 | 'next' | -1;
+  buyMode: 1 | 10 | 25 | 100 | 'next' | -1;
   blood: boolean;
   /** Staircase interlude between zones. */
   cinematics: boolean;
@@ -322,6 +325,8 @@ export interface SaveState {
   expeditions: Expedition[];
   /** A companion has reached EXPEDITION_LEVEL: expeditions are open for good. */
   tripsOpen: boolean;
+  /** You've used the expedition ladder in the Keep (its label says what it's for until then). */
+  ladderSeen: boolean;
   /** Companions who have ever reached the expedition level (each gets one toast saying so). */
   tripReady: number[];
   /** Expeditions ever sent, and the cards they've brought home. */
@@ -376,6 +381,8 @@ export interface SaveState {
   bladeSeen: boolean;
   /** Has Flurry, the first skill button, been pointed out? */
   flurrySeen: boolean;
+  /** The other skills whose unlock has been pointed out (the Blade and Flurry have their own flags, from before). */
+  skillsSeen: AbilityId[];
   rampage: number;
   /** Cards by id: copies per edition (normal, then each corruption; only normal is shown so far), plain and gold, and
    *  the kill (for goblins, the catch) that first dropped each. */
@@ -468,7 +475,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(), lastAttack: 0,
-    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, tripReady: [], tripsSent: 0, tripCards: 0, tripKills: 0, pets: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, keepSpot: null, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
+    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, ladderSeen: false, tripReady: [], tripsSent: 0, tripCards: 0, tripKills: 0, pets: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, keepSpot: null, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, skillsSeen: [], rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, autoHire: false, graphics: 'auto' },
   };
 }
@@ -1120,7 +1127,7 @@ export class Game {
     if (id === 'crit') return `Clicks and Phantom Blade have a ${pct(p.critBase + p.critUpg)} chance for ×${+(p.critMultBase + p.critMultUpg).toFixed(2)} damage.`;
     if (id === 'blade') return `Attacks for you, ${this.c.autoBase === 1 ? 'once' : `${+this.c.autoBase.toFixed(1)} times`} a second.`;
     if (id === 'cleave') return `Your clicks also hit every other monster for ${pct(CLEAVE_BASE * p.cleaveUpg)} damage.`;
-    if (id === 'rampage') return `Builds as you attack. Your party deals ×${+this.feverMult(0).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
+    if (id === 'rampage') return `Builds as you click. Your party deals ×${+this.feverMult(0).toFixed(1)}–×${+this.feverMult(RAMPAGE_TIERS.length - 1).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
     return ABILITY_BY_ID.get(id)!.desc;
   }
 
@@ -1426,7 +1433,7 @@ export class Game {
     const toughness = TUNE.bossHpFrom + (TUNE.bossHp - TUNE.bossHpFrom) * Math.min(1, (this.s.floor - 1) / TUNE.bossRamp);
     const wither = this.witherMult();
     const hp = floorHp(this.s.floor).times(toughness * zone * first * (giant ? 1 + 2 * bite : 1) * champHp * wither);
-    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, champ, ...this.spot(true) };
+    const m: Monster = { id: this.seq++, def, hp, max: hp, boss: true, arrive: 1.5, mods, champ, ...(def.move === 'emerge' ? RISING_SPOT : this.spot(true)) };
     this.monsters.push(m);
     let time = BOSS_TIME + this.bossTimeBonus();
     if (mods.includes('enraged')) time *= 1 - 0.5 * bite;

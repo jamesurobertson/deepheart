@@ -466,11 +466,11 @@ function traitEffect(kind: string, comp: number): { effect: Effect; desc: string
   const num = Number(kind.replace(/\D+/g, ''));
   if (kind === 'own') return { effect: { t: 'comp', comp, mult: 2 }, desc: `${COMPS[comp].name} deals ×2 damage.` };
   if (kind === 'party') return { effect: { t: 'party', mult: 1.5 }, desc: 'Every companion deals +50% damage.' };
-  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.01 }, desc: "Attacks also deal +1% of your party's damage." };
+  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.01 }, desc: "Clicks and Phantom Blade also deal +1% of your party's damage." };
   if (kind === 'gold') return { effect: { t: 'gold', pct: 0.5 }, desc: 'Monsters drop +50% gold.' };
   if (kind === 'boss') return { effect: { t: 'boss', pct: 0.25 }, desc: '+25% damage to bosses.' };
   if (kind === 'blade') return { effect: { t: 'auto', add: 1 }, desc: 'Phantom Blade +1/s.' };
-  if (kind.startsWith('cleave')) return { effect: { t: 'cleave', pct: num / 100 }, desc: `Cleave +${num}%.` };
+  if (kind.startsWith('cleave')) return { effect: { t: 'cleave', pct: num / 100 }, desc: `Cleave +${num}% damage.` };
   if (kind === 'fevfill') return { effect: { t: 'fever', fill: 1.25 }, desc: 'Rampage fills 25% faster.' };
   if (kind === 'fevdur') return { effect: { t: 'fever', dur: 1.5 }, desc: 'Rampage lasts 50% longer.' };
   if (kind === 'fevpow') return { effect: { t: 'fever', power: 1 }, desc: 'Rampage hits harder: +1 to both its multipliers.' };
@@ -520,7 +520,7 @@ export const ABILITIES: AbilityDef[] = [
   { id: 'blade', name: 'Phantom Blade', desc: 'Attacks for you, once a second.', kind: 'passive', comp: compIndex('squire'), trait: 0 },
   { id: 'flurry', name: 'Flurry', desc: 'Clicks for you, 10 times a second.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 8 * 60 },
   { id: 'crit', name: 'Critical Hits', desc: 'Clicks and Phantom Blade have a 3% chance for ×2 damage.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
-  { id: 'rampage', name: 'Rampage', desc: 'Builds as you attack. Your party deals ×2 damage for 10s.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
+  { id: 'rampage', name: 'Rampage', desc: 'Builds as you click. Your party deals ×2–×3 damage for 10s.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
   { id: 'cleave', name: 'Cleave', desc: 'Your clicks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 12 * 60 },
   ...(DEMO ? [] : [
     { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 25 * 60 },
@@ -629,12 +629,12 @@ const longer = (ability: AbilityId, secs: number) => ({ lengthens: { ability, se
 
 export const LEGENDS: LegendDef[] = DEMO ? [] : [
   o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Damage while idle', value: per(0.25) }),
-  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Your attacks and the Phantom Blade', value: per(0.1) }),
+  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Your clicks and the Phantom Blade', value: per(0.1) }),
   o({ id: 'needle', name: 'The Needle', kind: 'power', sprite: 'sd_executioner', what: 'Critical hit damage', value: per(0.15) }),
   o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'sd_mountain_king', what: 'All gold', value: per(0.05) }),
   o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'sm_sohei', what: 'Gold while idle', value: per(0.5) }),
   o({ id: 'goblinking', name: 'The Wish', kind: 'power', sprite: 'ef_fairy', what: 'Gold from treasure goblins and the Rainbow Vault', value: per(0.5) }),
-  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'sm_large_samurai', what: 'All damage, for each attack in your streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}% per attack`, note: 'A streak ends 2 seconds after your last attack, and counts up to 2,000 attacks.' }),
+  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'sm_large_samurai', what: 'All damage, for each click in your streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}% per click`, note: 'A streak ends 2 seconds after your last click, and counts up to 2,000 clicks.' }),
   o({ id: 'hourglass', name: 'The Hourglass', kind: 'utility', sprite: 'sd_magic_shopkeeper', what: 'Time to beat a boss', value: share(30, (n) => `+${+n.toFixed(1)}s`) }),
   o({ id: 'wither', name: 'The Wither', kind: 'utility', sprite: 'sd_bishop', what: 'Boss health', value: share(0.5, (n) => `−${pct(n)}`) }),
   o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${lv}`, maxLv: 10 }),
@@ -873,12 +873,12 @@ function buildTrophies(): TrophyDef[] {
   tiers('levelall', [[500, 'Loyal Company'], [1000, 'Legendary Company'], [2500, 'Mythic Company']],
     (n) => `Get every companion to level ${count(n)}.`, COMPS[0].sprite, (n) => ({ t: 'levelAll', n }), 1);
   tiers('clicks', [[100, 'Tap Tap'], [10_000, 'Clicker'], [100_000, 'Still Clicking'], [1e6, 'Carpal Tunnel']],
-    (n) => `Click ${count(n)} times.`, 'weapon_knife', (n) => ({ t: 'clicks', n }));
+    (n) => `Attack ${count(n)} times.`, 'weapon_knife', (n) => ({ t: 'clicks', n }));
   tiers('crit', [[1, 'Critical!'], [10_000, 'Sharp Eye'], [100_000, 'Surgeon'], [1e6, 'Critical Condition']],
     (n) => `Land ${count(n)} critical ${plural(n, 'hit')}.`, 'weapon_katana', (n) => ({ t: 'crits', n }));
   tiers('fev', [[1, 'Rampage!'], [100, 'Berserker'], [1000, 'Anger Issues']],
     (n) => `Go on a Rampage ${times(n)}.`, 'flask_big_red', (n) => ({ t: 'fevers', n }));
-  out.push({ id: 'rampage0', name: 'Bloodrush', desc: 'Keep attacking until a Rampage reaches its top tier.', icon: { sprite: 'flask_big_red', tier: 1 }, req: { t: 'rampage', n: 1 } });
+  out.push({ id: 'rampage0', name: 'Bloodrush', desc: 'Keep clicking until a Rampage reaches its top tier.', icon: { sprite: 'flask_big_red', tier: 1 }, req: { t: 'rampage', n: 1 } });
   tiers('raid', [[1, 'Finders Keepers'], [77, 'Red-Handed'], [777, 'Jackpot'], [2777, 'No One Escapes'], [7777, 'Treasure Lord']],
     (n) => `Catch ${n === 1 ? 'a treasure goblin' : `${count(n)} treasure goblins`}.`, 'goblin', (n) => ({ t: 'raids', n }));
   const missed: [number, string, string][] = [

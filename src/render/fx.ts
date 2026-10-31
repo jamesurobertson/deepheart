@@ -53,13 +53,10 @@ interface Wave {
 }
 
 interface Swipe {
-  mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   life: number;
   max: number;
-  from: number;
-  sweep: number;
-  /** 1, or -1 for a swing from the right. */
-  side: number;
+  frames: THREE.Texture[];
 }
 
 interface Shard {
@@ -295,32 +292,130 @@ const SPLATS: THREE.Texture[] = (() => {
   return out;
 })();
 const SPLAT_GEO = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+const SMEAR_GEO = new THREE.PlaneGeometry(1, 1);
 
-/** A crescent whose color runs from dark (tail) to bright (head): additive, so the tail vanishes. */
-function crescent(size: number, arc: number): THREE.BufferGeometry {
-  const n = 22;
-  const pos: number[] = [];
-  const col: number[] = [];
-  const idx: number[] = [];
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    const a = t * arc;
-    const thick = size * 0.38 * (0.15 + 0.85 * Math.sin(Math.PI * Math.min(1, t * 1.1)));
-    const r1 = size;
-    const r0 = size - thick;
-    pos.push(Math.cos(a) * r0, Math.sin(a) * r0, 0, Math.cos(a) * r1, Math.sin(a) * r1, 0);
-    const k = t ** 1.6;
-    col.push(k, k, k, k, k, k);
-    if (i < n) {
-      const b = i * 2;
-      idx.push(b, b + 1, b + 3, b, b + 3, b + 2);
+/** Pixels per world unit: the sprites' own grid, so a smear is as crisp as what it hits. */
+const SMEAR_PX = 16;
+/** Directions a smear is drawn at (baked into its pixels: a rotated texture would tilt the pixel grid). */
+const SMEAR_DIRS = 16;
+const SMEAR_SWEEP = 2.4;
+const smearCache = new Map<string, THREE.Texture[]>();
+
+/** A swing in four stepped frames, drawn on the pixel grid: the start of the arc, the whole arc, its back half gone,
+ *  then only the head. White edge, the swing's color through the body, a dithered darker tail. */
+function smearFrames(color: THREE.Color, radius: number, dir: number, mirror: boolean): THREE.Texture[] {
+  const key = `${color.getHexString()}|${radius}|${dir}|${mirror}`;
+  const hit = smearCache.get(key);
+  if (hit) return hit;
+  const size = radius * 2 + 4;
+  const mid = size / 2;
+  const thick = Math.max(2, Math.round(radius * 0.3));
+  const dark = color.getHSL({ h: 0, s: 0, l: 0 }).l < 0.35;
+  const css = (c: THREE.Color) => `#${c.getHexString()}`;
+  const head = css(dark ? color.clone().multiplyScalar(1.6) : color.clone().lerp(new THREE.Color(1, 1, 1), 0.7));
+  const body = css(color);
+  const tail = css(color.clone().multiplyScalar(0.55));
+  // Canvas y runs down, the world's up: the angle is flipped.
+  const center = -(dir / SMEAR_DIRS) * Math.PI * 2;
+  const spans = [[0, 0.45], [0, 1], [0.45, 1], [0.8, 1]];
+  const frames = spans.map(([s0, s1], f) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d')!;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const dx = x + 0.5 - mid, dy = y + 0.5 - mid;
+      const d = Math.hypot(dx, dy);
+      if (d > radius) continue;
+      let off = Math.atan2(dy, dx) - (center - SMEAR_SWEEP / 2);
+      off = ((off % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      if (off > SMEAR_SWEEP) continue;
+      // u runs tail (0) to head (1); a swing from the right leads with the other end.
+      const u = mirror ? off / SMEAR_SWEEP : 1 - off / SMEAR_SWEEP;
+      if (u < s0 || u > s1) continue;
+      // Thin at the tail, full at the body, tapering to a point at the head.
+      const t = 1 + (thick - 1) * Math.sin(Math.min(1, u * 1.15) * Math.PI * 0.5) * (u > 0.9 ? 0.4 + (1 - u) * 6 : 1);
+      if (d < radius - t) continue;
+      // (The first frame is the swing just begun: its leading end is the head.)
+      const lead = f === 0 ? u / s1 : u;
+      if (lead < 0.3 && (x + y) % 2) continue;
+      const edge = d > radius - 1.1;
+      g.fillStyle = f === 3 ? body : lead > 0.82 || (edge && f <= 1) ? head : lead > 0.3 ? body : tail;
+      g.fillRect(x, y, 1, 1);
     }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.setIndex(idx);
-  return g;
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  });
+  smearCache.set(key, frames);
+  return frames;
+}
+
+const burstCache = new Map<string, THREE.Texture[]>();
+
+/** A spell landing, in four stepped frames on the pixel grid: a white core, a star bursting out in the spell's color,
+ *  a ring of loose pixels, and those pixels scattering darker. */
+function burstFrames(color: THREE.Color, radius: number): THREE.Texture[] {
+  const key = `${color.getHexString()}|${radius}`;
+  const hit = burstCache.get(key);
+  if (hit) return hit;
+  const size = radius * 2 + 3;
+  const mid = Math.floor(size / 2);
+  const css = (c: THREE.Color) => `#${c.getHexString()}`;
+  const white = '#ffffff';
+  const light = css(color.clone().lerp(new THREE.Color(1, 1, 1), 0.6));
+  const body = css(color);
+  const dark = css(color.clone().multiplyScalar(0.5));
+  const draw = (paint: (px: (x: number, y: number, c: string) => void) => void) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d')!;
+    paint((x, y, col) => {
+      g.fillStyle = col;
+      g.fillRect(mid + Math.round(x), mid + Math.round(y), 1, 1);
+    });
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  };
+  const arms = (px: (x: number, y: number, c: string) => void, reach: number, diag: number) => {
+    for (let k = -reach; k <= reach; k++) {
+      const col = Math.abs(k) <= reach * 0.4 ? white : Math.abs(k) <= reach * 0.75 ? light : body;
+      px(k, 0, col);
+      px(0, k, col);
+    }
+    for (let k = -diag; k <= diag; k++) {
+      px(k, k, k === 0 ? white : body);
+      px(k, -k, k === 0 ? white : body);
+    }
+  };
+  const ring = (px: (x: number, y: number, c: string) => void, r: number, col: string, n: number, twist: number) => {
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + twist;
+      px(Math.cos(a) * r, Math.sin(a) * r, col);
+    }
+  };
+  const frames = [
+    draw((px) => {
+      for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) px(x, y, white);
+      arms(px, Math.round(radius * 0.35), 0);
+    }),
+    draw((px) => arms(px, Math.round(radius * 0.8), Math.round(radius * 0.35))),
+    draw((px) => {
+      ring(px, radius * 0.75, light, 8, 0);
+      ring(px, radius * 0.55, body, 8, Math.PI / 8);
+      px(0, 0, body);
+    }),
+    draw((px) => {
+      ring(px, radius, body, 8, 0.2);
+      ring(px, radius * 0.8, dark, 8, Math.PI / 8 + 0.2);
+    }),
+  ];
+  burstCache.set(key, frames);
+  return frames;
 }
 
 const STAR = (() => {
@@ -374,6 +469,8 @@ function shaftTexture() {
 export class Fx {
   /** Particles per burst, as a share of the full count (lower on low graphics). */
   scale = 1;
+  /** How deep the floor is at (x, z) (below 0 over an opening): blood lands there, or doesn't stain at all. */
+  floorY: (x: number, z: number) => number = () => 0;
   private scene: THREE.Scene;
   private parts: Particle[] = [];
   private beams: Beam[] = [];
@@ -457,6 +554,8 @@ export class Fx {
 
   /** A pixel-art splat on the floor, tinted `color`, that fades out slowly. */
   bloodSplat(at: THREE.Vector3, color: THREE.ColorRepresentation, size = 0.9) {
+    // (Not over an opening in the floor: there's nothing there for it to lie on.)
+    if (this.floorY(at.x, at.z) < 0) return;
     while (this.stains.length >= MAX_STAINS) this.dropStain(0);
     const mesh = new THREE.Mesh(SPLAT_GEO, new THREE.MeshLambertMaterial({
       map: SPLATS[Math.floor(Math.random() * SPLATS.length)], color, transparent: true, depthWrite: false, alphaTest: 0.1,
@@ -500,6 +599,14 @@ export class Fx {
     for (const d of this.decals) d.life = 0;
   }
 
+  /** Leaving the room for the stairwell: sparks, embers, cuts and flashes still in the air go out with it. (Falling loot
+   *  and rune casts keep their landings.) */
+  clearAir() {
+    for (const list of [this.parts, this.beams, this.bolts, this.waves, this.flashes, this.swipes, this.stars, this.shards, this.strikes, this.ghosts, this.chains]) {
+      for (const fx of list) fx.life = 0;
+    }
+  }
+
   /** Column of light (level-ups, awakenings, boss kills): a sheet facing the camera, brightest at its core and its foot,
    *  soft at the sides and fading out as it rises. */
   pillar(at: THREE.Vector3, color: THREE.ColorRepresentation, height = 6, dur = 0.9) {
@@ -534,21 +641,33 @@ export class Fx {
    */
   /** `mirror`: swung from the right (the arc and its sweep flipped left to right). */
   swipe(at: THREE.Vector3, color: THREE.ColorRepresentation, size = 1.1, angle = Math.random() * Math.PI * 2, dur = 0.16, mirror = false) {
-    const arc = 2.3;
-    const mesh = new THREE.Mesh(
-      crescent(size, arc),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2.2), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }),
-    );
+    const radius = Math.max(6, Math.round(size * SMEAR_PX));
+    const dir = ((Math.round((angle / (Math.PI * 2)) * SMEAR_DIRS) % SMEAR_DIRS) + SMEAR_DIRS) % SMEAR_DIRS;
+    const frames = smearFrames(new THREE.Color(color), radius, mirror ? (SMEAR_DIRS / 2 - dir + SMEAR_DIRS) % SMEAR_DIRS : dir, mirror);
+    const span = (radius * 2 + 4) / SMEAR_PX;
+    // (Plain white, not boosted: past 1 the bloom smudges the pixels. Drawn over everything: a swing low on a small
+    // monster would otherwise dip under the floor.)
+    const mesh = new THREE.Mesh(SMEAR_GEO, new THREE.MeshBasicMaterial({ map: frames[0], transparent: true, alphaTest: 0.5, depthWrite: false, depthTest: false, fog: false }));
+    mesh.scale.set(span, span, 1);
     mesh.position.copy(at);
     mesh.position.z += 0.5;
-    // Centre the arc on the target: rotate so the middle of the swing passes through it.
-    mesh.rotation.z = angle - arc / 2;
     mesh.renderOrder = 5;
     this.scene.add(mesh);
-    const side = mirror ? -1 : 1;
-    mesh.rotation.z *= side;
-    mesh.scale.x = side;
-    this.swipes.push({ mesh, life: dur, max: dur, from: angle - arc / 2 - 0.9, sweep: 1.3, side });
+    this.swipes.push({ mesh, life: dur, max: dur, frames });
+  }
+
+  /** A spell landing: a pixel burst in its color, `size` across in world units (stepped like a swipe). */
+  pop(at: THREE.Vector3, color: THREE.ColorRepresentation, size = 1, dur = 0.22) {
+    const radius = Math.max(4, Math.round((size * SMEAR_PX) / 2));
+    const frames = burstFrames(new THREE.Color(color), radius);
+    const span = (radius * 2 + 3) / SMEAR_PX;
+    const mesh = new THREE.Mesh(SMEAR_GEO, new THREE.MeshBasicMaterial({ map: frames[0], transparent: true, alphaTest: 0.5, depthWrite: false, depthTest: false, fog: false }));
+    mesh.scale.set(span, span, 1);
+    mesh.position.copy(at);
+    mesh.position.z += 0.5;
+    mesh.renderOrder = 5;
+    this.scene.add(mesh);
+    this.swipes.push({ mesh, life: dur, max: dur, frames });
   }
 
   /**
@@ -959,16 +1078,11 @@ export class Fx {
     for (let i = this.swipes.length - 1; i >= 0; i--) {
       const w = this.swipes[i];
       w.life -= dt;
-      const k = 1 - Math.max(0, w.life) / w.max;
-      // Fast out, eased: the swing snaps through, then the trail lingers and fades.
-      const e = 1 - (1 - k) ** 3;
-      w.mesh.rotation.z = w.side * (w.from + w.sweep * e);
-      w.mesh.scale.setScalar(0.85 + 0.3 * e);
-      w.mesh.scale.x *= w.side;
-      w.mesh.material.opacity = k < 0.45 ? 1 : Math.max(0, 1 - (k - 0.45) / 0.55);
+      // Stepped, not eased: one frame each, held, like hand-drawn smears.
+      const frame = Math.min(3, Math.floor((1 - Math.max(0, w.life) / w.max) * 4));
+      if (w.mesh.material.map !== w.frames[frame]) w.mesh.material.map = w.frames[frame];
       if (w.life <= 0) {
         this.scene.remove(w.mesh);
-        w.mesh.geometry.dispose();
         w.mesh.material.dispose();
         this.swipes.splice(i, 1);
       }
@@ -1025,9 +1139,10 @@ export class Fx {
           sp.pos[o] += sp.vel[o] * dt;
           sp.pos[o + 1] += sp.vel[o + 1] * dt;
           sp.pos[o + 2] += sp.vel[o + 2] * dt;
-          if (sp.pos[o + 1] <= 0.012) {
+          const ground = this.floorY(sp.pos[o], sp.pos[o + 2]) + 0.012;
+          if (sp.pos[o + 1] <= ground) {
             // Land and stay: a flat pixel stain.
-            sp.pos[o + 1] = 0.012;
+            sp.pos[o + 1] = ground;
             sp.landed[k] = 1;
           }
         }

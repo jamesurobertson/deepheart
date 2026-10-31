@@ -1,4 +1,5 @@
-import type { Rect } from '../render/atlas.ts';
+import * as THREE from 'three';
+import type { Atlas, Rect } from '../render/atlas.ts';
 import { BOUND, COMPS, LEGENDS, LEGEND_BY_ID, ZONES, boundName, type BoundId, type LegendId } from '../game/data.ts';
 import type { Game } from '../game/game.ts';
 import { KOKO_EYE, KOKO_FUR, KOKO_ROWS, KOKO_TAIL } from './koko.ts';
@@ -16,14 +17,16 @@ export type KeepStation = 'stairs' | 'dan' | 'victor' | 'trips' | 'heart' | 'kok
 
 /** Floor rectangles (x, y, w, h) for the rooms and the halls between them; the walls grow around them. The first room
  *  is the Heart's. */
-const ROOMS: [number, number, number, number][] = [[1, 2, 13, 10], [16, 2, 15, 10], [1, 16, 9, 8], [12, 15, 22, 9], [36, 16, 9, 8], [19, 27, 9, 6]];
-const HALLS: [number, number, number, number][] = [[22, 12, 3, 3], [10, 19, 2, 2], [34, 19, 2, 2], [5, 12, 2, 4], [22, 24, 2, 3]];
+const ROOMS: [number, number, number, number][] = [[1, 2, 13, 10], [16, 2, 15, 10], [1, 16, 9, 8], [12, 15, 22, 9], [36, 16, 9, 8], [17, 27, 12, 9]];
+const HALLS: [number, number, number, number][] = [[22, 12, 3, 3], [10, 19, 2, 2], [34, 19, 2, 2], [5, 12, 2, 4], [20, 24, 2, 3]];
 /** How close (in tiles) the hero's middle may come to a wall at its side. */
 const SIDE_GAP = 0.45;
 /** How far (in tiles) the hero's feet stay from a south wall. */
 const SOUTH_GAP = 0.2;
+/** How close (in tiles, middle to middle) the hero may come to a column from the side. */
+const COLUMN_REACH = 0.72;
 const W = 47;
-const H = 35;
+const H = 37;
 
 /** Things in the rooms: [sprite, x, y, how]: standing on the cell (and in the way), 'flat' on the floor, 'wall' hung
  *  on a wall face, 'soul' a wall piece run soul-purple. */
@@ -38,12 +41,27 @@ const THINGS: Thing[] = [
   ['wall_banner_yellow', 38, 15, 'wall'], ['wall_banner_yellow', 42, 15, 'wall'],
   ['chest_full_open', 40, 19], ['chest_full_open', 37, 22], ['chest_full_open', 43, 22],
   ...[[39, 20], [41, 20], [40, 21], [38, 18], [42, 18], [39, 22], [41, 22]].map(([x, y]): Thing => ['coin', x, y, 'flat']),
-  ['doors_frame_left', 21, 26, 'wall'], ['doors_leaf_open', 22, 26, 'wall'], ['doors_frame_right', 24, 26, 'wall'], ['doors_frame_top', 22, 24, 'wall'],
-  ['floor_stairs', 22, 30, 'flat'], ['floor_stairs', 23, 30, 'flat'], ['floor_stairs', 24, 30, 'flat'],
   ['wall_banner_red', 3, 1, 'wall'], ['wall_banner_red', 11, 1, 'wall'],
 ];
+/** The way down: a flight of steps in the entrance room going down from left to right into the east wall, like the
+ *  stairs in the dungeon's rooms. One step a tile, three tiles wide. */
+const STAIRS = { x: 21, y: 31, steps: 8, wide: 3 };
+/** How far down (in pixels) the stairs' step `i` is: also how tall the wall above it shows. */
+const stairDepth = (i: number) => Math.min(14, 3 + i * 2);
+/** How far down the stairs (x, feet) is, in pixels, and which step: 0 off them. */
+const onStairs = (x: number, feet: number) => {
+  const i = Math.floor(x - STAIRS.x);
+  return i >= 0 && i < STAIRS.steps && feet > STAIRS.y && feet <= STAIRS.y + STAIRS.wide + 0.2 ? { step: i, depth: stairDepth(i) } : null;
+};
+const STAIR_CELLS = Array.from({ length: STAIRS.steps }, (_, i) => Array.from({ length: STAIRS.wide }, (_, j): [number, number] => [STAIRS.x + i, STAIRS.y + j])).flat();
+/** Doors, set into the wall at the foot of a corridor (where its left side is, and the row its top is on): the Keep's
+ *  entrance, and the way up to the Heart, shut until the Heart first stirs (its button shows in the dock). */
+const ENTRANCE_DOOR: [number, number] = [20, 25];
+const HEART_DOOR: [number, number] = [5, 14];
+/** While it's shut: the doorway, so no one walks onto the door. */
+const HEART_DOOR_SHUT = new Set([0, 1].flatMap((x) => [0, 1].map((y) => `${HEART_DOOR[0] + x},${HEART_DOOR[1] + y}`)));
 /** The ladder hunters climb down on expeditions (shown once expeditions are open). */
-const LADDER: [number, number] = [20, 28];
+const LADDER: [number, number] = [27, 27];
 /** The Heart stands on its plinth here; the Bound around the room once you've awakened. */
 const HEART: [number, number] = [7, 4];
 /** Where each Bound stands: the four that make a Spirit's effect stronger on the Heart's right, the rest on its left. */
@@ -65,13 +83,14 @@ const STATIONS: Station[] = [
   { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 19.55], body: [[3, 18], [3, 17]] },
   { id: 'victor', label: 'Victor', cells: [[6, 18], [7, 19], [8, 18], [7, 17]], tag: [7, 19.55], body: [[7, 18], [7, 17]] },
   // The way down works from anywhere round the stairs, not just on them.
-  { id: 'stairs', label: 'Way down', cells: [21, 22, 23, 24, 25].flatMap((x) => [29, 30, 31].map((y): [number, number] => [x, y])), tag: [23, 31.6], body: [[22, 30], [23, 30], [24, 30]] },
+  { id: 'stairs', label: 'Way down', cells: Array.from({ length: STAIRS.steps + 1 }, (_, k) => STAIRS.x - 1 + k).flatMap((x) => [30, 31, 32, 33, 34].map((y): [number, number] => [x, y])), tag: [25, 35.1], body: STAIR_CELLS },
   { id: 'koko', label: 'Koko', cells: [[5, 19], [6, 19], [5, 20], [7, 20], [5, 21], [6, 21], [7, 21]], tag: [KOKO[0], KOKO[1] + 1.55], body: [KOKO, [KOKO[0], KOKO[1] - 1]] },
   { id: 'heart', label: 'The Heart', cells: [[6, 5], [7, 5], [8, 5], [6, 4], [8, 4]], tag: [7, 6.1], body: [[7, 4], [7, 3]] },
 ];
-const TRIPS: Station = { id: 'trips', label: 'Expeditions', cells: [[20, 28], [19, 28], [21, 28], [20, 29], [19, 29], [21, 29]], tag: [20, 29.55], body: [[20, 28]] };
-/** Where you arrive: on the stairs, facing up into the Entrance. */
-const ARRIVE: [number, number] = [23, 29];
+const TRIPS: Station = { id: 'trips', label: 'Expeditions', cells: [[27, 27], [26, 27], [28, 27], [27, 28], [26, 28], [28, 28]], tag: [27, 28.55], body: [[27, 27]] };
+/** Where you arrive: just off the top of the stairs (not so close the way down is on offer), the party coming up them
+ *  behind you. */
+const ARRIVE: [number, number] = [18, 32];
 const SPEED = 5.5;
 /** Milliseconds a click is held before the hero starts following the pointer. */
 const HOLD_AFTER = 220;
@@ -95,7 +114,7 @@ const GUARDS: [number, number][] = [
 /** The trail keeps a point every this many cells the hero walks. */
 const TRAIL_STEP = 0.08;
 /** The way the party winds round the Entrance when you arrive (the hero first). */
-const ENTRANCE_WIND: [number, number][] = [[23.5, 29.5], [23.5, 31.6], [19.6, 31.6], [19.6, 32.4], [27.4, 32.4], [27.4, 31], [25.6, 31], [25.6, 28], [27.4, 28], [27.4, 27.4], [19.6, 27.4], [19.6, 29.5], [21.4, 29.5]];
+const ENTRANCE_WIND: [number, number][] = [[18.5, 32.5], [21.2, 32.5], [28.4, 32.5]];
 /** Cells along the hero's trail between one follower and the next. */
 const GAP = 0.9;
 
@@ -133,10 +152,13 @@ export class KeepView {
   private cells: string[][];
   private tiles: ReturnType<typeof autotile>;
   private blocked = new Set<string>();
+  /** Columns stand in the way only round their base: you can walk right in front of one, or behind it. */
+  private columns: [number, number][] = [];
   /** Floor squares with a south wall's cap drawn along their bottom. */
   private capped = new Set<string>();
   /** The hero (cell units, feet at the point), the trail it leaves, a path to walk when you click, the camera. */
-  private hero = { x: ARRIVE[0] + 0.5, y: ARRIVE[1] + 0.5, left: false, moving: false };
+  // (Facing left: just up the stairs, which come up from the right.)
+  private hero = { x: ARRIVE[0] + 0.5, y: ARRIVE[1] + 0.5, left: true, moving: false };
   private trail: { x: number; y: number }[] = [];
   private path: { x: number; y: number }[] = [];
   private cam = { x: 0, y: 0 };
@@ -158,6 +180,8 @@ export class KeepView {
   /** A held click: where the pointer is on screen (the camera moves under it), where it went down, when, and whether
    *  the hero has started following it. */
   private held: { x: number; y: number; x0: number; y0: number; at: number; following: boolean } | null = null;
+  /** Going down the stairs: what to do once at the bottom (the hero and party walk it first). */
+  leaving: { then: () => void; at: number } | null = null;
   /** Moving with the keys (the labels then show which key uses a thing), rather than the mouse. */
   keyed = false;
   /** Called when you reach a station you clicked, or click the one you're at. */
@@ -180,11 +204,12 @@ export class KeepView {
     this.tiles = autotile(this.cells);
     // A south wall's cap is drawn along the bottom of the room's last floor row.
     for (const t of this.tiles[2]) if (t.name === 'wall_top_mid' && this.cells[t.y]?.[t.x] === '.') this.capped.add(`${t.x},${t.y}`);
-    for (const [, x, y, how] of THINGS) if (!how) this.blocked.add(`${x},${y}`);
+    for (const [name, x, y, how] of THINGS) {
+      if (how) continue;
+      if (name === 'column') this.columns.push([x, y]);
+      else this.blocked.add(`${x},${y}`);
+    }
     // The Heart's plinth stands in the way; spirits don't (you walk right through them).
-    // The door's posts are two tiles tall: their lower halves stand on the floor in front of the doorway.
-    this.blocked.add('21,27');
-    this.blocked.add('24,27');
     this.blocked.add(`${HEART[0]},${HEART[1]}`);
     for (const p of PEOPLE) this.blocked.add(`${p.x},${p.y}`);
     this.blocked.add(`${KOKO[0]},${KOKO[1]}`);
@@ -222,13 +247,21 @@ export class KeepView {
   private walkable(x: number, y: number) {
     const cx = Math.floor(x), cy = Math.floor(y);
     if (this.cells[cy]?.[cx] !== '.' || this.blocked.has(`${cx},${cy}`)) return false;
+    if (!this.game.s.heartTeased && HEART_DOOR_SHUT.has(`${cx},${cy}`)) return false;
     // Not half over a side wall: the hero (and the party in its footsteps) is a tile wide.
     const fx = x - cx;
     if (fx < SIDE_GAP && this.cells[cy][cx - 1] !== '.') return false;
     if (fx > 1 - SIDE_GAP && this.cells[cy][cx + 1] !== '.') return false;
+    if (this.columns.some(([bx, by]) => Math.abs(x - (bx + 0.5)) < COLUMN_REACH && y > by + 0.3 && y < by + 0.85)) return false;
     // On the last row before a south wall, the feet stay off the cap along its bottom.
     if (y - cy > 1 - SOUTH_GAP && this.capped.has(`${cx},${cy}`)) return false;
     return true;
+  }
+
+  /** A step from (x, y) to (nx, ny) that isn't climbing straight off the stairs: from the floor you can drop onto
+   *  them anywhere, but the way off them is up the steps, at their top (left) end. */
+  private offStairs(x: number, y: number, nx: number, ny: number) {
+    return !onStairs(x, y) || !!onStairs(nx, ny) || nx < STAIRS.x;
   }
 
   /** The Bound and where each stands, once you've awakened. */
@@ -310,6 +343,23 @@ export class KeepView {
     this.hearts.push({ at: this.time, dx: first ? 0 : Math.round(Math.random() * 22 - 11), dy: first ? 0 : Math.round(Math.random() * 9), pace: first ? 0.2 : 0.08 + Math.random() * 0.1 });
   }
 
+  /** Down the stairs: the hero walks to the top of the flight and down it, the party following, then `then`. Returns
+   *  false when there's no way to walk there. */
+  goDown(then: () => void) {
+    if (this.leaving) return true;
+    const mid = STAIRS.y + STAIRS.wide / 2;
+    const from = [Math.floor(this.hero.x), Math.floor(this.hero.y)] as const;
+    const onFlight = onStairs(this.hero.x, this.hero.y);
+    const entry = onFlight ? [] : this.route(from[0], from[1], STAIRS.x - 1, Math.floor(mid));
+    if (!onFlight && !entry.length && !(from[0] === STAIRS.x - 1 && from[1] === Math.floor(mid))) return false;
+    this.goal = null;
+    this.held = null;
+    // Already on the flight: on down from where you are (far enough down, the screen goes at once: see frame).
+    this.path = onFlight ? [{ x: STAIRS.x + STAIRS.steps - 0.6, y: this.hero.y }] : [...entry, { x: STAIRS.x + 0.2, y: mid }, { x: STAIRS.x + STAIRS.steps - 0.6, y: mid }];
+    this.leaving = { then, at: this.time };
+    return true;
+  }
+
   /** Use a station you're at, or walk up to it and use it when you get there. */
   useOrWalk(id: KeepStation) {
     this.keyed = false;
@@ -372,7 +422,7 @@ export class KeepView {
       if (x === tx && y === ty) break;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const key = `${x + dx},${y + dy}`;
-        if (prev.has(key) || !this.walkable(x + dx + 0.5, y + dy + 0.5)) continue;
+        if (prev.has(key) || !this.walkable(x + dx + 0.5, y + dy + 0.5) || !this.offStairs(x + 0.5, y + 0.5, x + dx + 0.5, y + dy + 0.5)) continue;
         prev.set(key, `${x},${y}`);
         queue.push([x + dx, y + dy]);
       }
@@ -389,6 +439,18 @@ export class KeepView {
   frame(dt: number, keys: { x: number; y: number }, w: number, h: number, zoomW = w) {
     this.time += dt;
     const hero = this.hero;
+    // On the way down the stairs nothing steers; once at the bottom (or if it's taking too long), on down.
+    if (this.leaving) {
+      keys = { x: 0, y: 0 };
+      this.held = null;
+      // (On down a few steps in: the screen goes before you reach the bottom.)
+      const step = onStairs(hero.x, hero.y)?.step ?? -1;
+      if (step >= 3 || (!this.path.length && this.time - this.leaving.at > 0.3) || this.time - this.leaving.at > 4) {
+        const then = this.leaving.then;
+        this.leaving.then = () => {};
+        then();
+      }
+    }
     let vx = keys.x, vy = keys.y;
     // A press held a moment becomes following, like a drag.
     if (this.held && !this.held.following && performance.now() - this.held.at > HOLD_AFTER) this.held.following = true;
@@ -416,8 +478,8 @@ export class KeepView {
       const step = Math.min(len, SPEED * dt) / len;
       const nx = hero.x + vx * step, ny = hero.y + vy * step;
       // Slide along walls: each axis on its own.
-      if (this.walkable(nx, hero.y)) hero.x = nx;
-      if (this.walkable(hero.x, ny)) hero.y = ny;
+      if (this.walkable(nx, hero.y) && this.offStairs(hero.x, hero.y, nx, hero.y)) hero.x = nx;
+      if (this.walkable(hero.x, ny) && this.offStairs(hero.x, hero.y, hero.x, ny)) hero.y = ny;
       if (vx) hero.left = vx < 0;
       const last = this.trail[0];
       if (Math.hypot(hero.x - last.x, hero.y - last.y) > TRAIL_STEP) {
@@ -479,17 +541,60 @@ export class KeepView {
   /** Where each station's label goes on screen. */
   /** A Spirit's name hangs just below its feet. Your own Spirits and the traders only show theirs when you're at them or
    *  pointing at them. */
-  labels(): { id: KeepStation; label: string; verb: string; x: number; y: number; below: boolean; shown: boolean }[] {
+  labels(): { id: KeepStation; label: string; verb: string; x: number; y: number; below: boolean; shown: boolean; tip?: string }[] {
     const r = this.canvas.getBoundingClientRect();
     const s = 16 * this.zoom;
     return this.stations().map((st) => {
-      // Spirits and the traders are named under their feet; the stairs' sign hangs over them.
-      const below = st.id !== 'stairs';
-      const [tx, ty] = below ? [st.tag[0], st.tag[1] - 0.45] : st.tag;
+      // Every name hangs under what it names, pointing up at it.
+      const below = true;
+      const [tx, ty] = [st.tag[0], st.tag[1] - 0.45];
       // Only the stairs and the spirits on offer always show their names; the rest when you point at them or stand there.
-      const shown = st.id === 'stairs' || st.id.startsWith('offer:') || (st.id === 'heart' && this.game.canAwaken()) || this.near === st.id || this.hover === st.id;
-      return { id: st.id, label: st.label, verb: this.verb(st.id), x: r.left + r.width / 2 + (tx + 0.5 - this.cam.x) * s, y: r.top + r.height / 2 + (ty - this.cam.y) * s, below, shown };
+      // The expedition ladder the first time you see it: named, with what it's for, until you've used it.
+      const tip = st.id === 'trips' && !this.game.s.ladderSeen ? 'Send companions to hunt cards' : undefined;
+      const shown = !!tip || st.id === 'stairs' || st.id.startsWith('offer:') || (st.id === 'heart' && this.game.canAwaken()) || this.near === st.id || this.hover === st.id;
+      return { id: st.id, label: st.label, verb: this.verb(st.id), x: r.left + r.width / 2 + (tx + 0.5 - this.cam.x) * s, y: r.top + r.height / 2 + (ty - this.cam.y) * s, below, shown, tip };
     });
+  }
+
+  /** A door in the wall at `at` (its left side, its top row): only the stone jambs of the frame sprites (the rest of
+   *  them is brick, which stood out in front of the wall), the door, and the cap of its arch. */
+  private drawDoor(g: CanvasRenderingContext2D, img: CanvasImageSource, atlas: Atlas, [x, y]: [number, number], open: boolean) {
+    const left = atlas.rect('doors_frame_left');
+    const right = atlas.rect('doors_frame_right');
+    const door = atlas.rect(open ? 'doors_leaf_open' : 'doors_leaf_closed');
+    const cap = atlas.rect('doors_frame_top');
+    g.drawImage(img, left.x + 12, left.y, 4, left.h, x * 16 - 4, y * 16, 4, left.h);
+    g.drawImage(img, right.x, right.y, 4, right.h, (x + 2) * 16, y * 16, 4, right.h);
+    g.drawImage(img, door.x, door.y, door.w, door.h, x * 16, y * 16, door.w, door.h);
+    g.drawImage(img, cap.x, cap.y + cap.h - 3, cap.w, 3, x * 16, y * 16 - 3, cap.w, 3);
+  }
+
+  /** A banner's blue cloth run soul-purple, drawn once and kept: only its colored pixels change, not the brick behind. */
+  private souls = new Map<string, HTMLCanvasElement>();
+  private soulCloth(img: CanvasImageSource, r: Rect) {
+    const key = `${r.x},${r.y}`;
+    let c = this.souls.get(key);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = r.w;
+    c.height = r.h;
+    const t = c.getContext('2d')!;
+    t.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    const data = t.getImageData(0, 0, r.w, r.h);
+    const color = new THREE.Color();
+    const hsl = { h: 0, s: 0, l: 0 };
+    for (let k = 0; k < data.data.length; k += 4) {
+      color.setRGB(data.data[k] / 255, data.data[k + 1] / 255, data.data[k + 2] / 255, THREE.SRGBColorSpace);
+      color.getHSL(hsl, THREE.SRGBColorSpace);
+      // (The cloth is the saturated blue; brick, the pole and shadows are left as they are.)
+      if (hsl.s < 0.3 || hsl.h < 0.45 || hsl.h > 0.75) continue;
+      color.setHSL(0.74, Math.min(1, hsl.s * 1.1), Math.min(0.85, hsl.l * 1.08), THREE.SRGBColorSpace);
+      const rgb = color.getStyle(THREE.SRGBColorSpace).match(/\d+/g)!.map(Number);
+      data.data.set(rgb.slice(0, 3), k);
+    }
+    t.putImageData(data, 0, 0);
+    this.souls.set(key, c);
+    return c;
   }
 
   /** A sprite frame in a monster's tint (as the dungeon colors it), drawn once and kept. */
@@ -515,6 +620,32 @@ export class KeepView {
 
   /** A sprite frame as a flat shape in one color (for the hover outline), drawn once and kept. */
   private flats = new WeakMap<object, Map<string, HTMLCanvasElement>>();
+  /** The way down, seen from above: steps of the Keep's own floor, each a shade darker than the last, a shadow where
+   *  each drops to the next (over the tiles' light grout, which read as a frame round every step), and the wall above
+   *  each step a little taller, so the flight's outline shows. */
+  private drawStairs(g: CanvasRenderingContext2D, img: CanvasImageSource, atlas: Atlas, worn: (x: number, y: number) => number) {
+    const wall = atlas.rect('wall_mid');
+    const left = STAIRS.x * 16;
+    const top = STAIRS.y * 16;
+    const tall = STAIRS.wide * 16;
+    for (let i = 0; i < STAIRS.steps; i++) {
+      const x = left + i * 16;
+      for (let j = 0; j < STAIRS.wide; j++) {
+        const f = atlas.rect(`floor_${worn(STAIRS.x + i, STAIRS.y + j)}`);
+        g.drawImage(img, f.x, f.y, 16, 16, x, top + j * 16, 16, 16);
+      }
+      g.fillStyle = `rgba(6, 3, 5, ${Math.min(0.82, 0.12 + i * 0.1)})`;
+      g.fillRect(x, top, 16, tall);
+      const lip = stairDepth(i);
+      g.drawImage(img, wall.x, wall.y + 16 - lip, 16, lip, x, top, 16, lip);
+      g.fillStyle = `rgba(6, 3, 5, ${Math.min(0.85, 0.3 + i * 0.08)})`;
+      g.fillRect(x, top, 16, lip);
+      // The drop from the step before: a shadow down the step's left edge, over the tile's grout.
+      g.fillStyle = 'rgba(6, 3, 5, 0.55)';
+      g.fillRect(x, top + lip, 2, tall - lip);
+    }
+  }
+
   private flat(img: CanvasImageSource, r: Rect, color: string) {
     // (Kept per image: a tinted Bound is its own little canvas, its frame always at 0,0.)
     let byFrame = this.flats.get(img);
@@ -581,6 +712,19 @@ export class KeepView {
         g.restore();
       } else g.drawImage(src, r.x, r.y, r.w, r.h, px, py, r.w, r.h);
     };
+    // Someone on the stairs: a step down (and a shade darker), ring and all, the opening's near edge hiding the feet.
+    const onStep = (x: number, feet: number, draw: () => void) => {
+      const on = onStairs(x, feet);
+      if (!on) return draw();
+      g.save();
+      g.beginPath();
+      g.rect(0, 0, W * 16, (STAIRS.y + STAIRS.wide) * 16);
+      g.clip();
+      g.filter = `brightness(${1 - on.step * 0.06})`;
+      g.translate(0, on.depth);
+      draw();
+      g.restore();
+    };
     // The one thing under the pointer gets a one-pixel outline, so you can see what a click will use.
     const standLit = (id: KeepStation, src: CanvasImageSource, r: Rect, x: number, feet: number, left = false) => {
       if (this.hover === id && !this.held) {
@@ -598,21 +742,25 @@ export class KeepView {
     for (const t of this.tiles[0]) tile(atlas.rect(`floor_${worn(t.x, t.y)}`), t.x, t.y);
     for (const t of this.tiles[1]) tile(atlas.rect(t.name), t.x, t.y);
     for (const t of this.tiles[2]) if (!this.capped.has(`${t.x},${t.y}`)) tile(atlas.rect(t.name), t.x, t.y);
+    this.drawStairs(g, img, atlas, worn);
     if (this.game.tripsOpen()) tile(rect('floor_ladder'), LADDER[0], LADDER[1]);
     for (const [name, x, y, how] of THINGS) {
       if (how === 'flat') tile(rect(name, tick), x, y);
-      else if (how === 'wall' || how === 'soul') {
-        if (how === 'soul') g.filter = 'hue-rotate(55deg) saturate(1.4) brightness(1.1)';
-        tile(rect(name, tick), x, y);
-        g.filter = 'none';
+      else if (how === 'wall') tile(rect(name, tick), x, y);
+      else if (how === 'soul') {
+        const r = rect(name, tick);
+        if (r) g.drawImage(this.soulCloth(img, r), x * 16, y * 16);
       }
     }
+    this.drawDoor(g, img, atlas, ENTRANCE_DOOR, true);
+    this.drawDoor(g, img, atlas, HEART_DOOR, this.game.s.heartTeased);
     // Everything standing, back to front: things, Dan and Victor, then your party (the hero leading).
     const standing: { y: number; draw: () => void }[] = [];
     for (const [name, x, y, how] of THINGS) {
       if (how) continue;
       const r = rect(name, name.startsWith('chest') ? 2 : 0);
-      if (r) standing.push({ y: y + 1, draw: () => stand(img, r, x + 0.5, y + 1) });
+      // (A column sorts by the middle of its base, so walking just in front of it puts you in front.)
+      if (r) standing.push({ y: y + (name === 'column' ? 0.85 : 1), draw: () => stand(img, r, x + 0.5, y + 1) });
     }
     const shadow = (x: number, y: number, rx: number) => {
       g.fillStyle = 'rgba(0, 0, 0, 0.35)';
@@ -803,7 +951,7 @@ export class KeepView {
     for (const [i, want] of places) {
       let at = this.party.get(i);
       if (!at) {
-        this.party.set(i, (at = { idx: want, x: 0, y: 0, left: false, running: false }));
+        this.party.set(i, (at = { idx: want, x: 0, y: 0, left: !this.partyPlaced, running: false }));
         // Hired up here: in from the nearest spot just out of sight, by the way round through the rooms.
         if (this.partyPlaced) {
           const goal = this.along(want);
@@ -842,7 +990,8 @@ export class KeepView {
       const p = this.along(at.idx);
       at.x = p.x;
       at.y = p.y;
-      if (Math.abs(at.x - was) > 0.002) at.left = at.x < was;
+      // (Not on the first frame, which only puts everyone in their places.)
+      if (this.partyPlaced && Math.abs(at.x - was) > 0.002) at.left = at.x < was;
     }
     for (const i of this.party.keys()) if (!places.has(i)) this.party.delete(i);
     this.partyPlaced = true;
@@ -851,7 +1000,7 @@ export class KeepView {
       const src = (at.running || (hero && this.hero.moving) ? spriteFrames(`${COMPS[i].sprite}_run`) : null) ?? spriteFrames(COMPS[i].sprite);
       if (!src) continue;
       const r = src.frames[(tick + i) % src.frames.length];
-      standing.push({ y: at.y, draw: () => {
+      standing.push({ y: at.y, draw: () => onStep(at.x, at.y, () => {
         if (hero) {
           g.strokeStyle = 'rgba(255, 224, 138, 0.9)';
           g.lineWidth = 1;
@@ -860,7 +1009,7 @@ export class KeepView {
           g.stroke();
         } else shadow(at.x, at.y, 5);
         stand(src.img, r, at.x, at.y, hero && !at.running ? this.hero.left : at.left);
-      } });
+      }) });
     }
     standing.sort((a, b) => a.y - b.y).forEach((s2) => s2.draw());
     // A south wall stands in front of the room: its cap goes over anyone right up against it (feet, rings and all).

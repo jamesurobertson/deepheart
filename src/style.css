@@ -75,18 +75,11 @@ body.blade-on, body.blade-on * { cursor: none !important; }
   55% { transform: translate(-50%, -100%) translate(4px, 30px) rotate(55deg); }
   100% { transform: translate(-50%, -100%) translate(10px, 26px) rotate(-40deg); }
 }
-.click-ring {
-  position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; pointer-events: none;
-  border: 3px solid rgba(255, 244, 220, 0.9); box-shadow: 0 0 0 2px rgba(11, 7, 16, 0.5);
-  animation: clickring 0.28s ease-out forwards;
-}
-.click-ring.crit { border-color: var(--gold-hi); width: 22px; height: 22px; margin: -11px 0 0 -11px; animation-duration: 0.4s; }
-@keyframes clickring { 0% { transform: scale(0.4) rotate(45deg); opacity: 1; } 100% { transform: scale(2.2) rotate(45deg); opacity: 0; } }
 
 #stage, #ui { position: fixed; inset: 0; }
 #stage canvas { display: block; }
 #ui { pointer-events: none; }
-#ui button, #ui .pnl, #ui .shop, #ui input, #ui textarea, #ui .modal-wrap { pointer-events: auto; }
+#ui button, #ui .pnl, #ui .shop, #ui input, #ui textarea, #ui .modal-wrap, #ui .ab { pointer-events: auto; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
 .px { display: inline-block; flex: none; image-rendering: pixelated; }
@@ -308,6 +301,8 @@ body.phone .fever-face .icon { zoom: 0.6; }
 }
 .hint b { display: block; transform: translateX(-50%); white-space: nowrap; animation: hintbob 0.9s ease-in-out infinite; padding: 8px 12px; background: rgba(12, 6, 10, 0.75); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--gold); }
 .hint b small { display: block; margin-top: 4px; font: 400 14px/1 var(--f-text); color: var(--dim); text-align: center; }
+/* A trait square named in a hint: the gold square it points at, so the two read as one thing. */
+.hint-trait { display: inline-grid; place-items: center; width: 24px; height: 22px; margin: -4px 2px; vertical-align: middle; border: 3px solid transparent; border-image: var(--f-gold) 2 fill / 3px stretch; font: 400 17px/1 'Jersey 10'; color: var(--gold-hi); text-shadow: none; }
 .hint b::before { content: ''; position: absolute; left: 50%; top: -10px; margin-left: -8px; border: 8px solid transparent; border-top: 0; border-bottom: 10px solid var(--gold); }
 /* Bobs over your hero's head while the hero tip is up. */
 .hero-mark { position: fixed; left: 0; top: 0; z-index: 26; margin: -26px 0 0 -7px; pointer-events: none; font: 400 26px/1 'Jersey 10'; color: var(--gold-hi); text-shadow: var(--outline), 0 0 10px rgba(255, 210, 100, 0.9); animation: markbob 0.7s ease-in-out infinite; }
@@ -407,7 +402,9 @@ body.phone .vp-face { width: 76px; min-height: 80px; }
 .ticker span.in { animation: tickerin 11s both; }
 body.ui-hidden .ticker { left: 180px; right: 180px; text-align: center; }
 
-.pops { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+/* Numbers and health bars stay on the battlefield: a monster still coming up the stairs under the party panel
+   doesn't show through it. */
+.pops { position: fixed; left: 0; top: 0; width: var(--free-w, 100%); height: var(--free-h, 100%); pointer-events: none; overflow: hidden; }
 .pop {
   position: absolute; transform: translate(-50%, -50%); white-space: nowrap;
   font: 400 30px/1 'Jersey 10'; color: #fff; letter-spacing: 0.5px;
@@ -429,7 +426,7 @@ body.ui-hidden .ticker { left: 180px; right: 180px; text-align: center; }
 @keyframes coinspin { 50% { transform: scaleX(0.15); } }
 
 /* Over the damage numbers, so a monster's health still reads under a flurry of hits. */
-.bars { position: fixed; inset: 0; pointer-events: none; z-index: 1; }
+.bars { position: fixed; left: 0; top: 0; width: var(--free-w, 100%); height: var(--free-h, 100%); pointer-events: none; overflow: hidden; z-index: 1; }
 .hp { position: absolute; left: -22px; top: 0; width: 44px; height: 6px; background: #1a0c0e; box-shadow: 0 0 0 2px var(--ink); }
 .hp i { display: block; height: 100%; }
 .hp.boss { left: -75px; width: 150px; height: 12px; box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px rgba(255, 220, 200, 0.35), 0 3px 10px rgba(0, 0, 0, 0.6); }
@@ -445,13 +442,12 @@ body.ui-hidden .abilities { right: 0; }
 .ui-back span { font: 400 18px/1 'Jersey 10'; color: #fff; letter-spacing: 0.5px; }
 .ui-back:hover { filter: brightness(1.15); }
 @media (prefers-reduced-motion: reduce) { .ui-back kbd { animation: none; } }
-.dock-b { position: relative; flex-direction: column; min-width: 76px; height: 64px; gap: 4px; padding: 4px 6px; font-size: 14px; }
+/* Labels pinned to the bottom, so they line up however tall the icon above (the Keep's door and stairs are sprites). */
+.dock-b { position: relative; flex-direction: column; justify-content: flex-end; min-width: 76px; height: 74px; gap: 4px; padding: 4px 6px 8px; font-size: 14px; }
 /* Drawn at 3× (see the dock in ui.ts): a box that isn't a whole multiple of the pixel grid makes uneven pixels. */
 .dock-b .glyph { color: var(--gold); }
 .dock-b .glyph.g-soul { color: var(--soul); }
 /* Shows a number rather than opening anything. */
-.dock-b.dock-stat { cursor: default; }
-.dock-b.dock-stat span { color: var(--gold-hi); }
 .badge {
   position: absolute; top: -14px; right: -8px; display: inline-flex; align-items: center; gap: 3px;
   font: 400 19px/1 'Jersey 10'; font-style: normal; padding: 2px 6px 3px;
@@ -560,18 +556,33 @@ body.ui-hidden .abilities { right: 0; }
 }
 .ab { position: relative; width: 52px; height: 52px; display: grid; place-items: center; padding: 0; flex: none; border: 6px solid transparent; border-image: var(--f-cell) 2 fill / 6px stretch; }
 .ab .px, .ab .icon { position: relative; }
-.ab[data-gap] { margin-top: 12px; }
-body.phone .ab[data-gap] { margin-top: 0; margin-left: 12px; }
+.ab[data-gap] { margin-top: 20px; }
+body.phone .ab[data-gap] { margin-top: 0; margin-left: 14px; }
 .ab-fill { position: absolute; inset: 0; background: conic-gradient(rgba(6, 3, 5, 0.78) var(--cd, 0%), transparent 0); pointer-events: none; }
 .ab-time { position: absolute; right: -8px; bottom: -8px; padding: 1px 3px 0; background: #140e18; font: 400 15px/1 'Jersey 10'; color: var(--text); box-shadow: 0 0 0 2px var(--ink); }
 .ab-time:empty { display: none; }
 .ab-lock { position: absolute; inset: 0; display: none; place-items: center; background: rgba(6, 3, 5, 0.6); color: var(--faint); }
 .ab.locked .ab-lock { display: grid; }
 .ab.locked .px, .ab.locked .icon { filter: brightness(0) drop-shadow(0 0 1px rgba(180, 140, 255, 0.5)); }
-.ab.passive { border-image-source: var(--f-panel); }
-.ab.passive::after { content: ''; position: absolute; left: -6px; right: -6px; bottom: -6px; height: 3px; background: var(--soul); }
-.ab.ready { border-image-source: var(--f-gold); box-shadow: 0 0 6px rgba(242, 193, 78, 0.4); }
+/* Always-on skills: flat inset tiles, not buttons, under a rule. */
+.ab.always { border: 2px solid #2a2024; border-image: none; background: rgba(6, 3, 5, 0.45); width: 48px; height: 48px; }
+.ab.always .ab-time { color: var(--gold-hi); }
+/* Centered in the gap above: the column's 6px gap plus the 20px margin, measured from inside the 2px border. */
+.ab.always[data-gap]::before { content: ''; position: absolute; top: -16px; left: 2px; right: 2px; height: 2px; background: #3b2e31; }
+body.phone .ab.always { width: 40px; height: 40px; }
+body.phone .ab.always[data-gap]::before { top: 2px; bottom: 2px; left: -13px; right: auto; width: 2px; height: auto; }
+.ab.ready { border-image-source: var(--f-gold); box-shadow: 0 0 6px rgba(242, 193, 78, 0.4); overflow: hidden; }
+/* Ready again: one light sweeps across it as it comes back. */
+.ab.ready::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(115deg, transparent 35%, rgba(255, 250, 225, 0.7) 50%, transparent 65%) no-repeat;
+  background-size: 300% 100%; background-position: 100% 0; animation: ab-ready 0.7s ease-out forwards; }
+@keyframes ab-ready { to { background-position: 0% 0; } }
+@media (prefers-reduced-motion: reduce) { .ab.ready::before { display: none; } }
 .ab.active { border-image-source: var(--f-gold); }
+/* Cooling down or running: the icon dims while cooling, and a bar along the bottom shows how far along it is. */
+.ab.cooling .px, .ab.cooling .icon { filter: grayscale(0.85) brightness(0.55); }
+.ab.cooling .ab-fill, .ab.active .ab-fill { background: none; }
+.ab.cooling .ab-fill::after, .ab.active .ab-fill::after { content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: calc(100% - var(--cd, 0%)); background: #8a7a70; }
+.ab.active .ab-fill::after { background: var(--gold-hi); }
 .ab.active .ab-time { color: var(--gold-hi); }
 /* Rampage charging: the button fills from the bottom up, inside its frame (the corners carry the key and the %). */
 .ab.charging .ab-fill { background: linear-gradient(to top, rgba(255, 84, 112, 0.45) var(--cd, 0%), transparent 0); }
@@ -581,6 +592,8 @@ body.phone .ab[data-gap] { margin-top: 0; margin-left: 12px; }
 .ab:not(.ready) { cursor: default; }
 body.compact:not(.phone) .abilities { width: 56px; gap: 4px; padding: 8px 0; }
 body.compact:not(.phone) .ab { width: 46px; height: 46px; }
+body.compact:not(.phone) .ab.always { width: 42px; height: 42px; }
+body.compact:not(.phone) .ab.always[data-gap]::before { top: -15px; }
 /* Phones: a row along the bottom of the fight, above the party sheet. */
 body.phone .abilities { bottom: auto; right: auto; left: calc(6px + var(--safe-l)); width: auto; height: auto; top: calc(var(--free-h) - 56px); flex-direction: row; padding: 0; background: none; }
 body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
@@ -614,7 +627,10 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 
 /* ---------- tooltip ---------- */
 
-.tip { position: fixed; left: 0; top: 0; z-index: 30; width: 300px; pointer-events: none !important; padding: 8px 12px 10px; background: none; }
+/* As wide as its words, up to 300px (a two-word tip shouldn't sit in a box built for a paragraph). */
+.tip { position: fixed; left: 0; top: 0; z-index: 30; width: max-content; max-width: 300px; pointer-events: none !important; padding: 8px 12px 10px; background: none; }
+.px-stack { display: inline-flex; flex-direction: column; }
+.px-row { display: inline-flex; align-items: flex-end; }
 .tt-h { display: flex; align-items: center; gap: 8px; }
 .tt-h b { font: 700 18px/1.1 var(--f-text); color: var(--gold-hi); text-shadow: var(--shadow); flex: 1; }
 .tt-own { font: 400 11px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; }
@@ -939,10 +955,8 @@ body.compact .buff small { font-size: 14px; }
 
 /* Buttons: an icon row. Top-right on portrait phones, bottom-left otherwise. */
 body.compact .dock { left: calc(8px + var(--safe-l)); bottom: calc(8px + var(--safe-b)); gap: 4px; }
-body.compact .dock-b { min-width: 0; width: 42px; height: 42px; padding: 0; }
+body.compact .dock-b { min-width: 0; width: 42px; height: 42px; padding: 0; justify-content: center; }
 body.compact .dock-b span { display: none; }
-body.compact .dock-b.dock-stat { width: auto; min-width: 42px; flex-direction: column; gap: 1px; padding: 2px 4px; }
-body.compact .dock-b.dock-stat span { display: block; font-size: 10px; line-height: 1; }
 body.compact .dock .mute { display: none; }
 body.compact .badge { top: -10px; right: -12px; font-size: 15px; padding: 1px 4px; }
 
@@ -1361,14 +1375,15 @@ body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticke
 body.in-keep #stage { visibility: hidden; }
 
 /* Up in the Keep there's no fight: the floor, skills, Rampage and damage lines step aside. */
-body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .abilities, body.in-keep .fever, body.in-keep .buffs, body.in-keep .bars, body.in-keep .blade-rate { display: none !important; }
+body.in-keep .floor, body.in-keep .zone-map, body.in-keep .rate, body.in-keep .abilities, body.in-keep .fever, body.in-keep .buffs, body.in-keep .bars { display: none !important; }
 /* Clipped to the open floor, so a name never draws over the party panel or the ability column. */
 .keep-labels { position: fixed; left: 0; top: 0; width: var(--free-w, 100%); height: var(--free-h, 100%); overflow: hidden; z-index: 4; pointer-events: none; }
 body.card-up .keep-labels { visibility: hidden; }
 .keep-label { position: absolute; left: 0; top: 0; display: grid; justify-items: center; gap: 2px; translate: -50% -100%; padding: 0; background: none; border: 0; cursor: pointer; pointer-events: auto; }
 .keep-label[hidden] { display: none; }
 .keep-label b { padding: 4px 8px; font: 400 21px/1 'Jersey 10'; color: var(--gold-hi); background: rgba(20, 12, 14, 0.82); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #946a26; }
-.keep-label i { font-style: normal; font-size: 12px; color: var(--gold-hi); text-shadow: var(--outline); animation: hintbob 0.9s ease-in-out infinite; }
+.keep-label b small { display: block; margin-top: 4px; font: 400 14px/1 var(--f-text); color: var(--dim); }
+.keep-label i { position: relative; left: var(--arrow-x, 0); font-style: normal; font-size: 12px; color: var(--gold-hi); text-shadow: var(--outline); animation: hintbob 0.9s ease-in-out infinite; }
 .keep-label:hover b, .keep-label.hover b { color: #fff; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--gold-hi); }
 .keep-label.soul b { color: #e2d2ff; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--soul), 0 0 14px rgba(179, 140, 255, 0.5); }
 .keep-label.soul i { color: #e2d2ff; }

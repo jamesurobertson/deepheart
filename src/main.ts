@@ -51,7 +51,7 @@ const PLAYTEST = location.pathname.startsWith('/dev-deepheart/');
 // time (the pacing bot plays it out, a few seconds); &fresh builds it again.
 const SIM_FLOOR = import.meta.env.DEV ? Number(params.get('sim')) || 0 : 0;
 // ?quick (dev only): its own save, with a Next floor button (or N) that wins the floor
-// you're on for everything it'd pay; &fresh starts it over.
+// you're on for everything it'd pay, and a +10 one (or Shift+N); &fresh starts it over.
 const QUICK = import.meta.env.DEV && params.has('quick');
 // ?timeaway=100&floor=50 (dev only): your own save comes back from 100 hours away on floor 50 (or the floor you're on;
 // never past your deepest), and keeps it: every refresh pays another 100 hours.
@@ -322,14 +322,21 @@ async function boot() {
     const next = (floors: number) => {
       for (let k = 0; k < floors && !scene.busy; k++) game.devClearFloor();
     };
-    const button = document.createElement('button');
-    button.textContent = 'Next floor ▸ (N)';
-    button.title = 'Win this floor for everything it pays. Shift: 10 floors.';
     const look = 'padding:6px 10px;font:14px Silkscreen,monospace;background:#2a1d14;color:#ffd27a;border:2px solid #7a5a2a;border-radius:4px;cursor:pointer';
-    button.style.cssText = `position:fixed;left:12px;top:132px;z-index:50;${look}`;
-    button.addEventListener('pointerdown', (e) => e.stopPropagation());
-    button.addEventListener('click', (e) => next(e.shiftKey ? 10 : 1));
-    document.body.appendChild(button);
+    const nexts = document.createElement('div');
+    nexts.style.cssText = 'position:fixed;left:12px;top:132px;z-index:50;display:flex;gap:4px';
+    const nextButton = (label: string, title: string, floors: number) => {
+      const button = document.createElement('button');
+      button.textContent = label;
+      button.title = title;
+      button.style.cssText = look;
+      button.addEventListener('pointerdown', (e) => e.stopPropagation());
+      button.addEventListener('click', (e) => next(e.shiftKey ? 10 : floors));
+      nexts.appendChild(button);
+    };
+    nextButton('Next floor ▸ (N)', 'Win this floor for everything it pays. Shift: 10 floors.', 1);
+    nextButton('+10 ▸▸', 'Win the next 10 floors (Shift+N)', 10);
+    document.body.appendChild(nexts);
     const SKIP_HOURS = [1, 2, 3, 8, 24];
     const skip = (hours: number) => {
       if (game.s.inKeep || scene.busy) return;
