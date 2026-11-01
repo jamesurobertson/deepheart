@@ -81,10 +81,12 @@ const HEART_TIME = 1.6;
  *  can walk through) the cells of its body that a click picks it by. */
 type Station = { id: KeepStation; label: string; cells: [number, number][]; tag: [number, number]; body?: [number, number][] };
 const STATIONS: Station[] = [
-  ...PEOPLE.map(({ id, x, y }): Station => ({ id, label: id === 'dan' ? 'Dan' : 'Victor', cells: [[x - 1, y], [x, y + 1], [x + 1, y], [x, y - 1]], tag: [x, y + 1.55], body: [[x, y], [x, y - 1]] })),
+  // (Written out, not mapped from PEOPLE: a call here would keep the Keep, names and all, in the demo's bundle.)
+  { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 19.55], body: [[3, 18], [3, 17]] },
+  { id: 'victor', label: 'Victor', cells: [[2, 20], [3, 21], [4, 20], [3, 19]], tag: [3, 21.55], body: [[3, 20], [3, 19]] },
   // The way down works from anywhere round the stairs, not just on them.
   { id: 'stairs', label: 'The Dungeon', cells: Array.from({ length: STAIRS.steps + 1 }, (_, k) => STAIRS.x - 1 + k).flatMap((x) => [30, 31, 32, 33, 34].map((y): [number, number] => [x, y])), tag: [25, 35.1], body: STAIR_CELLS },
-  { id: 'koko', label: 'Koko', cells: [[-1, -1], [0, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]].map(([dx, dy]): [number, number] => [KOKO[0] + dx, KOKO[1] + dy]), tag: [KOKO[0], KOKO[1] + 1.55], body: [KOKO, [KOKO[0], KOKO[1] - 1]] },
+  { id: 'koko', label: 'Koko', cells: [[2, 21], [3, 21], [2, 22], [4, 22], [2, 23], [3, 23], [4, 23]], tag: [KOKO[0], KOKO[1] + 1.55], body: [KOKO, [KOKO[0], KOKO[1] - 1]] },
   { id: 'heart', label: 'The Heart', cells: [[6, 5], [7, 5], [8, 5], [6, 4], [8, 4]], tag: [7, 6.1], body: [[7, 4], [7, 3]] },
 ];
 const TRIPS: Station = { id: 'trips', label: 'Expeditions', cells: [[27, 27], [26, 27], [28, 27], [27, 28], [26, 28], [28, 28]], tag: [27, 28.55], body: [[27, 27]] };
