@@ -1,5 +1,4 @@
 import type { AbilityId } from '../game/data.ts';
-import { spriteFit } from './px.ts';
 
 /** The skill icons: 9×9 pixel art (one letter per color, '.' empty), drawn with a dark outline around it. */
 const INK = '#1a0f0c';
@@ -12,7 +11,8 @@ const PALETTES: Record<string, Record<string, string>> = {
   chest: { a: '#6a3e1e', b: '#b07040', c: '#f2c14e', e: '#fff2a8' },
   drum: { a: '#c8432a', b: '#f4e0c0', c: '#9a5f30', d: '#f2c14e' },
 };
-const ART: Record<Exclude<AbilityId, 'crit'>, [string, string[]]> = {
+const ART: Record<AbilityId, [string, string[]]> = {
+  crit: ['teal', ['....a....', '..aaaaa..', '.a..a..a.', '.a.....a.', 'aaa.c.aaa', '.a.....a.', '.a..a..a.', '..aaaaa..', '....a....']],
   rampage: ['flame', ['....a....', '...aa....', '...aaa...', '..aabaa..', '.aabbba..', '.abbcbba.', '.abcccba.', '..abcba..', '...aaa...']],
   blade: ['purple', ['.......bb', '......bab', '.....bab.', '....bab..', '.c.bab...', '..cab....', '..cc.....', '.c..c....', 'c........']],
   // Two Phantom Blades crossed, the one behind a shade darker.
@@ -25,17 +25,13 @@ const ART: Record<Exclude<AbilityId, 'crit'>, [string, string[]]> = {
 };
 
 const drawn = new Map<string, string>();
-/** Skills drawn with a sprite from the sheet instead (the same as its trophies). */
-const SPRITE_SKILLS: Partial<Record<AbilityId, string>> = { crit: 'weapon_katana' };
 
 /** A skill's icon as crisp SVG, `size` pixels square (22 is 2×, 33 is 3×). */
 export function skillIcon(id: AbilityId, size = 22, cls = ''): string {
-  const sprite = SPRITE_SKILLS[id];
-  if (sprite) return spriteFit(sprite, size, `icon ${cls}`);
   const key = `${id}|${size}|${cls}`;
   const hit = drawn.get(key);
   if (hit) return hit;
-  const [palette, rows] = ART[id as keyof typeof ART];
+  const [palette, rows] = ART[id];
   const colors = PALETTES[palette];
   const w = Math.max(...rows.map((row) => row.length));
   const ox = 1 + Math.floor((9 - w) / 2), oy = 1 + Math.floor((9 - rows.length) / 2);

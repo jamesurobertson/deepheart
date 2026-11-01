@@ -871,7 +871,7 @@ function buildTrophies(): TrophyDef[] {
   tiers('clicks', [[100, 'Tap Tap'], [10_000, 'Clicker'], [100_000, 'Still Clicking'], [1e6, 'Carpal Tunnel']],
     (n) => `Attack ${count(n)} times.`, 'weapon_knife', (n) => ({ t: 'clicks', n }));
   tiers('crit', [[1, 'Critical!'], [10_000, 'Sharp Eye'], [100_000, 'Surgeon'], [1e6, 'Critical Condition']],
-    (n) => `Land ${count(n)} critical ${plural(n, 'hit')}.`, 'weapon_katana', (n) => ({ t: 'crits', n }));
+    (n) => `Land ${count(n)} critical ${plural(n, 'hit')}.`, 'skill:crit', (n) => ({ t: 'crits', n }));
   tiers('fev', [[1, 'Rampage!'], [100, 'Berserker'], [1000, 'Anger Issues']],
     (n) => `Go on a Rampage ${times(n)}.`, 'flask_big_red', (n) => ({ t: 'fevers', n }));
   out.push({ id: 'rampage0', name: 'Bloodrush', desc: 'Keep clicking until a Rampage reaches its top tier.', icon: { sprite: 'flask_big_red', tier: 1 }, req: { t: 'rampage', n: 1 } });
