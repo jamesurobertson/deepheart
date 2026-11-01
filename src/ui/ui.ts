@@ -1370,15 +1370,17 @@ export class Ui {
   }
 
   /** A pop element, new or the oldest one recycled (stopping any arc it was flying). */
-  private takePop() {
-    // (No cap on numbers, except on low graphics.)
-    const el = this.scene.quality === 'low' && this.pops.length >= MAX_POPS_LOW ? this.pops.shift()! : document.createElement('div');
-    el.getAnimations().forEach((a) => a.cancel());
-    return el;
+  /** A new number, or (a damage number) none on low graphics once MAX_POPS_LOW are up: a number that shows always
+   *  finishes its flight. (Making room used to take the oldest off mid-air, and auto graphics drops to low under load.)
+   *  Gold, pickups and the like always show. */
+  private takePop(kind: string) {
+    const damage = !/p-(gold|pick|champ|floor)/.test(kind);
+    return damage && this.scene.quality === 'low' && this.pops.length >= MAX_POPS_LOW ? null : document.createElement('div');
   }
 
   private pop(x: number, y: number, text: string, kind: string) {
-    const el = this.takePop();
+    const el = this.takePop(kind);
+    if (!el) return;
     el.className = `pop ${kind}`;
     el.textContent = text;
     el.style.left = `${x + (kind === 'p-dps' ? 0 : (Math.random() - 0.5) * 20)}px`;
@@ -1396,7 +1398,8 @@ export class Ui {
   /** A number thrown out of a monster in a high arc (up, over and down past where it started), toward `dir` (±1). The
    *  `k`-th number of a streak lands a little further out than the one before, so a fast streak fans out. */
   private arcPop(x: number, y: number, text: string, kind: string, dir: number, k: number) {
-    const el = this.takePop();
+    const el = this.takePop(kind);
+    if (!el) return;
     el.className = `pop ${kind} p-arc`;
     el.textContent = text;
     el.style.left = `${x}px`;
