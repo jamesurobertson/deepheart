@@ -31,7 +31,6 @@ const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: '
 const setText = (el: Element, text: string) => {
   if (el.textContent !== text) el.textContent = text;
 };
-const MAX_POPS = 90;
 const MAX_POPS_LOW = 30;
 const GRAPHICS_NAME = { auto: 'Auto', high: 'High', low: 'Low' } as const;
 /** Hits on one monster less than this many seconds apart are a streak; from the ARC_FROM-th hit of a streak on, its
@@ -258,6 +257,7 @@ export class Ui {
   private tipKey: string | null = null;
   private tipAnchor: HTMLElement | null = null;
   private pops: HTMLElement[] = [];
+
   /** Per monster: when it was last hit and how many hits its streak has run to. */
   private streaks = new Map<number, { at: number; n: number }>();
   private bars = new Map<number, HTMLElement>();
@@ -1371,7 +1371,8 @@ export class Ui {
 
   /** A pop element, new or the oldest one recycled (stopping any arc it was flying). */
   private takePop() {
-    const el = this.pops.length >= (this.scene.quality === 'low' ? MAX_POPS_LOW : MAX_POPS) ? this.pops.shift()! : document.createElement('div');
+    // (No cap on numbers, except on low graphics.)
+    const el = this.scene.quality === 'low' && this.pops.length >= MAX_POPS_LOW ? this.pops.shift()! : document.createElement('div');
     el.getAnimations().forEach((a) => a.cancel());
     return el;
   }

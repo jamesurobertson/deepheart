@@ -339,6 +339,8 @@ async function boot() {
     const skip = (hours: number) => {
       if (game.s.inKeep || scene.busy) return;
       const o = game.devSkipTime(hours * 3600);
+      // (For testing: Rampage charged after every skip.)
+      if (game.abilityUnlocked('rampage') && !game.s.buffs.some((b) => b.id === 'fever')) game.s.fervor = 1;
       flushAway();
       ui.showOffline(o);
       save();

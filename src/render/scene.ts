@@ -2126,11 +2126,11 @@ export class Scene {
         const angle = Math.random() * Math.PI * 2;
         this.fx.swipe(at, color, size, angle);
         if (crit) {
-          // Crossed double cut and a moment of slow motion.
+          // Crossed double cut. (No slow motion: Flurry with War Drums crits several times a second, and back to back
+          // the pauses slowed everything to a crawl.)
           this.fx.swipe(at, color, size * 1.05, angle + Math.PI / 2, 0.2);
           this.fx.light(at, 0xffd070, 25, 0.25, 8);
           this.addShake(0.15);
-          this.hitstop = Math.max(this.hitstop, 0.05);
         }
         if (parts) this.bleed(v, at, crit ? 10 : 4, crit);
         this.react(v, crit ? 0.8 : 0.45);
