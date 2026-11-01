@@ -34,10 +34,10 @@ type Thing = [string, number, number, ('flat' | 'wall' | 'soul')?];
 const THINGS: Thing[] = [
   ['wall_banner_blue', 17, 1, 'soul'], ['wall_banner_blue', 20, 1, 'soul'], ['wall_banner_blue', 26, 1, 'soul'], ['wall_banner_blue', 29, 1, 'soul'],
   ...[15, 19, 27, 31].flatMap((x): Thing[] => [['column', x, 17], ['column', x, 22]]),
-  ...([[13, 'red'], [17, 'blue'], [28, 'blue'], [32, 'red']] as const).map(([x, c]): Thing => [`wall_banner_${c}`, x, 14, 'wall']),
-  ['wall_banner_green', 2, 15, 'wall'], ['wall_banner_green', 8, 15, 'wall'],
-  ['flask_big_red', 3, 20], ['flask_big_blue', 2, 21], ['flask_big_green', 4, 21],
-  ['chest_full_open', 8, 20],
+  // The Great Hall: two banners in soul purple.
+  ['wall_banner_blue', 17, 14, 'soul'], ['wall_banner_blue', 28, 14, 'soul'],
+  // Red either side of the door up to the Heart.
+  ['wall_banner_red', 2, 15, 'wall'], ['wall_banner_red', 8, 15, 'wall'],
   ['wall_banner_yellow', 38, 15, 'wall'], ['wall_banner_yellow', 42, 15, 'wall'],
   ['chest_full_open', 40, 19], ['chest_full_open', 37, 22], ['chest_full_open', 43, 22],
   ...[[39, 20], [41, 20], [40, 21], [38, 18], [42, 18], [39, 22], [41, 22]].map(([x, y]): Thing => ['coin', x, y, 'flat']),
@@ -69,9 +69,10 @@ const BOUND_AT: Record<BoundId, [number, number]> = {
   ogre: [2, 7], lich: [4, 7], pitlord: [2, 10], frost: [4, 10],
   troll: [10, 7], golem: [12, 7], thing: [10, 10], ent: [12, 10],
 };
-const PEOPLE: { id: 'dan' | 'victor'; sprite: string; x: number; y: number }[] = [{ id: 'dan', sprite: 'ef_elf_m', x: 3, y: 18 }, { id: 'victor', sprite: 'victor', x: 7, y: 18 }];
-/** Koko, the Keep's cat: sitting by the traders' chest, just below Victor. Walk up and pet her. */
-const KOKO: [number, number] = [6, 20];
+/** The traders, Victor two tiles below Dan, both facing into the room (right). */
+const PEOPLE: { id: 'dan' | 'victor'; sprite: string; x: number; y: number }[] = [{ id: 'dan', sprite: 'ef_elf_m', x: 3, y: 18 }, { id: 'victor', sprite: 'victor', x: 3, y: 20 }];
+/** Koko, the Keep's cat: sitting two tiles below Victor. Walk up and pet her. */
+const KOKO: [number, number] = [3, 22];
 const KOKO_HEART = ['xx.xx', 'xxxxx', '.xxx.', '..x..'];
 /** Seconds a pet lasts (her tail swishing), and how long the little heart floats up for. */
 const PET_TIME = 2.5;
@@ -80,11 +81,12 @@ const HEART_TIME = 1.6;
  *  can walk through) the cells of its body that a click picks it by. */
 type Station = { id: KeepStation; label: string; cells: [number, number][]; tag: [number, number]; body?: [number, number][] };
 const STATIONS: Station[] = [
+  // (Written out, not mapped from PEOPLE: a call here would keep the Keep, names and all, in the demo's bundle.)
   { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 19.55], body: [[3, 18], [3, 17]] },
-  { id: 'victor', label: 'Victor', cells: [[6, 18], [7, 19], [8, 18], [7, 17]], tag: [7, 19.55], body: [[7, 18], [7, 17]] },
+  { id: 'victor', label: 'Victor', cells: [[2, 20], [3, 21], [4, 20], [3, 19]], tag: [3, 21.55], body: [[3, 20], [3, 19]] },
   // The way down works from anywhere round the stairs, not just on them.
-  { id: 'stairs', label: 'Way down', cells: Array.from({ length: STAIRS.steps + 1 }, (_, k) => STAIRS.x - 1 + k).flatMap((x) => [30, 31, 32, 33, 34].map((y): [number, number] => [x, y])), tag: [25, 35.1], body: STAIR_CELLS },
-  { id: 'koko', label: 'Koko', cells: [[5, 19], [6, 19], [5, 20], [7, 20], [5, 21], [6, 21], [7, 21]], tag: [KOKO[0], KOKO[1] + 1.55], body: [KOKO, [KOKO[0], KOKO[1] - 1]] },
+  { id: 'stairs', label: 'The Dungeon', cells: Array.from({ length: STAIRS.steps + 1 }, (_, k) => STAIRS.x - 1 + k).flatMap((x) => [30, 31, 32, 33, 34].map((y): [number, number] => [x, y])), tag: [25, 35.1], body: STAIR_CELLS },
+  { id: 'koko', label: 'Koko', cells: [[2, 21], [3, 21], [2, 22], [4, 22], [2, 23], [3, 23], [4, 23]], tag: [KOKO[0], KOKO[1] + 1.55], body: [KOKO, [KOKO[0], KOKO[1] - 1]] },
   { id: 'heart', label: 'The Heart', cells: [[6, 5], [7, 5], [8, 5], [6, 4], [8, 4]], tag: [7, 6.1], body: [[7, 4], [7, 3]] },
 ];
 const TRIPS: Station = { id: 'trips', label: 'Expeditions', cells: [[27, 27], [26, 27], [28, 27], [27, 28], [26, 28], [28, 28]], tag: [27, 28.55], body: [[27, 27]] };
@@ -926,8 +928,14 @@ export class KeepView {
         g.fillStyle = color ?? KOKO_FUR;
         for (const [x, y] of tail) g.fillRect(px + x + ox, py + y + oy, 1, 1);
       };
+      // (Mirrored from her art: she faces right, the way Dan and Victor do.)
+      const wide = Math.max(...KOKO_ROWS.map((row) => row.length), ...KOKO_TAIL.map(([x]) => x + 1));
+      g.save();
+      g.translate(px * 2 + wide, 0);
+      g.scale(-1, 1);
       if (this.hover === 'koko' && !this.held) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) body('#fff4d6', dx, dy);
       body(null, 0, 0);
+      g.restore();
       g.fillStyle = '#ff5a7e';
       for (const heart of this.hearts) {
         const age = this.time - heart.at;
@@ -939,7 +947,7 @@ export class KeepView {
       const src = spriteFrames(p.sprite);
       if (!src) continue;
       const r = src.frames[tick % src.frames.length];
-      standing.push({ y: p.y + 1, draw: () => (shadow(p.x + 0.5, p.y + 1, 6), standLit(p.id, src.img, r, p.x + 0.5, p.y + 1, true)) });
+      standing.push({ y: p.y + 1, draw: () => (shadow(p.x + 0.5, p.y + 1, 6), standLit(p.id, src.img, r, p.x + 0.5, p.y + 1)) });
     }
     // Your party: each has a place along your trail (the hero at its head) and runs there along the trail itself, so
     // a new hero runs up the line to the front and the old one drops back into it, never through a wall.
