@@ -1694,7 +1694,7 @@ export class Ui {
     // The Keep opens with your first ascent; from then on it's a button away (and the way back down, while you're there).
     this.el.keepBtn.hidden = !g.legendsOpen() || g.inVault() || !!g.raid;
     // Up in the Keep it's the way back down: the dungeon's stairs tile instead of the Keep's door.
-    const keepText = DEMO ? '' : g.s.inKeep ? 'Way down' : 'The Keep';
+    const keepText = DEMO ? '' : g.s.inKeep ? 'The Dungeon' : 'The Keep';
     if (this.keepBtnText !== keepText) {
       this.keepBtnText = keepText;
       this.el.keepBtn.innerHTML = `${g.s.inKeep ? sprite('floor_stairs', 2) : keepDoor()}<span>${keepText}</span>`;
