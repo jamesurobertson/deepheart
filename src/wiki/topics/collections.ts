@@ -1,9 +1,10 @@
 import { CARDS, CORRUPTION, CURSORS, LEGENDS, TROPHIES, ZONES, type CardDef, type TrophyDef } from '../../game/data.ts';
-import { ABILITIES, COMPS } from '../../game/data.ts';
+import { ABILITIES, COMPS, type AbilityId } from '../../game/data.ts';
 import { AWAKEN_ON, CARD_ODDS, CHAMP_CHANCE, DAN_GIVES, EXPEDITION_LEVEL, FLOOR_KILLS, GOLD_SET_BONUS, SET_BONUS, TRIP_HOURS, VICTOR_GIVES } from '../../game/game.ts';
 import { esc, h2, link, pct, table, toc } from '../kit.ts';
 import { spr } from '../sprites.ts';
 import { kokoSvg } from '../../ui/koko.ts';
+import { skillIcon } from '../../ui/icons.ts';
 import type { Page } from '../pages.ts';
 
 const LAP_COLOR = ['#c9b8a0', ...CORRUPTION.slice(1).map((c) => `#${c.tint.toString(16).padStart(6, '0')}`)];
@@ -67,7 +68,7 @@ const trophiesBody = () => {
     ${toc('trophies', [...GROUPS.filter(([, kinds]) => trophies.some((t) => kinds.includes(t.req.t))).map(([g]) => g), 'Cursors'])}
     ${GROUPS.map(([group, kinds]) => {
       const list = trophies.filter((t) => listed(t) && kinds.includes(t.req.t));
-      return list.length ? `${h2(group)}${table(['Trophy', 'How'], list.map((t) => [`<span class="who">${t.icon.sprite === 'soul' ? SOUL : t.icon.sprite === 'koko' ? kokoSvg(22) : spr(t.icon.sprite, 22)}<b>${esc(t.name)}</b></span>`, esc(t.desc)]))}` : '';
+      return list.length ? `${h2(group)}${table(['Trophy', 'How'], list.map((t) => [`<span class="who">${t.icon.sprite === 'soul' ? SOUL : t.icon.sprite === 'koko' ? kokoSvg(22) : t.icon.sprite.startsWith('skill:') ? skillIcon(t.icon.sprite.slice(6) as AbilityId, 22) : spr(t.icon.sprite, 22)}<b>${esc(t.name)}</b></span>`, esc(t.desc)]))}` : '';
     }).join('')}
     ${h2('Cursors')}
     <p>Cursor skins, picked in Options.</p>
