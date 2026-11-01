@@ -1,16 +1,5 @@
 import * as THREE from 'three';
 
-interface Particle {
-  mesh: THREE.InstancedMesh;
-  vel: Float32Array;
-  pos: Float32Array;
-  life: number;
-  size: number;
-  gravity: number;
-  /** Where they come to rest (the room's floor; none for ones that start below it, down the stairwell). */
-  floor: number;
-}
-
 interface Beam {
   group: THREE.Group;
   life: number;
@@ -468,13 +457,102 @@ function shaftTexture() {
   return shaftTex;
 }
 
+/** Every spark, chip and ember in one pool, drawn in one call: a burst used to be a mesh (and a material) of its own, and
+ *  with skills stacked there were hundreds of them at once. When it's full the oldest go first. */
+const SPARKS = 4096;
+class Sparks {
+  readonly mesh: THREE.InstancedMesh;
+  private pos = new Float32Array(SPARKS * 3);
+  private vel = new Float32Array(SPARKS * 3);
+  private life = new Float32Array(SPARKS);
+  private size = new Float32Array(SPARKS);
+  private gravity = new Float32Array(SPARKS);
+  private floor = new Float32Array(SPARKS);
+  private alpha: THREE.InstancedBufferAttribute;
+  private next = 0;
+  /** One past the last slot in use, so the update stops there. */
+  private top = 0;
+
+  constructor(scene: THREE.Scene) {
+    const material = new THREE.MeshBasicMaterial({ transparent: true });
+    // (Each spark fades on its own: an alpha per instance, as the old per-burst materials faded theirs.)
+    material.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float sparkAlpha;\nvarying float vSparkAlpha;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSparkAlpha = sparkAlpha;');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vSparkAlpha;')
+        .replace('#include <alphamap_fragment>', '#include <alphamap_fragment>\ndiffuseColor.a *= vSparkAlpha;');
+    };
+    this.mesh = new THREE.InstancedMesh(CUBE, material, SPARKS);
+    this.alpha = new THREE.InstancedBufferAttribute(new Float32Array(SPARKS), 1);
+    this.mesh.geometry = CUBE.clone();
+    this.mesh.geometry.setAttribute('sparkAlpha', this.alpha);
+    this.mesh.setColorAt(0, new THREE.Color());
+    this.mesh.count = 0;
+    this.mesh.frustumCulled = false;
+    scene.add(this.mesh);
+  }
+
+  add(at: THREE.Vector3, vx: number, vy: number, vz: number, size: number, gravity: number, color: THREE.Color) {
+    const i = this.next;
+    this.next = (this.next + 1) % SPARKS;
+    this.top = Math.max(this.top, i + 1);
+    this.pos.set([at.x, at.y, at.z], i * 3);
+    this.vel.set([vx, vy, vz], i * 3);
+    this.life[i] = 1;
+    this.size[i] = size;
+    this.gravity[i] = gravity;
+    // (Ones that start below the room's floor, down the stairwell, fall or rise freely.)
+    this.floor[i] = at.y < 0 ? -Infinity : 0.05;
+    this.mesh.setColorAt(i, color);
+    this.mesh.instanceColor!.needsUpdate = true;
+  }
+
+  clear() {
+    this.life.fill(0);
+  }
+
+  update(dt: number) {
+    let live = 0;
+    for (let i = 0; i < this.top; i++) {
+      if (this.life[i] <= 0) {
+        if (this.size[i]) {
+          this.size[i] = 0;
+          dummy.scale.setScalar(0);
+          dummy.updateMatrix();
+          this.mesh.setMatrixAt(i, dummy.matrix);
+        }
+        continue;
+      }
+      live = i + 1;
+      const o = i * 3;
+      this.life[i] -= dt * 1.5;
+      this.vel[o + 1] -= this.gravity[i] * dt;
+      this.pos[o] += this.vel[o] * dt;
+      this.pos[o + 1] += this.vel[o + 1] * dt;
+      this.pos[o + 2] += this.vel[o + 2] * dt;
+      if (this.pos[o + 1] < this.floor[i]) {
+        this.pos[o + 1] = this.floor[i];
+        this.vel[o + 1] *= -0.3;
+        this.vel[o] *= 0.6;
+      }
+      dummy.position.set(this.pos[o], this.pos[o + 1], this.pos[o + 2]);
+      dummy.scale.setScalar(this.size[i] * Math.max(0.2, this.life[i]));
+      dummy.updateMatrix();
+      this.mesh.setMatrixAt(i, dummy.matrix);
+      this.alpha.array[i] = Math.max(0, Math.min(1, this.life[i] * 1.6));
+    }
+    this.top = live;
+    this.mesh.count = live;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.alpha.needsUpdate = true;
+  }
+}
+
 export class Fx {
-  /** Particles per burst, as a share of the full count (lower on low graphics). */
-  scale = 1;
   /** How deep the floor is at (x, z) (below 0 over an opening): blood lands there, or doesn't stain at all. */
   floorY: (x: number, z: number) => number = () => 0;
   private scene: THREE.Scene;
-  private parts: Particle[] = [];
+  private sparks: Sparks;
   private beams: Beam[] = [];
   private bolts: Bolt[] = [];
   private waves: Wave[] = [];
@@ -493,6 +571,7 @@ export class Fx {
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
+    this.sparks = new Sparks(scene);
     // A small pool of lights for impacts; reusing them avoids shader recompiles.
     for (let i = 0; i < 4; i++) {
       const light = new THREE.PointLight(0xffffff, 0, 9, 1.6);
@@ -604,7 +683,8 @@ export class Fx {
   /** Leaving the room for the stairwell: sparks, embers, cuts and flashes still in the air go out with it. (Falling loot
    *  and rune casts keep their landings.) */
   clearAir() {
-    for (const list of [this.parts, this.beams, this.bolts, this.waves, this.flashes, this.swipes, this.stars, this.shards, this.strikes, this.ghosts, this.chains]) {
+    this.sparks.clear();
+    for (const list of [this.beams, this.bolts, this.waves, this.flashes, this.swipes, this.stars, this.shards, this.strikes, this.ghosts, this.chains]) {
       for (const fx of list) fx.life = 0;
     }
   }
@@ -847,41 +927,23 @@ export class Fx {
 
   /** Square "pixel" debris, the way sprites shatter in pixel games. */
   burst(at: THREE.Vector3, color: THREE.ColorRepresentation, n = 14, speed = 3.2, size = 0.09, gravity = 12, glow = false) {
-    n = Math.max(1, Math.round(n * this.scale));
-    const mat = new THREE.MeshBasicMaterial({ color, transparent: true });
-    if (glow) (mat.color as THREE.Color).multiplyScalar(2.2);
-    const mesh = new THREE.InstancedMesh(CUBE, mat, n);
-    const pos = new Float32Array(n * 3);
-    const vel = new Float32Array(n * 3);
+    const c = new THREE.Color(color);
+    if (glow) c.multiplyScalar(2.2);
     for (let i = 0; i < n; i++) {
-      pos.set([at.x, at.y, at.z], i * 3);
       const a = Math.random() * Math.PI * 2;
       const up = 0.3 + Math.random() * 0.9;
       const s = speed * (0.35 + Math.random() * 0.65);
-      vel.set([Math.cos(a) * s * 0.8, up * s, Math.sin(a) * s * 0.35], i * 3);
+      this.sparks.add(at, Math.cos(a) * s * 0.8, up * s, Math.sin(a) * s * 0.35, size, gravity, c);
     }
-    mesh.frustumCulled = false;
-    this.scene.add(mesh);
-    this.parts.push({ mesh, vel, pos, life: 1, size, gravity, floor: at.y < 0 ? -Infinity : 0.05 });
   }
 
-  /** Embers drifting up off many spots at once, drawn as one batch: each starts at its own point, in one of `colors`. */
+  /** Embers drifting up off many spots at once: each starts at its own point, in one of `colors`. */
   embers(points: THREE.Vector3[], colors: string[], size = 0.07) {
-    const n = points.length;
-    if (!n) return;
-    const mesh = new THREE.InstancedMesh(CUBE, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.2, 2.2), transparent: true }), n);
-    const pos = new Float32Array(n * 3);
-    const vel = new Float32Array(n * 3);
     const c = new THREE.Color();
-    points.forEach((p, i) => {
-      pos.set([p.x, p.y, p.z], i * 3);
-      vel.set([(Math.random() - 0.5) * 0.8, 0.9 + Math.random() * 1.4, (Math.random() - 0.5) * 0.3], i * 3);
-      mesh.setColorAt(i, c.set(colors[Math.floor(Math.random() * colors.length)]));
-    });
-    mesh.instanceColor!.needsUpdate = true;
-    mesh.frustumCulled = false;
-    this.scene.add(mesh);
-    this.parts.push({ mesh, vel, pos, life: 1, size, gravity: -1.5, floor: points.some((p) => p.y < 0) ? -Infinity : 0.05 });
+    for (const p of points) {
+      c.set(colors[Math.floor(Math.random() * colors.length)]).multiplyScalar(2.2);
+      this.sparks.add(p, (Math.random() - 0.5) * 0.8, 0.9 + Math.random() * 1.4, (Math.random() - 0.5) * 0.3, size, -1.5, c);
+    }
   }
 
   /** A column of light over dropped loot; brighter and taller with rarity. */
@@ -1213,35 +1275,7 @@ export class Fx {
       }
     }
 
-    for (let i = this.parts.length - 1; i >= 0; i--) {
-      const p = this.parts[i];
-      p.life -= dt * 1.5;
-      const n = p.mesh.count;
-      for (let k = 0; k < n; k++) {
-        const o = k * 3;
-        p.vel[o + 1] -= p.gravity * dt;
-        p.pos[o] += p.vel[o] * dt;
-        p.pos[o + 1] += p.vel[o + 1] * dt;
-        p.pos[o + 2] += p.vel[o + 2] * dt;
-        if (p.pos[o + 1] < p.floor) {
-          p.pos[o + 1] = p.floor;
-          p.vel[o + 1] *= -0.3;
-          p.vel[o] *= 0.6;
-        }
-        dummy.position.set(p.pos[o], p.pos[o + 1], p.pos[o + 2]);
-        dummy.scale.setScalar(p.size * Math.max(0.2, p.life));
-        dummy.updateMatrix();
-        p.mesh.setMatrixAt(k, dummy.matrix);
-      }
-      p.mesh.instanceMatrix.needsUpdate = true;
-      (p.mesh.material as THREE.MeshBasicMaterial).opacity = Math.min(1, p.life * 1.6);
-      if (p.life <= 0) {
-        this.scene.remove(p.mesh);
-        (p.mesh.material as THREE.Material).dispose();
-        p.mesh.dispose();
-        this.parts.splice(i, 1);
-      }
-    }
+    this.sparks.update(dt);
 
     for (let i = this.beams.length - 1; i >= 0; i--) {
       const b = this.beams[i];

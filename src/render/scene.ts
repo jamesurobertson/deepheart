@@ -418,8 +418,6 @@ function bloodOf(sprite: string): string {
  * The chamber: an HD-2D dungeon room. Your companions hold the left side; monsters pour
  * up the stairs on the right and take their places to be clicked to pieces.
  */
-/** How much of the look a machine draws (see setQuality). */
-export type Quality = 'high' | 'medium' | 'low';
 
 export class Scene {
   readonly renderer: THREE.WebGLRenderer;
@@ -501,7 +499,6 @@ export class Scene {
   private look = LOOK.clone();
   private camBase = new THREE.Vector3();
   settings = { particles: true, calm: false, shake: true, blood: true, cinematics: true };
-  quality: Quality = 'high';
   /** Zone-change interlude: the party leaves, descends a spiral staircase, arrives somewhere new. */
   /** A pause (the loot card is up) before the staircase starts. */
   private hold: { zone: number; t: number } | null = null;
@@ -623,20 +620,6 @@ export class Scene {
     this.setBand(0);
     this.resize();
     addEventListener('resize', () => this.resize());
-  }
-
-  /** High is everything at up to 2× resolution; medium draws at 1×; low also turns off bloom, the tilt-shift blur and
-   *  two of the torches, and makes fewer particles. */
-  setQuality(q: Quality) {
-    if (q === this.quality) return;
-    this.quality = q;
-    const ratio = q === 'high' ? Math.min(devicePixelRatio, matchMedia('(pointer: coarse)').matches ? 1.5 : 2) : 1;
-    this.renderer.setPixelRatio(ratio);
-    this.composer.setPixelRatio(ratio);
-    for (const pass of [this.bloom, this.tiltH, this.tiltV]) pass.enabled = q !== 'low';
-    this.torchLights.forEach((light, i) => (light.visible = q !== 'low' || i < 2));
-    this.fx.scale = q === 'low' ? 0.4 : 1;
-    this.resize();
   }
 
   /** Space the UI covers on the right (desktop) or bottom (phone), so the fight centers in what's left. */
@@ -2126,11 +2109,11 @@ export class Scene {
         const angle = Math.random() * Math.PI * 2;
         this.fx.swipe(at, color, size, angle);
         if (crit) {
-          // Crossed double cut and a moment of slow motion.
+          // Crossed double cut. (No slow motion: Flurry with War Drums crits several times a second, and back to back
+          // the pauses slowed everything to a crawl.)
           this.fx.swipe(at, color, size * 1.05, angle + Math.PI / 2, 0.2);
           this.fx.light(at, 0xffd070, 25, 0.25, 8);
           this.addShake(0.15);
-          this.hitstop = Math.max(this.hitstop, 0.05);
         }
         if (parts) this.bleed(v, at, crit ? 10 : 4, crit);
         this.react(v, crit ? 0.8 : 0.45);

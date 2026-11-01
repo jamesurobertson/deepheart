@@ -31,9 +31,6 @@ const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: '
 const setText = (el: Element, text: string) => {
   if (el.textContent !== text) el.textContent = text;
 };
-const MAX_POPS = 90;
-const MAX_POPS_LOW = 30;
-const GRAPHICS_NAME = { auto: 'Auto', high: 'High', low: 'Low' } as const;
 /** Hits on one monster less than this many seconds apart are a streak; from the ARC_FROM-th hit of a streak on, its
  *  numbers arc out of the monster away from your hero, each landing a little further out, fanning into a rainbow. */
 const STREAK_GAP = 0.25;
@@ -258,6 +255,7 @@ export class Ui {
   private tipKey: string | null = null;
   private tipAnchor: HTMLElement | null = null;
   private pops: HTMLElement[] = [];
+
   /** Per monster: when it was last hit and how many hits its streak has run to. */
   private streaks = new Map<number, { at: number; n: number }>();
   private bars = new Map<number, HTMLElement>();
@@ -969,11 +967,6 @@ export class Ui {
         this.hooks.settings();
         this.renderModal();
         break;
-      case 'graphics':
-        s.graphics = s.graphics === 'auto' ? 'high' : s.graphics === 'high' ? 'low' : 'auto';
-        this.hooks.settings();
-        this.renderModal();
-        break;
       case 'notation':
         s.notation = s.notation === 'short' ? 'sci' : 'short';
         setNotation(s.notation);
@@ -1369,15 +1362,8 @@ export class Ui {
     return n;
   }
 
-  /** A pop element, new or the oldest one recycled (stopping any arc it was flying). */
-  private takePop() {
-    const el = this.pops.length >= (this.scene.quality === 'low' ? MAX_POPS_LOW : MAX_POPS) ? this.pops.shift()! : document.createElement('div');
-    el.getAnimations().forEach((a) => a.cancel());
-    return el;
-  }
-
   private pop(x: number, y: number, text: string, kind: string) {
-    const el = this.takePop();
+    const el = document.createElement('div');
     el.className = `pop ${kind}`;
     el.textContent = text;
     el.style.left = `${x + (kind === 'p-dps' ? 0 : (Math.random() - 0.5) * 20)}px`;
@@ -1395,7 +1381,7 @@ export class Ui {
   /** A number thrown out of a monster in a high arc (up, over and down past where it started), toward `dir` (±1). The
    *  `k`-th number of a streak lands a little further out than the one before, so a fast streak fans out. */
   private arcPop(x: number, y: number, text: string, kind: string, dir: number, k: number) {
-    const el = this.takePop();
+    const el = document.createElement('div');
     el.className = `pop ${kind} p-arc`;
     el.textContent = text;
     el.style.left = `${x}px`;
@@ -2597,8 +2583,7 @@ export class Ui {
           <label>Effects volume <input type="range" min="0" max="100" value="${Math.round(s.sfxVol * 100)}" data-set="sfxVol"></label>
           <label>Music volume <input type="range" min="0" max="100" value="${Math.round(s.musicVol * 100)}" data-set="musicVol"></label>
           <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('calm', s.calm, 'Reduce flashing')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
-          <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button>
-          <button class="btn toggle" data-act="graphics">Graphics: ${GRAPHICS_NAME[s.graphics]}</button></div>
+          <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button></div>
           <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
           <div class="cursors">${CURSORS.map((c) => {
             const open = this.cursorOpen(c.id);

@@ -1,5 +1,5 @@
 /** A dev-only corner readout (?fps): frames a second, the slowest frame gap, and how long each frame's work took. */
-export function fpsOverlay(quality: () => string) {
+export function fpsOverlay() {
   const el = document.createElement('div');
   el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:9999;padding:4px 8px;background:rgba(0,0,0,0.75);color:#8cf07e;font:12px/1.4 ui-monospace,monospace;pointer-events:none;white-space:pre';
   document.body.appendChild(el);
@@ -15,7 +15,7 @@ export function fpsOverlay(quality: () => string) {
     work += workMs;
     const span = t - from;
     if (span < 500) return;
-    el.textContent = `${Math.round((frames * 1000) / span)} fps · worst ${worst.toFixed(0)} ms\nwork ${(work / frames).toFixed(1)} ms · ${quality()}`;
+    el.textContent = `${Math.round((frames * 1000) / span)} fps · worst ${worst.toFixed(0)} ms\nwork ${(work / frames).toFixed(1)} ms`;
     frames = 0;
     work = 0;
     worst = 0;
