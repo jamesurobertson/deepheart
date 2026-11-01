@@ -549,8 +549,6 @@ class Sparks {
 }
 
 export class Fx {
-  /** Particles per burst, as a share of the full count (lower on low graphics). */
-  scale = 1;
   /** How deep the floor is at (x, z) (below 0 over an opening): blood lands there, or doesn't stain at all. */
   floorY: (x: number, z: number) => number = () => 0;
   private scene: THREE.Scene;
@@ -929,7 +927,6 @@ export class Fx {
 
   /** Square "pixel" debris, the way sprites shatter in pixel games. */
   burst(at: THREE.Vector3, color: THREE.ColorRepresentation, n = 14, speed = 3.2, size = 0.09, gravity = 12, glow = false) {
-    n = Math.max(1, Math.round(n * this.scale));
     const c = new THREE.Color(color);
     if (glow) c.multiplyScalar(2.2);
     for (let i = 0; i < n; i++) {

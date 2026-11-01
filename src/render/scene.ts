@@ -418,8 +418,6 @@ function bloodOf(sprite: string): string {
  * The chamber: an HD-2D dungeon room. Your companions hold the left side; monsters pour
  * up the stairs on the right and take their places to be clicked to pieces.
  */
-/** How much of the look a machine draws (see setQuality). */
-export type Quality = 'high' | 'medium' | 'low';
 
 export class Scene {
   readonly renderer: THREE.WebGLRenderer;
@@ -501,7 +499,6 @@ export class Scene {
   private look = LOOK.clone();
   private camBase = new THREE.Vector3();
   settings = { particles: true, calm: false, shake: true, blood: true, cinematics: true };
-  quality: Quality = 'high';
   /** Zone-change interlude: the party leaves, descends a spiral staircase, arrives somewhere new. */
   /** A pause (the loot card is up) before the staircase starts. */
   private hold: { zone: number; t: number } | null = null;
@@ -623,20 +620,6 @@ export class Scene {
     this.setBand(0);
     this.resize();
     addEventListener('resize', () => this.resize());
-  }
-
-  /** High is everything at up to 2× resolution; medium draws at 1×; low also turns off bloom, the tilt-shift blur and
-   *  two of the torches, and makes fewer particles. */
-  setQuality(q: Quality) {
-    if (q === this.quality) return;
-    this.quality = q;
-    const ratio = q === 'high' ? Math.min(devicePixelRatio, matchMedia('(pointer: coarse)').matches ? 1.5 : 2) : 1;
-    this.renderer.setPixelRatio(ratio);
-    this.composer.setPixelRatio(ratio);
-    for (const pass of [this.bloom, this.tiltH, this.tiltV]) pass.enabled = q !== 'low';
-    this.torchLights.forEach((light, i) => (light.visible = q !== 'low' || i < 2));
-    this.fx.scale = q === 'low' ? 0.4 : 1;
-    this.resize();
   }
 
   /** Space the UI covers on the right (desktop) or bottom (phone), so the fight centers in what's left. */

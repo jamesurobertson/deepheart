@@ -6,7 +6,7 @@ import './style.css';
 import Decimal from 'break_infinity.js';
 import { Game, TUNE, floorHp, newSave, SAVE_VERSION, type GameEvent, type SaveState } from './game/game.ts';
 import { Atlas } from './render/atlas.ts';
-import { FELL_HIT, Scene, type Quality } from './render/scene.ts';
+import { FELL_HIT, Scene } from './render/scene.ts';
 import { fpsOverlay } from './ui/fps.ts';
 import { Ui } from './ui/ui.ts';
 import { setAtlas } from './ui/px.ts';
@@ -114,8 +114,6 @@ async function boot() {
   const scene = new Scene(document.getElementById('stage')!, atlas);
   let resetting = false;
 
-  /** Auto graphics: high to start, a step down each time frames run long (never back up in a session). */
-  let autoQuality: Quality = 'high';
   const applySettings = () => {
     const s = game.s.settings;
     sfx.muted = s.muted;
@@ -126,7 +124,6 @@ async function boot() {
     scene.settings.shake = s.shake;
     scene.settings.blood = s.blood;
     scene.settings.cinematics = s.cinematics;
-    scene.setQuality(s.graphics === 'auto' ? autoQuality : s.graphics);
   };
   /** Up while the main menu is: the fight waits, and nothing is saved (time away is settled when you play). */
   let atMenu = !SKIP_MENU;
@@ -488,36 +485,12 @@ async function boot() {
   let last = performance.now();
   let slow = 0;
   let loggedError = false;
-  // Auto graphics watches FRAME_WINDOW seconds of drawn frames (after the first few, while things load) and steps down
-  // if they average under SLOW_FPS.
-  const FRAME_WINDOW = 4;
-  const SLOW_FPS = 45;
-  let watchFrom = performance.now() + 5000;
-  let watched = 0;
-  let watchedTime = 0;
-  const watchFrames = (gap: number) => {
-    if (game.s.settings.graphics !== 'auto' || autoQuality === 'low' || performance.now() < watchFrom) return;
-    // A long gap is a hidden tab or a one-off hitch, not a slow machine.
-    if (gap > 1000) return;
-    watched++;
-    watchedTime += gap;
-    if (watchedTime < FRAME_WINDOW * 1000) return;
-    if (watched / (watchedTime / 1000) < SLOW_FPS) {
-      autoQuality = autoQuality === 'high' ? 'medium' : 'low';
-      applySettings();
-      // The new level needs a moment to settle before it's judged.
-      watchFrom = performance.now() + 2000;
-    }
-    watched = 0;
-    watchedTime = 0;
-  };
-  const fpsMeter = SHOW_FPS ? fpsOverlay(() => scene.quality) : null;
+  const fpsMeter = SHOW_FPS ? fpsOverlay() : null;
   const frame = (t: number) => {
     // Queue the next frame first so one bad frame can't freeze the game.
     requestAnimationFrame(frame);
     // At most 60 a second: a 120 or 144 Hz screen would otherwise draw everything twice as often for nothing.
     if (t - last < 1000 / 60 - 2) return;
-    watchFrames(t - last);
     const workFrom = performance.now();
     try {
       draw(t);
