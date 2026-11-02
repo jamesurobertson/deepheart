@@ -291,6 +291,8 @@ export interface SaveState {
   /** Legend offers come from this seed and a count of rolls, so reloading (or an older save) can't fish for better ones. */
   legendSeed: number;
   legendRolls: number;
+  /** Each ascent brings one free reroll of the Spirits on offer (not kept past the next ascent). */
+  freeReroll: boolean;
   /** This run's seed for gold boss rolls: whether a floor's boss is gold is settled for the run. */
   runSeed: number;
   /** Heartmarks on each companion, and the deepest floor that has given one (this awakening cycle). */
@@ -367,6 +369,8 @@ export interface SaveState {
   markTipSeen: boolean;
   /** Auto-buy has been pointed out (after your first ascent). */
   autoTipSeen: boolean;
+  /** The Auto hire button has been pointed out (once it opens, after AUTO_HIRE_ASCENTS ascents). */
+  autoHireTipSeen: boolean;
   /** The party is up in the Keep: nothing happens below until they come back down, time away included. */
   inKeep: boolean;
   /** The square you stand on in the Keep, so a reload puts you back there (cleared each time you come up). */
@@ -493,11 +497,11 @@ function reorderRoster(s: SaveState) {
 export function newSave(): SaveState {
   return {
     v: SAVE_VERSION, gold: new Decimal(0), runGold: new Decimal(0), totalGold: new Decimal(0), kills: 0, bosses: 0, clicks: 0, crits: 0,
-    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], bossSouls: 0, goldBosses: {}, legends: {}, legendOffer: [], legendSpent: 0, legendSeed: freshSeed(), legendRolls: 0, runSeed: freshSeed(), marks: COMPS.map(() => 0), markBest: 0, soulsLifetime: 0, trophies: [], souls: 0, spentSouls: 0,
+    owned: COMPS.map(() => 0), upgrades: [], upgradesKnown: [], cooldowns: {}, abilitiesFound: [], bossSouls: 0, goldBosses: {}, legends: {}, legendOffer: [], legendSpent: 0, legendSeed: freshSeed(), legendRolls: 0, freeReroll: false, runSeed: freshSeed(), marks: COMPS.map(() => 0), markBest: 0, soulsLifetime: 0, trophies: [], souls: 0, spentSouls: 0,
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(), lastAttack: 0,
-    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, critSpirits: true, ladderSeen: false, tripReady: [], tripsSent: 0, tripCards: 0, tripKills: 0, pets: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, keepSpot: null, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, skillsSeen: [], rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
+    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, critSpirits: true, ladderSeen: false, tripReady: [], tripsSent: 0, tripCards: 0, tripKills: 0, pets: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, autoHireTipSeen: false, inKeep: false, keepSpot: null, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, skillsSeen: [], rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, autoHire: false },
   };
 }
@@ -2078,6 +2082,7 @@ export class Game {
     if (this.s.descents === AUTO_HIRE_ASCENTS) this.events.push({ t: 'autoHireOpen' });
     this.s.lastAscent = Math.max(this.s.lastAscent, this.s.maxFloor);
     this.s.bossSouls = 0;
+    this.s.freeReroll = true;
     this.resetRun();
     this.events.push({ t: 'descend', souls: gained });
     return true;
@@ -2177,7 +2182,7 @@ export class Game {
   }
 
   rerollPrice() {
-    return rerollCost(this.legendsOwned());
+    return this.s.freeReroll ? 0 : rerollCost(this.legendsOwned());
   }
 
   /** Three Legends you don't have yet, rolled from the save's seed so a reload can't fish for a better offer. */
@@ -2226,7 +2231,8 @@ export class Game {
     if (DEMO) return false;
     const price = this.rerollPrice();
     if (!this.legendsOpen() || this.soulsFree() < price || this.legendsOwned() >= LEGENDS.length - OFFER_SIZE) return false;
-    this.spendSouls(price, false);
+    if (price) this.spendSouls(price, false);
+    this.s.freeReroll = false;
     this.rollOffer();
     return true;
   }
@@ -3134,13 +3140,10 @@ export class Game {
     return this.s.descents >= AUTO_HIRE_ASCENTS;
   }
 
-  /** Companions auto-hire still has to bring back up to their best level (whether or not there's the gold yet). */
-  autoHireLeft() {
-    return COMPS.filter((_, i) => this.s.owned[i] < (this.s.bestLevel[i] ?? 0) && !this.away(i) && this.compUnlocked(i)).length;
-  }
-
-  /** Auto-hire: over and over, the companion whose next step (to its next trait or ×4 level, as Next buys) adds the
-   *  most damage for its gold, among what you can afford, until nobody below their best level is affordable. */
+  /** Auto-hire: over and over, the buy that adds the most damage for its gold, among what you can afford, until nobody
+   *  below their best level is affordable. Each companion is priced three ways up to its next trait or ×4 level (as Next
+   *  buys): one level, as many as the gold reaches, and the whole step. (A new companion's single levels can be worth
+   *  more than anyone's step; the whole step counts its ×4.) */
   private autoHire() {
     for (let buys = 0; buys < 60; buys++) {
       let best = -1, bestN = 0, bestValue = 0;
@@ -3148,14 +3151,28 @@ export class Game {
         const level = this.s.owned[i];
         const cap = this.s.bestLevel[i] ?? 0;
         if (level >= cap || this.away(i) || !this.compUnlocked(i) || (level === 0 && i >= this.s.revealed)) continue;
-        const n = Math.min(cap, level === 0 ? 1 : nextMilestone(i, level)) - level;
-        const cost = this.compCost(i, n);
-        if (cost.gt(this.s.gold)) continue;
-        const value = this.compGain(i, n).div(cost.plus(1)).toNumber();
-        if (value > bestValue) [best, bestN, bestValue] = [i, n, value];
+        const step = Math.min(cap, level === 0 ? 1 : nextMilestone(i, level)) - level;
+        for (const n of new Set([1, this.affordableLevels(i, step), step])) {
+          if (n < 1) continue;
+          const cost = this.compCost(i, n);
+          if (cost.gt(this.s.gold)) continue;
+          const value = this.compGain(i, n).div(cost.plus(1)).toNumber();
+          if (value > bestValue) [best, bestN, bestValue] = [i, n, value];
+        }
       }
       if (best < 0 || !this.buyComp(best, bestN)) return;
     }
+  }
+
+  /** The most of a companion's next `most` levels the gold buys (0 if not even one). */
+  private affordableLevels(i: number, most: number) {
+    let lo = 0, hi = most;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (this.compCost(i, mid).lte(this.s.gold)) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
   }
 
   /** Damage these n more levels of a companion would add (before buffs), its ×4 and ×10 levels counted. */

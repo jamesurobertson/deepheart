@@ -7,6 +7,7 @@ const PALETTES: Record<string, Record<string, string>> = {
   purple: { a: '#b98cff', b: '#f1e6ff', c: '#7048c8', d: '#4a2f8a', g: '#c9b0ff', h: '#9a72e6' },
   flame: { a: '#e8433a', b: '#ff9a2a', c: '#ffe08a' },
   teal: { a: '#5ad8e6', c: '#2a9ab0' },
+  red: { a: '#ff5a4e', c: '#b8242a' },
   trail: { b: '#ffffff', g: '#b8b0a8', c: '#6e6460', k: '#1a0f0c' },
   chest: { a: '#6a3e1e', b: '#b07040', c: '#f2c14e', e: '#fff2a8' },
   drum: { a: '#c8432a', b: '#f4e0c0', c: '#9a5f30', d: '#f2c14e' },
@@ -27,12 +28,12 @@ const ART: Record<AbilityId, [string, string[]]> = {
 const drawn = new Map<string, string>();
 
 /** A skill's icon as crisp SVG, `size` pixels square (22 is 2×, 33 is 3×). */
-export function skillIcon(id: AbilityId, size = 22, cls = ''): string {
-  const key = `${id}|${size}|${cls}`;
+export function skillIcon(id: AbilityId, size = 22, cls = '', palette?: keyof typeof PALETTES): string {
+  const key = `${id}|${size}|${cls}|${palette ?? ''}`;
   const hit = drawn.get(key);
   if (hit) return hit;
-  const [palette, rows] = ART[id];
-  const colors = PALETTES[palette];
+  const [own, rows] = ART[id];
+  const colors = PALETTES[palette ?? own];
   const w = Math.max(...rows.map((row) => row.length));
   const ox = 1 + Math.floor((9 - w) / 2), oy = 1 + Math.floor((9 - rows.length) / 2);
   const grid: (string | null)[][] = Array.from({ length: 11 }, () => Array(11).fill(null));

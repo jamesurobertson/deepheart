@@ -371,7 +371,7 @@ export class Ui {
       <nav class="abilities" aria-label="Abilities"></nav>
       <div class="drops"></div>
       <aside class="shop">
-        <header class="shop-head"><h2>Your Party</h2><span class="shop-autos"><button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden></button><button class="btn small auto-upg auto-hire" data-act="autoHire" data-tip="shop:hire" hidden></button></span><span class="sheet-grip" aria-hidden="true"></span></header>
+        <header class="shop-head"><h2>Your Party</h2><span class="shop-autos"><span class="auto-lbl" hidden>Auto</span><button class="btn small auto-upg auto-hire" data-act="autoHire" data-tip="shop:hire" hidden>Levels</button><button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden>Traits</button></span><span class="sheet-grip" aria-hidden="true"></span></header>
         <div class="modes">
           <span>Hire</span>
           <button class="btn mode" data-mode="1">×1</button><button class="btn mode" data-mode="10">×10</button><button class="btn mode" data-mode="25">×25</button><button class="btn mode" data-mode="100">×100</button><button class="btn mode" data-mode="next" data-tip="shop:next">Next</button><button class="btn mode" data-mode="-1">Max</button>
@@ -393,7 +393,7 @@ export class Ui {
       zonePrev: q('[data-act=zonePrev]'), zoneNext: q('[data-act=zoneNext]'), down: q('[data-act=floorDown]'), up: q('[data-act=floorUp]'), auto: q('[data-act=auto]'),
       fever: q('.fever'), feverBar: q('.fever > i'), feverLabel: q('.fever > span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), vaultPick: q('.vault-pick'), vaultLeave: q('.vault-leave'), vaultFaces: q('.vp-faces'), heroMark: q('.hero-mark'), raid: q('.raid-mark'), exitMark: q('.exit-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'),
-      autoUpg: q('.auto-upg:not(.auto-hire)'), autoHire: q('.auto-hire'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
+      autoUpg: q('.auto-upg:not(.auto-hire)'), autoHire: q('.auto-hire'), autoLbl: q('.auto-lbl'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
       blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), heartBtn: q('.dock-heart'), heartBadge: q('.dock-heart .badge'), keepBtn: q('[data-act=keep]'), keepLabels: q('.keep-labels'),
       cardBadge: q('[data-open=trophies] .badge'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
     };
@@ -931,6 +931,7 @@ export class Ui {
         break;
       case 'autoHire':
         g.s.settings.autoHire = !g.s.settings.autoHire;
+        g.s.autoHireTipSeen = true;
         this.refreshTip();
         break;
       case 'sound':
@@ -1316,7 +1317,7 @@ export class Ui {
         break;
       case 'tripsOpen': this.toast('<b>Expeditions</b> are open: the ladder in the Keep', COMPS[ev.comp].sprite, 'trophy'); break;
       case 'setStart': this.toast(`Card sets: <b>floor ${fmt(ev.floor)}</b> · +${fmt(ev.gold)} gold`, 'imp', 'trophy'); break;
-      case 'autoHireOpen': this.toast('<b>Auto hire</b> is open: the toggle above your party', 'knight_m', 'trophy'); break;
+      case 'autoHireOpen': this.toast('<b>Auto levels</b> is open: the toggle above your party', 'knight_m', 'trophy'); break;
       case 'tripReady': this.toast(`<b>${esc(COMPS[ev.comp].name)}</b> can go on expeditions`, COMPS[ev.comp].sprite); break;
       case 'legend': if (ev.summoned) this.toast(`<b>${esc(LEGEND_BY_ID.get(ev.id)!.name)}</b> joins you`, LEGEND_BY_ID.get(ev.id)!.sprite); break;
       case 'mark':
@@ -1829,7 +1830,7 @@ export class Ui {
         chip = document.createElement('div');
         chip.className = `buff ${b.id}`;
         chip.dataset.buff = b.id;
-        chip.innerHTML = `<span class="buff-ico">${ability ? skillIcon(ability.id, 22) : b.id === 'deadeye' ? skillIcon('crit', 22) : spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(b.name)}</b><small></small></span><em class="buff-bar"></em>`;
+        chip.innerHTML = `<span class="buff-ico">${ability ? skillIcon(ability.id, 22) : b.id === 'deadeye' ? skillIcon('crit', 22, '', 'red') : spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(b.name)}</b><small></small></span><em class="buff-bar"></em>`;
         box.appendChild(chip);
       }
       // Phones only have room for the countdown; the icon says which buff it is.
@@ -2047,22 +2048,16 @@ export class Ui {
     setTimeout(() => burst.remove(), 500);
   }
 
-  /** Auto-buy for companion traits, beside the hire modes. */
+  /** The Auto toggles over your party: Levels (rehiring companions to their best) and Traits. */
   private renderShopActs() {
     const g = this.game;
-    const auto = g.autoUpgOpen();
-    this.el.autoUpg.hidden = !auto;
-    if (auto) {
-      if (this.el.autoUpg.textContent !== 'Auto traits') this.el.autoUpg.textContent = 'Auto traits';
-      this.el.autoUpg.classList.toggle('on', g.s.settings.autoUpg);
-    }
-    const hire = g.autoHireOpen();
-    this.el.autoHire.hidden = !hire;
-    if (hire) {
-      if (this.el.autoHire.textContent !== 'Auto hire') this.el.autoHire.textContent = 'Auto hire';
-      this.el.autoHire.classList.toggle('on', g.s.settings.autoHire);
-      this.el.autoHire.classList.toggle('busy', g.s.settings.autoHire && g.autoHireLeft() > 0);
-    }
+    const traits = g.autoUpgOpen();
+    const levels = g.autoHireOpen();
+    this.el.autoLbl.hidden = !traits && !levels;
+    this.el.autoUpg.hidden = !traits;
+    this.el.autoUpg.classList.toggle('on', traits && g.s.settings.autoUpg);
+    this.el.autoHire.hidden = !levels;
+    this.el.autoHire.classList.toggle('on', levels && g.s.settings.autoHire);
   }
 
   // ---------- onboarding ----------
@@ -2088,6 +2083,8 @@ export class Ui {
     else if (!g.s.markTipSeen && g.marksTotal() > 0) state = 'mark';
     // After your first ascent: the Auto button that buys back the traits you had.
     else if (!g.s.autoTipSeen && g.autoUpgOpen() && !this.el.autoUpg.hidden) state = 'auto';
+    // After a few ascents: the one that rehires your companions.
+    else if (!g.s.autoHireTipSeen && g.autoHireOpen() && !this.el.autoHire.hidden) state = 'autohire';
     else if (g.raid && g.s.raids === 0) state = 'raid';
     // Meeting your hero: first on the field, then (once there's someone to switch to) the star that picks one.
     else if (g.s.heroTips === 0 && g.heroIndex() >= 0) state = 'hero';
@@ -2120,6 +2117,9 @@ export class Ui {
     } else if (state === 'auto') {
       this.pointAt(this.el.autoUpg);
       if (this.hintState === 'auto' && performance.now() - this.tourAt > MARK_TIP_MS) g.s.autoTipSeen = true;
+    } else if (state === 'autohire') {
+      this.pointAt(this.el.autoHire);
+      if (this.hintState === 'autohire' && performance.now() - this.tourAt > MARK_TIP_MS) g.s.autoHireTipSeen = true;
     } else if (state === 'mark') {
       const row = this.rows[this.markRow()];
       this.pointAt(row?.querySelector('.marks') ?? row);
@@ -2129,7 +2129,7 @@ export class Ui {
     }
     if (state === this.hintState) return;
     this.hintState = state;
-    const pointing = state.startsWith('skill:') || ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'mark', 'auto'].includes(state);
+    const pointing = state.startsWith('skill:') || ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'mark', 'auto', 'autohire'].includes(state);
     this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ';
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero');
@@ -2144,7 +2144,8 @@ export class Ui {
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
             : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
               : state === 'champ' ? this.champHint()
-              : state === 'auto' ? `<b>Auto-buy<small>Traits you've bought before buy themselves</small></b>`
+              : state === 'auto' ? `<b>Auto traits<small>Traits you've bought before buy themselves</small></b>`
+              : state === 'autohire' ? `<b>Auto levels<small>Companions level back up to their best</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
               : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`;
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
@@ -2288,12 +2289,11 @@ export class Ui {
         <p class="tt-f">“${esc(def.flavor)}”</p>`;
     }
     if (kind === 'shop') {
-      const text = id === 'next'
-        ? 'Hire up to each companion\'s next milestone, where a damage upgrade unlocks.'
-        : id === 'hire'
-          ? `Rehire companions up to their best levels: ${g.s.settings.autoHire ? 'On' : 'Off'}.`
-          : `Auto-buy traits you've bought before: ${g.s.settings.autoUpg ? 'On' : 'Off'}.`;
-      return `<p class="tt-d">${text}</p>`;
+      if (id === 'next') return `<p class="tt-d">Hire up to each companion's next milestone, where a damage upgrade unlocks.</p>`;
+      // (The state on a line of its own, so the tip is the same size on and off.)
+      const on = id === 'hire' ? g.s.settings.autoHire : g.s.settings.autoUpg;
+      const text = id === 'hire' ? 'Buys companion levels back up to their best.' : 'Buys traits you\'ve bought before.';
+      return `<p class="tt-d">${text}</p><p class="tt-d tt-state ${on ? 'on' : ''}">${on ? 'On' : 'Off'}</p>`;
     }
     if (kind === 'lvl') {
       const i = Number(id);
@@ -2535,14 +2535,15 @@ export class Ui {
     const name = this.modal;
     if (!name) return;
     const g = this.game;
-    const head = (title: string, sub = '') => `<header class="m-head"><h2>${title}</h2>${sub ? `<span>${sub}</span>` : ''}<button class="btn icon" data-act="close" aria-label="Close">${G.close()}</button></header>`;
+    // The title (and any tabs under it) stays put while the window scrolls.
+    const head = (title: string, sub = '', tabs = '') => `<div class="m-top"><header class="m-head"><h2>${title}</h2>${sub ? `<span>${sub}</span>` : ''}<button class="btn icon" data-act="close" aria-label="Close">${G.close()}</button></header>${tabs}</div>`;
     let html = '';
     if (name === 'trophies') {
       const n = g.s.trophies.length;
       const shown = shownTrophies(g);
-      html = head('Trophies', `${n} / ${shown.length} · +${n}% damage`) + this.troTabs('trophies') + `<div class="tro-grid">${shown.map((t) => `<span class="tro ${g.hasTrophy(t.id) ? 'got' : ''}" data-tip="tro:${t.id}">${icon(t.icon, 28)}</span>`).join('')}</div>`;
+      html = head('Trophies', `${n} / ${shown.length} · +${n}% damage`, this.troTabs('trophies')) + `<div class="tro-grid">${shown.map((t) => `<span class="tro ${g.hasTrophy(t.id) ? 'got' : ''}" data-tip="tro:${t.id}">${icon(t.icon, 28)}</span>`).join('')}</div>`;
     } else if (name === 'cards') {
-      html = head('Cards') + this.troTabs('cards') + this.cardsHtml();
+      html = head('Cards', '', this.troTabs('cards')) + this.cardsHtml();
 
     } else if (DEMO && name === 'abyss') {
       html = head('Ascend') + this.ascendHtml();
@@ -2563,7 +2564,7 @@ export class Ui {
     } else if (!DEMO && name === 'heart') {
       html = head('The Heart', g.s.awakens ? `${boundGlyph()} ${fmt(g.boundFree())} bound souls · ${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}` : '') + this.heartHtml();
     } else if (name === 'stats' || name === 'party' || name === 'records' || name === 'ascents') {
-      html = `<div class="m-top">${head('Stats')}${this.statTabs(name)}</div>` + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
+      html = head('Stats', '', this.statTabs(name)) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
     } else if (!DEMO && (name === 'dan' || name === 'victor')) {
       const who = name as Trader;
       html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${who === 'dan' ? 'Dan' : 'Victor'}`, who === 'dan' ? `Trade ${DAN_GIVES} cards for a random card` : `Trade ${VICTOR_GIVES} cards for 1 gold card`) + this.tradeHtml(who);
@@ -2663,7 +2664,7 @@ export class Ui {
     const summon = pick
       ? `<p class="legend-warn">Summon a Spirit for <b>${G.soul(2)} ${fmt(price)} soul${price === 1 ? '' : 's'}</b>. Every soul you spend gives up ${soulPct(1)} damage.</p>
         <div class="pedestals">${pedestals}</div>
-        ${LEGENDS.length - g.legendsOwned() > OFFER_SIZE ? `<div class="legend-reroll"><button class="btn" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>Reroll all three · ${G.soul(1.5)} ${fmt(g.rerollPrice())}</button></div>` : ''}
+        ${LEGENDS.length - g.legendsOwned() > OFFER_SIZE ? `<div class="legend-reroll"><button class="btn" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>Reroll all three · ${g.rerollPrice() ? `${G.soul(1.5)} ${fmt(g.rerollPrice())}` : 'Free'}</button></div>` : ''}
         <div class="legend-panel">
           <div class="tt-h"><b>${esc(pick.name)}</b><span class="tt-own">${KIND_NAME[pick.kind]}</span></div>
           ${legendDetail(pick, 0)}

@@ -1,6 +1,6 @@
 import { ABILITIES, ABILITY_BY_UPGRADE, COMPS, LEGENDS, LEVEL_BONUS, UPGRADES, levelMult, type CompDef, type UpgDef } from '../../game/data.ts';
 import {
-  AUTO_BASE, BASE_CRIT, BASE_CRIT_MULT, CLEAVE_BASE, CLICK_DPS, DRUMS_CRIT, FEVER_CLICKS, FEVER_TIME, FLURRY_RATE, IDLE_AFTER, MANUAL_RATE, MARK_POWER,
+  AUTO_BASE, AUTO_HIRE_ASCENTS, BASE_CRIT, BASE_CRIT_MULT, CLEAVE_BASE, CLICK_DPS, DRUMS_CRIT, FEVER_CLICKS, FEVER_TIME, FLURRY_RATE, IDLE_AFTER, MANUAL_RATE, MARK_POWER,
   RAMPAGE_EXTEND, RAMPAGE_STEPS, RAMPAGE_TIERS, REBUY_GAP, REVEAL_AT, STREAK_CAP, STREAK_GAP, TUNE,
 } from '../../game/game.ts';
 import { fmt } from '../../game/format.ts';
@@ -148,7 +148,8 @@ const traitsBody = () => {
     ${table(['Kind', 'Effect', { h: 'How many', cls: 'c' }], kinds.map(([k, e, n]) => [`<b>${k}</b>`, e, n]))}
     <p>Every companion's traits are listed on its page under ${link('companions', 'Companions')}. A trait costs a multiple of its companion's hire price: ×12, ×30, ×150, ×1,000, ×10,000, ×60,000 and ×300,000 for the seven levels.</p>
     ${h2('Auto-buy')}
-    <p>After your first ascent, an Auto toggle appears in the shop. With it on, every ${REBUY_GAP} seconds the game buys any trait you've bought before, cheapest first. Traits you've never bought stay yours to find.</p>`;
+    <p>After your first ascent, Auto Traits appears over your party. With it on, every ${REBUY_GAP} seconds the game buys any trait you've bought before, cheapest first. Traits you've never bought stay yours to find.</p>
+    <p>From ascent ${AUTO_HIRE_ASCENTS}, Auto Levels joins it: the game buys companion levels back up to each one's best, wherever its gold adds the most damage. It never hires anyone new or goes past a companion's best.</p>`;
 };
 
 export const PARTY_PAGES: Page[] = [

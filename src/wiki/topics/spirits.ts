@@ -96,7 +96,7 @@ const listBody = () => {
   return `<p class="lede">Spirits are what you spend souls on. Each one boosts one part of the game, and you level them up with more souls. They stay with you through every ascent. Awakening sends them all away.</p>
     ${toc('spirits', ['Summoning', 'Leveling', 'All Spirits', 'Respec', 'Kept souls'])}
     ${h2('Summoning')}
-    <p>Spirits open after your first ascent. The summoning circle offers ${OFFER_SIZE} Spirits at a time. Pick one and pay the summon cost to bring it in at level 1. Every summon rolls a new offer. You can also reroll the offer for a third of the summon cost, rounded up.</p>
+    <p>Spirits open after your first ascent. The summoning circle offers ${OFFER_SIZE} Spirits at a time. Pick one and pay the summon cost to bring it in at level 1. Every summon rolls a new offer. You can also reroll the offer for a third of the summon cost, rounded up. Each ascent brings one free reroll, good until the next ascent.</p>
     <p>The summon cost depends only on how many Spirits you have. Summoning all ${LEGENDS.length} costs ${totalSummon.toLocaleString('en-US')} souls.</p>
     ${splitTables([{ h: 'Spirit #', cls: 'c' }, { h: 'Summon', cls: 'num' }, { h: 'Reroll', cls: 'num' }], [summonRows.slice(0, 9), summonRows.slice(9)])}
     ${h2('Leveling')}
