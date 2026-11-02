@@ -26,7 +26,7 @@ export interface UiHooks {
 }
 
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
-const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', soulstorm: 'Soul Storm!', vault: 'Rainbow Vault!', rainbow: 'Rainbow Haul!' };
+const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', deadeye: 'Deadeye!', brutal: 'Brutality!', soulstorm: 'Soul Storm!', vault: 'Rainbow Vault!', rainbow: 'Rainbow Haul!' };
 /** Writes text only when it changed: rewriting the same text still costs the page a relayout. */
 const setText = (el: Element, text: string) => {
   if (el.textContent !== text) el.textContent = text;
@@ -186,6 +186,8 @@ function buffText(b: Buff) {
   if (b.id === 'flurry') return '10 clicks a second';
   if (b.id === 'drums') return '+50% critical hits';
   if (b.id === 'legion') return 'a blade for every monster';
+  if (b.crit) return 'every click crits';
+  if (b.critMult) return `×${b.critMult} crit damage`;
   if (b.blade && b.blade > 1) return `Phantom Blade ×${b.blade}`;
   if (b.dps > 1 && b.click > 1) return `×${b.dps} damage`;
   if (b.dps > 1) return `×${b.dps} companion damage`;
@@ -1823,11 +1825,11 @@ export class Ui {
       let chip = box.querySelector<HTMLElement>(`[data-buff="${b.id}"]`);
       if (!chip) {
         const ability = ABILITY_BY_ID.get(b.id as AbilityId);
-        const ico = b.id === 'bloodlust' ? 'flask_big_red' : b.id === 'heartstorm' ? 'weapon_golden_sword' : b.id === 'soulstorm' ? 'chest_mimic_open' : b.id === 'vault' ? 'chest_full_open' : 'coin';
+        const ico = b.id === 'bloodlust' ? 'flask_big_red' : b.id === 'heartstorm' ? 'weapon_golden_sword' : b.id === 'brutal' ? 'weapon_big_hammer' : b.id === 'soulstorm' ? 'chest_mimic_open' : b.id === 'vault' ? 'chest_full_open' : 'coin';
         chip = document.createElement('div');
         chip.className = `buff ${b.id}`;
         chip.dataset.buff = b.id;
-        chip.innerHTML = `<span class="buff-ico">${ability ? skillIcon(ability.id, 22) : spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(b.name)}</b><small></small></span><em class="buff-bar"></em>`;
+        chip.innerHTML = `<span class="buff-ico">${ability ? skillIcon(ability.id, 22) : b.id === 'deadeye' ? skillIcon('crit', 22) : spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(b.name)}</b><small></small></span><em class="buff-bar"></em>`;
         box.appendChild(chip);
       }
       // Phones only have room for the countdown; the icon says which buff it is.

@@ -292,6 +292,7 @@ body.phone .fever-face .icon { zoom: 0.6; }
 .buff-bar { position: absolute; left: 2px; bottom: 2px; height: 3px; background: var(--gold); }
 .buff.bloodlust { box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #a3243a, 0 0 16px rgba(255, 50, 80, 0.5); }
 .buff.heartstorm, .buff.soulstorm { box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #d0902f, 0 0 16px rgba(255, 200, 80, 0.6); }
+.buff.deadeye, .buff.brutal { box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px #ff8a1a, 0 0 16px rgba(255, 138, 26, 0.55); }
 
 /* ---------- chamber overlays ---------- */
 
