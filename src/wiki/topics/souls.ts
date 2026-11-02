@@ -49,12 +49,12 @@ const awakenBody = () => `<p class="lede">Reach floor ${TUNE.awakenFloor} and yo
 
 const marksBody = () => `<p class="lede">Heartmarks are bonus damage that lands on a random companion when you beat a deep zone boss for the first time.</p>
   ${h2('Earning Heartmarks')}
-  <p>The first time you beat the boss on each 10th floor past ${MARK_FROM} (110, 120, 130 and so on), a random companion gets a Heartmark. It can land on any companion you've unlocked, hired this run or not. Heartmarks stay through every ascent. ${link('awakening', 'Awakening')} takes them all, and they're earned again from floor ${MARK_FROM + 10}.</p>
+  <p>The first time you beat the boss on each 10th floor past ${MARK_FROM} (110, 120, 130 and so on), a random companion gets a Heartmark. It lands on a companion you've hired this run. Heartmarks stay through every ascent. ${link('awakening', 'Awakening')} takes them all, and they're earned again from floor ${MARK_FROM + 10}.</p>
   ${h2('What they do')}
   <p>Each Heartmark adds +${pct(MARK_POWER, 0)} to that companion's damage. Two is +100%, three is +150%.</p>
   ${h2('Moving them')}
   ${table(['Action', { h: 'Cost', cls: 'num' }, 'What happens'], [
-    ['Send one away', `${MARK_REROLL} soul`, 'One of this companion\'s Heartmarks moves to a random other companion'],
+    ['Send one away', `${MARK_REROLL} soul`, 'One of this companion\'s Heartmarks moves to a random other companion you\'ve hired this run'],
     ['Bring one here', `${MARK_MOVE} souls`, 'A Heartmark moves to this companion from a random companion that has one'],
   ])}
   <p>Souls spent moving Heartmarks don't come back with a Spirit respec.</p>`;
