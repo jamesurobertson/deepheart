@@ -159,7 +159,8 @@ export class TitleMenu {
   /** The demo's is the same, with a DEMO stamp on the logo and Wishlist on Steam as the button that stands out. */
   private mainMenu() {
     const s = this.game.s;
-    const run = this.hasRun ? `<p class="mm-run">Floor ${fmt(s.floor)} · ${esc(zoneName(s.floor))} · ${duration(s.playTime)}</p>` : '';
+    const where = !DEMO && s.inKeep ? 'The Keep' : `Floor ${fmt(s.floor)} · ${esc(zoneName(s.floor))}`;
+    const run = this.hasRun ? `<p class="mm-run">${where} · ${duration(s.playTime)}</p>` : '';
     const logo = DEMO ? `<div class="mm-stamped">${LOGO}<span class="mm-stamp">DEMO</span></div>` : LOGO;
     const play = this.hasRun ? 'Continue' : DEMO ? 'Play the Demo' : 'New Game';
     return `<div class="mm-head">${HEART}${logo}<p class="mm-tag">AN IDLE DUNGEON CRAWLER</p></div>
@@ -327,7 +328,9 @@ class Stairs {
   }
 
   private frame = (now: number) => {
-    this.dt = Math.min(0.1, (now - (this.last || now)) / 1000);
+    // (Never backwards: the first frame's timestamp can be a little before the performance.now() the menu opened at,
+    // and a clock below 0 picks frame -1 of an animation.)
+    this.dt = Math.max(0, Math.min(0.1, (now - (this.last || now)) / 1000));
     this.t += this.dt;
     this.last = now;
     this.draw();
