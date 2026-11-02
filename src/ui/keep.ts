@@ -552,13 +552,13 @@ export class KeepView {
     const r = this.canvas.getBoundingClientRect();
     const s = 16 * this.zoom;
     return this.stations().map((st) => {
-      // Every name hangs under what it names, pointing up at it.
-      const below = true;
-      const [tx, ty] = [st.tag[0], st.tag[1] - 0.45];
-      // Only the stairs and the spirits on offer always show their names; the rest when you point at them or stand there.
-      // The expedition ladder the first time you see it: named, with what it's for, until you've used it.
+      // A name hangs under what it names, pointing up at it; the stairs' sits over the top of the flight, pointing down.
+      const below = st.id !== 'stairs';
+      const [tx, ty] = below ? [st.tag[0], st.tag[1] - 0.45] : [STAIRS.x + STAIRS.steps / 2 - 0.5, STAIRS.y - 0.1];
+      // Names show when you point at them or stand there. The expedition ladder the first time you see it: named, with
+      // what it's for, until you've used it.
       const tip = st.id === 'trips' && !this.game.s.ladderSeen ? 'Send companions to hunt cards' : undefined;
-      const shown = !!tip || st.id === 'stairs' || st.id.startsWith('offer:') || (st.id === 'heart' && this.game.canAwaken()) || this.near === st.id || this.hover === st.id;
+      const shown = !!tip || (st.id === 'heart' && this.game.canAwaken()) || this.near === st.id || this.hover === st.id;
       return { id: st.id, label: st.label, verb: this.verb(st.id), x: r.left + r.width / 2 + (tx + 0.5 - this.cam.x) * s, y: r.top + r.height / 2 + (ty - this.cam.y) * s, below, shown, tip };
     });
   }
