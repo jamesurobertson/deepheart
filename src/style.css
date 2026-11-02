@@ -1411,9 +1411,9 @@ body.card-up .keep-labels { visibility: hidden; }
 @keyframes kp-press { 0%, 80%, 100% { translate: 0 -2px; box-shadow: 0 0 0 2px var(--ink), 0 3px 0 2px #8a6a3a; } 88% { translate: 0 1px; box-shadow: 0 0 0 2px var(--ink), 0 0 0 2px #8a6a3a; } }
 @media (prefers-reduced-motion: reduce) { .keep-label.near em.kp, .keep-label.near.keyed .kp kbd { animation: none; } }
 .keep-label.near.keyed i { display: none; }
-/* Under a Legend's feet, pointing up at it (the arrow stays when the key shows, so the label doesn't jump). */
+/* Under a Legend's feet, pointing up at it. (The arrow stays when the key shows, so the label doesn't jump.) */
 .keep-label.below { translate: -50% 0; }
-.keep-label.below.near i { display: block; }
+.keep-label.near i { display: block; }
 .keep-label.near b { color: #fff; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--gold-hi), 0 0 14px rgba(255, 224, 138, 0.45); }
 .keep-label.soul.near b { box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--soul), 0 0 16px rgba(179, 140, 255, 0.7); }
 .lcards.one { grid-template-columns: 1fr; margin-bottom: 10px; }

@@ -24,9 +24,9 @@ export function cardCanvas(card: CardDef, lap = 0): HTMLCanvasElement | null {
 /** Characters made by recoloring another sprite: Victor is Dan's sprite with brown hair and a blue shirt. */
 const VARIANTS: Record<string, { base: string; swap: Record<string, string> }> = {
   victor: { base: 'ef_elf_m', swap: { '#facb3e': '#9a6a3a', '#ee8e2e': '#6a4024', '#c56025': '#3f6aa8', '#62232f': '#263a66' } },
-  // Spirit forms (a Spirit's sprite as `spiritForm` draws it): the Hourglass's green eyes are as bright as its face, so
-  // the spirit look's grayscale lost them; dark, they show.
-  sd_magic_shopkeeper_spirit: { base: 'sd_magic_shopkeeper', swap: { '#97da3f': '#2b2140' } },
+  // Spirit forms (a Spirit's sprite as `spiritForm` draws it): the spirit look keeps only brightness, and the
+  // Hourglass's green eyes and white hair and beard are as bright as its pale face. Dark eyes and darker skin keep them.
+  sd_magic_shopkeeper_spirit: { base: 'sd_magic_shopkeeper', swap: { '#97da3f': '#2b2140', '#fccba3': '#b98a6c', '#e2b694': '#9c6f55' } },
 };
 
 /** The sprite to draw a Spirit with in spirit form (purple and see-through): its own, or a variant that keeps its face. */
