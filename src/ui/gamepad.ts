@@ -2,7 +2,7 @@
  *  picks up what it walks over, as with the keys) and A attacks the monster nearest them. The d-pad's ▲ ▼ (or the right
  *  stick) pick a companion in your party: RT levels it, X buys its next upgrade, R3 makes it your hero; ◀ ▶ change how
  *  many levels a buy is. LB, RB and Y use abilities, and with LT held three more (LT with ◀ ▶ changes floor). Menu lets
- *  the d-pad step to any button on screen (reading its tooltip; A presses it), View opens Ascend, B backs out. In a window or on the title screen
+ *  the d-pad step to any button on screen (reading its tooltip; A presses it), View opens Options, B backs out. In a window or on the title screen
  *  the sticks and d-pad step between buttons and LB RB change tabs. Prompts show the controller's own buttons (Kenney's Input Prompts, by kind of pad) while it's the last
  *  thing used; the mouse, keyboard or a finger puts the usual words back. */
 const REACH = 'button:not([disabled]), a[href], [tabindex="0"], input:not([disabled])';
@@ -30,7 +30,7 @@ export const padFamily = () => family;
 /** A controller button's picture: a, b, x, y, lb, rb, lt, rt, up, down, left, right, ls, rs, r3, menu, view. */
 export function padGlyph(key: string, size = 22, cls = ''): string {
   if (!family) return '';
-  return `<img class="pad-g ${cls}" src="${import.meta.env.BASE_URL}assets/prompts/${family}/${key}.png" width="${size}" height="${size}" alt="" draggable="false">`;
+  return `<img class="pad-g ${cls}" data-k="${key}" src="${import.meta.env.BASE_URL}assets/prompts/${family}/${key}.png" width="${size}" height="${size}" alt="" draggable="false">`;
 }
 
 /** A hint about one companion's row (hire them, buy their upgrade, make them your hero): the right stick's pick moves
@@ -193,8 +193,8 @@ export function installGamepad() {
     const items: [string[], string][] = modal ? [[['a'], 'Select'], [['b'], 'Back']]
       : titleOpen() ? [[['a'], 'Select']]
       : docked ? [[['a'], 'Select'], [['b'], 'Back']]
-      : inKeep() ? [[['ls'], 'Walk'], [['a'], 'Use'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['menu'], 'Menu']]
-      : [[['ls'], 'Move'], [['a'], 'Attack'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['view'], 'Ascend'], [['menu'], 'Menu']];
+      : inKeep() ? [[['ls'], 'Walk'], [['a'], 'Use'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['view'], 'Options'], [['menu'], 'Menu']]
+      : [[['ls'], 'Move'], [['a'], 'Attack'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['view'], 'Options'], [['menu'], 'Menu']];
     if (modal && document.querySelector('.modal-wrap:not([hidden]) .tabs')) items.splice(1, 0, [['lb', 'rb'], 'Tabs']);
     const key = family + items.map(([, w]) => w).join();
     if (key !== barKey) {
@@ -335,17 +335,17 @@ export function installGamepad() {
     showPick(!!family && !modal && !title, moved);
     showBar();
 
-    // B backs out; Menu opens the dock (or leaves it); View opens Ascend (either closes the window it opened).
+    // B backs out; Menu lets the d-pad roam the screen (or stops it); View opens Options (either closes a window).
     if (fresh('b1')) docked ? leaveDock() : tap('Escape');
     if (fresh('b9')) {
       if (modal) tap('Escape');
       else if (docked) leaveDock();
       else if (!title) {
         docked = true;
-        land(document.querySelector<HTMLElement>('.dock [data-open="settings"]') ?? neighbor(null, 'right', document.querySelector('.dock') ?? document));
+        land(document.querySelector<HTMLElement>('.dock button') ?? neighbor(null, 'right', document));
       }
     }
-    if (fresh('b8') && !title) modal ? tap('Escape') : click(document.querySelector('[data-open="abyss"]'));
+    if (fresh('b8') && !title) modal ? tap('Escape') : click(document.querySelector('[data-open="settings"]'));
 
     held = down;
     requestAnimationFrame(poll);

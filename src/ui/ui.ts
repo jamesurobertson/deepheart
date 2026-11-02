@@ -2630,7 +2630,7 @@ export class Ui {
         ...ABILITIES.filter((a) => ABILITY_PAD[a.id]).map((a): [string, string] => [pad(...ABILITY_PAD[a.id]), esc(a.name)]),
         [pad('lt', 'left', 'right'), 'Floor down, floor up'],
         [pad('lt', 'down'), 'Auto'],
-        [pad('view'), 'Ascend'],
+        [pad('view'), 'Options'],
         [pad('menu'), 'Browse the screen'],
         [pad('b'), 'Back'],
       ] : [

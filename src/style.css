@@ -1669,6 +1669,12 @@ body.pad-on :is(button, a, [tabindex="0"], [tabindex="-1"]):focus { outline: 3px
 body.pad-on, body.pad-on * { cursor: none !important; }
 body.pad-on .blade { display: none !important; }
 .pad-g { display: inline-block; vertical-align: middle; flex: none; pointer-events: none; user-select: none; }
+/* A stick swivels (move it); a stick to press bobs down (click it). */
+.pad-g:is([data-k="ls"], [data-k="rs"]) { animation: pad-swivel 1.6s ease-in-out infinite; }
+.pad-g[data-k="r3"] { animation: pad-press 1.2s ease-in-out infinite; }
+@keyframes pad-swivel { 0%, 100% { translate: 0 -2px; } 25% { translate: 2px 0; } 50% { translate: 0 2px; } 75% { translate: -2px 0; } }
+@keyframes pad-press { 0%, 55%, 100% { scale: 1; } 70% { scale: 0.84; } }
+@media (prefers-reduced-motion: reduce) { .pad-g { animation: none !important; } }
 .gen.pad-pick { box-shadow: 0 0 0 3px var(--gold-hi), 0 0 18px rgba(255, 224, 138, 0.45); z-index: 1; }
 .pad-bar span { display: inline-flex; align-items: center; gap: 6px; }
 .pad-bar b { font: 400 18px/1 'Jersey 10', monospace; color: var(--text); text-shadow: var(--outline); letter-spacing: 0.5px; }
