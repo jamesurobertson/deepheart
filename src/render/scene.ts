@@ -2871,6 +2871,8 @@ export class Scene {
       this.heroRing = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.7, 32), new THREE.MeshBasicMaterial({ color: 0xffd070, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
       this.heroRing.rotation.x = -Math.PI / 2;
       this.heroRing.position.y = 0.03;
+      // (After the blood and the shadows on the floor, so it's never painted over.)
+      this.heroRing.renderOrder = 2;
     }
     c.body.add(this.heroRing);
     this.heroComp = c.comp;
