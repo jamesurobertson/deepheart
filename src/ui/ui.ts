@@ -2763,7 +2763,7 @@ export class Ui {
         <td>${n ? `<button class="btn small" data-mark-away="${i}" ${free >= MARK_REROLL ? '' : 'disabled'}>Send one away · ${G.soul(1.2)} ${MARK_REROLL}</button>` : ''}</td>
         <td>${others ? `<button class="btn small" data-mark-here="${i}" ${free >= MARK_MOVE ? '' : 'disabled'}>Bring one here · ${G.soul(1.2)} ${MARK_MOVE}</button>` : ''}</td></tr>`;
     }).join('');
-    return `<p class="muted bd-help">The first time you beat each 10th floor past ${100}, a random companion gets a Heartmark: +${MARK_POWER * 100}% damage each, until you awaken. Send one to someone at random, or bring one from someone else to the companion you choose.</p>
+    return `<p class="muted bd-help">The first time you beat each 10th floor past ${100}, a random companion in your party gets a Heartmark: +${MARK_POWER * 100}% damage each, until you awaken. Send one to someone at random, or bring one from someone else to the companion you choose.</p>
       <section class="bd wide bd-marks"><table><thead><tr><th>Companion</th><td>Marks</td><td>Damage</td><td></td><td></td></tr></thead>${rows}</table></section>`;
   }
 

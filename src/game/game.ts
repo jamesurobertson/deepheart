@@ -2295,9 +2295,11 @@ export class Game {
 
   // ---------- Heartmarks ----------
 
-  /** Companions a Heartmark can land on: everyone you could hire. */
+  /** Companions a Heartmark can land at random: your party this run (or, with no one hired yet, everyone you could
+   *  hire). */
   private markable() {
-    return COMPS.map((_, i) => i).filter((i) => this.compUnlocked(i));
+    const hired = COMPS.map((_, i) => i).filter((i) => this.s.owned[i] > 0);
+    return hired.length ? hired : COMPS.map((_, i) => i).filter((i) => this.compUnlocked(i));
   }
 
   private giveMark(floor: number) {
