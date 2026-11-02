@@ -215,7 +215,7 @@ body.compact .rate .short { display: inline; }
 .fm.locked .mon { filter: brightness(0) invert(0.3); opacity: 0.8; }
 .fm.boss { --edge: #d0505e; }
 .fm.zone { --edge: #e0b04a; }
-.fm.locked.boss, .fm.locked.zone { background: #160e12; }
+.fm.locked.boss, .fm.locked.zone { --edge: #2e2228; background: #160e12; }
 .fm.now { --edge: var(--gold-hi); z-index: 1; background: radial-gradient(circle at 50% 65%, #4a3520, #241812 80%); }
 .fm.now::before { content: ''; position: absolute; inset: -2px; box-shadow: 0 0 12px 1px rgba(255, 224, 138, 0.65); animation: roompulse 1.6s ease-in-out infinite; pointer-events: none; }
 @keyframes roompulse { 50% { opacity: 0.35; } }
@@ -480,13 +480,13 @@ body.ui-hidden .abilities { right: 0; }
 .shop-head h2 { margin: 0; font: 700 22px/1 var(--f-text); color: var(--gold-hi); text-shadow: var(--shadow); }
 .shop-autos { display: flex; gap: 6px; align-self: center; margin-left: auto; }
 
+.tt-state { margin-top: 4px; color: var(--faint); }
+.tt-state.on { color: var(--green); }
+.auto-lbl { font: 400 12px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; align-self: center; }
+.auto-lbl[hidden] { display: none; }
 .auto-upg { color: var(--faint); }
 .auto-upg.on { color: var(--green); }
-/* Auto hire: pulsing while there's still someone to hire back, dimmer once they're all back. */
 .set-done { font: 400 13px/1 'Silkscreen'; color: var(--green); letter-spacing: 0.5px; }
-.auto-hire.on { opacity: 0.7; }
-.auto-hire.on.busy { opacity: 1; animation: hirepulse 1.2s ease-in-out infinite; }
-@keyframes hirepulse { 50% { text-shadow: 0 0 8px var(--green); } }
 
 .ico { position: relative; display: grid; place-items: center; }
 .ico .tier {
