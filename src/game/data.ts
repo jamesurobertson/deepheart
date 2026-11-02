@@ -868,7 +868,7 @@ function buildTrophies(): TrophyDef[] {
     out.push({ id: 'hire-all', name: 'Full Party', desc: `Hire all ${COMPS.length} companions.`, icon: { sprite: COMPS[0].sprite, tier: 0 }, req: { t: 'levelAll', n: 1 } });
   }
   tiers('level', [[1000, 'Legendary'], [2500, 'Mythic'], [5000, 'Immortal'], [10_000, 'Overleveled']],
-    (n) => `Get a companion to level ${count(n)}.`, COMPS[compIndex('paladin')].sprite, (n) => ({ t: 'level', n }), 1);
+    (n) => `Get a companion to level ${count(n)}.`, 'cr_gold_knight', (n) => ({ t: 'level', n }), 1);
   tiers('levelall', [[500, 'Loyal Company'], [1000, 'Legendary Company'], [2500, 'Mythic Company']],
     (n) => `Get every companion to level ${count(n)}.`, COMPS[0].sprite, (n) => ({ t: 'levelAll', n }), 1);
   tiers('clicks', [[100, 'Tap Tap'], [10_000, 'Clicker'], [100_000, 'Still Clicking'], [1e6, 'Carpal Tunnel']],
