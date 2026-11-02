@@ -16,6 +16,7 @@ const TRACKS = ['halls', 'crypts', 'warrens', 'tomb', 'rotting', 'grove', 'demon
 export type Track = (typeof TRACKS)[number];
 const MUSIC_VOL = 0.45;
 const FADE = 1.2;
+const RETRY_MS = 30_000;
 
 export interface PlayOpts {
   vol?: number;
@@ -165,7 +166,8 @@ export class Sfx {
     fetch(`${this.musicBase}/${t}.mp3`).then((r) => r.arrayBuffer()).then((b) => {
       this.musicRaw.set(t, b);
       if (this.ctx) this.decodeTrack(t);
-    }).catch(() => this.fetching.delete(t)); // try again next time it's wanted
+    // A failed fetch is tried again in a while (not on the next frame: a file that isn't there fails every time).
+    }).catch(() => setTimeout(() => this.fetching.delete(t), RETRY_MS));
   }
 
   private decodeTrack(t: Track) {
