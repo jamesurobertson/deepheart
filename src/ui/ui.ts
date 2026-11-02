@@ -54,6 +54,8 @@ const SKILL_TIP_MS = 6000;
 const COIN_REACH = 52;
 /** Coins start leaning toward whoever's collecting from this far out (px). */
 const COIN_MAGNET = 110;
+/** On a controller there's no quick mouse to sweep gold up: your hero reaches this much further. */
+const PAD_COIN_REACH = 2.6;
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -1983,7 +1985,8 @@ export class Ui {
     if (this.modal || !collectors.length) return;
     const now = performance.now();
     for (const [id, pile] of this.coinPiles) {
-      if (now >= pile.landsAt && this.scene.sweepCoins(id, collectors, COIN_REACH, COIN_MAGNET)) this.game.collectGold(id);
+      const k = padFamily() ? PAD_COIN_REACH : 1;
+      if (now >= pile.landsAt && this.scene.sweepCoins(id, collectors, COIN_REACH * k, COIN_MAGNET * k)) this.game.collectGold(id);
     }
   }
 
@@ -2178,7 +2181,7 @@ export class Ui {
               : state === 'auto' ? `<b>Auto upgrades<small>Companion upgrades you've bought before buy themselves</small></b>`
               : state === 'autohire' ? `<b>Auto levels<small>Companion levels you've bought before buy themselves</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
-              : (padFamily() ? `<b>Attack the monsters!<small>Hold ${padGlyph('a', 18)} to keep attacking</small></b>` : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`);
+              : (padFamily() ? `<b>Attack the monsters!<small>Tap ${padGlyph('a', 18)} to attack, hold it to keep attacking</small></b>` : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`);
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
   }
