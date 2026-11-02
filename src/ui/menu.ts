@@ -275,10 +275,12 @@ class Stairs {
     this.ctx = canvas.getContext('2d')!;
     this.actor = actor.getContext('2d')!;
     this.standOn = standOn;
-    // The party you've gathered, your hero leading; a new game has only the Squire, who joins first.
+    // The party you've gathered, your hero leading and the rest in the Keep's line (anyone not in it after); a new game
+    // has only the Squire, who joins first.
     const owned = COMPS.map((_, i) => i).filter((i) => game.s.owned[i] > 0);
     const hero = game.heroIndex();
-    const order = owned.length ? [...owned.filter((i) => i === hero), ...owned.filter((i) => i !== hero)] : [0];
+    const line = game.s.keepLine.map((id) => COMPS.findIndex((c) => c.id === id)).filter((i) => i !== hero && owned.includes(i));
+    const order = owned.length ? [...owned.filter((i) => i === hero), ...line, ...owned.filter((i) => i !== hero && !line.includes(i))] : [0];
     this.party = order.map((i) => ({ frames: spriteFrames(COMPS[i].sprite), run: spriteFrames(`${COMPS[i].sprite}_run`), phase: Math.random() }));
     canvas.addEventListener('pointerdown', (e) => this.press(e));
     canvas.addEventListener('blur', () => this.held.clear());
