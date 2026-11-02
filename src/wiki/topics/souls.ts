@@ -18,8 +18,8 @@ const soulsBody = () => `<p class="lede">Reach floor ${DESCEND_FLOOR} and you ca
   <p>Every soul you haven't spent adds +${pct(TUNE.soulPower, 0)} to all damage: 10 souls is +100%, 50 souls is +500%. Spend them on ${link('spirits', 'Spirits')} or ${link('heartmarks', 'Heartmarks')}. Spent souls stop adding damage.</p>
   ${h2('What an ascent keeps')}
   ${table(['Reset', 'Kept'], [[
-    'Gold<br>Companion levels and traits<br>Abilities and their cooldowns<br>Buffs and the Rampage meter<br>Your floor (back to 1)',
-    'Souls<br>Spirits<br>Heartmarks<br>Trophies<br>Cards<br>Your deepest floor ever (late companions stay unlocked)<br>Auto-buy\'s list of traits<br>Settings and your hero',
+    'Gold<br>Companion levels and upgrades<br>Abilities and their cooldowns<br>Buffs and the Rampage meter<br>Your floor (back to 1)',
+    'Souls<br>Spirits<br>Heartmarks<br>Trophies<br>Cards<br>Your deepest floor ever (late companions stay unlocked)<br>Auto-buy\'s list of upgrades<br>Settings and your hero',
   ]])}`;
 
 const boundTotal = (b: (typeof BOUND)[number], lv: number) => Array.from({ length: lv }, (_, l) => boundCost(b, l)).reduce((a, c) => a + c, 0);

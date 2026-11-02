@@ -100,12 +100,12 @@ const bossesBody = () => `<p class="lede">Every fifth floor is a boss fight agai
 /** Companions with gold traits, in roster order, and how many each has. */
 const goldTraits = COMPS.map((c, i) => [c.name, UPGRADES.filter((u) => u.req.t === 'owned' && u.req.comp === i && u.effect.t === 'gold').length] as const).filter(([, n]) => n);
 
-const goldBody = () => `<p class="lede">Gold buys companion levels and traits. Every kill drops some, bosses drop a floor's worth, and treasure goblins drop a lot.</p>
+const goldBody = () => `<p class="lede">Gold buys companion levels and upgrades. Every kill drops some, bosses drop a floor's worth, and treasure goblins drop a lot.</p>
   ${h2('Picking it up')}
   <p>A kill's gold drops on the floor as a pile. It banks itself after ${GOLD_WAIT} seconds, or straight away when your hero or your cursor passes near it. At most ${MAX_DROPS} piles lie around at once (the oldest banks itself), and leaving a floor or ascending banks everything.</p>
   ${h2('Gold bonuses')}
   ${table(['Source', 'Bonus'], [
-    [`Gold traits (${goldTraits.map(([name, n]) => `${name} ×${n}`).join(', ')})`, `+50% each, added together (up to +${goldTraits.reduce((sum, [, n]) => sum + 50 * n, 0)}%)`],
+    [`Gold upgrades (${goldTraits.map(([name, n]) => `${name} ×${n}`).join(', ')})`, `+50% each, added together (up to +${goldTraits.reduce((sum, [, n]) => sum + 50 * n, 0)}%)`],
     [link('spirit-hoard', 'The Hoard'), '+5% a level'],
     [link('spirit-patient', 'The Patient'), '+50% a level while idle'],
     [link('abilities', 'Treasure Sense'), '×3 for 30 seconds'],
