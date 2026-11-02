@@ -1362,7 +1362,9 @@ body.at-menu .hint, body.at-menu .toasts, body.at-menu .tip, body.at-menu .ticke
 .mm-credits a:hover { color: var(--gold-hi); }
 .mm-credits li span, .mm-by { color: #a8907c; }
 .mm-by { margin: 0; font-size: 20px; line-height: 1.2; max-width: 440px; }
-.mm-credits .mm-btn { align-self: flex-start; margin-top: 6px; }
+.mm-credits .mm-btn { align-self: flex-start; }
+/* Back stays at the bottom of the list as it scrolls, over a fade into the dark. */
+.mm-credits .mm-foot { position: sticky; bottom: 0; margin-top: -6px; padding: 26px 0 8px; background: linear-gradient(transparent, rgba(12, 8, 10, 0.92) 45%); }
 /* Phones and narrow windows: the menu over the stairs, which dim behind it. */
 @media (max-width: 760px) {
   .mm-panel { width: 100%; padding: 32px max(24px, calc(16px + var(--safe-l))); background: rgba(8, 4, 6, 0.72); }
