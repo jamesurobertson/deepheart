@@ -667,6 +667,9 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
 /* Panels with tabs hang from the top, so switching to a shorter tab doesn't move the tabs. */
 .modal-wrap:has(> .m-trophies, > .m-cards, > .m-abyss, > .m-marks, > .m-heart, > .m-stats, > .m-party, > .m-records, > .m-ascents) { align-items: start; }
 .modal-wrap:has(> .m-trophies, > .m-cards, > .m-abyss, > .m-marks, > .m-heart, > .m-stats, > .m-party, > .m-records, > .m-ascents) > .modal { margin-top: 20px; }
+/* Stays put while the window scrolls under it (out to the panel's edges, in its fill color). */
+.m-top { position: sticky; top: -12px; z-index: 2; margin: -12px -12px 0 -18px; padding: 12px 12px 0 18px; background: #1c1517; }
+body.compact .m-top { top: -8px; margin: -8px -8px 0 -12px; padding: 8px 8px 0 12px; }
 .m-head { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 2px solid #2d2224; }
 .m-head h2 { margin: 0; font: 400 38px/0.9 'Jersey 10'; letter-spacing: 1px; color: var(--gold-hi); text-shadow: var(--shadow); }
 .m-head span { flex: 1; font: 400 20px/1 'Jersey 10'; color: var(--dim); display: inline-flex; align-items: center; gap: 6px; }
@@ -1166,6 +1169,8 @@ body.phone .badge.hot, body.phone .badge.new { animation: none; }
 .bd tr.off th, .bd tr.off td { opacity: 0.45; }
 .bd tr.off td { color: var(--dim); }
 .bd tr.tot { border-top: 2px solid #5a3f2c; }
+.bd tr.asc-now th, .bd tr.asc-now td { color: var(--gold-hi); }
+.bd tr.asc-now small { display: inline; margin-left: 6px; }
 .bd tr.asc-awaken { border-top: 2px solid var(--ess); }
 .bd tr.asc-awaken th, .bd tr.asc-awaken td { color: var(--ess); }
 .bd tr.tot th { color: var(--gold-hi); font-weight: 700; }

@@ -7,7 +7,7 @@ import type { Drop, Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
-import { G, cardArt, charFit, keepDoor, silhouette, sprite, spriteFit, spriteFrames } from './px.ts';
+import { G, cardArt, charFit, keepDoor, silhouette, spiritForm, sprite, spriteFit, spriteFrames } from './px.ts';
 import { skillIcon } from './icons.ts';
 import { kokoSvg } from './koko.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
@@ -2563,7 +2563,7 @@ export class Ui {
     } else if (!DEMO && name === 'heart') {
       html = head('The Heart', g.s.awakens ? `${boundGlyph()} ${fmt(g.boundFree())} bound souls · ${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}` : '') + this.heartHtml();
     } else if (name === 'stats' || name === 'party' || name === 'records' || name === 'ascents') {
-      html = head('Stats') + this.statTabs(name) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
+      html = `<div class="m-top">${head('Stats')}${this.statTabs(name)}</div>` + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
     } else if (!DEMO && (name === 'dan' || name === 'victor')) {
       const who = name as Trader;
       html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${who === 'dan' ? 'Dan' : 'Victor'}`, who === 'dan' ? `Trade ${DAN_GIVES} cards for a random card` : `Trade ${VICTOR_GIVES} cards for 1 gold card`) + this.tradeHtml(who);
@@ -2646,7 +2646,7 @@ export class Ui {
       // No offer is rolled until Legends open: show the one that will be.
       const peds = g.previewOffer().map((id) => {
         const d = LEGEND_BY_ID.get(id)!;
-        const fig = stirring ? charFit(d.sprite, 84, 92) : silhouette(d.sprite, 84, '#0b0710');
+        const fig = stirring ? charFit(spiritForm(d.sprite), 84, 92) : silhouette(d.sprite, 84, '#0b0710');
         return `<div class="pedestal shade${stirring ? ' stirring' : ''}"><span class="spirit">${WISPS}</span><span class="ped-fig">${fig}</span><span class="ped-stone"></span></div>`;
       }).join('');
       return `<div class="legend-await"><div class="pedestals">${peds}</div><p>Spirits await after you ascend</p></div>`;
@@ -2657,7 +2657,8 @@ export class Ui {
     const pick = this.legendPick ? LEGEND_BY_ID.get(this.legendPick)! : null;
     const pedestals = offer.map((id) => {
       const d = LEGEND_BY_ID.get(id)!;
-      return `<button class="pedestal ${id === this.legendPick ? 'on' : 'ghost'}" data-pick="${id}"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 72, 96)}</span><span class="ped-stone"></span><b>${esc(d.name)}</b></button>`;
+      const on = id === this.legendPick;
+      return `<button class="pedestal ${on ? 'on' : 'ghost'}" data-pick="${id}"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(on ? d.sprite : spiritForm(d.sprite), 72, 96)}</span><span class="ped-stone"></span><b>${esc(d.name)}</b></button>`;
     }).join('');
     const summon = pick
       ? `<p class="legend-warn">Summon a Spirit for <b>${G.soul(2)} ${fmt(price)} soul${price === 1 ? '' : 's'}</b>. Every soul you spend gives up ${soulPct(1)} damage.</p>
@@ -2966,16 +2967,18 @@ export class Ui {
     return `<nav class="tabs">${tab('stats', 'Bonuses')}${tab('party', 'Companions')}${tab('records', 'Records')}${DEMO ? '' : tab('ascents', 'Ascents')}</nav>`;
   }
 
-  /** Every ascent so far: its run time, the deepest floor reached and the souls it paid. */
+  /** This run, then every ascent so far: its run time, the deepest floor reached and the souls it paid. */
   private ascentsHtml(): string {
     if (DEMO) return '';
-    const list = this.game.s.ascents;
+    const g = this.game;
+    const list = g.s.ascents;
     const clock = (t: number) => [Math.floor(t / 3600), Math.floor((t % 3600) / 60), Math.floor(t % 60)].map((n, i) => (i ? String(n).padStart(2, '0') : String(n))).join(':');
     let ascent = 0;
     const rows = list.map((a) => a.awakening
       ? `<tr class="asc-awaken"><th>Awakening ${a.awakening}</th><td>${clock(a.time)}</td><td>${fmt(a.floor)}</td><td>${boundGlyph(1.2)} ${fmt(a.bound ?? 0)}</td></tr>`
       : `<tr><th>${++ascent}</th><td>${clock(a.time)}</td><td>${fmt(a.floor)}</td><td>${G.soul(1.2)} ${fmt(a.souls)}</td></tr>`).reverse().join('');
-    return `<section class="bd wide bd-ascents"><table><thead><tr><th>Ascent</th><td>Time</td><td>Deepest floor</td><td>Souls</td></tr></thead>${rows || '<tr><th>No ascents yet.</th></tr>'}</table></section>`;
+    const now = `<tr class="asc-now"><th>${ascent + 1} <small>Now</small></th><td>${clock(g.s.runTime)}</td><td>${fmt(g.s.maxFloor)}</td><td>${G.soul(1.2)} ${fmt(g.pendingSouls())}</td></tr>`;
+    return `<section class="bd wide bd-ascents"><table><thead><tr><th>Ascent</th><td>Time</td><td>Deepest floor</td><td>Souls</td></tr></thead>${now}${rows}</table></section>`;
   }
 
   /** Where every number comes from: each multiplier on its own line, then the total. */
