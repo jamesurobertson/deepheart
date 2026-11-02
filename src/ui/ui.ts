@@ -1227,7 +1227,7 @@ export class Ui {
       }
       case 'spawn': {
         const m = g.monster(ev.id);
-        if (m?.boss && m.champ && !m.half) {
+        if (m?.boss && m.champ && !m.half && !g.s.inKeep) {
           this.banner('CHAMPION BOSS!', `${m.def.name} · tougher, richer, and it might drop a gold card`, 'loot');
           this.hooks.sound('drop4', { vol: 0.6 });
         }
@@ -1471,6 +1471,8 @@ export class Ui {
   }
 
   private banner(title: string, sub: string, cls = '') {
+    // Every banner is the dungeon's news: none over the Keep (a reload there still spawns the floor you left).
+    if (this.game.s.inKeep) return;
     // Nothing else takes the banner during a clutch kill's slow motion; it waits its turn after the CLUTCH! one.
     const cinema = this.cinemaUntil - performance.now();
     if (cinema > 0 && !/\bclutch\b/.test(cls)) {
@@ -2374,7 +2376,7 @@ export class Ui {
         return `<div class="tt-h"><b>How souls work</b></div>
           <p class="tt-d">You get them when you ascend.</p>
           <ul class="tt-l"><li>1 soul for every ${fmt(TUNE.levelsPerSoul)} companion levels.</li>
-          <li>Champion bosses (from floor ${fmt(TUNE.goldBossFrom)}+) give souls the first time you defeat them.</li></ul>
+          <li>Champion bosses (from floor ${fmt(TUNE.goldBossFrom)}+) give souls the first time you defeat them each run.</li></ul>
           <p class="tt-d">Each soul gives ${soulPct(1)} damage, or spend them on Spirits.</p>`;
       }
       if (kind === 'respec') {

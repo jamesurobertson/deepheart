@@ -124,6 +124,8 @@ const TRAIL_STEP = 0.08;
 const ENTRANCE_WIND: [number, number][] = [[18.5, 32.5], [21.2, 32.5], [28.4, 32.5]];
 /** Cells along the hero's trail between one follower and the next. */
 const GAP = 0.9;
+/** How far (in trail points) a companion's place has to move for it to cut across rather than run the trail. */
+const SWAP_JUMP = (1.5 * GAP) / TRAIL_STEP;
 
 /** Which tile shows where: '.' floor, '#' wall, ' ' nothing. Every wall shows a cap line where it meets the floor;
  *  a wall with floor below it shows a brick face, one beside the floor a thin edge. */
@@ -170,7 +172,7 @@ export class KeepView {
   private path: { x: number; y: number }[] = [];
   private cam = { x: 0, y: 0 };
   /** Where each of your party is standing and which way they face (they run to their places, never jump). */
-  private party = new Map<number, { idx: number; x: number; y: number; left: boolean; running: boolean; arriving?: { x: number; y: number }[] }>();
+  private party = new Map<number, { idx: number; want?: number; x: number; y: number; left: boolean; running: boolean; arriving?: { x: number; y: number }[] }>();
   /** Once the party has been placed: anyone joining after that runs in from somewhere out of sight. */
   private partyPlaced = false;
   private zoom = 3;
@@ -523,6 +525,22 @@ export class KeepView {
     const mine = this.guards().map(({ d, at }) => ({ ...figure(`legend:${d.id}`, d.name, at, 2), tag: [at[0], at[1] + 1.3] as [number, number] }));
     const bound = this.bound().map(({ b, at }) => ({ ...figure(`bound:${b.id}`, boundName(b), at, 2), tag: [at[0], at[1] + 1.3] as [number, number] }));
     return [...STATIONS, ...(this.game.tripsOpen() ? [TRIPS] : []), ...offer, ...mine, ...bound];
+  }
+
+  /** Your followers in line behind the hero. The line keeps its order (in the save, between visits): a new hero steps
+   *  out of it, the one it replaced steps in right behind, and someone new joins at the back. */
+  private lineUp(hero: number) {
+    const s = this.game.s;
+    const indexOf = (id: string) => COMPS.findIndex((c) => c.id === id);
+    const inParty = (i: number) => i >= 0 && i !== hero && this.game.inParty(i);
+    let line = s.keepLine.map(indexOf);
+    const was = s.keepHero ? indexOf(s.keepHero) : -1;
+    if (was !== hero && inParty(was)) line = [was, ...line.filter((i) => i !== was)];
+    line = line.filter(inParty);
+    for (let i = 0; i < COMPS.length; i++) if (inParty(i) && !line.includes(i)) line.push(i);
+    s.keepLine = line.map((i) => COMPS[i].id);
+    s.keepHero = hero >= 0 ? COMPS[hero].id : null;
+    return line;
   }
 
   /** A point along the trail, `idx` steps back from the hero (in between two points, part of the way). */
@@ -956,11 +974,11 @@ export class KeepView {
       const r = src.frames[tick % src.frames.length];
       standing.push({ y: p.y + 1, draw: () => (shadow(p.x + 0.5, p.y + 1, 6), standLit(p.id, src.img, r, p.x + 0.5, p.y + 1)) });
     }
-    // Your party: each has a place along your trail (the hero at its head) and runs there along the trail itself, so
-    // a new hero runs up the line to the front and the old one drops back into it, never through a wall.
+    // Your party: each has a place along your trail (the hero at its head) and keeps to it along the trail. One whose
+    // place jumps (a new hero to the front, the old one back into line) runs there the shortest way round the walls.
     const g0 = this.game;
     const heroIndex = g0.heroIndex();
-    const followers = COMPS.map((_, i) => i).filter((i) => g0.inParty(i) && i !== heroIndex);
+    const followers = this.lineUp(heroIndex);
     const places = new Map<number, number>(followers.map((i, k) => [i, ((k + 1) * GAP) / TRAIL_STEP]));
     if (heroIndex >= 0) places.set(heroIndex, 0);
     for (const [i, want] of places) {
@@ -979,6 +997,12 @@ export class KeepView {
           }
         }
       }
+      if (this.partyPlaced && at.want !== undefined && want !== at.want && Math.abs(want - at.idx) > SWAP_JUMP) {
+        const goal = this.along(want);
+        at.arriving = this.route(Math.floor(at.x), Math.floor(at.y), Math.floor(goal.x), Math.floor(goal.y));
+        at.idx = want;
+      }
+      at.want = want;
       if (at.arriving) {
         // Running in: along the path, then the last stretch straight to its place in line.
         const next = at.arriving[0] ?? this.along(at.idx);
