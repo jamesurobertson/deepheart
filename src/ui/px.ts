@@ -24,7 +24,15 @@ export function cardCanvas(card: CardDef, lap = 0): HTMLCanvasElement | null {
 /** Characters made by recoloring another sprite: Victor is Dan's sprite with brown hair and a blue shirt. */
 const VARIANTS: Record<string, { base: string; swap: Record<string, string> }> = {
   victor: { base: 'ef_elf_m', swap: { '#facb3e': '#9a6a3a', '#ee8e2e': '#6a4024', '#c56025': '#3f6aa8', '#62232f': '#263a66' } },
+  // Spirit forms (a Spirit's sprite as `spiritForm` draws it): the Hourglass's green eyes are as bright as its face, so
+  // the spirit look's grayscale lost them; dark, they show.
+  sd_magic_shopkeeper_spirit: { base: 'sd_magic_shopkeeper', swap: { '#97da3f': '#2b2140' } },
 };
+
+/** The sprite to draw a Spirit with in spirit form (purple and see-through): its own, or a variant that keeps its face. */
+export function spiritForm(sprite: string) {
+  return VARIANTS[`${sprite}_spirit`] ? `${sprite}_spirit` : sprite;
+}
 const variants = new Map<string, { img: HTMLCanvasElement; frames: Rect[] }>();
 
 /** A variant's frames (`victor`, or `victor_run` for walking), recolored onto their own little sheet. */

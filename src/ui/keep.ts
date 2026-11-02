@@ -3,7 +3,7 @@ import type { Atlas, Rect } from '../render/atlas.ts';
 import { BOUND, COMPS, LEGENDS, LEGEND_BY_ID, ZONES, boundName, type BoundId, type LegendId } from '../game/data.ts';
 import type { Game } from '../game/game.ts';
 import { KOKO_EYE, KOKO_FUR, KOKO_ROWS, KOKO_TAIL } from './koko.ts';
-import { spriteFrames, uiAtlas } from './px.ts';
+import { spiritForm, spriteFrames, uiAtlas } from './px.ts';
 
 /**
  * The Keep, the castle above the dungeon: a top-down map in the dungeon's own tiles. You come up the stairs in the
@@ -779,8 +779,10 @@ export class KeepView {
     // An offered one you're standing at comes into its own colors in a flash, and fades back when you step away.
     const spirit = (sprite: string, [x, y]: [number, number], k: number, scale = 2, id?: KeepStation, fx?: { dy: number; alpha: number; sy: number; flash: number }) => {
       const src = spriteFrames(sprite);
-      if (!src) return;
+      const ghost = spriteFrames(spiritForm(sprite)) ?? src;
+      if (!src || !ghost) return;
       const r = src.frames[(tick + k) % src.frames.length];
+      const gr = ghost.frames[(tick + k) % ghost.frames.length];
       const bob = Math.sin(this.time * 1.6 + k * 2) * 0.12;
       const lit = this.lit.get(sprite) ?? { amt: 0, flash: 0 };
       const want = id && (this.pinned ?? this.near) === id ? 1 : 0;
@@ -800,7 +802,7 @@ export class KeepView {
         if (lit.amt < 1) {
           g.globalAlpha = 0.86 * (1 - lit.amt) * (fx?.alpha ?? 1);
           g.filter = `grayscale(1) sepia(1) hue-rotate(215deg) saturate(2.6) brightness(${1.15 + (fx?.flash ?? 0) * 1.8}) drop-shadow(0 0 3px rgba(179, 140, 255, 0.9))`;
-          g.drawImage(src.img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+          g.drawImage(ghost.img, gr.x, gr.y, gr.w, gr.h, 0, 0, gr.w, gr.h);
         }
         if (lit.amt > 0) {
           g.globalAlpha = lit.amt;
