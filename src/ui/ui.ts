@@ -695,6 +695,8 @@ export class Ui {
         const aim = padFamily() ? this.scene.heroScreen(this.game) : this.pointer;
         const at = aim ?? { x: -1, y: -1 };
         const id = aim ? this.scene.pick(at.x, at.y) : null;
+        // (A controller's attack counts as being at a monster, as the mouse over one does, for the hints that wait on it.)
+        if (padFamily() && id !== null) this.onMonsterAt = performance.now();
         if (e.key === ' ') {
           this.spaceHeld = true;
           this.game.hold = { id, ...at };
@@ -1538,6 +1540,7 @@ export class Ui {
     if (padFamily() && this.spaceHeld && this.game.hold) {
       const at = this.scene.heroScreen(this.game);
       if (at) this.game.hold = { id: this.scene.pick(at.x, at.y), ...at };
+      if (this.game.hold?.id != null) this.onMonsterAt = performance.now();
     }
     const g = this.game;
     if (!DEMO && g.s.inKeep && !this.keepView) {
@@ -2633,7 +2636,7 @@ export class Ui {
         [pad('lt', 'left', 'right'), 'Floor down, floor up'],
         [pad('lt', 'down'), 'Auto'],
         [pad('view'), 'Ascend'],
-        [pad('menu'), 'Menu'],
+        [pad('menu'), 'Browse the screen'],
         [pad('b'), 'Back'],
       ] : [
         [cap('W', 'A', 'S', 'D'), 'Move'],

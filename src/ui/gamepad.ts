@@ -1,13 +1,15 @@
 /** Controller support, with no cursor: everything has a button. The left stick walks your hero (it catches goblins and
  *  picks up what it walks over, as with the keys) and A attacks the monster nearest them. The d-pad's ▲ ▼ (or the right
  *  stick) pick a companion in your party: RT levels it, X buys its next upgrade, R3 makes it your hero; ◀ ▶ change how
- *  many levels a buy is. LB, RB and Y use abilities, and with LT held three more (LT with ◀ ▶ changes floor). Menu opens
- *  the dock (step along it, A opens what's there), View opens Ascend, B backs out. In a window or on the title screen
+ *  many levels a buy is. LB, RB and Y use abilities, and with LT held three more (LT with ◀ ▶ changes floor). Menu lets
+ *  the d-pad step to any button on screen (reading its tooltip; A presses it), View opens Ascend, B backs out. In a window or on the title screen
  *  the sticks and d-pad step between buttons and LB RB change tabs. Prompts show the controller's own buttons (Kenney's Input Prompts, by kind of pad) while it's the last
  *  thing used; the mouse, keyboard or a finger puts the usual words back. */
 const REACH = 'button:not([disabled]), a[href], [tabindex="0"], input:not([disabled])';
-/** In a window, anything with a tooltip can be stepped to as well (a trophy, a card), to read it. */
+/** In a window, or around the screen from Menu, anything with a tooltip can be stepped to as well (a trophy, a card,
+ *  an ability), to read it. */
 const REACH_WINDOW = `${REACH}, .modal-wrap [data-tip]`;
+const REACH_SCREEN = `${REACH}, #ui [data-tip]`;
 const DEAD_ZONE = 0.35;
 const REPEAT_MS = 220;
 /** How often a held RT buys again (after a longer first wait, so one press buys once). */
@@ -64,7 +66,7 @@ const visible = (el: HTMLElement) => {
 
 /** The nearest visible control in a direction, by distance along that direction with a penalty for drifting off it. */
 function neighbor(from: HTMLElement | null, dir: Dir, scope: ParentNode): HTMLElement | null {
-  const reach = scope instanceof Element && scope.matches('.modal-wrap') ? REACH_WINDOW : REACH;
+  const reach = !(scope instanceof Element) ? REACH : scope.matches('.modal-wrap') ? REACH_WINDOW : scope.matches('#ui') ? REACH_SCREEN : REACH;
   const items = [...scope.querySelectorAll<HTMLElement>(reach)].filter((el) => !el.parentElement?.closest(reach) || el.matches('button, a, input')).filter((el) => visible(el) && !el.matches('canvas'));
   if (!from || !items.includes(from)) return items[0] ?? null;
   const origin = from.getBoundingClientRect();
@@ -102,14 +104,15 @@ export function installGamepad() {
   let pickedRow: HTMLElement | null = null;
   let stickAt = 0;
   let barKey = '';
-  /** Menu put the focus on the dock (Collection … Options): the d-pad steps along it until A opens one or B leaves. */
+  /** Menu put the focus on the screen's buttons (starting on the dock): the d-pad steps anywhere (abilities, the floor,
+   *  your party, the dock), each shows its tooltip, A presses it, B goes back to playing. */
   let docked = false;
   let focusTip: HTMLElement | null = null;
 
   const modalOpen = () => !!document.querySelector('.modal-wrap:not([hidden])');
   const titleOpen = () => !!document.querySelector('.title-menu');
   const inKeep = () => document.body.classList.contains('in-keep');
-  const scope = (): ParentNode => document.querySelector('.modal-wrap:not([hidden])') ?? document.querySelector('.title-menu') ?? document.querySelector('.dock') ?? document;
+  const scope = (): ParentNode => document.querySelector('.modal-wrap:not([hidden])') ?? document.querySelector('.title-menu') ?? document.getElementById('ui') ?? document;
   const rows = () => [...document.querySelectorAll<HTMLElement>('.gens .gen[data-comp]')].filter(visible);
   const focused = () => (document.activeElement && document.activeElement !== document.body ? document.activeElement as HTMLElement : null);
   /** The d-pad (or a stick) lands on a button: focused, with its tooltip. */
@@ -189,7 +192,7 @@ export function installGamepad() {
     const modal = modalOpen();
     const items: [string[], string][] = modal ? [[['a'], 'Select'], [['b'], 'Back']]
       : titleOpen() ? [[['a'], 'Select']]
-      : docked ? [[['a'], 'Open'], [['b'], 'Back']]
+      : docked ? [[['a'], 'Select'], [['b'], 'Back']]
       : inKeep() ? [[['ls'], 'Walk'], [['a'], 'Use'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['menu'], 'Menu']]
       : [[['ls'], 'Move'], [['a'], 'Attack'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['view'], 'Ascend'], [['menu'], 'Menu']];
     if (modal && document.querySelector('.modal-wrap:not([hidden]) .tabs')) items.splice(1, 0, [['lb', 'rb'], 'Tabs']);
@@ -244,7 +247,7 @@ export function installGamepad() {
     if ([...down].some((b) => !held.has(b)) || Math.hypot(lx, ly) > DEAD_ZONE || Math.abs(ry) > 0.5 || Math.abs(rx) > 0.5) use(familyOf(pad));
     const modal = modalOpen();
     const title = titleOpen();
-    if (docked && (modal || title || !document.querySelector('.dock')?.contains(document.activeElement))) {
+    if (docked && (modal || title || !document.getElementById('ui')?.contains(document.activeElement))) {
       if (modal || title) docked = false;
       else leaveDock();
     }
@@ -271,9 +274,7 @@ export function installGamepad() {
       }
       heldDir = dir;
       if (fresh('b0')) {
-        const el = focused() ?? neighbor(null, 'down', scope());
-        if (docked) leaveDock();
-        click(el);
+        click(focused() ?? neighbor(null, 'down', scope()));
       }
       if (modal && (fresh('b4') || fresh('b5'))) {
         const tabs = [...document.querySelectorAll<HTMLElement>('.modal-wrap:not([hidden]) .tabs .tab')].filter(visible);
