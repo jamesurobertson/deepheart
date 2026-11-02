@@ -60,7 +60,9 @@ interface Shard {
 }
 
 interface Spray {
-  mesh: THREE.InstancedMesh<THREE.BoxGeometry, THREE.MeshLambertMaterial>;
+  n: number;
+  /** Each droplet's color: the blood's, a little lighter or darker. */
+  color: Float32Array;
   pos: Float32Array;
   vel: Float32Array;
   size: Float32Array;
@@ -69,7 +71,9 @@ interface Spray {
 }
 
 interface Stain {
-  mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshLambertMaterial>;
+  splat: number;
+  matrix: THREE.Matrix4;
+  color: THREE.Color;
   life: number;
   max: number;
 }
@@ -224,6 +228,8 @@ const MAX_SHATTERS = 10;
 const MAX_SPRAYS = 40;
 const MAX_STAINS = 50;
 const SPRAY_LIFE = 4;
+/** The most droplets a spray throws (a boss's death). */
+const SPRAY_MOST = 30;
 const STAIN_LIFE = 9;
 
 /**
@@ -548,6 +554,47 @@ class Sparks {
   }
 }
 
+/** Many of one thing in one draw, each with its own matrix, color and fade, filled afresh every frame: blood droplets
+ *  and stains were a mesh (and a material) each. */
+class Pool {
+  private mesh: THREE.InstancedMesh;
+  private alpha: THREE.InstancedBufferAttribute;
+
+  constructor(scene: THREE.Scene, geometry: THREE.BufferGeometry, material: THREE.Material, size: number, renderOrder: number) {
+    material.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float poolAlpha;\nvarying float vPoolAlpha;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPoolAlpha = poolAlpha;');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vPoolAlpha;')
+        .replace('#include <alphamap_fragment>', '#include <alphamap_fragment>\ndiffuseColor.a *= vPoolAlpha;');
+    };
+    this.alpha = new THREE.InstancedBufferAttribute(new Float32Array(size), 1);
+    this.mesh = new THREE.InstancedMesh(geometry.clone(), material, size);
+    this.mesh.geometry.setAttribute('poolAlpha', this.alpha);
+    this.mesh.setColorAt(0, new THREE.Color());
+    this.mesh.count = 0;
+    this.mesh.renderOrder = renderOrder;
+    this.mesh.frustumCulled = false;
+    scene.add(this.mesh);
+  }
+
+  /** Slot `i` this frame: a matrix, a color (from `rgb` at `at`, or `color` when `at` is -1) and a fade. */
+  add(i: number, matrix: THREE.Matrix4, rgb: Float32Array | THREE.Color, at: number, alpha: number) {
+    if (i >= this.alpha.count) return;
+    this.mesh.setMatrixAt(i, matrix);
+    const colors = this.mesh.instanceColor!.array as Float32Array;
+    if (rgb instanceof THREE.Color) colors.set([rgb.r, rgb.g, rgb.b], i * 3);
+    else colors.set(rgb.subarray(at, at + 3), i * 3);
+    this.alpha.array[i] = alpha;
+  }
+
+  done(n: number) {
+    this.mesh.count = Math.min(n, this.alpha.count);
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.mesh.instanceColor!.needsUpdate = true;
+    this.alpha.needsUpdate = true;
+  }
+}
+
 export class Fx {
   /** How deep the floor is at (x, z) (below 0 over an opening): blood lands there, or doesn't stain at all. */
   floorY: (x: number, z: number) => number = () => 0;
@@ -568,10 +615,16 @@ export class Fx {
   private chains: Chain[] = [];
   private sprays: Spray[] = [];
   private stains: Stain[] = [];
+  private drops: Pool;
+  private splats: Pool[];
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
     this.sparks = new Sparks(scene);
+    this.drops = new Pool(scene, CUBE, new THREE.MeshLambertMaterial({ transparent: true }), MAX_SPRAYS * SPRAY_MOST, 0);
+    this.splats = SPLATS.map((map) => new Pool(scene, SPLAT_GEO, new THREE.MeshLambertMaterial({
+      map, transparent: true, depthWrite: false, alphaTest: 0.1, polygonOffset: true, polygonOffsetFactor: -2,
+    }), MAX_STAINS, 1));
     // A small pool of lights for impacts; reusing them avoids shader recompiles.
     for (let i = 0; i < 4; i++) {
       const light = new THREE.PointLight(0xffffff, 0, 9, 1.6);
@@ -609,12 +662,13 @@ export class Fx {
    * `dirX`. They arc down, land, flatten into little stains on the floor and fade later.
    */
   spray(at: THREE.Vector3, color: THREE.ColorRepresentation, n: number, dirX = 1, power = 1) {
-    while (this.sprays.length >= MAX_SPRAYS) this.dropSpray(0);
-    const mesh = new THREE.InstancedMesh(CUBE, new THREE.MeshLambertMaterial({ color, transparent: true }), n);
+    while (this.sprays.length >= MAX_SPRAYS) this.sprays.shift();
+    n = Math.min(n, SPRAY_MOST);
     const pos = new Float32Array(n * 3);
     const vel = new Float32Array(n * 3);
     const size = new Float32Array(n);
-    const shade = new THREE.Color();
+    const tints = new Float32Array(n * 3);
+    const base = new THREE.Color(color);
     for (let i = 0; i < n; i++) {
       pos[i * 3] = at.x + (Math.random() - 0.5) * 0.15;
       pos[i * 3 + 1] = at.y + (Math.random() - 0.5) * 0.15;
@@ -625,46 +679,25 @@ export class Fx {
       // Pixel-sized: one or two sprite pixels across.
       size[i] = (Math.random() < 0.7 ? 1 : 2) / 16 * 1.2;
       // A little tonal variety so it doesn't read as flat paint.
-      mesh.setColorAt(i, shade.setScalar(0.75 + Math.random() * 0.35));
+      const shade = 0.75 + Math.random() * 0.35;
+      tints.set([base.r * shade, base.g * shade, base.b * shade], i * 3);
     }
-    mesh.instanceColor!.needsUpdate = true;
-    mesh.frustumCulled = false;
-    this.scene.add(mesh);
-    this.sprays.push({ mesh, pos, vel, size, landed: new Uint8Array(n), life: SPRAY_LIFE });
+    this.sprays.push({ n, color: tints, pos, vel, size, landed: new Uint8Array(n), life: SPRAY_LIFE });
   }
 
   /** A pixel-art splat on the floor, tinted `color`, that fades out slowly. */
   bloodSplat(at: THREE.Vector3, color: THREE.ColorRepresentation, size = 0.9) {
     // (Not over an opening in the floor: there's nothing there for it to lie on.)
     if (this.floorY(at.x, at.z) < 0) return;
-    while (this.stains.length >= MAX_STAINS) this.dropStain(0);
-    const mesh = new THREE.Mesh(SPLAT_GEO, new THREE.MeshLambertMaterial({
-      map: SPLATS[Math.floor(Math.random() * SPLATS.length)], color, transparent: true, depthWrite: false, alphaTest: 0.1,
-      polygonOffset: true, polygonOffsetFactor: -2,
-    }));
+    while (this.stains.length >= MAX_STAINS) this.stains.shift();
     // Snap to the floor's pixel grid so it sits in the tiles like it belongs there.
     const px = size / 20;
-    mesh.position.set(Math.round(at.x / px) * px, 0.011 + Math.random() * 0.002, Math.round(at.z / px) * px);
-    mesh.rotation.y = Math.floor(Math.random() * 4) * (Math.PI / 2);
-    mesh.scale.set(size, 1, size);
-    mesh.renderOrder = 1;
-    this.scene.add(mesh);
-    this.stains.push({ mesh, life: STAIN_LIFE, max: STAIN_LIFE });
-  }
-
-  private dropSpray(i: number) {
-    const s = this.sprays[i];
-    this.scene.remove(s.mesh);
-    s.mesh.material.dispose();
-    s.mesh.dispose();
-    this.sprays.splice(i, 1);
-  }
-
-  private dropStain(i: number) {
-    const s = this.stains[i];
-    this.scene.remove(s.mesh);
-    s.mesh.material.dispose();
-    this.stains.splice(i, 1);
+    dummy.position.set(Math.round(at.x / px) * px, 0.011 + Math.random() * 0.002, Math.round(at.z / px) * px);
+    dummy.rotation.set(0, Math.floor(Math.random() * 4) * (Math.PI / 2), 0);
+    dummy.scale.set(size, 1, size);
+    dummy.updateMatrix();
+    const splat = Math.floor(Math.random() * SPLATS.length);
+    this.stains.push({ splat, matrix: dummy.matrix.clone(), color: new THREE.Color(color), life: STAIN_LIFE, max: STAIN_LIFE });
   }
 
   /** A new floor: the last one's blood and spray fade out quickly (their opacity follows their life from these). */
@@ -675,8 +708,8 @@ export class Fx {
 
   /** A new room (the stairwell, a new zone): nothing on the floor comes along. */
   clearGround() {
-    while (this.stains.length) this.dropStain(0);
-    while (this.sprays.length) this.dropSpray(0);
+    this.stains = [];
+    this.sprays = [];
     for (const d of this.decals) d.life = 0;
   }
 
@@ -1191,11 +1224,11 @@ export class Fx {
       sh.mesh.instanceMatrix.needsUpdate = true;
       if (sh.life <= 0) this.dropShard(i);
     }
-    for (let i = this.sprays.length - 1; i >= 0; i--) {
-      const sp = this.sprays[i];
+    let drops = 0;
+    for (const sp of this.sprays) {
       sp.life -= dt;
-      const n = sp.mesh.count;
-      for (let k = 0; k < n; k++) {
+      const alpha = Math.max(0, Math.min(1, sp.life / 1.2));
+      for (let k = 0; k < sp.n; k++) {
         const o = k * 3;
         const sz = sp.size[k];
         if (!sp.landed[k]) {
@@ -1215,18 +1248,19 @@ export class Fx {
         if (sp.landed[k]) dummy.scale.set(sz * 1.3, 0.004, sz * 1.1);
         else dummy.scale.setScalar(sz);
         dummy.updateMatrix();
-        sp.mesh.setMatrixAt(k, dummy.matrix);
+        this.drops.add(drops++, dummy.matrix, sp.color, o, alpha);
       }
-      sp.mesh.instanceMatrix.needsUpdate = true;
-      sp.mesh.material.opacity = Math.min(1, sp.life / 1.2);
-      if (sp.life <= 0) this.dropSpray(i);
     }
-    for (let i = this.stains.length - 1; i >= 0; i--) {
-      const st = this.stains[i];
+    this.sprays = this.sprays.filter((sp) => sp.life > 0);
+    this.drops.done(drops);
+    const splats = SPLATS.map(() => 0);
+    for (const st of this.stains) {
       st.life -= dt;
-      st.mesh.material.opacity = Math.min(0.92, st.life / 2.5);
-      if (st.life <= 0) this.dropStain(i);
+      const pool = this.splats[st.splat];
+      pool.add(splats[st.splat]++, st.matrix, st.color, -1, Math.max(0, Math.min(0.92, st.life / 2.5)));
     }
+    this.stains = this.stains.filter((st) => st.life > 0);
+    this.splats.forEach((pool, k) => pool.done(splats[k]));
     for (const f of this.flashes) {
       f.life = Math.max(0, f.life - dt);
       const k = f.life / f.max;

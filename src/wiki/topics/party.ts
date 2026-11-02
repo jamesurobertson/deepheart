@@ -90,7 +90,8 @@ const attacksBody = () => `<p class="lede">You attack by clicking, tapping, or h
     [`Traits (${critChance.names})`, `+${pct(critChance.total, 0)} in all`, ''],
     [`Traits (${critDamage.names})`, '', `+${critDamage.total}× in all`],
     ['War Drums', `+${pct(DRUMS_CRIT, 0)} for its duration`, ''],
-    [link('spirit-needle', 'The Needle'), '', '×(1 + 0.15 a level)'],
+    [link('spirit-needle', 'The Needle'), 'up to +50%', ''],
+    [link('spirit-breaker', 'The Breaker'), '', '×(1 + 0.15 a level)'],
   ])}
   ${h2('Streaks')}
   <p>Each attack within ${STREAK_GAP} seconds of the last adds to your streak, up to ${STREAK_CAP.toLocaleString('en-US')}. Stop for ${STREAK_GAP} seconds and it starts over. ${link('spirit-unbroken', 'The Unbroken')} turns your streak into damage.</p>

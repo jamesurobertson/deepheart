@@ -212,7 +212,7 @@ const byNumber = (a: string, b: string) => Number(a.match(/(\d+)\.png$/)![1]) - 
 }
 {
   const dir = join(SRC, 'fantasy-npcs/Fantasy RPG NPCs - Individuel Frames');
-  for (const folder of ['Executioner', 'Mountain King', 'Merchant', 'Magic Shopkeeper', 'Bishop', 'Butcher', 'Princess', 'King', 'Knight - Elite', 'Knight - Heavy']) {
+  for (const folder of ['Executioner', 'Mountain King', 'Merchant', 'Magic Shopkeeper', 'Bishop', 'Butcher', 'Princess', 'King', 'Knight - Elite', 'Knight - Heavy', 'Large Knight - Elite']) {
     const files = readdirSync(join(dir, folder)).filter((f) => f.endsWith('.png')).sort(byNumber);
     const read = (re: RegExp) => files.filter((f) => re.test(f)).map((f) => whole(readPng(join(dir, folder, f))));
     const both = read(/_Idle \+ Walk_/);

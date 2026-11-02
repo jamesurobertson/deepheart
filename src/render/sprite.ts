@@ -147,15 +147,57 @@ export class PixelSprite {
   }
 }
 
-/** Soft oval contact shadow; grounds sprites without shadow maps. */
-export function blobShadow(width: number): THREE.Mesh {
-  const m = new THREE.Mesh(SHADOW_GEO, SHADOW_MAT);
+/** Soft oval contact shadow; grounds sprites without shadow maps. Only a place in the scene: BlobShadows draws every
+ *  one in the room at once, where these sit. */
+export class BlobShadow extends THREE.Object3D {
+  /** Fades it (a raider running off fades out with its shadow). */
+  opacity = 1;
+}
+
+export function blobShadow(width: number): BlobShadow {
+  const m = new BlobShadow();
   m.rotation.x = -Math.PI / 2;
   m.scale.set(width, width * 0.38, 1);
   m.position.y = 0.012;
-  m.renderOrder = 1;
   return m;
 }
 
-const SHADOW_GEO = new THREE.CircleGeometry(0.5, 20);
-const SHADOW_MAT = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.42, depthWrite: false });
+const SHADOWS = 512;
+
+/** Every blob shadow in one draw: each was a mesh of its own, one per companion and monster. */
+export class BlobShadows {
+  private mesh: THREE.InstancedMesh;
+  private alpha = new THREE.InstancedBufferAttribute(new Float32Array(SHADOWS), 1);
+
+  constructor(scene: THREE.Scene) {
+    const material = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.42, depthWrite: false });
+    material.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float shadowAlpha;\nvarying float vShadowAlpha;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvShadowAlpha = shadowAlpha;');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vShadowAlpha;')
+        .replace('#include <alphamap_fragment>', '#include <alphamap_fragment>\ndiffuseColor.a *= vShadowAlpha;');
+    };
+    const geometry = new THREE.CircleGeometry(0.5, 20);
+    geometry.setAttribute('shadowAlpha', this.alpha);
+    this.mesh = new THREE.InstancedMesh(geometry, material, SHADOWS);
+    this.mesh.count = 0;
+    this.mesh.renderOrder = 1;
+    this.mesh.frustumCulled = false;
+    scene.add(this.mesh);
+  }
+
+  /** Each shadow to where it is now (after everything has moved, before the frame is drawn). */
+  sync(scene: THREE.Scene) {
+    scene.updateMatrixWorld();
+    let n = 0;
+    scene.traverseVisible((o) => {
+      if (!(o instanceof BlobShadow) || n >= SHADOWS) return;
+      this.mesh.setMatrixAt(n, o.matrixWorld);
+      this.alpha.array[n] = o.opacity;
+      n++;
+    });
+    this.mesh.count = n;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.alpha.needsUpdate = true;
+  }
+}

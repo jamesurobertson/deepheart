@@ -13,7 +13,8 @@ const BOOSTED_BY: Record<string, string> = { wither: 'troll', soulcaller: 'golem
 const HOW: Record<string, string> = {
   sleeper: 'Multiplies your party\'s damage by 1 + 0.25 × level while you are idle (no attack by hand for 60 seconds). Time away counts as idle.',
   fist: 'Multiplies your click damage, and with it the Phantom Blade\'s, by 1 + 0.1 × level.',
-  needle: 'Adds 0.15 × level to the critical hit multiplier.',
+  breaker: 'Multiplies the critical hit multiplier by 1 + 0.15 × level.',
+  needle: 'Adds critical hit chance, closing in on +50%: each level adds a tenth of what\'s left.',
   hoard: 'Multiplies all gold by 1 + 0.05 × level.',
   patient: 'Multiplies gold by 1 + 0.5 × level while you are idle. Time away counts as idle.',
   goblinking: 'Multiplies the gold from treasure goblins and from the Rainbow Vault\'s chests by 1 + 0.5 × level.',
