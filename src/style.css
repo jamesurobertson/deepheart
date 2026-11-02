@@ -415,13 +415,17 @@ body.ui-hidden .ticker { left: 180px; right: 180px; text-align: center; }
   text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink);
   animation: popup 0.9s ease-out forwards;
 }
-.pop.p-crit { font-size: 52px; color: var(--gold-hi); animation-duration: 1.2s; z-index: 3; }
+/* Hit colors, the classic action-RPG way: white hits, crits pale to strong yellow, the biggest orange. */
+.pop.p-crit { font-size: 52px; color: #ffd21f; animation-duration: 1.2s; z-index: 3; }
 .pop.p-crit::after { content: '!'; }
+/* Crits by how they rolled: the bottom of the range a paler, smaller yellow; the top a big orange with a glow. */
+.pop.p-crit.p-low { font-size: 42px; color: #fff3a0; }
+.pop.p-crit.p-top { font-size: 66px; color: #ff8a1a; z-index: 4; text-shadow: 0 3px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 0 0 16px rgba(255, 122, 0, 0.8); }
 .pop.p-arc { animation: none; }
-.pop.p-fever { color: #ff9aae; font-size: 38px; z-index: 2; }
-.pop.p-dps { font-size: 22px; color: #d8cfe6; animation-name: popdps; animation-duration: 0.8s; }
-.pop.p-cleave { font-size: 20px; color: #ffd0c8; opacity: 0.9; }
-.pop.p-gold { font-size: 22px; color: var(--gold-hi); animation-name: popgold; animation-duration: 1s; }
+.pop.p-fever { color: #fff; font-size: 34px; z-index: 2; }
+.pop.p-dps { font-size: 22px; color: #c9c9c9; animation-name: popdps; animation-duration: 0.8s; }
+.pop.p-cleave { font-size: 20px; color: #e6e6e6; opacity: 0.9; }
+.pop.p-gold { font-size: 22px; color: #ffd84a; animation-name: popgold; animation-duration: 1s; }
 .pop.p-gold.p-big { font-size: 40px; }
 .pop.p-gold.p-sweep { font-size: 30px; white-space: nowrap; }
 .coin-fly { position: absolute; pointer-events: none; z-index: 4; filter: drop-shadow(0 0 5px rgba(255, 210, 100, 0.95)); }
@@ -610,7 +614,7 @@ body.phone .ab { width: 44px; height: 44px; border-width: 5px; }
   box-shadow: 0 0 6px rgba(255, 220, 120, 0.95); animation: spark 0.45s ease-out forwards;
 }
 @keyframes spark { to { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; } }
-.pop.p-pick { font-size: 20px; color: var(--gold-hi); animation-name: popgold; animation-duration: 0.8s; z-index: 3; }
+.pop.p-pick { font-size: 20px; color: #ffd84a; animation-name: popgold; animation-duration: 0.8s; z-index: 3; }
 @media (prefers-reduced-motion: reduce) { .sparks b, .coin-fly .px { animation: none; } }
 .gen-lv { font: 400 28px/1 'Jersey 10'; color: rgba(241, 228, 204, 0.55); text-shadow: var(--shadow); font-weight: 400; }
 .gen-dps { font: 400 18px/1 'Jersey 10'; color: var(--dim); text-shadow: var(--shadow); }
@@ -1096,7 +1100,7 @@ body.compact .cur { width: auto; height: auto; aspect-ratio: 1; }
 .hp-mods { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 3px; white-space: nowrap; }
 .tt-l .mod { margin-right: 4px; vertical-align: 1px; }
 
-.pop.p-heal { font-size: 22px; color: #8cf07e; animation-name: popdps; animation-duration: 0.9s; }
+.pop.p-heal { font-size: 22px; color: #47ff47; animation-name: popdps; animation-duration: 0.9s; }
 .pop.p-mod { font-size: 44px; color: #e4b4ff; z-index: 3; }
 
 /* Descend / Awaken tabs on the prestige screen. */

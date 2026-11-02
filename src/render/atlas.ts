@@ -47,10 +47,17 @@ export class Atlas {
 
   has(name: string): boolean {
     if (this.rects.has(name)) return true;
+    const known = this.animated.get(name);
+    if (known !== undefined) return known;
     const prefix = `${name}_anim_f`;
-    for (const k of this.rects.keys()) if (k.startsWith(prefix) && /^\d+$/.test(k.slice(prefix.length))) return true;
-    return false;
+    let found = false;
+    for (const k of this.rects.keys()) if (k.startsWith(prefix) && /^\d+$/.test(k.slice(prefix.length))) found = true;
+    this.animated.set(name, found);
+    return found;
   }
+  // (has() and anim() scan every sprite name, and the Keep asks for each thing on every frame: kept once found.)
+  private animated = new Map<string, boolean>();
+  private anims = new Map<string, Rect[]>();
 
   /**
    * Frames for an animation base name, or the single frame if not animated.
@@ -58,14 +65,19 @@ export class Atlas {
    * list has quirks (e.g. the zombie's first frame is named `zombie_anim_f10`).
    */
   anim(base: string): Rect[] {
+    const known = this.anims.get(base);
+    if (known) return known;
     const prefix = `${base}_anim_f`;
     const frames = [...this.rects.entries()]
       .filter(([k]) => k.startsWith(prefix) && /^\d+$/.test(k.slice(prefix.length)))
       .map(([k, r]) => [Number(k.slice(prefix.length)) % 10, r] as const)
       .sort((a, b) => a[0] - b[0])
       .map(([, r]) => r);
-    if (frames.length) return frames;
-    if (this.rects.has(base)) return [this.rects.get(base)!];
+    if (!frames.length && this.rects.has(base)) frames.push(this.rects.get(base)!);
+    if (frames.length) {
+      this.anims.set(base, frames);
+      return frames;
+    }
     throw new Error(`atlas: no animation "${base}"`);
   }
 

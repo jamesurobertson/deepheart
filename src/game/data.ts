@@ -578,7 +578,7 @@ export function modsFor(floor: number): ModId[] {
 // ---------- Legends (spending souls) ----------
 
 export type LegendId =
-  | 'sleeper' | 'fist' | 'needle' | 'hoard' | 'patient' | 'goblinking' | 'unbroken'
+  | 'sleeper' | 'fist' | 'breaker' | 'needle' | 'hoard' | 'patient' | 'goblinking' | 'unbroken'
   | 'hourglass' | 'wither' | 'thinning' | 'haggler' | 'restless' | 'soulcaller' | 'lure' | 'collector' | 'ronin'
   | 'lingering' | 'whirl' | 'headsman' | 'magpie' | 'drummer' | 'host'
   | 'hungry';
@@ -617,6 +617,8 @@ export function legendCost(def: LegendDef, lv: number) {
 export const SUMMON_COST = [1, 2, 4, 8, 16, 35, 70, 125, 250, 500, 800, 1200, 1700, 2200, 2750, 3400, 4100, 5000, 6000, 7500, 10_000, 12_500, 16_000];
 export const summonCost = (owned: number) => SUMMON_COST[Math.min(owned, SUMMON_COST.length - 1)];
 export const rerollCost = (owned: number) => Math.ceil(summonCost(owned) / 3);
+/** The most crit chance The Needle can add (it closes in on this, a level at a time). */
+export const NEEDLE_CRIT = 0.5;
 /** Legends offered at a time, and the share of souls a respec gives back. */
 export const OFFER_SIZE = 3;
 export const RESPEC_REFUND = 0.75;
@@ -630,7 +632,8 @@ const longer = (ability: AbilityId, secs: number) => ({ lengthens: { ability, se
 export const LEGENDS: LegendDef[] = DEMO ? [] : [
   o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Damage while idle', value: per(0.25) }),
   o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Your clicks and the Phantom Blade', value: per(0.1) }),
-  o({ id: 'needle', name: 'The Needle', kind: 'power', sprite: 'sd_executioner', what: 'Critical hit damage', value: per(0.15) }),
+  o({ id: 'breaker', name: 'The Breaker', kind: 'power', sprite: 'sd_large_knight_elite', what: 'Critical hit damage', value: per(0.15) }),
+  o({ id: 'needle', name: 'The Needle', kind: 'utility', sprite: 'sd_executioner', what: 'Critical hit chance', value: share(NEEDLE_CRIT, (n) => `+${pct(n)}`) }),
   o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'sd_mountain_king', what: 'All gold', value: per(0.05) }),
   o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'sm_sohei', what: 'Gold while idle', value: per(0.5) }),
   o({ id: 'goblinking', name: 'The Wish', kind: 'power', sprite: 'ef_fairy', what: 'Gold from treasure goblins and the Rainbow Vault', value: per(0.5) }),

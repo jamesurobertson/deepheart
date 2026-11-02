@@ -17,15 +17,19 @@ export type KeepStation = 'stairs' | 'dan' | 'victor' | 'trips' | 'heart' | 'kok
 
 /** Floor rectangles (x, y, w, h) for the rooms and the halls between them; the walls grow around them. The first room
  *  is the Heart's. */
-const ROOMS: [number, number, number, number][] = [[1, 2, 13, 10], [16, 2, 15, 10], [1, 16, 9, 8], [12, 15, 22, 9], [36, 16, 9, 8], [17, 27, 12, 9]];
-const HALLS: [number, number, number, number][] = [[22, 12, 3, 3], [10, 19, 2, 2], [34, 19, 2, 2], [5, 12, 2, 4], [20, 24, 2, 3]];
+const ROOMS: [number, number, number, number][] = [[1, 2, 13, 10], [16, 2, 15, 10], [1, 16, 9, 8], [12, 15, 22, 9], [36, 15, 34, 9], [17, 27, 12, 9]];
+// (No way into the treasury: a sealed room, its gold in sight and out of reach. It runs on past where the camera
+// stops, so it looks bigger than the screen.)
+const HALLS: [number, number, number, number][] = [[22, 12, 3, 3], [10, 19, 2, 2], [5, 12, 2, 4], [20, 24, 2, 3]];
 /** How close (in tiles) the hero's middle may come to a wall at its side. */
 const SIDE_GAP = 0.45;
 /** How far (in tiles) the hero's feet stay from a south wall. */
 const SOUTH_GAP = 0.2;
 /** How close (in tiles, middle to middle) the hero may come to a column from the side. */
 const COLUMN_REACH = 0.72;
-const W = 47;
+const W = 71;
+/** The castle as the camera frames it: everything but the far end of the treasury. */
+const CASTLE_W = 47;
 const H = 37;
 
 /** Things in the rooms: [sprite, x, y, how]: standing on the cell (and in the way), 'flat' on the floor, 'wall' hung
@@ -38,9 +42,9 @@ const THINGS: Thing[] = [
   ['wall_banner_blue', 17, 14, 'soul'], ['wall_banner_blue', 28, 14, 'soul'],
   // Red either side of the door up to the Heart.
   ['wall_banner_red', 2, 15, 'wall'], ['wall_banner_red', 8, 15, 'wall'],
-  ['wall_banner_yellow', 38, 15, 'wall'], ['wall_banner_yellow', 42, 15, 'wall'],
-  ['chest_full_open', 40, 19], ['chest_full_open', 37, 22], ['chest_full_open', 43, 22],
-  ...[[39, 20], [41, 20], [40, 21], [38, 18], [42, 18], [39, 22], [41, 22]].map(([x, y]): Thing => ['coin', x, y, 'flat']),
+  // The treasury, packed with chests in rows.
+  ...Array.from({ length: 17 }, (_, k) => 36 + 2 * k).flatMap((x) => [16, 18, 20, 22].map((y): Thing => ['chest_full_open', x, y])),
+  ...Array.from({ length: 9 }, (_, k): Thing => ['wall_banner_yellow', 37 + 4 * k, 14, 'wall']),
   ['wall_banner_red', 3, 1, 'wall'], ['wall_banner_red', 11, 1, 'wall'],
 ];
 /** The way down: a flight of steps in the entrance room going down from left to right into the east wall, like the
@@ -104,14 +108,15 @@ const STAGGER = 0.14;
 /** The menu's arrive easing, cubic-bezier(0.2, 1.5, 0.4, 1): a quick rise that overshoots and settles. */
 const overshoot = (t: number) => 1 + 2.4 * (t - 1) ** 3 + 1.4 * (t - 1) ** 2;
 /** The shrine: the Spirits on offer float here as spirits, big, side by side (their feet on these cells). */
-const SHRINE: [number, number] = [23, 8];
-const SPIRITS: [number, number][] = [[18, 9], [23, 9], [28, 9]];
+const SHRINE: [number, number] = [23, 6];
+const SPIRITS: [number, number][] = [[18, 7], [23, 7], [28, 7]];
 /** Where the Spirits you've summoned hang out in the Great Hall, in the order they're listed: spread about the room,
- *  clear of the columns and the ways through. */
+ *  clear of the columns, and far enough in from the side walls (x 13 to 32) for the widest of them (the Hungry Dark).
+ *  One spot for every Spirit, and two to spare. */
 const GUARDS: [number, number][] = [
-  [13, 16], [17, 16], [29, 16], [33, 16], [14, 18], [20, 18], [26, 18], [32, 18], [13, 21],
-  [17, 21], [29, 21], [33, 21], [14, 23], [19, 23], [27, 23], [32, 23], [20, 16], [26, 16],
-  [16, 20], [30, 20], [21, 21], [25, 21], [30, 23],
+  [13, 16], [17, 16], [29, 16], [32, 16], [14, 18], [20, 18], [26, 18], [32, 18], [13, 21],
+  [17, 21], [29, 21], [32, 21], [14, 23], [19, 23], [27, 23], [32, 23], [20, 16], [26, 16],
+  [16, 20], [30, 20], [21, 21], [25, 21], [30, 23], [23, 19], [23, 23], [23, 16],
 ];
 /** The trail keeps a point every this many cells the hero walks. */
 const TRAIL_STEP = 0.08;
@@ -686,8 +691,8 @@ export class KeepView {
     // The camera eases after the hero, kept inside the castle.
     const halfW = w / 2 / s, halfH = h / 2 / s;
     // (It can show some dark past the castle's edges: more above, where the gold counter sits.)
-    const want = { x: Math.max(halfW - 1.5, Math.min(W + 1.5 - halfW, this.hero.x)), y: Math.max(halfH - 3.5, Math.min(H + 1.5 - halfH, this.hero.y)) };
-    if (W + 3 < halfW * 2) want.x = W / 2;
+    const want = { x: Math.max(halfW - 1.5, Math.min(CASTLE_W + 1.5 - halfW, this.hero.x)), y: Math.max(halfH - 3.5, Math.min(H + 1.5 - halfH, this.hero.y)) };
+    if (CASTLE_W + 3 < halfW * 2) want.x = CASTLE_W / 2;
     if (H + 5 < halfH * 2) want.y = H / 2 - 1;
     this.cam.x += (want.x - this.cam.x) * Math.min(1, dt * 6);
     this.cam.y += (want.y - this.cam.y) * Math.min(1, dt * 6);
@@ -738,7 +743,7 @@ export class KeepView {
     };
     const tick = Math.floor(this.time * 6);
     const worn = (x: number, y: number) => {
-      const f = Math.abs(Math.sin((y * W + x) * 12.9898) * 43758.5453) % 1;
+      const f = Math.abs(Math.sin((y * CASTLE_W + x) * 12.9898) * 43758.5453) % 1;
       return f < 0.78 ? 1 : 2 + Math.floor(((f - 0.78) / 0.22) * 7);
     };
     for (const t of this.tiles[0]) tile(atlas.rect(`floor_${worn(t.x, t.y)}`), t.x, t.y);

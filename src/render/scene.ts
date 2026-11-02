@@ -6,7 +6,7 @@ import { Dazzle } from './dazzle.ts';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import type { Atlas, Rect } from './atlas.ts';
-import { PixelSprite, blobShadow } from './sprite.ts';
+import { BlobShadow, BlobShadows, PixelSprite, blobShadow } from './sprite.ts';
 import { Fx, flameTexture, spellTextures } from './fx.ts';
 import { eyeMask } from './eyes.ts';
 import { GradeShader, tiltShift } from './post.ts';
@@ -429,6 +429,7 @@ export class Scene {
   private tiltH: ShaderPass;
   private tiltV: ShaderPass;
   private fx: Fx;
+  private shadows: BlobShadows;
   private atlas: Atlas;
   private container: HTMLElement;
   private glow = glowTexture();
@@ -551,7 +552,7 @@ export class Scene {
   /** The demo stops on the stairs down into this zone: they fade to black and stay there, and `onEnd` is called. */
   endBefore = -1;
   onEnd: (() => void) | null = null;
-  private cine: { phase: 'exit' | 'stairs' | 'arrive' | 'end'; t: number; zone: number; walkers: PixelSprite[]; shadows: THREE.Mesh[]; well: THREE.Group | null; flames: THREE.Mesh[]; queue: CompView[]; down: Set<CompView>; gone: number } | null = null;
+  private cine: { phase: 'exit' | 'stairs' | 'arrive' | 'end'; t: number; zone: number; walkers: PixelSprite[]; shadows: BlobShadow[]; well: THREE.Group | null; flames: THREE.Mesh[]; queue: CompView[]; down: Set<CompView>; gone: number } | null = null;
   /** Black card in front of the camera for fades. */
   private fade: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   /** The floor we were last on: stepping down into a new zone plays the staircase. */
@@ -593,6 +594,7 @@ export class Scene {
     this.composer.addPass(new OutputPass());
 
     this.fx = new Fx(this.scene);
+    this.shadows = new BlobShadows(this.scene);
     // (On the stairwell's steps themselves, not the slope through them that walkers take.)
     this.fx.floorY = (x, z) => {
       const y = this.wellY(x, z);
@@ -622,6 +624,13 @@ export class Scene {
     addEventListener('resize', () => this.resize());
   }
 
+  // (Asking the canvas where it is forces a layout whenever the UI has just changed the page, and the scene asks dozens
+  // of times a frame: asked once a frame instead.)
+  private canvasRect: DOMRect | null = null;
+  private rect() {
+    return (this.canvasRect ??= this.renderer.domElement.getBoundingClientRect());
+  }
+
   /** Space the UI covers on the right (desktop) or bottom (phone), so the fight centers in what's left. */
   setViewport(right: number, bottom: number, top = 0) {
     if (right === this.view.right && bottom === this.view.bottom && top === this.view.top) return;
@@ -630,6 +639,7 @@ export class Scene {
   }
 
   private resize() {
+    this.canvasRect = null;
     const w = this.container.clientWidth || innerWidth;
     const h = this.container.clientHeight || innerHeight;
     this.renderer.setSize(w, h);
@@ -1886,7 +1896,7 @@ export class Scene {
         if (o instanceof THREE.Mesh && o.material instanceof THREE.Material) {
           o.material.transparent = true;
           o.material.opacity = Math.min(o.material.opacity, fade);
-        }
+        } else if (o instanceof BlobShadow) o.opacity = Math.min(o.opacity, fade);
       });
       l.light.intensity *= 0.9;
       if (l.t > 0.8) {
@@ -1936,7 +1946,7 @@ export class Scene {
 
   private toScreen(v: THREE.Vector3) {
     const p = v.clone().project(this.camera);
-    const rect = this.renderer.domElement.getBoundingClientRect();
+    const rect = this.rect();
     return { x: rect.left + (p.x * 0.5 + 0.5) * rect.width, y: rect.top + (-p.y * 0.5 + 0.5) * rect.height };
   }
 
@@ -2644,7 +2654,7 @@ export class Scene {
 
   /** Where a point on screen lands on the floor. */
   private floorAt(x: number, y: number): THREE.Vector3 | null {
-    const rect = this.renderer.domElement.getBoundingClientRect();
+    const rect = this.rect();
     const ndc = new THREE.Vector2(((x - rect.left) / rect.width) * 2 - 1, -((y - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
     const ray = this.raycaster.ray;
@@ -2832,7 +2842,7 @@ export class Scene {
 
   private onScreen(at: THREE.Vector3) {
     const foot = this.toScreen(at);
-    const rect = this.renderer.domElement.getBoundingClientRect();
+    const rect = this.rect();
     const { right, bottom, top } = this.view;
     const clear = foot.x > rect.left + 48 && foot.x < rect.right - right - 48 && foot.y > rect.top + top + 70 && foot.y < rect.bottom - bottom - 16;
     // Not behind the dock either (feet within reach of its buttons would put the hero's body behind them).
@@ -3301,6 +3311,7 @@ export class Scene {
   // ---------- frame ----------
 
   update(dt: number, game: Game) {
+    this.canvasRect = null;
     this.time += dt;
     // (Picked up by the next room built: a new run's rooms are new, the one you're standing in stays.)
     this.roomSeed = roomSeedOf(game);
@@ -3395,6 +3406,7 @@ export class Scene {
       }
       this.camera.lookAt(look);
     }
+    this.shadows.sync(this.scene);
     this.composer.render(dt);
   }
 }

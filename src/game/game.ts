@@ -4,7 +4,7 @@ import Decimal from 'break_infinity.js';
 import {
   CARD_BY_ID, COST_GROWTH, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, BOUND, BOUND_BY_ID, boundCost, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, featuredFor, modsFor, pickMonster,
   CARDS, CORRUPTION, ZONES, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, levelMult, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
-  LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost,
+  LEGENDS, LEGEND_BY_ID, NEEDLE_CRIT, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost,
   type AbilityId, type LegendId, type BoundId,
   type Attack, type Effect, type ModId, type MonsterDef, type RaidReward, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
@@ -147,6 +147,18 @@ export const RAINBOW_HAUL = 3;
 export const VAULT_CHESTS = 40;
 /** How far down the hall the chests go (in the floor's units; the fight's floor is about -9 to 9). */
 export const VAULT_LENGTH = 62;
+/** Every hit rolls its damage between these (times the usual), averaging exactly the usual: numbers vary hit to hit,
+ *  and a crit near the top of the range lands much bigger than one near the bottom. */
+const DAMAGE_LOW = 0.8;
+const DAMAGE_HIGH = 1.2;
+const damageRoll = () => DAMAGE_LOW + Math.random() * (DAMAGE_HIGH - DAMAGE_LOW);
+/** How a crit rolled, for its number: the bottom 30% of the range, the top 10%, or between. */
+export type CritTier = 'low' | 'mid' | 'top';
+const critTier = (roll: number): CritTier => {
+  const k = (roll - DAMAGE_LOW) / (DAMAGE_HIGH - DAMAGE_LOW);
+  return k < 0.3 ? 'low' : k >= 0.9 ? 'top' : 'mid';
+};
+
 /** Where a boss that rises through the floor comes up: always the same spot, since its zone's rooms are broken open
  *  there from the first floor. (On a tile corner once the scene spreads the fight out, so its grates sit on the grid.) */
 export const RISING_SPOT = { x: 2.78, z: 0 };
@@ -326,6 +338,8 @@ export interface SaveState {
   tripsOpen: boolean;
   /** Dev only (?state=rampage): the floor that test slot goes back to on every load. */
   rampageSlot?: number;
+  /** Needle levels (once crit damage) moved to The Breaker. */
+  critSpirits: boolean;
   /** You've used the expedition ladder in the Keep (its label says what it's for until then). */
   ladderSeen: boolean;
   /** Companions who have ever reached the expedition level (each gets one toast saying so). */
@@ -476,7 +490,7 @@ export function newSave(): SaveState {
     descents: 0, raids: 0, missed: 0, fevers: 0, fervor: 0, buffs: [], raidTimer: 40,
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(), lastAttack: 0,
-    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, ladderSeen: false, tripReady: [], tripsSent: 0, tripCards: 0, tripKills: 0, pets: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, keepSpot: null, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, skillsSeen: [], rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
+    roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, critSpirits: true, ladderSeen: false, tripReady: [], tripsSent: 0, tripCards: 0, tripKills: 0, pets: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, inKeep: false, keepSpot: null, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, skillsSeen: [], rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
     settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, autoHire: false },
   };
 }
@@ -515,7 +529,7 @@ export interface Monster {
 export type HitKind = 'click' | 'crit' | 'dps' | 'cleave' | 'auto' | 'autoCrit' | 'fever';
 
 export type GameEvent =
-  | { t: 'hit'; id: number; amount: Decimal; kind: HitKind; x?: number; y?: number }
+  | { t: 'hit'; id: number; amount: Decimal; kind: HitKind; x?: number; y?: number; tier?: CritTier }
   | { t: 'swing'; comp: number; id: number; delay: number }
   | { t: 'keep'; on: boolean }
   | { t: 'click'; crit: boolean; x: number; y: number }
@@ -858,6 +872,14 @@ export class Game {
     s.tripReady ??= (s.owned ?? []).map((_, i) => i).filter((i) => s.owned[i] >= EXPEDITION_LEVEL);
     // Saves from before they were stamped count as the oldest version (a fresh save's stamp would say current).
     s.version ??= '0.0.0';
+    // The Needle was crit damage, which The Breaker is now: levels bought in it move across (it's crit chance now).
+    if (s.critSpirits === undefined) {
+      if (s.legends?.needle) {
+        s.legends.breaker = (s.legends.breaker ?? 0) + s.legends.needle;
+        delete s.legends.needle;
+      }
+      s.critSpirits = true;
+    }
     const fresh = newSave();
     for (const k of Object.keys(fresh) as (keyof SaveState)[]) if (s[k] === undefined) (s as unknown as Record<string, unknown>)[k] = fresh[k];
     s.settings = { ...fresh.settings, ...s.settings };
@@ -1049,8 +1071,8 @@ export class Game {
     const click = all.times(blades).plus(dps.times(parts.clickDps)).times(1 + 0.1 * this.legendLv('fist'));
     this.cache = {
       dps, perComp, shares, baseComp, parts, all, click,
-      crit: this.abilityUnlocked('crit') ? parts.critBase + parts.critUpg : 0,
-      critMult: (parts.critMultBase + parts.critMultUpg) * (1 + 0.15 * this.legendLv('needle')),
+      crit: this.abilityUnlocked('crit') ? parts.critBase + parts.critUpg + NEEDLE_CRIT * legendShare(this.legendLv('needle')) : 0,
+      critMult: (parts.critMultBase + parts.critMultUpg) * (1 + 0.15 * this.legendLv('breaker')),
       cleave: this.abilityUnlocked('cleave') && this.s.buffs.some((b) => b.id === 'cleave') ? CLEAVE_BASE * parts.cleaveUpg : 0,
       gold: parts.goldUpg * (1 + 0.05 * this.legendLv('hoard')),
       autoBase: AUTO_BASE + effects.reduce((sum, e) => sum + (e.t === 'auto' ? e.add : 0), 0),
@@ -1127,7 +1149,7 @@ export class Game {
   abilityText(id: AbilityId): string {
     const p = this.c.parts;
     const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
-    if (id === 'crit') return `Clicks and Phantom Blade have a ${pct(p.critBase + p.critUpg)} chance for ×${+(p.critMultBase + p.critMultUpg).toFixed(2)} damage.`;
+    if (id === 'crit') return `Clicks and Phantom Blade have a ${pct(Math.min(1, p.critBase + p.critUpg + NEEDLE_CRIT * legendShare(this.legendLv('needle'))))} chance for ×${+((p.critMultBase + p.critMultUpg) * (1 + 0.15 * this.legendLv('breaker'))).toFixed(2)} damage.`;
     if (id === 'blade') return `Attacks for you, ${this.c.autoBase === 1 ? 'once' : `${+this.c.autoBase.toFixed(1)} times`} a second.`;
     if (id === 'cleave') return `Your clicks also hit every other monster for ${pct(CLEAVE_BASE * p.cleaveUpg)} damage.`;
     if (id === 'rampage') return `Builds as you click. Your party deals ×${+this.feverMult(0).toFixed(1)}–×${+this.feverMult(RAMPAGE_TIERS.length - 1).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
@@ -1496,7 +1518,7 @@ export class Game {
   }
 
   /** Damage a monster; returns overflow past its death. */
-  private damage(m: Monster, amount: Decimal, kind: HitKind, x?: number, y?: number): Decimal {
+  private damage(m: Monster, amount: Decimal, kind: HitKind, x?: number, y?: number, tier?: CritTier): Decimal {
     if (this.downed > 0) return new Decimal(0);
     if (m.boss) {
       amount = amount.times(this.c.parts.boss);
@@ -1508,7 +1530,7 @@ export class Game {
     m.hp = m.hp.minus(amount);
     // The number shown is the whole hit, overkill included: one-shotting a weak monster should look like it.
     if (kind === 'dps') this.dpsShown.set(m.id, (this.dpsShown.get(m.id) ?? new Decimal(0)).plus(amount));
-    else this.events.push({ t: 'hit', id: m.id, amount, kind, x, y });
+    else this.events.push({ t: 'hit', id: m.id, amount, kind, x, y, tier });
     if (m.hp.lte(0)) {
       // How many times over this hit killed it (the Ronin's card luck).
       this.kill(m, kind, amount.div(m.max).toNumber());
@@ -1687,7 +1709,7 @@ export class Game {
         const pointed = i === hero && this.heroTarget !== null ? this.monster(this.heroTarget) : undefined;
         const target = pointed ?? (Math.random() < 0.7 || arrived.length < 2 ? focus : arrived[Math.floor(Math.random() * arrived.length)]);
         const delay = HIT_DELAY[COMPS[i].attack];
-        this.blows.push({ id: target.id, amount, t: delay });
+        this.blows.push({ id: target.id, amount: amount.times(damageRoll()), t: delay });
         this.events.push({ t: 'swing', comp: i, id: target.id, delay });
       }
     }
@@ -1729,9 +1751,11 @@ export class Game {
     }
     const crit = Math.random() < this.critChance();
     const fever = this.s.buffs.some((b) => b.id === 'fever');
-    const amount = this.clickDamage().times((crit ? this.critMult() : 1) * (auto ? this.sleeperMult() : 1));
+    const roll = damageRoll();
+    const amount = this.clickDamage().times((crit ? this.critMult() : 1) * (auto ? this.sleeperMult() : 1) * roll);
+    const tier = crit ? critTier(roll) : undefined;
     const others = this.cleave() > 0 ? this.monsters.filter((m) => m !== target && m.arrive <= 0) : [];
-    this.damage(target, amount, auto ? (crit ? 'autoCrit' : 'auto') : crit ? 'crit' : fever ? 'fever' : 'click', x, y);
+    this.damage(target, amount, auto ? (crit ? 'autoCrit' : 'auto') : crit ? 'crit' : fever ? 'fever' : 'click', x, y, tier);
     for (const m of others) if (this.monsters.includes(m)) this.damage(m, amount.times(this.cleave()), 'cleave');
     if (crit) this.s.crits++;
     if (!auto) {

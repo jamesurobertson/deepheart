@@ -1114,16 +1114,18 @@ export class Ui {
         const s = this.scene.screenOf(ev.id);
         if (!s) break;
         const streak = ev.kind === 'dps' ? 0 : this.streak(ev.id);
+        // A crit's number by how it rolled: paler at the bottom of the range, a big dark red at the top.
+        const tier = ev.tier === 'low' ? ' p-low' : ev.tier === 'top' ? ' p-top' : '';
         if (streak >= ARC_FROM) {
           const hero = this.scene.heroScreen(g);
           const kind = ev.kind === 'autoCrit' ? 'crit' : ev.kind === 'auto' ? 'cleave' : ev.kind;
-          this.arcPop(s.x, s.y + s.h * 0.25, fmt(ev.amount), `p-${kind}`, hero && hero.x > s.x ? -1 : 1, streak - ARC_FROM);
+          this.arcPop(s.x, s.y + s.h * 0.25, fmt(ev.amount), `p-${kind}${kind === 'crit' ? tier : ''}`, hero && hero.x > s.x ? -1 : 1, streak - ARC_FROM);
         } else if (ev.kind === 'dps') this.pop(s.x + (Math.random() - 0.5) * 30, s.y + s.h * 0.2, fmt(ev.amount), 'p-dps');
         else if (ev.kind === 'cleave' || ev.kind === 'auto') this.pop(s.x + (Math.random() - 0.5) * 40, s.y + s.h * 0.3, fmt(ev.amount), 'p-cleave');
-        else if (ev.kind === 'autoCrit') this.pop(s.x + (Math.random() - 0.5) * 40, s.y + s.h * 0.25, fmt(ev.amount), 'p-crit');
+        else if (ev.kind === 'autoCrit') this.pop(s.x + (Math.random() - 0.5) * 40, s.y + s.h * 0.25, fmt(ev.amount), `p-crit${tier}`);
         // Pop classes are prefixed so they can't collide with HUD classes (the Rampage meter is .fever).
         // Numbers always rise from the monster that was hit, wherever you tapped.
-        else this.pop(s.x + (Math.random() - 0.5) * s.h * 0.5, s.y + s.h * 0.2, fmt(ev.amount), `p-${ev.kind}`);
+        else this.pop(s.x + (Math.random() - 0.5) * s.h * 0.5, s.y + s.h * 0.2, fmt(ev.amount), `p-${ev.kind}${ev.kind === 'crit' ? tier : ''}`);
         break;
       }
       case 'kill': {
