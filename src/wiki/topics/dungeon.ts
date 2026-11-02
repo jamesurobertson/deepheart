@@ -120,11 +120,13 @@ const goblinsBody = () => `<p class="lede">Now and then a treasure goblin runs a
   ${h2('When they come')}
   <p>Goblins start once you've made a few kills. After that one comes every ${secs(RAID_MIN)} to ${secs(RAID_MAX)}, and it takes ${RAID_STAY} seconds to cross the floor. ${link('spirit-lure', 'The Lure')} brings them up to three times as often.</p>
   ${h2('What a goblin drops')}
-  ${table(['Reward', 'Chance', 'What you get'], [
-    ['<b>Plunder</b>', '30%', 'A pile of gold: 10 to 20 times the floor\'s gold (about 25 to 50 kills\' worth)'],
-    ['<b>Bloodlust</b>', '25%', 'Your party deals ×7 damage for 7 seconds'],
-    ['<b>Frenzy</b>', '20%', 'Your attacks deal ×77 damage for 7 seconds'],
-    ['<b>Gold Rush</b>', '25%', 'All gold ×7 for 30 seconds'],
+  ${table(['Reward', 'Chance', `With ${link('abilities', 'Critical Hits')}`, 'What you get'], [
+    ['<b>Plunder</b>', '35%', '30%', 'A pile of gold: 10 to 20 times the floor\'s gold (about 25 to 50 kills\' worth)'],
+    ['<b>Gold Rush</b>', '30%', '25%', 'All gold ×7 for 30 seconds'],
+    ['<b>Bloodlust</b>', '25%', '15%', 'Your party deals ×7 damage for 7 seconds'],
+    ['<b>Deadeye</b>', '', '11%', 'Every click is a critical hit for 10 seconds'],
+    ['<b>Brutality</b>', '', '11%', 'Critical hits deal ×3 damage for 10 seconds'],
+    ['<b>Frenzy</b>', '10%', '8%', 'Your attacks deal ×77 damage for 7 seconds'],
   ])}
   <p>Every goblin you catch can also drop its card. ${link('spirit-goblinking', 'The Wish')} boosts goblin gold.</p>
   ${h2('Rainbow goblins')}

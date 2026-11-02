@@ -104,6 +104,9 @@ export const CHAMP_BOSS_GOLD = 10;
 export const DAN_GIVES = 5;
 export const VICTOR_GIVES = 10;
 export const CARD_ODDS = { monster: 2_000_000, boss: 500_000, champ: 250_000, champBoss: 10_000, goblin: 10_000, rainbow: 1_000 };
+/** Your first card is sure to drop from a monster killed somewhere in this stretch of kills (about floors 10 to 90, before
+ *  the first ascent opens at 100): at the odds above a first run would never see one. */
+export const FIRST_CARD = { from: 200, by: 1800 };
 /** Expeditions open the first time a companion reaches this level, and only companions at it can go. */
 export const EXPEDITION_LEVEL = 1000;
 /** Auto-hire opens after this many ascents. It brings each companion back up to the best level it has ever had; past
@@ -221,6 +224,10 @@ export interface Buff {
   gold: number;
   /** Phantom Blade speed multiplier. */
   blade?: number;
+  /** Added to the crit chance (1: every click crits). */
+  crit?: number;
+  /** Crit damage multiplier. */
+  critMult?: number;
 }
 
 export interface Settings {
@@ -1134,11 +1141,13 @@ export class Game {
 
   /** War Drums, while they play, add DRUMS_CRIT to the chance. */
   critChance() {
-    return Math.min(1, this.c.crit + (this.s.buffs.some((b) => b.id === 'drums') ? DRUMS_CRIT : 0));
+    if (!this.c.crit) return 0;
+    const buffs = this.s.buffs.reduce((n, b) => n + (b.crit ?? 0), 0);
+    return Math.min(1, this.c.crit + (this.s.buffs.some((b) => b.id === 'drums') ? DRUMS_CRIT : 0) + buffs);
   }
 
   critMult() {
-    return this.c.critMult;
+    return this.s.buffs.reduce((m, b) => m * (b.critMult ?? 1), this.c.critMult);
   }
 
   cleave() {
@@ -1994,11 +2003,13 @@ export class Game {
   }
 
   private rollReward(): RaidReward {
-    const r = Math.random();
-    if (r < 0.3) return 'plunder';
-    if (r < 0.55) return 'bloodlust';
-    if (r < 0.75) return 'heartstorm';
-    return 'horde';
+    // The big damage ones are the rare ones; the crit ones only once you have crits.
+    const odds: [RaidReward, number][] = this.abilityUnlocked('crit')
+      ? [['plunder', 0.3], ['horde', 0.25], ['bloodlust', 0.15], ['deadeye', 0.11], ['brutal', 0.11], ['heartstorm', 0.08]]
+      : [['plunder', 0.35], ['horde', 0.3], ['bloodlust', 0.25], ['heartstorm', 0.1]];
+    let r = Math.random();
+    for (const [reward, chance] of odds) if ((r -= chance) < 0) return reward;
+    return 'plunder';
   }
 
   private rewardBuff(reward: RaidReward, effect: number): Buff {
@@ -2007,6 +2018,8 @@ export class Game {
       case 'bloodlust': return b('bloodlust', 'Bloodlust', 7, 7, 1, 1);
       case 'heartstorm': return b('heartstorm', 'Frenzy', 7, 1, 77, 1);
       case 'soulstorm': return b('soulstorm', 'Soul Storm', 6, 666, 666, 1);
+      case 'deadeye': return { ...b('deadeye', 'Deadeye', 10, 1, 1, 1), crit: 1 };
+      case 'brutal': return { ...b('brutal', 'Brutality', 10, 1, 1, 1), critMult: 3 };
       default: return b('horde', 'Gold Rush', 30, 1, 1, 7);
     }
   }
@@ -2662,10 +2675,10 @@ export class Game {
 
   /** A killed monster's chance at its card: champions roll for a gold one first. */
   private rollCard(id: string, champ: boolean, src: 'kill' | 'sweep', boss = false, overkill = 1) {
-    // In the demo your first card is sure to turn up early (at normal odds a short session would never see one): each
-    // kill in DEMO_FIRST_CARD's stretch has a 1 in (kills left) chance, so the drop lands evenly across it.
-    const { from, by } = DEMO_FIRST_CARD;
-    if (DEMO && src === 'kill' && this.s.kills >= from && Object.keys(this.s.cards).length === 0 && Math.random() * (by - this.s.kills) < 1) {
+    // Your first card is sure to turn up early (at normal odds it wouldn't for hours): each kill in the stretch has a 1 in
+    // (kills left) chance, so the drop lands evenly across it.
+    const { from, by } = DEMO ? DEMO_FIRST_CARD : FIRST_CARD;
+    if (src === 'kill' && this.s.kills >= from && Object.keys(this.s.cards).length === 0 && Math.random() * (by - this.s.kills) < 1) {
       this.giveCard(id, false, src);
       return;
     }

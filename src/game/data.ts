@@ -1033,4 +1033,4 @@ export const NEWS: News[] = [
   { text: 'A monster tried to surrender today. It was killed anyway. Rules are rules.' },
 ];
 
-export type RaidReward = 'plunder' | 'bloodlust' | 'heartstorm' | 'horde' | 'soulstorm' | 'vault' | 'rainbow';
+export type RaidReward = 'plunder' | 'bloodlust' | 'heartstorm' | 'horde' | 'deadeye' | 'brutal' | 'soulstorm' | 'vault' | 'rainbow';

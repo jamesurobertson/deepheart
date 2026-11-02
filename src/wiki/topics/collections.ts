@@ -1,6 +1,6 @@
 import { CARDS, CORRUPTION, CURSORS, LEGENDS, TROPHIES, ZONES, type CardDef, type TrophyDef } from '../../game/data.ts';
 import { ABILITIES, COMPS, type AbilityId } from '../../game/data.ts';
-import { AWAKEN_ON, CARD_ODDS, CHAMP_CHANCE, DAN_GIVES, EXPEDITION_LEVEL, FLOOR_KILLS, GOLD_SET_BONUS, SET_BONUS, TRIP_HOURS, VICTOR_GIVES } from '../../game/game.ts';
+import { AWAKEN_ON, CARD_ODDS, CHAMP_CHANCE, FIRST_CARD, DAN_GIVES, EXPEDITION_LEVEL, FLOOR_KILLS, GOLD_SET_BONUS, SET_BONUS, TRIP_HOURS, VICTOR_GIVES } from '../../game/game.ts';
 import { esc, h2, link, pct, table, toc } from '../kit.ts';
 import { spr } from '../sprites.ts';
 import { kokoSvg } from '../../ui/koko.ts';
@@ -29,6 +29,7 @@ const cardsBody = () => {
       ['A treasure goblin', `1 in ${CARD_ODDS.goblin.toLocaleString('en-US')}`],
       ['A rainbow goblin', `1 in ${CARD_ODDS.rainbow.toLocaleString('en-US')}`],
     ])}
+    <p>Your first card is sure to drop from a monster somewhere between kill ${FIRST_CARD.from.toLocaleString('en-US')} and kill ${FIRST_CARD.by.toLocaleString('en-US')} (about floors ${FIRST_CARD.from / FLOOR_KILLS} to ${FIRST_CARD.by / FLOOR_KILLS}).</p>
     <p>${link(`spirit-${collector.id}`, collector.name)} raises every chance, up to two and a half times. ${link('spirit-ronin', 'The Ronin')} raises it for kills that deal far more than a monster's health. Swept floors roll a card for every kill, and time away rolls them too (plain cards only). ${link('expeditions', 'Expeditions')} roll them for every kill a hunter makes.</p>
     ${h2('Colors')}
     <p>A card drops in the color of the lap you're on, if that card comes in it: plain on floors 1–80, then ${CORRUPTION.slice(1).map((c) => c.name).join(', ')}. A zone's newcomers only come in the later colors, and only two of its first crowd come back. Goblin cards are plain only.</p>
