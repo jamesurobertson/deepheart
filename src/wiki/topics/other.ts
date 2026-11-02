@@ -8,13 +8,13 @@ const basicsBody = () => `<p class="lede">Deepheart is an idle dungeon crawler. 
   ${h2('The loop')}
   <ol>
     <li>Monsters drop gold when they die.</li>
-    <li>Spend gold on companions and their traits.</li>
+    <li>Spend gold on companions and their upgrades.</li>
     <li>Your party kills faster, so you clear floors faster and go deeper.</li>
     <li>At floor ${DESCEND_FLOOR}, ascend for souls, which make every run after stronger.</li>
   </ol>
   ${h2('Your first run')}
   <p>Each floor needs ${FLOOR_KILLS} kills. Every fifth floor is a boss with a 30-second timer; if it beats you, you drop back a floor to farm. Click or hold to attack, and catch treasure goblins when they run by.</p>
-  <p>Companions open traits at levels 10, 25, 50, 75 and up. Some traits unlock abilities like the Phantom Blade, Flurry and Rampage.</p>
+  <p>Companions open upgrades at levels 10, 25, 50, 75 and up. Some upgrades unlock abilities like the Phantom Blade, Flurry and Rampage.</p>
   ${h2('After floor 100')}
   <p>Floor ${DESCEND_FLOOR} opens the way up. Ascending starts a new run with souls: each soul you keep is +10% damage, or spend them on ${link('spirits', 'Spirits')}. Deeper bosses can be champions that drop more souls, and zone bosses past floor 100 hand out ${link('heartmarks', 'Heartmarks')}.</p>
   ${h2('Where to look next')}

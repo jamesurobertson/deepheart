@@ -32,25 +32,25 @@ function companionPage(c: CompDef, i: number): Page {
       ['Damage', `${fmt(c.dps)} a level`],
       ['Joins', joins(c)],
       ['Attack', c.attack],
-      ['Traits', String(traits.length)],
+      ['Upgrades', String(traits.length)],
     ], c.flavor)}
       <p class="lede">${esc(c.flavor)}</p>
       ${c.floor ? `<p>Joins once your deepest floor ever reaches ${c.floor}. After that it stays available on every run.</p>` : ''}
-      ${h2('Traits')}
-      <p>A trait opens when ${c.name} reaches its level, and is bought with gold on ${c.name}'s row. Traits are bought again every run.</p>
-      ${table([{ h: 'Level', cls: 'c' }, 'Trait', { h: 'Cost', cls: 'num' }, 'Effect'], traits.map((u) => [`<b>${traitLevel(u)}</b>`, esc(u.name), fmt(u.cost), traitText(u)]))}
+      ${h2('Upgrades')}
+      <p>An upgrade opens when ${c.name} reaches its level, and is bought with gold on ${c.name}'s row. Upgrades are bought again every run.</p>
+      ${table([{ h: 'Level', cls: 'c' }, 'Upgrade', { h: 'Cost', cls: 'num' }, 'Effect'], traits.map((u) => [`<b>${traitLevel(u)}</b>`, esc(u.name), fmt(u.cost), traitText(u)]))}
       ${h2('Levels')}
-      <p>Each level costs ×${TUNE.costGrowth} the last. Damage is ${fmt(c.dps)} × level, ×${LEVEL_BONUS.mult} every ${LEVEL_BONUS.every} levels from ${LEVEL_BONUS.from} (×${LEVEL_BONUS.thousand} at each 1000th level). The table leaves out traits and every other bonus.</p>
+      <p>Each level costs ×${TUNE.costGrowth} the last. Damage is ${fmt(c.dps)} × level, ×${LEVEL_BONUS.mult} every ${LEVEL_BONUS.every} levels from ${LEVEL_BONUS.from} (×${LEVEL_BONUS.thousand} at each 1000th level). The table leaves out upgrades and every other bonus.</p>
       ${splitTables([{ h: 'Lvl', cls: 'c' }, { h: 'Level cost', cls: 'num' }, { h: 'Total', cls: 'num' }, { h: 'Damage', cls: 'num' }],
         LEVELS.map((levels) => levels.map((lv) => [`<b>${lv}</b>`, fmt(levelCost(c, lv)), fmt(totalCost(c, lv)), fmt(baseDamage(c, lv))])))}
       <div class="clear"></div>`,
   };
 }
 
-const companionsBody = () => `<p class="lede">Companions fight for you. Hire them with gold, level them up, and buy their traits. Their damage is most of your damage.</p>
+const companionsBody = () => `<p class="lede">Companions fight for you. Hire them with gold, level them up, and buy their upgrades. Their damage is most of your damage.</p>
   ${toc('companions', ['The roster', 'Hiring and leveling', 'Level milestones', 'Your hero', 'Heartmarks'])}
   ${h2('The roster')}
-  ${table(['Companion', { h: 'Hire', cls: 'num' }, { h: 'Damage / level', cls: 'num' }, 'Joins', { h: 'Traits', cls: 'c' }], COMPS.map((c, i) => [
+  ${table(['Companion', { h: 'Hire', cls: 'num' }, { h: 'Damage / level', cls: 'num' }, 'Joins', { h: 'Upgrades', cls: 'c' }], COMPS.map((c, i) => [
     `<a class="who" href="#/${compId(c)}">${spr(c.sprite, 28)}${c.name}</a>`, fmt(c.cost), fmt(c.dps), joins(c), traitsOf(i).length,
   ]))}
   ${h2('Hiring and leveling')}
@@ -58,7 +58,7 @@ const companionsBody = () => `<p class="lede">Companions fight for you. Hire the
   <p>The buy buttons above the roster set how many levels a click buys:</p>
   ${table(['Button', 'Buys'], [
     ['×1, ×10, ×100', 'That many levels'],
-    ['Next', 'Up to the next level that brings something: a trait, or a milestone'],
+    ['Next', 'Up to the next level that brings something: an upgrade, or a milestone'],
     ['Max', 'As many as you can afford'],
   ])}
   ${h2('Level milestones')}
@@ -81,14 +81,14 @@ const critDamage = critTraits('add');
 const attacksBody = () => `<p class="lede">You attack by clicking, tapping, or holding the button down. Your attacks borrow part of your party's damage.</p>
   ${toc('attacks', ['Attack damage', 'Critical hits', 'Streaks', 'Idle'])}
   ${h2('Attack damage')}
-  <p>An attack deals ${pct(CLICK_DPS, 0)} of your party's damage per second, plus 1% for each click trait you own (there are ${UPGRADES.filter((u) => u.effect.t === 'clickDps').length}). ${link('spirit-fist', 'The Fist')} multiplies it, and so does Frenzy from a ${link('goblins', 'treasure goblin')}. Rampage and Bloodlust boost the party, not your attacks.</p>
+  <p>An attack deals ${pct(CLICK_DPS, 0)} of your party's damage per second, plus 1% for each click upgrade you own (there are ${UPGRADES.filter((u) => u.effect.t === 'clickDps').length}). ${link('spirit-fist', 'The Fist')} multiplies it, and so does Frenzy from a ${link('goblins', 'treasure goblin')}. Rampage and Bloodlust boost the party, not your attacks.</p>
   <p>You can attack up to ${MANUAL_RATE} times a second. Holding the button down attacks at that rate on its own. Flurry and the Phantom Blade aren't limited by it.</p>
   ${h2('Critical hits')}
   <p>Once the Ranger unlocks Critical Hits, your attacks, Flurry and the Phantom Blade can crit: a ${pct(BASE_CRIT, 0)} chance for ×${BASE_CRIT_MULT} damage to start. Companions don't crit.</p>
   ${table(['Source', 'Crit chance', 'Crit damage'], [
     ['Base', pct(BASE_CRIT, 0), `×${BASE_CRIT_MULT}`],
-    [`Traits (${critChance.names})`, `+${pct(critChance.total, 0)} in all`, ''],
-    [`Traits (${critDamage.names})`, '', `+${critDamage.total}× in all`],
+    [`Upgrades (${critChance.names})`, `+${pct(critChance.total, 0)} in all`, ''],
+    [`Upgrades (${critDamage.names})`, '', `+${critDamage.total}× in all`],
     ['War Drums', `+${pct(DRUMS_CRIT, 0)} for its duration`, ''],
     [link('spirit-needle', 'The Needle'), 'up to +50%', ''],
     [link('spirit-breaker', 'The Breaker'), '', '×(1 + 0.15 a level)'],
@@ -100,7 +100,7 @@ const attacksBody = () => `<p class="lede">You attack by clicking, tapping, or h
 
 const abilitiesBody = () => {
   const spiritFor = (id: string) => LEGENDS.find((d) => d.lengthens?.ability === id);
-  return `<p class="lede">Abilities come from companion traits. Buying the trait unlocks the ability for the rest of the run. You earn them again after every ascent.</p>
+  return `<p class="lede">Abilities come from companion upgrades. Buying the upgrade unlocks the ability for the rest of the run. You earn them again after every ascent.</p>
     ${table(['Ability', 'Unlocked by', 'Kind', 'Lasts', 'Cooldown', 'Longer with'], ABILITIES.map((a) => {
       const c = COMPS[a.comp];
       const u = UPGRADES.find((x) => x.id === `m${a.comp}_${a.trait}`)!;
@@ -112,11 +112,11 @@ const abilitiesBody = () => {
     }))}
     ${h2('What each one does')}
     ${table(['Ability', 'Effect'], [
-      ['Phantom Blade', `Attacks the front monster for you, ${AUTO_BASE} time a second. Each blade trait adds one more (up to 6 a second). Its hits count as attacks for crits and Cleave.`],
+      ['Phantom Blade', `Attacks the front monster for you, ${AUTO_BASE} time a second. Each blade upgrade adds one more (up to 6 a second). Its hits count as attacks for crits and Cleave.`],
       ['Flurry', `Attacks wherever you point, ${FLURRY_RATE} times a second. These count toward Rampage.`],
       ['Critical Hits', `Lets attacks crit. See ${link('attacks', 'Attacks', 'Critical hits')}.`],
       ['Rampage', 'See below.'],
-      ['Cleave', `Your attacks also hit every other monster for ${pct(CLEAVE_BASE, 0)} of their damage. Two traits raise it (Shieldmaiden ×1.25, Paladin ×1.5).`],
+      ['Cleave', `Your attacks also hit every other monster for ${pct(CLEAVE_BASE, 0)} of their damage. Two upgrades raise it (Shieldmaiden ×1.25, Paladin ×1.5).`],
       ['Treasure Sense', 'Monsters drop ×3 gold.'],
       ['War Drums', `+${pct(DRUMS_CRIT, 0)} crit chance.`],
       ['Phantom Legion', 'Every Phantom Blade attack hits every monster on the floor.'],
@@ -125,7 +125,7 @@ const abilitiesBody = () => {
     ${h2('Rampage')}
     <p>Your attacks charge the Rampage meter: ${FEVER_CLICKS} attacks fill it (about a minute of holding the button). Set it off when it's full and your party deals ×${RAMPAGE_TIERS[0]} damage for ${FEVER_TIME} seconds.</p>
     <p>Keep attacking through it: after ${RAMPAGE_STEPS[0]} more attacks it climbs to ×${RAMPAGE_TIERS[1]} and gains ${RAMPAGE_EXTEND} seconds. The meter doesn't charge while a Rampage runs.</p>
-    ${table(['Trait (Dwarf Brawler)', 'Effect'], [['Level 75', 'Rampage fills 25% faster'], ['Level 100', 'Rampage lasts 50% longer'], ['Level 125', '+1 to both multipliers']])}
+    ${table(['Upgrade (Dwarf Brawler)', 'Effect'], [['Level 75', 'Rampage fills 25% faster'], ['Level 100', 'Rampage lasts 50% longer'], ['Level 125', '+1 to both multipliers']])}
     <p>${link('spirit-lingering', 'The Lingering')} adds a second a level.</p>`;
 };
 
@@ -143,19 +143,19 @@ const traitsBody = () => {
     ['Rampage', 'Fills faster, lasts longer or hits harder.', UPGRADES.filter((u) => u.effect.t === 'fever').length],
     ['Ability', 'Unlocks an ability.', UPGRADES.filter((u) => u.effect.t === 'skill').length],
   ];
-  return `<p class="lede">Traits are the upgrades. Each companion has four to seven, opening at levels 10, 25, 50, 75, 100, 125 and 150.</p>
-    ${h2('Kinds of trait')}
+  return `<p class="lede">Each companion has four to seven upgrades, opening at levels 10, 25, 50, 75, 100, 125 and 150.</p>
+    ${h2('Kinds of upgrade')}
     ${table(['Kind', 'Effect', { h: 'How many', cls: 'c' }], kinds.map(([k, e, n]) => [`<b>${k}</b>`, e, n]))}
-    <p>Every companion's traits are listed on its page under ${link('companions', 'Companions')}. A trait costs a multiple of its companion's hire price: ×12, ×30, ×150, ×1,000, ×10,000, ×60,000 and ×300,000 for the seven levels.</p>
+    <p>Every companion's upgrades are listed on its page under ${link('companions', 'Companions')}. An upgrade costs a multiple of its companion's hire price: ×12, ×30, ×150, ×1,000, ×10,000, ×60,000 and ×300,000 for the seven levels.</p>
     ${h2('Auto-buy')}
-    <p>After your first ascent, Auto Traits appears over your party. With it on, every ${REBUY_GAP} seconds the game buys any trait you've bought before, cheapest first. Traits you've never bought stay yours to find.</p>
-    <p>From ascent ${AUTO_HIRE_ASCENTS}, Auto Levels joins it: the game buys companion levels back up to each one's best, wherever its gold adds the most damage. It never hires anyone new or goes past a companion's best.</p>`;
+    <p>After your first ascent, Auto Upgrades appears over your party. With it on, every ${REBUY_GAP} seconds the game buys any upgrade you've bought before, cheapest first. Upgrades you've never bought stay yours to find.</p>
+    <p>From ascent ${AUTO_HIRE_ASCENTS}, Auto Levels joins it: the game buys companion levels back up to each one's best. It buys what will pay for itself soonest (counting how long it takes to afford), and saves up for a much better buy that's only a few seconds away. It never hires anyone new or goes past a companion's best.</p>`;
 };
 
 export const PARTY_PAGES: Page[] = [
   { id: 'companions', group: 'Your party', title: 'Companions', summary: 'Every companion, hiring, levels, milestones and your hero.', body: companionsBody },
   { id: 'attacks', group: 'Your party', title: 'Attacks and crits', summary: 'Attack damage, critical hits, streaks and idle.', body: attacksBody },
   { id: 'abilities', group: 'Your party', title: 'Abilities', summary: 'Every ability, its unlock, duration and cooldown, and Rampage.', body: abilitiesBody },
-  { id: 'traits', group: 'Your party', title: 'Traits and auto-buy', summary: 'The kinds of trait and how auto-buy works.', body: traitsBody },
+  { id: 'upgrades', group: 'Your party', title: 'Upgrades and auto-buy', summary: 'The kinds of upgrade and how auto-buy works.', body: traitsBody },
   ...COMPS.map(companionPage),
 ];

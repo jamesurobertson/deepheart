@@ -124,8 +124,8 @@ function mount(root: HTMLElement) {
     const check = (k: keyof Scenario, label: string) => `<label class="cx-ck"><input type="checkbox" data-sc="${k}"${sc[k] ? ' checked' : ''}> ${label}</label>`;
     inputs.innerHTML = `
       ${h2('Party')}
-      <div class="tbl"><table class="cx-t"><thead><tr><th>Companion</th><th>Level</th><th>Traits</th><th>Heartmarks</th></tr></thead><tbody>${comp}</tbody></table></div>
-      <p class="muted">Traits count up from the first: 3 means its first three. A trait needs its level.</p>
+      <div class="tbl"><table class="cx-t"><thead><tr><th>Companion</th><th>Level</th><th>Upgrades</th><th>Heartmarks</th></tr></thead><tbody>${comp}</tbody></table></div>
+      <p class="muted">Upgrades count up from the first: 3 means its first three. An upgrade needs its level.</p>
       ${h2('Souls and Spirits')}
       <div class="cx-row"><label>Souls kept <input type="number" min="0" step="1" data-kept value="${soulsKept(edit)}"></label>
       <label>Trophies <input type="number" min="0" max="${TROPHIES.length}" step="1" data-trophies value="${edit.trophies.length}"></label></div>
@@ -226,4 +226,4 @@ function mount(root: HTMLElement) {
   showResults();
 }
 
-export const CALCULATOR: Page = { id: 'calculator', group: 'Start here', title: 'Calculator', summary: 'Try out a build: levels, traits, Spirits, souls and buffs.', body, mount };
+export const CALCULATOR: Page = { id: 'calculator', group: 'Start here', title: 'Calculator', summary: 'Try out a build: levels, upgrades, Spirits, souls and buffs.', body, mount };

@@ -57,6 +57,8 @@ export const CLEAVE_BASE = 0.1;
 const ABILITIES_KEEP = false;
 /** Seconds between auto-buy's shopping trips. */
 export const REBUY_GAP = 0.5;
+/** Seconds of gold earned that auto-hire reads its income from. */
+export const INCOME_WINDOW = 10;
 /** Ordinary monsters are a fraction of a floor's base health: many small kills. */
 export const TRASH = 0.4;
 /** Every click deals this share of your companions' damage, before upgrades. */
@@ -2949,6 +2951,7 @@ export class Game {
   }
 
   private earn(n: Decimal) {
+    this.earnedSince = this.earnedSince.plus(n);
     this.s.gold = this.s.gold.plus(n);
     this.s.runGold = this.s.runGold.plus(n);
     this.s.totalGold = this.s.totalGold.plus(n);
@@ -3124,6 +3127,7 @@ export class Game {
     this.rebuyT -= dt;
     if (this.rebuyT > 0) return;
     this.rebuyT = REBUY_GAP;
+    this.sampleIncome();
     // (Purchases made here are marked as the auto-buyers', for the play log.)
     this.autoBuying = true;
     if (this.s.settings.autoUpg && this.autoUpgOpen()) this.buyAllUpgs(true);
@@ -3140,28 +3144,78 @@ export class Game {
     return this.s.descents >= AUTO_HIRE_ASCENTS;
   }
 
-  /** Auto-hire: over and over, the buy that adds the most damage for its gold, among what you can afford, until nobody
-   *  below their best level is affordable. Each companion is priced three ways up to its next trait or ×4 level (as Next
-   *  buys): one level, as many as the gold reaches, and the whole step. (A new companion's single levels can be worth
-   *  more than anyone's step; the whole step counts its ×4.) */
+  /** Auto-hire, by payback time: how long until a buy has paid for itself, counting the wait to afford it (gold still
+   *  needed ÷ income) and the time its extra damage takes to earn its cost back (gold comes with kills, so income grows
+   *  with damage). The buy that pays back soonest is bought, or saved for; while saving, a buy that pays for itself
+   *  before that one could be afforded goes ahead (it doesn't hold it up). With no income measured yet (just after an
+   *  ascent), the most damage for the gold among what's affordable. */
   private autoHire() {
+    const rate = this.goldRate();
+    const dps = this.baseDps();
     for (let buys = 0; buys < 60; buys++) {
-      let best = -1, bestN = 0, bestValue = 0;
-      for (let i = 0; i < COMPS.length; i++) {
-        const level = this.s.owned[i];
-        const cap = this.s.bestLevel[i] ?? 0;
-        if (level >= cap || this.away(i) || !this.compUnlocked(i) || (level === 0 && i >= this.s.revealed)) continue;
-        const step = Math.min(cap, level === 0 ? 1 : nextMilestone(i, level)) - level;
-        for (const n of new Set([1, this.affordableLevels(i, step), step])) {
-          if (n < 1) continue;
-          const cost = this.compCost(i, n);
-          if (cost.gt(this.s.gold)) continue;
-          const value = this.compGain(i, n).div(cost.plus(1)).toNumber();
-          if (value > bestValue) [best, bestN, bestValue] = [i, n, value];
+      const options = this.hireOptions();
+      if (!options.length) return;
+      const gold = this.s.gold;
+      if (rate.lte(0) || dps.lte(0)) {
+        let best: (typeof options)[number] | null = null;
+        let bestValue = 0;
+        for (const o of options) {
+          if (o.cost.gt(gold)) continue;
+          const value = o.gain.div(o.cost.plus(1)).toNumber();
+          if (value > bestValue) [best, bestValue] = [o, value];
         }
+        if (!best || !this.buyComp(best.i, best.n)) return;
+        continue;
       }
-      if (best < 0 || !this.buyComp(best, bestN)) return;
+      const timed = options.map((o) => {
+        const payback = o.cost.times(dps).div(o.gain.times(rate)).toNumber();
+        const wait = o.cost.lte(gold) ? 0 : o.cost.minus(gold).div(rate).toNumber();
+        return { ...o, payback, wait, total: wait + payback };
+      });
+      const best = timed.reduce((a, b) => (b.total < a.total ? b : a));
+      const pick = best.wait === 0 ? best
+        : timed.filter((o) => o.wait === 0 && o.payback < best.wait).reduce<(typeof timed)[number] | null>((a, b) => (!a || b.payback < a.payback ? b : a), null);
+      if (!pick || !this.buyComp(pick.i, pick.n)) return;
     }
+  }
+
+  /** What auto-hire could buy for each companion below its best level: one level, as many as the gold reaches toward
+   *  its next trait or ×4 level (as Next buys), and the whole step (which counts its ×4). */
+  private hireOptions() {
+    const out: { i: number; n: number; cost: Decimal; gain: Decimal }[] = [];
+    for (let i = 0; i < COMPS.length; i++) {
+      const level = this.s.owned[i];
+      const cap = this.s.bestLevel[i] ?? 0;
+      if (level >= cap || this.away(i) || !this.compUnlocked(i) || (level === 0 && i >= this.s.revealed)) continue;
+      const step = Math.min(cap, level === 0 ? 1 : nextMilestone(i, level)) - level;
+      for (const n of new Set([1, this.affordableLevels(i, step), step])) {
+        if (n < 1) continue;
+        const gain = this.compGain(i, n);
+        if (gain.gt(0)) out.push({ i, n, cost: this.compCost(i, n), gain });
+      }
+    }
+    return out;
+  }
+
+  /** Gold earned between auto-buy passes over the last INCOME_WINDOW seconds, for the rate it's coming in. (Counted as
+   *  it comes, not read off the run's total: that can be too big to change by a pass's worth.) */
+  private income: { t: number; gold: Decimal }[] = [];
+  private earnedSince = new Decimal(0);
+  private sampleIncome() {
+    const t = this.s.runTime;
+    // (A new run starts the count again.)
+    if (this.income.length && t < this.income[this.income.length - 1].t) this.income = [];
+    this.income.push({ t, gold: this.earnedSince });
+    this.earnedSince = new Decimal(0);
+    while (this.income.length > 1 && t - this.income[0].t > INCOME_WINDOW) this.income.shift();
+  }
+
+  /** Gold a second, from the samples (0 until there are a few seconds of them). */
+  private goldRate() {
+    const first = this.income[0], last = this.income[this.income.length - 1];
+    if (!first || last.t - first.t < 2) return new Decimal(0);
+    // (The first sample's gold came before the span.)
+    return this.income.slice(1).reduce((sum, x) => sum.plus(x.gold), new Decimal(0)).div(last.t - first.t);
   }
 
   /** The most of a companion's next `most` levels the gold buys (0 if not even one). */

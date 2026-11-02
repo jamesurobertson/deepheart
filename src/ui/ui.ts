@@ -371,7 +371,7 @@ export class Ui {
       <nav class="abilities" aria-label="Abilities"></nav>
       <div class="drops"></div>
       <aside class="shop">
-        <header class="shop-head"><h2>Your Party</h2><span class="shop-autos"><span class="auto-lbl" hidden>Auto</span><button class="btn small auto-upg auto-hire" data-act="autoHire" data-tip="shop:hire" hidden>Levels</button><button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden>Traits</button></span><span class="sheet-grip" aria-hidden="true"></span></header>
+        <header class="shop-head"><h2>Your Party</h2><span class="shop-autos"><span class="auto-lbl" hidden>Auto</span><button class="btn small auto-upg auto-hire" data-act="autoHire" data-tip="shop:hire" hidden>Levels</button><button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden>Upgrades</button></span><span class="sheet-grip" aria-hidden="true"></span></header>
         <div class="modes">
           <span>Hire</span>
           <button class="btn mode" data-mode="1">×1</button><button class="btn mode" data-mode="10">×10</button><button class="btn mode" data-mode="25">×25</button><button class="btn mode" data-mode="100">×100</button><button class="btn mode" data-mode="next" data-tip="shop:next">Next</button><button class="btn mode" data-mode="-1">Max</button>
@@ -2144,8 +2144,8 @@ export class Ui {
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
             : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
               : state === 'champ' ? this.champHint()
-              : state === 'auto' ? `<b>Auto traits<small>Traits you've bought before buy themselves</small></b>`
-              : state === 'autohire' ? `<b>Auto levels<small>Companions level back up to their best</small></b>`
+              : state === 'auto' ? `<b>Auto upgrades<small>Companion upgrades you've bought before buy themselves</small></b>`
+              : state === 'autohire' ? `<b>Auto levels<small>Companion levels you've bought before buy themselves</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
               : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`;
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
@@ -2284,7 +2284,7 @@ export class Ui {
         <ul class="tt-l">
           ${g.s.owned[i] ? `<li>Deals <b>${fmt(g.compDps(i))}</b> damage/sec (${(share * 100).toFixed(1)}% of your party)</li>` : ''}
           <li>Next ${q.n > 1 ? `${q.n} levels` : 'level'}: <b class="up">+${fmt(next)}</b> damage/sec</li>
-          <li>${traitLevels(i).includes(nextMilestone(i, g.s.owned[i])) ? 'Next trait' : `×${milestoneMult(nextMilestone(i, g.s.owned[i]))} damage`} at level ${nextMilestone(i, g.s.owned[i])}</li>
+          <li>${traitLevels(i).includes(nextMilestone(i, g.s.owned[i])) ? 'Next upgrade' : `×${milestoneMult(nextMilestone(i, g.s.owned[i]))} damage`} at level ${nextMilestone(i, g.s.owned[i])}</li>
         </ul>
         <p class="tt-f">“${esc(def.flavor)}”</p>`;
     }
@@ -2292,7 +2292,7 @@ export class Ui {
       if (id === 'next') return `<p class="tt-d">Hire up to each companion's next milestone, where a damage upgrade unlocks.</p>`;
       // (The state on a line of its own, so the tip is the same size on and off.)
       const on = id === 'hire' ? g.s.settings.autoHire : g.s.settings.autoUpg;
-      const text = id === 'hire' ? 'Buys companion levels back up to their best.' : 'Buys traits you\'ve bought before.';
+      const text = id === 'hire' ? 'Buys companion levels back up to what you\'ve bought before.' : 'Buys companion upgrades you\'ve bought before.';
       return `<p class="tt-d">${text}</p><p class="tt-d tt-state ${on ? 'on' : ''}">${on ? 'On' : 'Off'}</p>`;
     }
     if (kind === 'lvl') {
@@ -2372,10 +2372,10 @@ export class Ui {
     if (!DEMO) {
       if (kind === 'souls') {
         return `<div class="tt-h"><b>How souls work</b></div>
-          <p class="tt-d">You get them when you ascend:</p>
-          <ul class="tt-l"><li>1 soul for every ${fmt(TUNE.levelsPerSoul)} companion levels you bought this run.</li>
-          <li>Champion bosses (from floor ${fmt(TUNE.goldBossFrom)}) drop souls the first time you beat them each run, more the deeper they are.</li></ul>
-          <p class="tt-d">Each soul you keep adds ${soulPct(1)} damage. Or spend them on Spirits.</p>`;
+          <p class="tt-d">You get them when you ascend.</p>
+          <ul class="tt-l"><li>1 soul for every ${fmt(TUNE.levelsPerSoul)} companion levels.</li>
+          <li>Champion bosses (from floor ${fmt(TUNE.goldBossFrom)}+) give souls the first time you defeat them.</li></ul>
+          <p class="tt-d">Each soul gives ${soulPct(1)} damage, or spend them on Spirits.</p>`;
       }
       if (kind === 'respec') {
         const back = Math.floor(g.s.legendSpent * RESPEC_REFUND);
@@ -3015,16 +3015,16 @@ export class Ui {
     ];
 
     const dps = panel('Party damage', fmt(g.dps()), '/sec', [
-      row('Companions', fmt(baseSum), DEMO ? 'levels × traits' : 'levels × traits × Heartmarks'),
+      row('Companions', fmt(baseSum), DEMO ? 'levels × upgrades' : 'levels × upgrades × Heartmarks'),
       ...allRows,
-      mul('Party traits', p.party, 'companion traits that lift everyone', 'Some companion traits lift everyone'),
+      mul('Party upgrades', p.party, 'companion upgrades that lift everyone', 'Some companion upgrades lift everyone'),
       mul('Buffs', b.buffDps, buffNames('dps'), 'Rampage, Bloodlust'),
     ]);
 
     const click = panel('Click damage', fmt(g.clickDamage()), '/click', [
       row('Base', '1'),
       row('All-damage bonuses', x(b.all), DEMO ? 'trophies and card sets' : 'trophies, card sets and souls'),
-      row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion traits` : ''}`),
+      row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion upgrades` : ''}`),
       ...(DEMO ? [] : [mul('The Fist', 1 + 0.1 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Spirit')]),
       mul('Buffs', b.buffClick, buffNames('click'), 'Frenzy'),
       row('During Rampage', x(g.feverMult())),
@@ -3037,14 +3037,14 @@ export class Ui {
     ], critNote);
 
     const goldT = panel('Gold', x(g.goldMult()), '', [
-      mul('Companion traits', p.goldUpg, 'gold traits', 'Some companion traits add gold'),
+      mul('Companion upgrades', p.goldUpg, 'gold upgrades', 'Some companion upgrades add gold'),
       ...(DEMO ? [] : [mul('The Hoard', 1 + 0.05 * g.legendLv('hoard'), `level ${g.legendLv('hoard')}`, 'A Spirit')]),
       mul('Buffs', b.buffGold, buffNames('gold'), 'Gold Rush'),
     ]);
 
     const baseTime = 30;
     const boss = panel('Bosses', `${baseTime + Math.round(g.bossTimeBonus())}s`, 'timer', [
-      mul('Damage to bosses', p.boss, 'companion traits', 'Some companion traits hit bosses harder'),
+      mul('Damage to bosses', p.boss, 'companion upgrades', 'Some companion upgrades hit bosses harder'),
       row('Armored blocks', pc(g.armor()), 'of companion damage'),
       row('Regenerating heals', `${pc(g.regen())}/s`, 'of its health'),
       row('Modifier strength', pc(g.modBite()), 'how hard Armored and Regenerating bite'),
@@ -3070,7 +3070,7 @@ export class Ui {
       return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(levelMult(lv))}</td><td>${x(p.tier[i])}</td>${DEMO ? '' : `<td>${g.s.marks[i] ? `${G.heart(1.2)} ${g.s.marks[i]}` : ''}</td>`}<td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? g.compDps(i).div(total).times(100).toNumber().toFixed(1) : 0}%</td></tr>`;
     }).join('');
     return `<p class="muted bd-help">Each companion: level × base damage × milestones × traits${DEMO ? '' : ' × Heartmarks'}, then every all-damage bonus (${x(b.all.times(p.party))} right now) on top.</p>
-      <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Milestones</td><td>Traits</td>${DEMO ? '' : '<td>Marks</td>'}<td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
+      <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Milestones</td><td>Upgrades</td>${DEMO ? '' : '<td>Marks</td>'}<td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
   }
 
   private recordsHtml(): string {
