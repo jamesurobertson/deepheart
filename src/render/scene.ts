@@ -1929,9 +1929,10 @@ export class Scene {
     }
   }
 
-  raiderScreen(): { x: number; y: number } | null {
+  /** Where the treasure goblin is on screen: over its head (for its marker), or at `height` (0: its feet). */
+  raiderScreen(height = 2.6): { x: number; y: number } | null {
     const r = this.raider;
-    return r ? this.toScreen(r.group.position.clone().setY(2.6)) : null;
+    return r ? this.toScreen(r.group.position.clone().setY(height)) : null;
   }
 
   hitRaider(x: number, y: number): boolean {

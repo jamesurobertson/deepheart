@@ -1664,7 +1664,10 @@ body.over-act .blade-act { display: block; }
 /* Controller: a focus ring where the d-pad lands, the companion the right stick picks (framed), each ability's button
    by its square, LB and RB where the buy amounts' label is, and a bar of what the buttons do here. Only while the
    controller is the thing in use. */
-body.pad-on :is(button, a, [tabindex="0"]):focus { outline: 3px solid var(--gold-hi); outline-offset: 2px; }
+body.pad-on :is(button, a, [tabindex="0"], [tabindex="-1"]):focus { outline: 3px solid var(--gold-hi); outline-offset: 2px; }
+/* No mouse pointer (nor the game's sword) while you play on the controller; moving the mouse brings it back. */
+body.pad-on, body.pad-on * { cursor: none !important; }
+body.pad-on .blade { display: none !important; }
 .pad-g { display: inline-block; vertical-align: middle; flex: none; pointer-events: none; user-select: none; }
 .gen.pad-pick { box-shadow: 0 0 0 3px var(--gold-hi), 0 0 18px rgba(255, 224, 138, 0.45); z-index: 1; }
 .pad-bar span { display: inline-flex; align-items: center; gap: 6px; }

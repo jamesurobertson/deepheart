@@ -1,21 +1,23 @@
 /** Controller support, with no cursor: everything has a button. The left stick walks your hero (it catches goblins and
- *  picks up what it walks over, as with the keys) and A attacks. The right stick picks a companion in your party, RT
- *  levels it, X buys its next upgrade, R3 makes it your hero, and LB and RB change how many levels a buy is. The d-pad
- *  and Y use abilities; LT with the d-pad changes floor. Menu opens the dock (step along it, A opens what's there), View
- *  opens Ascend, B backs out. In a window or on the title screen the sticks and d-pad step between buttons and LB RB
- *  change tabs. Prompts show the controller's own buttons (Kenney's Input Prompts, by kind of pad) while it's the last
+ *  picks up what it walks over, as with the keys) and A attacks the monster nearest them. The d-pad's ▲ ▼ (or the right
+ *  stick) pick a companion in your party: RT levels it, X buys its next upgrade, R3 makes it your hero; ◀ ▶ change how
+ *  many levels a buy is. LB, RB and Y use abilities, and with LT held three more (LT with ◀ ▶ changes floor). Menu opens
+ *  the dock (step along it, A opens what's there), View opens Ascend, B backs out. In a window or on the title screen
+ *  the sticks and d-pad step between buttons and LB RB change tabs. Prompts show the controller's own buttons (Kenney's Input Prompts, by kind of pad) while it's the last
  *  thing used; the mouse, keyboard or a finger puts the usual words back. */
 const REACH = 'button:not([disabled]), a[href], [tabindex="0"], input:not([disabled])';
+/** In a window, anything with a tooltip can be stepped to as well (a trophy, a card), to read it. */
+const REACH_WINDOW = `${REACH}, .modal-wrap [data-tip]`;
 const DEAD_ZONE = 0.35;
 const REPEAT_MS = 220;
 /** How often a held RT buys again (after a longer first wait, so one press buys once). */
 const BUY_REPEAT_MS = 160;
 const ARROWS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } as const;
 type Dir = keyof typeof ARROWS;
-/** The ability each d-pad direction uses (its number key). Y is Rampage (2), LT with up Phantom Legion (6). */
-const DPAD_ABILITY: Record<Dir, string> = { up: '1', right: '3', down: '4', left: '5' };
+/** The ability (its number key) on LB, RB and Y, and on each with LT held. */
+const ABILITY_KEY: Record<string, [string, string]> = { b4: ['1', '4'], b5: ['3', '5'], b3: ['2', '6'] };
 /** Each ability's button(s), for its prompt. */
-export const ABILITY_PAD: Record<string, string[]> = { flurry: ['up'], cleave: ['right'], treasure: ['down'], drums: ['left'], rampage: ['y'], legion: ['lt', 'up'] };
+export const ABILITY_PAD: Record<string, string[]> = { flurry: ['lb'], cleave: ['rb'], rampage: ['y'], treasure: ['lt', 'lb'], drums: ['lt', 'rb'], legion: ['lt', 'y'] };
 
 export type PadFamily = 'xbox' | 'ps' | 'switch';
 
@@ -62,7 +64,8 @@ const visible = (el: HTMLElement) => {
 
 /** The nearest visible control in a direction, by distance along that direction with a penalty for drifting off it. */
 function neighbor(from: HTMLElement | null, dir: Dir, scope: ParentNode): HTMLElement | null {
-  const items = [...scope.querySelectorAll<HTMLElement>(REACH)].filter((el) => visible(el) && !el.matches('canvas'));
+  const reach = scope instanceof Element && scope.matches('.modal-wrap') ? REACH_WINDOW : REACH;
+  const items = [...scope.querySelectorAll<HTMLElement>(reach)].filter((el) => !el.parentElement?.closest(reach) || el.matches('button, a, input')).filter((el) => visible(el) && !el.matches('canvas'));
   if (!from || !items.includes(from)) return items[0] ?? null;
   const origin = from.getBoundingClientRect();
   const [ox, oy] = [origin.left + origin.width / 2, origin.top + origin.height / 2];
@@ -91,6 +94,7 @@ export function installGamepad() {
 
   let held = new Set<string>();
   let heldDir: Dir | null = null;
+  let heldSide: Dir | null = null;
   let walking = new Set<Dir>();
   let repeatAt = 0;
   let buyAt = 0;
@@ -111,6 +115,8 @@ export function installGamepad() {
   /** The d-pad (or a stick) lands on a button: focused, with its tooltip. */
   const land = (el: HTMLElement | null) => {
     if (!el) return;
+    // (A trophy or a card isn't a button: it takes the focus all the same, just not from Tab.)
+    if (!el.matches(REACH)) el.tabIndex = -1;
     el.focus({ preventScroll: false });
     el.scrollIntoView({ block: 'nearest' });
     hover(focusTip, false);
@@ -156,7 +162,8 @@ export function installGamepad() {
       if (!tag) {
         tag = document.createElement('span');
         tag.className = 'pad-ab';
-        document.body.appendChild(tag);
+        // (In the interface's own layer, so tooltips go over them.)
+        (document.getElementById('ui') ?? document.body).appendChild(tag);
         abilityTags.set(id, tag);
       }
       const box = slot.getBoundingClientRect();
@@ -170,7 +177,7 @@ export function installGamepad() {
       tag.style.transform = `translate(${Math.round(box.left - tag.offsetWidth - 6)}px, ${Math.round(box.top + (box.height - tag.offsetHeight) / 2)}px)`;
     }
     const modes = document.querySelector('.modes');
-    if (family && modes && !modes.querySelector('.pad-amount')) modes.querySelector('.mode')?.insertAdjacentHTML('beforebegin', `<span class="pad-fixed pad-amount">${padGlyph('lb', 22)}${padGlyph('rb', 22)}</span>`);
+    if (family && modes && !modes.querySelector('.pad-amount')) modes.querySelector('.mode')?.insertAdjacentHTML('beforebegin', `<span class="pad-fixed pad-amount">${padGlyph('left', 22)}${padGlyph('right', 22)}</span>`);
   };
 
   /** The prompt bar: what the buttons do here, in one line. */
@@ -250,7 +257,6 @@ export function installGamepad() {
       if (lx > DEAD_ZONE) want.add('right');
       if (ly < -DEAD_ZONE) want.add('up');
       if (ly > DEAD_ZONE) want.add('down');
-      if (inKeep() && dpad) want.add(dpad);
     }
     for (const d of walking) if (!want.has(d)) press(ARROWS[d], ARROWS[d], false);
     for (const d of want) if (!walking.has(d)) press(ARROWS[d], ARROWS[d], true);
@@ -279,29 +285,34 @@ export function installGamepad() {
       // A attacks (hold it to keep swinging); in the Keep it uses what you're at.
       if (fresh('b0')) press(' ', 'Space', true);
       if (letGo('b0')) press(' ', 'Space', false);
-      // The d-pad and Y: abilities, or with LT held, the floor (◀ ▶) and Auto (▼). In the Keep the d-pad walks.
+      // LB, RB and Y: abilities (with LT held, the other three). LT with the d-pad: the floor (◀ ▶) and Auto (▼).
       if (!inKeep()) {
-        if (dpad && fresh(`b${12 + ['up', 'down', 'left', 'right'].indexOf(dpad)}`)) {
-          if (down.has('b6')) {
-            if (dpad === 'up') tap('6', 'Digit6');
-            else click(document.querySelector(dpad === 'left' ? '[data-act="floorDown"]' : dpad === 'right' ? '[data-act="floorUp"]' : '[data-act="auto"]'));
-          } else tap(DPAD_ABILITY[dpad], `Digit${DPAD_ABILITY[dpad]}`);
+        const lt = down.has('b6');
+        for (const [b, [plain, shifted]] of Object.entries(ABILITY_KEY)) {
+          if (!fresh(b)) continue;
+          const key = lt ? shifted : plain;
+          tap(key, `Digit${key}`);
         }
-        if (fresh('b3')) tap('2', 'Digit2');
+        if (lt && dpad && dpad !== 'up' && fresh(`b${12 + ['up', 'down', 'left', 'right'].indexOf(dpad)}`)) {
+          click(document.querySelector(dpad === 'left' ? '[data-act="floorDown"]' : dpad === 'right' ? '[data-act="floorUp"]' : '[data-act="auto"]'));
+        }
       }
     }
 
-    // Your party, always at hand (not under a window): the right stick picks, RT levels, X upgrades, R3 makes them your
-    // hero, LB and RB the amount.
+    // Your party, always at hand (not under a window): the d-pad's ▲ ▼ or the right stick pick, RT levels, X upgrades,
+    // R3 makes them your hero, ◀ ▶ the amount.
     let moved = false;
     if (!modal && !title) {
       const list = rows();
-      if (Math.abs(ry) > 0.5 && now >= stickAt) {
-        picked = Math.max(0, Math.min(list.length - 1, picked + (ry > 0 ? 1 : -1)));
-        stickAt = now + (Math.abs(ry) > 0.9 ? 90 : 170);
+      const lt = down.has('b6');
+      const step = !docked && !lt && (dpad === 'up' || dpad === 'down') ? (dpad === 'down' ? 1 : -1) : Math.abs(ry) > 0.5 ? (ry > 0 ? 1 : -1) : 0;
+      if (step && now >= stickAt) {
+        picked = Math.max(0, Math.min(list.length - 1, picked + step));
+        // (Held: a first wait, then quicker steps; the stick pushed all the way goes quicker still.)
+        stickAt = now + (stickAt === 0 ? REPEAT_MS * 1.4 : Math.abs(ry) > 0.9 ? 70 : 110);
         list[picked]?.scrollIntoView({ block: 'nearest' });
         moved = true;
-      } else if (Math.abs(ry) <= 0.5) stickAt = 0;
+      } else if (!step) stickAt = 0;
       const row = list[picked];
       if (row && down.has('b7') && now >= buyAt) {
         click(row);
@@ -309,11 +320,13 @@ export function installGamepad() {
       }
       if (row && fresh('b2')) click(row.querySelector('.trait[data-trait]'));
       if (row && fresh('b11')) click(row.querySelector('[data-hero]'));
-      if (!docked && (fresh('b4') || fresh('b5'))) {
+      const side = !docked && !lt && (dpad === 'left' || dpad === 'right') && dpad !== heldSide ? dpad : null;
+      if (side) {
         const modes = [...document.querySelectorAll<HTMLElement>('.modes .mode')];
         const on = Math.max(0, modes.findIndex((m) => m.classList.contains('on')));
-        click(modes[(on + (fresh('b5') ? 1 : modes.length - 1)) % modes.length]);
+        click(modes[(on + (side === 'right' ? 1 : modes.length - 1)) % modes.length]);
       }
+      heldSide = dpad === 'left' || dpad === 'right' ? dpad : null;
       // (The tooltip goes with anything else you do.)
       if (!moved && (fresh('b0') || Math.hypot(lx, ly) > DEAD_ZONE)) hover(pickedRow, false);
     }
