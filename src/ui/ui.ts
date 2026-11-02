@@ -8,6 +8,7 @@ import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, keepDoor, silhouette, spiritForm, sprite, spriteFit, spriteFrames } from './px.ts';
+import { ABILITY_PAD, padFamily, padGlyph, padHooks } from './gamepad.ts';
 import { skillIcon } from './icons.ts';
 import { kokoSvg } from './koko.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
@@ -164,6 +165,8 @@ const abilityKey = (id: AbilityId) => KEYED.indexOf(id) + 1;
 /** "4:05" for a cooldown. */
 /** The same words for a finger: "click" in tooltips (and the game's copy) reads "tap" on a touch screen. */
 const tapWords = (html: string) => html.replace(/\b([Cc])lick(s|ed|ing)?\b/g, (_, c: string, end = '') => `${c === 'C' ? 'T' : 't'}ap${end === 'ed' ? 'ped' : end === 'ing' ? 'ping' : end}`);
+/** A tooltip's mouse words, for a controller: its A button presses what the cursor is on. */
+const padWords = (html: string) => html.replace(/\bClick (to|the)\b/g, (_, w: string) => `Press ${padGlyph('a', 18)} ${w === 'the' ? 'on the' : 'to'}`).replace(/\bclicking\b/g, 'attacking');
 /** The ✦ on a trait square, drawn as that square where a hint names it. */
 const TRAIT_KEY = '<span class="hint-trait">✦</span>';
 const clock = (s: number) => {
@@ -550,6 +553,13 @@ export class Ui {
 
   private bind() {
     const r = this.root;
+    // Picking up the controller (or putting it down): the hint, the open tooltip and the Keep's prompts change words.
+    padHooks.change = () => {
+      this.hintState = '~';
+      delete this.el.keepLabels.dataset.ids;
+      this.refreshTip();
+      if (this.modal === 'keys') this.renderModal(true);
+    };
     // Clicking the chamber: the treasure goblin first, then whichever monster is nearest.
     addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || this.modal || this.descending) return;
@@ -867,7 +877,7 @@ export class Ui {
         }
         return;
       }
-      const key = t.dataset.set as 'sfxVol' | 'musicVol' | undefined;
+      const key = t.dataset.set as 'sfxVol' | 'musicVol' | 'padSpeed' | undefined;
       if (!key) return;
       this.game.s.settings[key] = Number(t.value) / 100;
       this.hooks.settings();
@@ -1244,7 +1254,7 @@ export class Ui {
         this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 });
         break;
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
-      case 'fever': if (ev.on) this.banner(`RAMPAGE ×${fmt(g.feverMult())}!`, `Keep ${this.touch ? 'tapping' : 'clicking'} for ×${fmt(g.rampageNext()?.mult ?? g.feverMult())}`, 'rampage'); break;
+      case 'fever': if (ev.on) this.banner(`RAMPAGE ×${fmt(g.feverMult())}!`, `Keep ${this.attacking()} for ×${fmt(g.rampageNext()?.mult ?? g.feverMult())}`, 'rampage'); break;
       case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, 'Full power', `rampage tier${ev.tier}`); break;
       case 'vaultPick': this.showVaultPick(); break;
       case 'vault':
@@ -1662,7 +1672,7 @@ export class Ui {
     if (fever) {
       this.el.feverBar.style.width = `${(fever.t / fever.dur) * 100}%`;
       const next = g.rampageNext();
-      const label = next ? `×${fmt(g.feverMult())} · keep ${this.touch ? 'tapping' : 'clicking'}!` : `×${fmt(g.feverMult())}!`;
+      const label = next ? `×${fmt(g.feverMult())} · keep ${this.attacking()}!` : `×${fmt(g.feverMult())}!`;
       if (this.el.feverLabel.textContent !== label) this.el.feverLabel.textContent = label;
     }
 
@@ -2137,27 +2147,37 @@ export class Ui {
     this.el.hint.classList.toggle('still', state === 'hero');
     this.el.shop.classList.toggle('show-stars', state === 'star');
     this.el.hint.innerHTML = state === 'hero'
-      ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : 'they follow your mouse'}</small></b>`
-      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click their ${G.star()} to switch</small></b>`
+      ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : padFamily() ? 'they follow your cursor' : 'they follow your mouse'}</small></b>`
+      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>${padFamily() ? `Point at their ${G.star()} and press ${padGlyph('a', 18)}` : `Click their ${G.star()} to switch`}</small></b>`
         : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>Companions fight for you, even while you're away</small></b>`
-          : state === 'level' ? `<b>Keep ${this.touch ? 'tapping' : 'clicking'} to level up<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
+          : state === 'level' ? `<b>${padFamily() ? `Press ${padGlyph('rt', 20)} to level up` : `Keep ${this.touch ? 'tapping' : 'clicking'} to level up`}<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
             : state.startsWith('skill:') ? this.skillHint(state.slice(6) as AbilityId)
-            : state === 'rampage' ? `<b>Rampage is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
+            : state === 'rampage' ? `<b>Rampage is ready!<small>${padFamily() ? `Press ${this.abilityButtons('rampage')}` : this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
-            : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
+            : state === 'shop' ? `<b>An upgrade is ready!<small>${padFamily() ? `Pick its companion with ${padGlyph('rs', 18)}, then press ${padGlyph('x', 18)}` : this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
               : state === 'champ' ? this.champHint()
               : state === 'auto' ? `<b>Auto upgrades<small>Companion upgrades you've bought before buy themselves</small></b>`
               : state === 'autohire' ? `<b>Auto levels<small>Companion levels you've bought before buy themselves</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
-              : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`;
+              : (padFamily() ? `<b>Attack the monsters!<small>Hold ${padGlyph('a', 18)} to keep attacking</small></b>` : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`);
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
+  }
+
+  /** The word for attacking the way you're playing. */
+  private attacking() {
+    return padFamily() ? 'attacking' : this.touch ? 'tapping' : 'clicking';
+  }
+
+  /** The controller button(s) that use an ability. */
+  private abilityButtons(id: AbilityId) {
+    return (ABILITY_PAD[id] ?? []).map((k) => padGlyph(k, 20)).join('');
   }
 
   /** A skill just unlocked: its name, and how to use it (or that it's always on). */
   private skillHint(id: AbilityId) {
     const a = ABILITY_BY_ID.get(id)!;
-    const how = a.kind === 'button' ? `<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey(id)}`} to use it</small>` : a.kind === 'passive' ? '<small>Always on</small>' : '';
+    const how = a.kind === 'button' ? `<small>${padFamily() ? `Press ${this.abilityButtons(id)}` : this.touch ? 'Tap it' : `Click it or press ${abilityKey(id)}`} to use it</small>` : a.kind === 'passive' ? '<small>Always on</small>' : '';
     return `<b>${esc(a.name)} unlocked!${how}</b>`;
   }
 
@@ -2176,6 +2196,12 @@ export class Ui {
   private firstUpgradeHint(row: number) {
     const id = `m${row}_0`;
     const skill = ABILITY_BY_UPGRADE.get(id);
+    if (padFamily()) {
+      const x = padGlyph('x', 18);
+      if (skill) return `Press ${x} to unlock the ${esc(skill.name)}`;
+      const u = UPG_BY_ID.get(id);
+      return u?.effect.t === 'comp' ? `Press ${x} to double ${esc(COMPS[row].name)}'s damage` : `Press ${x}: ${esc(u?.desc ?? '')}`;
+    }
     const press = this.touch ? 'Tap' : 'Click';
     if (skill) return `${press} the ${TRAIT_KEY} to unlock the ${esc(skill.name)}`;
     const u = UPG_BY_ID.get(id);
@@ -2240,7 +2266,7 @@ export class Ui {
       if (!a) return this.hideTip();
       this.tipAnchor = a;
     }
-    const html = this.touch ? tapWords(this.tipHtml(this.tipKey)) : this.tipHtml(this.tipKey);
+    const html = padFamily() ? padWords(this.tipHtml(this.tipKey)) : this.touch ? tapWords(this.tipHtml(this.tipKey)) : this.tipHtml(this.tipKey);
     if (!html) return this.hideTip();
     const tip = this.el.tip;
     if (tip.innerHTML !== html) tip.innerHTML = html;
@@ -2319,7 +2345,7 @@ export class Ui {
       const a = ABILITY_BY_ID.get(id as AbilityId)!;
       const comp = COMPS[a.comp];
       const cd = g.abilityCooldown(a.id);
-      const key = this.touch ? '' : ` (or press ${abilityKey(a.id)})`;
+      const key = this.touch || padFamily() ? '' : ` (or press ${abilityKey(a.id)})`;
       const fever = a.id === 'rampage' ? g.s.buffs.find((b) => b.id === 'fever') : undefined;
       const next = fever ? g.rampageNext() : null;
       const status = !DEMO && g.away(a.comp)
@@ -2329,9 +2355,9 @@ export class Ui {
         : a.kind === 'passive' ? ''
           : fever ? (next ? `×${fmt(g.feverMult())}. Keep clicking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
             : a.kind === 'charge' && g.s.fervor < 1 ? `${Math.floor(g.s.fervor * 100)}% charged.`
-              : cd > 0 ? `Ready again in ${duration(cd)}.` : `Ready. Click to use it${key}.`;
+              : cd > 0 ? `Ready again in ${duration(cd)}.` : padFamily() ? `Ready. Press ${this.abilityButtons(a.id)} to use it.` : `Ready. Click to use it${key}.`;
       const timing = a.kind === 'button' ? `<ul class="tt-l"><li>Lasts ${+g.abilityDuration(a.id).toFixed(1)}s · cooldown ${duration(a.cooldown ?? 0)}</li></ul>` : '';
-      return `<div class="tt-h"><b>${esc(a.name)}</b><span class="tt-own">${a.kind === 'passive' ? 'always on' : this.touch ? 'ability' : `key ${abilityKey(a.id)}`}</span></div>
+      return `<div class="tt-h"><b>${esc(a.name)}</b><span class="tt-own">${a.kind === 'passive' ? 'always on' : padFamily() ? this.abilityButtons(a.id) : this.touch ? 'ability' : `key ${abilityKey(a.id)}`}</span></div>
         <p class="tt-d">${esc(g.abilityText(a.id))}</p>${timing}${status ? `<p class="tt-f">${status}</p>` : ''}`;
     }
     if (kind === 'tro') {
@@ -2572,7 +2598,19 @@ export class Ui {
       html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${who === 'dan' ? 'Dan' : 'Victor'}`, who === 'dan' ? `Trade ${DAN_GIVES} cards for a random card` : `Trade ${VICTOR_GIVES} cards for 1 gold card`) + this.tradeHtml(who);
     } else if (name === 'keys') {
       const cap = (...keys: string[]) => keys.map((k) => `<kbd>${k}</kbd>`).join('');
-      const rows: [string, string][] = [
+      const pad = (...keys: string[]) => keys.map((k) => padGlyph(k, 26)).join('');
+      const rows: [string, string][] = padFamily() ? [
+        [pad('ls'), 'Move the cursor (your hero follows)'],
+        [pad('a'), 'Attack, or press what the cursor is on'],
+        [pad('rs'), 'Pick a companion'],
+        [pad('rt'), 'Level them'],
+        [pad('x'), 'Buy their next upgrade'],
+        [pad('lb', 'rb'), 'Buy amount'],
+        ...ABILITIES.filter((a) => ABILITY_PAD[a.id]).map((a): [string, string] => [pad(...ABILITY_PAD[a.id]), esc(a.name)]),
+        [pad('b'), 'Back'],
+        [pad('view'), 'Ascend'],
+        [pad('menu'), 'Options'],
+      ] : [
         [cap('W', 'A', 'S', 'D'), 'Move'],
         [`${MOUSE_GLYPH}${cap('Space')}`, 'Attack'],
         [`${cap('1')}–${cap(String(KEYED.length))}`, 'Abilities'],
@@ -2589,6 +2627,7 @@ export class Ui {
         <div class="set">
           <label>Effects volume <input type="range" min="0" max="100" value="${Math.round(s.sfxVol * 100)}" data-set="sfxVol"></label>
           <label>Music volume <input type="range" min="0" max="100" value="${Math.round(s.musicVol * 100)}" data-set="musicVol"></label>
+          <label class="pad-only">Controller cursor speed <input type="range" min="0" max="100" step="25" value="${Math.round(s.padSpeed * 100)}" data-set="padSpeed"></label>
           <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('calm', s.calm, 'Reduce flashing')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
           <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button></div>
           <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
@@ -3227,7 +3266,7 @@ export class Ui {
     const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
       <div class="cr-card">${ev.gold ? GOLD_DAZZLE : ''}<div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96, ev.lap)}</div></div></div>
-      <div class="cr-text"><small>${head}</small><b>${esc(cardName(d.name, ev.lap))} Card${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
+      <div class="cr-text"><small>${head}</small><b>${esc(cardName(d.name, ev.lap))} Card${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${padFamily() ? `Press ${padGlyph('a', 18)}` : this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
     this.el.banner.parentElement!.appendChild(el);
     // The sound lands with the flip.
     setTimeout(() => this.hooks.sound(ev.gold || d.kind !== 'monster' ? 'drop4' : 'drop3', { vol: 0.8 }), 380);
@@ -3343,7 +3382,7 @@ export class Ui {
     el.innerHTML = `<div class="awk-embers">${embers}</div><div class="awk-souls">${souls}</div><div class="awk-sparks">${sparks}</div><div class="awk-ring">${ring}</div>
       <div class="awk-heart">${G.heart(18)}<i class="awk-wave"></i></div><div class="awk-flash"></div>
       <div class="awk-text"><b>${esc(title)}</b><span class="awk-gain">${boundGlyph(3)}<em>0</em><small>bound souls</small></span></div>
-      <span class="awk-tap">${this.touch ? 'Tap' : 'Click'} to continue</span>`;
+      <span class="awk-tap">${padFamily() ? `Press ${padGlyph('a', 18)}` : this.touch ? 'Tap' : 'Click'} to continue</span>`;
     this.root.appendChild(el);
     const timers: number[] = [];
     const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
@@ -3563,10 +3602,10 @@ export class Ui {
       document.body.classList.remove('over-act');
       return;
     }
-    const ids = labels.map((l) => `${l.id}:${l.verb}:${l.tip ?? ''}`).join(' ');
+    const ids = labels.map((l) => `${l.id}:${l.verb}:${l.tip ?? ''}`).join(' ') + (padFamily() ?? '');
     if (host.dataset.ids !== ids) {
       host.dataset.ids = ids;
-      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}${l.tip ? `<small>${esc(l.tip)}</small>` : ''}</b><em class="kp"><kbd>E</kbd>${MOUSE_GLYPH}<span>${esc(l.verb)}</span></em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
+      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}${l.tip ? `<small>${esc(l.tip)}</small>` : ''}</b><em class="kp">${padFamily() ? padGlyph('a', 22) : `<kbd>E</kbd>${MOUSE_GLYPH}`}<span>${esc(l.verb)}</span></em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
       // Clicking a label walks you over and uses it when you get there.
       host.querySelectorAll<HTMLElement>('[data-station]').forEach((b) => {
         b.addEventListener('click', (e) => {

@@ -26,6 +26,7 @@ const CREDITS: { what: string; items: { name: string; by?: string; url: string }
       { name: 'DungeonTileset II Extended', by: 'Niji', url: 'https://nijikokun.itch.io/dungeontileset-ii-extended' },
       { name: 'CR+ TileSet', by: 'AnriTool', url: 'https://anritool.itch.io/cr-tileset' },
       { name: 'Pixel Art Spells', by: 'DevWizard', url: 'https://opengameart.org/content/pixel-art-spells' },
+      { name: 'Input Prompts', by: 'Kenney', url: 'https://kenney.nl/assets/input-prompts' },
     ],
   },
   {

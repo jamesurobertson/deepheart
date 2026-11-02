@@ -254,6 +254,8 @@ export interface Settings {
   autoUpg: boolean;
   /** Auto-hire: hire and level companions, the best damage per gold first, up to each one's best level. */
   autoHire: boolean;
+  /** A controller's cursor speed, 0 to 1 (0.5 the default: half and double either end). */
+  padSpeed: number;
   /** How much of the look to draw: a fixed level, or auto (high, stepping down if frames run long). */
 }
 
@@ -507,7 +509,7 @@ export function newSave(): SaveState {
     floor: 1, maxFloor: 1, bestFloor: 1, bestCleared: 0, floorKills: 0, peakKills: 0, auto: true, revealed: 0,
     bestDps: new Decimal(0), playTime: 0, runTime: 0, activeTime: 0, runActive: 0, startedAt: Date.now(), lastSave: Date.now(), lastAttack: 0,
     roster: COMPS.map((c) => c.id), bestLevel: COMPS.map(() => 0), bound: {}, boundEarned: 0, awakens: 0, expeditions: [], tripsOpen: false, critSpirits: true, ladderSeen: false, tripReady: [], tripsSent: 0, tripCards: 0, tripKills: 0, pets: 0, heartTeased: false, dreamSeen: false, soulBossDone: false, markTipSeen: false, autoTipSeen: false, autoHireTipSeen: false, keepLine: [], keepHero: null, inKeep: false, keepSpot: null, dreamCards: [], trades: 0, stashes: [], ascents: [], version: GAME_VERSION, brosMet: false, gifts: [], talkedTo: [], clutches: 0, champions: 0, vaults: 0, rainbows: 0, rainbowSeen: false, hero: 0, heroTips: 0, bladeSeen: false, flurrySeen: false, skillsSeen: [], rampage: 0, cycleBest: 0, lastAscent: 0, cards: {}, slain: {}, slainLaps: {}, champSlain: {}, latePrices: true,
-    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, autoHire: false },
+    settings: { sfxVol: 0.8, musicVol: 0.6, muted: false, music: true, particles: true, calm: false, shake: true, numbers: true, notation: 'short', buyMode: 1, blood: true, cinematics: true, cursor: 'auto', autoUpg: true, autoHire: false, padSpeed: 0.5 },
   };
 }
 

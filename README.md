@@ -92,7 +92,8 @@ All CC0. Art: [0x72 DungeonTileset II](https://0x72.itch.io/dungeontileset-ii) a
 [Dark Dungeon](https://kosinaz.itch.io/16x16-dark-dungeon-tileset) by Zoltan Kosina,
 [DungeonTileset II Extended](https://nijikokun.itch.io/dungeontileset-ii-extended) by Niji,
 [CR+ TileSet](https://anritool.itch.io/cr-tileset) characters by AnriTool,
-[Pixel Art Spells](https://opengameart.org/content/pixel-art-spells) by DevWizard.
+[Pixel Art Spells](https://opengameart.org/content/pixel-art-spells) by DevWizard. Controller button prompts:
+[Input Prompts](https://kenney.nl/assets/input-prompts) by Kenney.
 Sound: [Kenney](https://kenney.nl) sound packs. Music: Juhani Junkala's
 [Chiptune Adventures](https://opengameart.org/content/4-chiptunes-adventure) and
 [5 Chiptunes (Action)](https://opengameart.org/node/55580), [Spooky Dungeon](https://opengameart.org/content/spooky-dungeon) by Memoraphile,

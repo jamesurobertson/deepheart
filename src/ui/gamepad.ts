@@ -2,12 +2,16 @@
  *  and A clicks: a swing over the dungeon, a press over a button. The right stick picks a companion in your party, RT
  *  levels it and X buys its next upgrade; LB and RB change how many levels a buy is. The d-pad and Y use abilities.
  *  B backs out, Menu opens Options and View opens Ascend. In a window or on the title screen the d-pad steps between
- *  buttons; in the Keep it walks. Button names follow the kind of controller (Xbox, PlayStation, Nintendo). */
+ *  buttons; in the Keep it walks. Prompts show the controller's own buttons (Kenney's Input Prompts, by kind of pad)
+ *  while it's the last thing used; the mouse or keyboard puts the usual words back. */
 const REACH = 'button:not([disabled]), a[href], [tabindex="0"], input:not([disabled])';
 const DEAD_ZONE = 0.18;
-/** Cursor speed at full tilt, in CSS pixels a second, and how much it slows over something you can press. */
-const CURSOR_SPEED = 1100;
-const STICKY = 0.4;
+/** The cursor at full tilt crosses the window's height in this many seconds (at the default speed); it starts at
+ *  CURSOR_START of that and reaches it after CURSOR_RAMP seconds held, and slows to STICKY over anything you can press. */
+const CURSOR_CROSS = 1.4;
+const CURSOR_START = 0.35;
+const CURSOR_RAMP = 0.4;
+const STICKY = 0.45;
 const REPEAT_MS = 220;
 /** How often a held RT buys again. */
 const BUY_REPEAT_MS = 160;
@@ -16,20 +20,28 @@ type Dir = keyof typeof ARROWS;
 /** The ability each d-pad direction uses (its number key), and with LT held. Y is Rampage (2). */
 const DPAD_ABILITY: Record<Dir, string> = { up: '1', right: '3', down: '4', left: '5' };
 const DPAD_ABILITY_LT: Partial<Record<Dir, string>> = { up: '6' };
+/** Each ability's button(s), for its prompt. */
+export const ABILITY_PAD: Record<string, string[]> = { flurry: ['up'], cleave: ['right'], treasure: ['down'], drums: ['left'], rampage: ['y'], legion: ['lt', 'up'] };
 
-type Family = 'xbox' | 'ps' | 'nintendo';
-/** What each button is called on each kind of controller (standard layout: A bottom, B right, X left, Y top). */
-const GLYPHS: Record<Family, Record<string, string>> = {
-  xbox: { a: 'A', b: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', lt: 'LT', rt: 'RT', view: 'View', menu: 'Menu' },
-  ps: { a: '✕', b: '○', x: '□', y: '△', lb: 'L1', rb: 'R1', lt: 'L2', rt: 'R2', view: 'Create', menu: 'Options' },
-  nintendo: { a: 'B', b: 'A', x: 'Y', y: 'X', lb: 'L', rb: 'R', lt: 'ZL', rt: 'ZR', view: '−', menu: '+' },
-};
+export type PadFamily = 'xbox' | 'ps' | 'switch';
+/** The controller's cursor speed, 0 to 1 (set from Options). */
+export const padTuning = { speed: 0.5 };
+
+let family: PadFamily | null = null;
+/** The controller in use, while it's the last thing you touched (null with the mouse, keyboard or touch). */
+export const padFamily = () => family;
+
+/** A controller button's picture: a, b, x, y, lb, rb, lt, rt, up, down, left, right, ls, rs, menu, view. */
+export function padGlyph(key: string, size = 22, cls = ''): string {
+  if (!family) return '';
+  return `<img class="pad-g ${cls}" src="${import.meta.env.BASE_URL}assets/prompts/${family}/${key}.png" width="${size}" height="${size}" alt="" draggable="false">`;
+}
 
 /** Which kind of controller this is, from the id the browser gives it (it carries the maker's USB vendor id). */
-function familyOf(pad: Gamepad): Family {
+function familyOf(pad: Gamepad): PadFamily {
   const id = pad.id.toLowerCase();
   if (/054c|playstation|dualsense|dualshock/.test(id)) return 'ps';
-  if (/057e|nintendo|pro controller|joy-con/.test(id)) return 'nintendo';
+  if (/057e|nintendo|pro controller|joy-con/.test(id)) return 'switch';
   return 'xbox';
 }
 
@@ -69,29 +81,34 @@ function neighbor(from: HTMLElement | null, dir: Dir, scope: ParentNode): HTMLEl
   return best;
 }
 
+/** Runs when the controller starts or stops being the thing in use (so prompts can change their words). */
+export const padHooks = { change: () => {} };
+
 export function installGamepad() {
   if (!navigator.getGamepads) return;
   const cursor = document.createElement('div');
   cursor.className = 'pad-cursor';
   cursor.hidden = true;
   document.body.appendChild(cursor);
-  const prompt = document.createElement('div');
-  prompt.className = 'pad-prompt';
-  prompt.hidden = true;
-  document.body.appendChild(prompt);
+  const bar = document.createElement('div');
+  bar.className = 'pad-bar';
+  bar.hidden = true;
+  document.body.appendChild(bar);
 
-  let family: Family | null = null;
+  let connected: PadFamily | null = null;
   let held = new Set<string>();
   let heldDir: Dir | null = null;
   let walking: Dir | null = null;
   let repeatAt = 0;
   let buyAt = 0;
   let last = 0;
+  let tiltFor = 0;
   const at = { x: innerWidth * 0.35, y: innerHeight * 0.55 };
   let aiming: 'cursor' | 'focus' = 'cursor';
   let downOn: Element | null = null;
   let picked = 0;
   let stickAt = 0;
+  let barKey = '';
 
   const modalOpen = () => !!document.querySelector('.modal-wrap:not([hidden])');
   const titleOpen = () => !!document.querySelector('.title-menu');
@@ -100,33 +117,82 @@ export function installGamepad() {
   const rows = () => [...document.querySelectorAll<HTMLElement>('.gens .gen[data-comp]')].filter((r) => !r.hidden && r.offsetParent);
   const click = (el: Element | null) => el?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
 
-  const setFamily = (f: Family | null) => {
+  /** The controller becomes (or stops being) the thing in use: its pictures go on (or come off) the abilities and the
+   *  buy amounts, and the words elsewhere follow. */
+  const use = (f: PadFamily | null) => {
     if (f === family) return;
     family = f;
     document.body.classList.toggle('pad-on', !!f);
-    if (f) {
-      document.body.dataset.pad = f;
-      // Glyphs for the CSS badges (ability squares, the hire modes, the dock, a window's close).
-      for (const [k, v] of Object.entries(GLYPHS[f])) document.body.style.setProperty(`--pad-${k}`, `"${v}"`);
-    } else delete document.body.dataset.pad;
+    if (f) document.body.dataset.pad = f;
+    else delete document.body.dataset.pad;
+    document.querySelectorAll('.pad-fixed').forEach((g) => g.remove());
+    barKey = '';
+    padHooks.change();
+  };
+  // The mouse, the keyboard or a finger puts the usual words back (only real input: the controller's own events are
+  // made up, and don't count).
+  addEventListener('pointermove', (e) => e.isTrusted && (e.movementX || e.movementY) && use(null), true);
+  addEventListener('pointerdown', (e) => e.isTrusted && use(null), true);
+  addEventListener('keydown', (e) => e.isTrusted && use(null), true);
+
+  /** The controller's buttons beside each ability you have (their squares clip, so these sit in a layer of their own),
+   *  and LB RB where the buy amounts' label is (put back when the panel redraws). */
+  const abilityTags = new Map<string, HTMLElement>();
+  const fixGlyphs = () => {
+    for (const slot of document.querySelectorAll<HTMLElement>('.ab[data-ability]')) {
+      const id = slot.dataset.ability ?? '';
+      const keys = ABILITY_PAD[id];
+      if (!keys) continue;
+      let tag = abilityTags.get(id);
+      if (!tag) {
+        tag = document.createElement('span');
+        tag.className = 'pad-ab';
+        document.body.appendChild(tag);
+        abilityTags.set(id, tag);
+      }
+      const box = slot.getBoundingClientRect();
+      const show = !!family && !modalOpen() && !titleOpen() && !slot.classList.contains('locked') && box.width > 0;
+      tag.hidden = !show;
+      if (!show) continue;
+      if (tag.dataset.family !== family) {
+        tag.innerHTML = keys.map((k) => padGlyph(k, 26)).join('');
+        tag.dataset.family = family ?? '';
+      }
+      tag.style.transform = `translate(${Math.round(box.left - tag.offsetWidth - 6)}px, ${Math.round(box.top + (box.height - tag.offsetHeight) / 2)}px)`;
+    }
+    const modes = document.querySelector('.modes');
+    if (family && modes && !modes.querySelector('.pad-amount')) modes.querySelector('.mode')?.insertAdjacentHTML('beforebegin', `<span class="pad-fixed pad-amount">${padGlyph('lb', 22)}${padGlyph('rb', 22)}</span>`);
   };
 
-  /** Your party's picked row: outlined, kept in view, with its buttons beside it. */
+  /** The prompt bar: what the buttons do here, in one line. */
+  const showBar = () => {
+    if (!family) {
+      bar.hidden = true;
+      return;
+    }
+    const items: [string[], string][] = modalOpen() ? [[['a'], 'Select'], [['b'], 'Back']]
+      : titleOpen() ? [[['a'], 'Select']]
+      : inKeep() ? [[['a'], 'Use'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['menu'], 'Options']]
+      : [[['a'], 'Attack'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['view'], 'Ascend'], [['menu'], 'Options']];
+    const key = family + items.map(([, w]) => w).join();
+    if (key !== barKey) {
+      barKey = key;
+      bar.innerHTML = items.map(([keys, what]) => `<span>${keys.map((k) => padGlyph(k, 26)).join('')}<b>${what}</b></span>`).join('');
+    }
+    const over = modalOpen() || titleOpen();
+    bar.classList.toggle('over', over);
+    // (Across the dungeon, not under the party panel.)
+    const shop = document.querySelector('.shop')?.getBoundingClientRect();
+    bar.style.width = !over && shop && shop.left > 0 ? `${Math.round(shop.left)}px` : '';
+    bar.hidden = false;
+  };
+
+  /** Your party's picked row, framed (the bar names what RT and X do to it). */
   const showPick = () => {
     const list = rows();
-    document.querySelectorAll('.gen.pad-pick').forEach((r) => r.classList.remove('pad-pick'));
     const show = !!family && !modalOpen() && !titleOpen() && list.length > 0;
-    prompt.hidden = !show;
-    if (!show || !family) return;
     picked = Math.max(0, Math.min(list.length - 1, picked));
-    const row = list[picked];
-    row.classList.add('pad-pick');
-    const box = row.getBoundingClientRect();
-    const g = GLYPHS[family];
-    const html = `<span><kbd>${g.rt}</kbd>Level</span><span><kbd>${g.x}</kbd>Upgrade</span>`;
-    if (prompt.innerHTML !== html) prompt.innerHTML = html;
-    // (Just left of the row, over the dungeon's edge, so it covers no other row.)
-    prompt.style.transform = `translate(${Math.round(box.left - prompt.offsetWidth - 8)}px, ${Math.round(box.top + (box.height - prompt.offsetHeight) / 2)}px)`;
+    list.forEach((r, i) => r.classList.toggle('pad-pick', show && i === picked));
   };
 
   const poll = (now: number) => {
@@ -134,37 +200,42 @@ export function installGamepad() {
     last = now;
     const pad = [...navigator.getGamepads()].find((p) => p?.connected) ?? null;
     if (!pad) {
-      setFamily(null);
+      connected = null;
+      use(null);
       cursor.hidden = true;
-      prompt.hidden = true;
       requestAnimationFrame(poll);
       return;
     }
-    setFamily(familyOf(pad));
+    connected = familyOf(pad);
     const down = new Set<string>();
     pad.buttons.forEach((b, i) => (b.pressed || b.value > 0.5) && down.add(`b${i}`));
     const fresh = (id: string) => down.has(id) && !held.has(id);
     const letGo = (id: string) => held.has(id) && !down.has(id);
     const dpad: Dir | null = down.has('b12') ? 'up' : down.has('b13') ? 'down' : down.has('b14') ? 'left' : down.has('b15') ? 'right' : null;
     const [lx, ly, , ry] = [pad.axes[0] ?? 0, pad.axes[1] ?? 0, pad.axes[2] ?? 0, pad.axes[3] ?? 0];
+    const tilt = Math.hypot(lx, ly);
+    // Anything on the controller makes it the thing in use.
+    if ([...down].some((b) => !held.has(b)) || tilt > DEAD_ZONE || Math.abs(ry) > 0.5) use(connected);
     const modal = modalOpen();
     const title = titleOpen();
     const nav = modal || title;
 
-    // Left stick: the cursor. A little slower over anything you can press, so it's easy to land on.
-    const tilt = Math.hypot(lx, ly);
+    // Left stick: the cursor. It starts gently and speeds up as you hold it, and slows over anything you can press.
     if (tilt > DEAD_ZONE) {
+      tiltFor += dt;
       const over = document.elementFromPoint(at.x, at.y)?.closest(REACH);
-      const speed = CURSOR_SPEED * ((tilt - DEAD_ZONE) / (1 - DEAD_ZONE)) ** 1.6 * (over ? STICKY : 1);
+      const top = (innerHeight / CURSOR_CROSS) * 2 ** ((padTuning.speed - 0.5) * 2);
+      const ramp = CURSOR_START + (1 - CURSOR_START) * Math.min(1, tiltFor / CURSOR_RAMP);
+      const speed = top * ramp * ((tilt - DEAD_ZONE) / (1 - DEAD_ZONE)) ** 2 * (over ? STICKY : 1);
       at.x = Math.max(0, Math.min(innerWidth - 1, at.x + (lx / tilt) * speed * dt));
       at.y = Math.max(0, Math.min(innerHeight - 1, at.y + (ly / tilt) * speed * dt));
       aiming = 'cursor';
       (document.activeElement as HTMLElement | null)?.blur?.();
       pointer('pointermove', at.x, at.y);
-    }
+    } else tiltFor = 0;
     // The game's own sword shows over the dungeon; elsewhere this arrow does.
     const blade = document.querySelector<HTMLElement>('.blade');
-    cursor.hidden = aiming !== 'cursor' || (!!blade && !blade.hidden);
+    cursor.hidden = !family || aiming !== 'cursor' || (!!blade && !blade.hidden);
     cursor.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px)`;
 
     // A: a click, at the cursor or on the button the d-pad picked.
@@ -226,7 +297,9 @@ export function installGamepad() {
         click(modes[(on + (fresh('b5') ? 1 : modes.length - 1)) % modes.length]);
       }
     }
+    fixGlyphs();
     showPick();
+    showBar();
 
     // B backs out; Menu opens Options; View opens Ascend (either closes the window it opened).
     if (fresh('b1')) tap('Escape');
