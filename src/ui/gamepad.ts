@@ -1,41 +1,43 @@
-/** Controller support, played like a mouse. The left stick moves a cursor (your hero follows it, as it follows the mouse)
- *  and A clicks: a swing over the dungeon, a press over a button. The right stick picks a companion in your party, RT
- *  levels it and X buys its next upgrade; LB and RB change how many levels a buy is. The d-pad and Y use abilities.
- *  B backs out, Menu opens Options and View opens Ascend. In a window or on the title screen the d-pad steps between
- *  buttons; in the Keep it walks. Prompts show the controller's own buttons (Kenney's Input Prompts, by kind of pad)
- *  while it's the last thing used; the mouse or keyboard puts the usual words back. */
+/** Controller support, with no cursor: everything has a button. The left stick walks your hero (it catches goblins and
+ *  picks up what it walks over, as with the keys) and A attacks. The right stick picks a companion in your party, RT
+ *  levels it, X buys its next upgrade, R3 makes it your hero, and LB and RB change how many levels a buy is. The d-pad
+ *  and Y use abilities; LT with the d-pad changes floor. Menu opens the dock (step along it, A opens what's there), View
+ *  opens Ascend, B backs out. In a window or on the title screen the sticks and d-pad step between buttons and LB RB
+ *  change tabs. Prompts show the controller's own buttons (Kenney's Input Prompts, by kind of pad) while it's the last
+ *  thing used; the mouse, keyboard or a finger puts the usual words back. */
 const REACH = 'button:not([disabled]), a[href], [tabindex="0"], input:not([disabled])';
-const DEAD_ZONE = 0.18;
-/** The cursor at full tilt crosses the window's height in this many seconds (at the default speed); it starts at
- *  CURSOR_START of that and reaches it after CURSOR_RAMP seconds held, and slows to STICKY over anything you can press. */
-const CURSOR_CROSS = 1.4;
-const CURSOR_START = 0.35;
-const CURSOR_RAMP = 0.4;
-const STICKY = 0.45;
+const DEAD_ZONE = 0.35;
 const REPEAT_MS = 220;
-/** How often a held RT buys again. */
+/** How often a held RT buys again (after a longer first wait, so one press buys once). */
 const BUY_REPEAT_MS = 160;
 const ARROWS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } as const;
 type Dir = keyof typeof ARROWS;
-/** The ability each d-pad direction uses (its number key), and with LT held. Y is Rampage (2). */
+/** The ability each d-pad direction uses (its number key). Y is Rampage (2), LT with up Phantom Legion (6). */
 const DPAD_ABILITY: Record<Dir, string> = { up: '1', right: '3', down: '4', left: '5' };
-const DPAD_ABILITY_LT: Partial<Record<Dir, string>> = { up: '6' };
 /** Each ability's button(s), for its prompt. */
 export const ABILITY_PAD: Record<string, string[]> = { flurry: ['up'], cleave: ['right'], treasure: ['down'], drums: ['left'], rampage: ['y'], legion: ['lt', 'up'] };
 
 export type PadFamily = 'xbox' | 'ps' | 'switch';
-/** The controller's cursor speed, 0 to 1 (set from Options). */
-export const padTuning = { speed: 0.5 };
 
 let family: PadFamily | null = null;
 /** The controller in use, while it's the last thing you touched (null with the mouse, keyboard or touch). */
 export const padFamily = () => family;
 
-/** A controller button's picture: a, b, x, y, lb, rb, lt, rt, up, down, left, right, ls, rs, menu, view. */
+/** A controller button's picture: a, b, x, y, lb, rb, lt, rt, up, down, left, right, ls, rs, r3, menu, view. */
 export function padGlyph(key: string, size = 22, cls = ''): string {
   if (!family) return '';
   return `<img class="pad-g ${cls}" src="${import.meta.env.BASE_URL}assets/prompts/${family}/${key}.png" width="${size}" height="${size}" alt="" draggable="false">`;
 }
+
+/** A hint about one companion's row (hire them, buy their upgrade, make them your hero): the right stick's pick moves
+ *  there, so the button the hint names does what it says. */
+let pickComp: number | null = null;
+export const padPick = (comp: number) => {
+  pickComp = comp;
+};
+
+/** Runs when the controller starts or stops being the thing in use (so prompts can change their words). */
+export const padHooks = { change: () => {} };
 
 /** Which kind of controller this is, from the id the browser gives it (it carries the maker's USB vendor id). */
 function familyOf(pad: Gamepad): PadFamily {
@@ -48,20 +50,19 @@ function familyOf(pad: Gamepad): PadFamily {
 const press = (key: string, code: string, down: boolean) =>
   document.body.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { key, code, bubbles: true, cancelable: true }));
 const tap = (key: string, code = key) => (press(key, code, true), press(key, code, false));
+const click = (el: Element | null | undefined) => el?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+/** Its tooltip, as pointing at it with the mouse shows it (or takes it away). */
+const hover = (el: Element | null | undefined, on: boolean) =>
+  el?.dispatchEvent(new PointerEvent(on ? 'pointerover' : 'pointerout', { bubbles: true, pointerType: 'mouse', relatedTarget: null }));
 
-/** A mouse event at the cursor, sent to whatever is under it (the game listens for these as it does for a mouse). */
-function pointer(type: 'pointermove' | 'pointerdown' | 'pointerup', x: number, y: number) {
-  const target = document.elementFromPoint(x, y) ?? document.body;
-  target.dispatchEvent(new PointerEvent(type, { clientX: x, clientY: y, bubbles: true, cancelable: true, composed: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
-  return target;
-}
+const visible = (el: HTMLElement) => {
+  const box = el.getBoundingClientRect();
+  return box.width > 0 && box.height > 0 && !el.closest('[hidden]');
+};
 
 /** The nearest visible control in a direction, by distance along that direction with a penalty for drifting off it. */
 function neighbor(from: HTMLElement | null, dir: Dir, scope: ParentNode): HTMLElement | null {
-  const items = [...scope.querySelectorAll<HTMLElement>(REACH)].filter((el) => {
-    const box = el.getBoundingClientRect();
-    return box.width > 0 && box.height > 0 && !el.closest('[hidden]') && !el.matches('canvas');
-  });
+  const items = [...scope.querySelectorAll<HTMLElement>(REACH)].filter((el) => visible(el) && !el.matches('canvas'));
   if (!from || !items.includes(from)) return items[0] ?? null;
   const origin = from.getBoundingClientRect();
   const [ox, oy] = [origin.left + origin.width / 2, origin.top + origin.height / 2];
@@ -81,50 +82,58 @@ function neighbor(from: HTMLElement | null, dir: Dir, scope: ParentNode): HTMLEl
   return best;
 }
 
-/** Runs when the controller starts or stops being the thing in use (so prompts can change their words). */
-export const padHooks = { change: () => {} };
-
 export function installGamepad() {
   if (!navigator.getGamepads) return;
-  const cursor = document.createElement('div');
-  cursor.className = 'pad-cursor';
-  cursor.hidden = true;
-  document.body.appendChild(cursor);
   const bar = document.createElement('div');
   bar.className = 'pad-bar';
   bar.hidden = true;
   document.body.appendChild(bar);
 
-  let connected: PadFamily | null = null;
   let held = new Set<string>();
   let heldDir: Dir | null = null;
-  let walking: Dir | null = null;
+  let walking = new Set<Dir>();
   let repeatAt = 0;
   let buyAt = 0;
-  let last = 0;
-  let tiltFor = 0;
-  const at = { x: innerWidth * 0.35, y: innerHeight * 0.55 };
-  let aiming: 'cursor' | 'focus' = 'cursor';
-  let downOn: Element | null = null;
   let picked = 0;
+  let pickedRow: HTMLElement | null = null;
   let stickAt = 0;
   let barKey = '';
+  /** Menu put the focus on the dock (Collection … Options): the d-pad steps along it until A opens one or B leaves. */
+  let docked = false;
+  let focusTip: HTMLElement | null = null;
 
   const modalOpen = () => !!document.querySelector('.modal-wrap:not([hidden])');
   const titleOpen = () => !!document.querySelector('.title-menu');
   const inKeep = () => document.body.classList.contains('in-keep');
-  const scope = (): ParentNode => document.querySelector('.modal-wrap:not([hidden])') ?? document.querySelector('.title-menu') ?? document;
-  const rows = () => [...document.querySelectorAll<HTMLElement>('.gens .gen[data-comp]')].filter((r) => !r.hidden && r.offsetParent);
-  const click = (el: Element | null) => el?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+  const scope = (): ParentNode => document.querySelector('.modal-wrap:not([hidden])') ?? document.querySelector('.title-menu') ?? document.querySelector('.dock') ?? document;
+  const rows = () => [...document.querySelectorAll<HTMLElement>('.gens .gen[data-comp]')].filter(visible);
+  const focused = () => (document.activeElement && document.activeElement !== document.body ? document.activeElement as HTMLElement : null);
+  /** The d-pad (or a stick) lands on a button: focused, with its tooltip. */
+  const land = (el: HTMLElement | null) => {
+    if (!el) return;
+    el.focus({ preventScroll: false });
+    el.scrollIntoView({ block: 'nearest' });
+    hover(focusTip, false);
+    focusTip = el.closest<HTMLElement>('[data-tip]');
+    hover(focusTip, true);
+  };
+  const leaveDock = () => {
+    docked = false;
+    hover(focusTip, false);
+    focusTip = null;
+    focused()?.blur();
+  };
 
-  /** The controller becomes (or stops being) the thing in use: its pictures go on (or come off) the abilities and the
-   *  buy amounts, and the words elsewhere follow. */
+  /** The controller becomes (or stops being) the thing in use: the prompts follow. */
   const use = (f: PadFamily | null) => {
     if (f === family) return;
     family = f;
     document.body.classList.toggle('pad-on', !!f);
     if (f) document.body.dataset.pad = f;
-    else delete document.body.dataset.pad;
+    else {
+      delete document.body.dataset.pad;
+      if (docked) leaveDock();
+    }
     document.querySelectorAll('.pad-fixed').forEach((g) => g.remove());
     barKey = '';
     padHooks.change();
@@ -138,7 +147,7 @@ export function installGamepad() {
   /** The controller's buttons beside each ability you have (their squares clip, so these sit in a layer of their own),
    *  and LB RB where the buy amounts' label is (put back when the panel redraws). */
   const abilityTags = new Map<string, HTMLElement>();
-  const fixGlyphs = () => {
+  const fixGlyphs = (show: boolean) => {
     for (const slot of document.querySelectorAll<HTMLElement>('.ab[data-ability]')) {
       const id = slot.dataset.ability ?? '';
       const keys = ABILITY_PAD[id];
@@ -151,9 +160,9 @@ export function installGamepad() {
         abilityTags.set(id, tag);
       }
       const box = slot.getBoundingClientRect();
-      const show = !!family && !modalOpen() && !titleOpen() && !slot.classList.contains('locked') && box.width > 0;
-      tag.hidden = !show;
-      if (!show) continue;
+      const on = show && !slot.classList.contains('locked') && box.width > 0;
+      tag.hidden = !on;
+      if (!on) continue;
       if (tag.dataset.family !== family) {
         tag.innerHTML = keys.map((k) => padGlyph(k, 26)).join('');
         tag.dataset.family = family ?? '';
@@ -170,16 +179,19 @@ export function installGamepad() {
       bar.hidden = true;
       return;
     }
-    const items: [string[], string][] = modalOpen() ? [[['a'], 'Select'], [['b'], 'Back']]
+    const modal = modalOpen();
+    const items: [string[], string][] = modal ? [[['a'], 'Select'], [['b'], 'Back']]
       : titleOpen() ? [[['a'], 'Select']]
-      : inKeep() ? [[['a'], 'Use'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['menu'], 'Options']]
-      : [[['a'], 'Attack'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['view'], 'Ascend'], [['menu'], 'Options']];
+      : docked ? [[['a'], 'Open'], [['b'], 'Back']]
+      : inKeep() ? [[['ls'], 'Walk'], [['a'], 'Use'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['menu'], 'Menu']]
+      : [[['ls'], 'Move'], [['a'], 'Attack'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['view'], 'Ascend'], [['menu'], 'Menu']];
+    if (modal && document.querySelector('.modal-wrap:not([hidden]) .tabs')) items.splice(1, 0, [['lb', 'rb'], 'Tabs']);
     const key = family + items.map(([, w]) => w).join();
     if (key !== barKey) {
       barKey = key;
       bar.innerHTML = items.map(([keys, what]) => `<span>${keys.map((k) => padGlyph(k, 26)).join('')}<b>${what}</b></span>`).join('');
     }
-    const over = modalOpen() || titleOpen();
+    const over = modal || titleOpen();
     bar.classList.toggle('over', over);
     // (Across the dungeon, not under the party panel.)
     const shop = document.querySelector('.shop')?.getBoundingClientRect();
@@ -187,103 +199,108 @@ export function installGamepad() {
     bar.hidden = false;
   };
 
-  /** Your party's picked row, framed (the bar names what RT and X do to it). */
-  const showPick = () => {
+  /** Your party's picked row, framed, with its tooltip while you're choosing (the bar names what RT and X do). */
+  const showPick = (show: boolean, moved: boolean) => {
     const list = rows();
-    const show = !!family && !modalOpen() && !titleOpen() && list.length > 0;
+    if (pickComp !== null) {
+      const at = list.findIndex((r) => Number(r.dataset.comp) === pickComp);
+      if (at >= 0) picked = at;
+      pickComp = null;
+    }
     picked = Math.max(0, Math.min(list.length - 1, picked));
-    list.forEach((r, i) => r.classList.toggle('pad-pick', show && i === picked));
+    const row = show ? list[picked] ?? null : null;
+    list.forEach((r) => r.classList.toggle('pad-pick', r === row));
+    if (row !== pickedRow || moved) {
+      hover(pickedRow, false);
+      if (row && moved) hover(row, true);
+      pickedRow = row;
+    }
   };
 
   const poll = (now: number) => {
-    const dt = Math.min(0.05, last ? (now - last) / 1000 : 0);
-    last = now;
     const pad = [...navigator.getGamepads()].find((p) => p?.connected) ?? null;
     if (!pad) {
-      connected = null;
       use(null);
-      cursor.hidden = true;
+      for (const d of walking) press(ARROWS[d], ARROWS[d], false);
+      walking.clear();
       requestAnimationFrame(poll);
       return;
     }
-    connected = familyOf(pad);
     const down = new Set<string>();
     pad.buttons.forEach((b, i) => (b.pressed || b.value > 0.5) && down.add(`b${i}`));
     const fresh = (id: string) => down.has(id) && !held.has(id);
     const letGo = (id: string) => held.has(id) && !down.has(id);
+    const [lx, ly, rx, ry] = [pad.axes[0] ?? 0, pad.axes[1] ?? 0, pad.axes[2] ?? 0, pad.axes[3] ?? 0];
+    // The d-pad, or (in a window, on the title screen or along the dock) the left stick: a step in one direction.
+    const stickDir: Dir | null = Math.hypot(lx, ly) < 0.5 ? null : Math.abs(lx) > Math.abs(ly) ? (lx < 0 ? 'left' : 'right') : (ly < 0 ? 'up' : 'down');
     const dpad: Dir | null = down.has('b12') ? 'up' : down.has('b13') ? 'down' : down.has('b14') ? 'left' : down.has('b15') ? 'right' : null;
-    const [lx, ly, , ry] = [pad.axes[0] ?? 0, pad.axes[1] ?? 0, pad.axes[2] ?? 0, pad.axes[3] ?? 0];
-    const tilt = Math.hypot(lx, ly);
-    // Anything on the controller makes it the thing in use.
-    if ([...down].some((b) => !held.has(b)) || tilt > DEAD_ZONE || Math.abs(ry) > 0.5) use(connected);
+    if ([...down].some((b) => !held.has(b)) || Math.hypot(lx, ly) > DEAD_ZONE || Math.abs(ry) > 0.5 || Math.abs(rx) > 0.5) use(familyOf(pad));
     const modal = modalOpen();
     const title = titleOpen();
-    const nav = modal || title;
-
-    // Left stick: the cursor. It starts gently and speeds up as you hold it, and slows over anything you can press.
-    if (tilt > DEAD_ZONE) {
-      tiltFor += dt;
-      const over = document.elementFromPoint(at.x, at.y)?.closest(REACH);
-      const top = (innerHeight / CURSOR_CROSS) * 2 ** ((padTuning.speed - 0.5) * 2);
-      const ramp = CURSOR_START + (1 - CURSOR_START) * Math.min(1, tiltFor / CURSOR_RAMP);
-      const speed = top * ramp * ((tilt - DEAD_ZONE) / (1 - DEAD_ZONE)) ** 2 * (over ? STICKY : 1);
-      at.x = Math.max(0, Math.min(innerWidth - 1, at.x + (lx / tilt) * speed * dt));
-      at.y = Math.max(0, Math.min(innerHeight - 1, at.y + (ly / tilt) * speed * dt));
-      aiming = 'cursor';
-      (document.activeElement as HTMLElement | null)?.blur?.();
-      pointer('pointermove', at.x, at.y);
-    } else tiltFor = 0;
-    // The game's own sword shows over the dungeon; elsewhere this arrow does.
-    const blade = document.querySelector<HTMLElement>('.blade');
-    cursor.hidden = !family || aiming !== 'cursor' || (!!blade && !blade.hidden);
-    cursor.style.transform = `translate(${Math.round(at.x)}px, ${Math.round(at.y)}px)`;
-
-    // A: a click, at the cursor or on the button the d-pad picked.
-    if (fresh('b0')) {
-      const focused = document.activeElement as HTMLElement | null;
-      if (aiming === 'focus' && focused && focused !== document.body) click(focused);
-      else if (inKeep() && !nav && !document.elementFromPoint(at.x, at.y)?.closest('#ui button, #ui .shop, #ui .dock, .keep-label')) press(' ', 'Space', true);
-      else downOn = pointer('pointerdown', at.x, at.y);
+    if (docked && (modal || title || !document.querySelector('.dock')?.contains(document.activeElement))) {
+      if (modal || title) docked = false;
+      else leaveDock();
     }
-    if (letGo('b0')) {
-      if (downOn) {
-        const upOn = pointer('pointerup', at.x, at.y);
-        if (upOn === downOn || downOn.contains(upOn)) click(upOn);
-        downOn = null;
-      }
-      press(' ', 'Space', false);
-    }
+    const nav = modal || title || docked;
 
-    // D-pad: steps between buttons in a window or on the title screen; walks in the Keep; uses abilities in the dungeon.
-    if (walking && (nav || !inKeep() || dpad !== walking)) {
-      press(ARROWS[walking], ARROWS[walking], false);
-      walking = null;
-    }
-    if (nav) {
-      if (dpad && (dpad !== heldDir || now >= repeatAt)) {
-        neighbor(document.activeElement as HTMLElement | null, dpad, scope())?.focus({ preventScroll: false });
-        aiming = 'focus';
-        repeatAt = now + REPEAT_MS;
-      }
-    } else if (inKeep()) {
-      if (dpad && dpad !== walking) {
-        press(ARROWS[dpad], ARROWS[dpad], true);
-        walking = dpad;
-      }
-    } else if (dpad && dpad !== heldDir) {
-      const key = down.has('b6') ? DPAD_ABILITY_LT[dpad] : DPAD_ABILITY[dpad];
-      if (key) tap(key, `Digit${key}`);
-    }
-    if (!nav && !inKeep() && fresh('b3')) tap('2', 'Digit2');
-
-    // Your party, always at hand (not under a window): the right stick picks, RT levels, X upgrades, LB and RB the amount.
+    // Walking: the left stick in the dungeon and the Keep, as the arrow keys (two at once on a diagonal).
+    const want = new Set<Dir>();
     if (!nav) {
+      if (lx < -DEAD_ZONE) want.add('left');
+      if (lx > DEAD_ZONE) want.add('right');
+      if (ly < -DEAD_ZONE) want.add('up');
+      if (ly > DEAD_ZONE) want.add('down');
+      if (inKeep() && dpad) want.add(dpad);
+    }
+    for (const d of walking) if (!want.has(d)) press(ARROWS[d], ARROWS[d], false);
+    for (const d of want) if (!walking.has(d)) press(ARROWS[d], ARROWS[d], true);
+    walking = want;
+
+    if (nav) {
+      // Stepping between buttons; A presses, LB RB change a window's tabs.
+      const dir = dpad ?? stickDir;
+      if (dir && (dir !== heldDir || now >= repeatAt)) {
+        land(neighbor(focused(), dir, scope()));
+        repeatAt = now + (dir === heldDir ? REPEAT_MS * 0.6 : REPEAT_MS);
+      }
+      heldDir = dir;
+      if (fresh('b0')) {
+        const el = focused() ?? neighbor(null, 'down', scope());
+        if (docked) leaveDock();
+        click(el);
+      }
+      if (modal && (fresh('b4') || fresh('b5'))) {
+        const tabs = [...document.querySelectorAll<HTMLElement>('.modal-wrap:not([hidden]) .tabs .tab')].filter(visible);
+        const on = Math.max(0, tabs.findIndex((t) => t.classList.contains('on')));
+        if (tabs.length > 1) click(tabs[(on + (fresh('b5') ? 1 : tabs.length - 1)) % tabs.length]);
+      }
+    } else {
+      heldDir = dpad;
+      // A attacks (hold it to keep swinging); in the Keep it uses what you're at.
+      if (fresh('b0')) press(' ', 'Space', true);
+      if (letGo('b0')) press(' ', 'Space', false);
+      // The d-pad and Y: abilities, or with LT held, the floor (◀ ▶) and Auto (▼). In the Keep the d-pad walks.
+      if (!inKeep()) {
+        if (dpad && fresh(`b${12 + ['up', 'down', 'left', 'right'].indexOf(dpad)}`)) {
+          if (down.has('b6')) {
+            if (dpad === 'up') tap('6', 'Digit6');
+            else click(document.querySelector(dpad === 'left' ? '[data-act="floorDown"]' : dpad === 'right' ? '[data-act="floorUp"]' : '[data-act="auto"]'));
+          } else tap(DPAD_ABILITY[dpad], `Digit${DPAD_ABILITY[dpad]}`);
+        }
+        if (fresh('b3')) tap('2', 'Digit2');
+      }
+    }
+
+    // Your party, always at hand (not under a window): the right stick picks, RT levels, X upgrades, R3 makes them your
+    // hero, LB and RB the amount.
+    let moved = false;
+    if (!modal && !title) {
       const list = rows();
       if (Math.abs(ry) > 0.5 && now >= stickAt) {
-        picked += ry > 0 ? 1 : -1;
+        picked = Math.max(0, Math.min(list.length - 1, picked + (ry > 0 ? 1 : -1)));
         stickAt = now + (Math.abs(ry) > 0.9 ? 90 : 170);
-        picked = Math.max(0, Math.min(list.length - 1, picked));
         list[picked]?.scrollIntoView({ block: 'nearest' });
+        moved = true;
       } else if (Math.abs(ry) <= 0.5) stickAt = 0;
       const row = list[picked];
       if (row && down.has('b7') && now >= buyAt) {
@@ -291,22 +308,31 @@ export function installGamepad() {
         buyAt = now + (fresh('b7') ? BUY_REPEAT_MS * 2.5 : BUY_REPEAT_MS);
       }
       if (row && fresh('b2')) click(row.querySelector('.trait[data-trait]'));
-      if (fresh('b4') || fresh('b5')) {
+      if (row && fresh('b11')) click(row.querySelector('[data-hero]'));
+      if (!docked && (fresh('b4') || fresh('b5'))) {
         const modes = [...document.querySelectorAll<HTMLElement>('.modes .mode')];
         const on = Math.max(0, modes.findIndex((m) => m.classList.contains('on')));
         click(modes[(on + (fresh('b5') ? 1 : modes.length - 1)) % modes.length]);
       }
+      // (The tooltip goes with anything else you do.)
+      if (!moved && (fresh('b0') || Math.hypot(lx, ly) > DEAD_ZONE)) hover(pickedRow, false);
     }
-    fixGlyphs();
-    showPick();
+    fixGlyphs(!!family && !modal && !title);
+    showPick(!!family && !modal && !title, moved);
     showBar();
 
-    // B backs out; Menu opens Options; View opens Ascend (either closes the window it opened).
-    if (fresh('b1')) tap('Escape');
-    if (fresh('b9')) modal ? tap('Escape') : click(document.querySelector('[data-open="settings"]'));
-    if (fresh('b8')) modal ? tap('Escape') : click(document.querySelector('[data-open="abyss"]'));
+    // B backs out; Menu opens the dock (or leaves it); View opens Ascend (either closes the window it opened).
+    if (fresh('b1')) docked ? leaveDock() : tap('Escape');
+    if (fresh('b9')) {
+      if (modal) tap('Escape');
+      else if (docked) leaveDock();
+      else if (!title) {
+        docked = true;
+        land(document.querySelector<HTMLElement>('.dock [data-open="settings"]') ?? neighbor(null, 'right', document.querySelector('.dock') ?? document));
+      }
+    }
+    if (fresh('b8') && !title) modal ? tap('Escape') : click(document.querySelector('[data-open="abyss"]'));
 
-    heldDir = dpad;
     held = down;
     requestAnimationFrame(poll);
   };

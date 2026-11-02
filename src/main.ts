@@ -17,7 +17,7 @@ import { TitleMenu } from './ui/menu.ts';
 import { PlayRecorder } from './record.ts';
 import { olderVersion } from './version.ts';
 import { installCrashScreen } from './crash.ts';
-import { installGamepad, padTuning } from './ui/gamepad.ts';
+import { installGamepad } from './ui/gamepad.ts';
 
 installCrashScreen();
 installGamepad();
@@ -119,7 +119,6 @@ async function boot() {
     sfx.muted = s.muted;
     sfx.musicOn = s.music;
     sfx.setVolumes(s.sfxVol, s.musicVol);
-    padTuning.speed = s.padSpeed;
     scene.settings.particles = s.particles;
     scene.settings.calm = s.calm;
     scene.settings.shake = s.shake;

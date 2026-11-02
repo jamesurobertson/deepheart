@@ -1661,16 +1661,11 @@ body.over-act .blade-act { display: block; }
 .crash h1 { margin: 0; font: 400 64px/1 'Jersey 10', monospace; color: var(--text); text-shadow: 0 4px 0 var(--ink); }
 .crash p { margin: 0 0 10px; font: 400 13px/1 'Silkscreen', monospace; letter-spacing: 2px; color: #a8907c; }
 
-/* Controller: a focus ring where the d-pad lands, the cursor the left stick moves, the companion the right stick picks
-   (framed, its buttons named beside it), each ability's button by its square, LB and RB either side of the buy amounts,
-   and a bar of what the buttons do here. Only while the controller is the thing in use. */
+/* Controller: a focus ring where the d-pad lands, the companion the right stick picks (framed), each ability's button
+   by its square, LB and RB where the buy amounts' label is, and a bar of what the buttons do here. Only while the
+   controller is the thing in use. */
 body.pad-on :is(button, a, [tabindex="0"]):focus { outline: 3px solid var(--gold-hi); outline-offset: 2px; }
-.pad-only { display: none; }
-body.pad-on .pad-only { display: revert; }
 .pad-g { display: inline-block; vertical-align: middle; flex: none; pointer-events: none; user-select: none; }
-.pad-cursor { position: fixed; left: 0; top: 0; z-index: 10000; width: 0; height: 0; pointer-events: none; }
-.pad-cursor::before { content: ''; position: absolute; left: -2px; top: -2px; width: 18px; height: 22px; background: var(--text);
-  clip-path: polygon(0 0, 100% 64%, 58% 66%, 78% 100%, 62% 100%, 42% 70%, 0 92%); filter: drop-shadow(1px 1px 0 var(--ink)) drop-shadow(-1px -1px 0 var(--ink)); }
 .gen.pad-pick { box-shadow: 0 0 0 3px var(--gold-hi), 0 0 18px rgba(255, 224, 138, 0.45); z-index: 1; }
 .pad-bar span { display: inline-flex; align-items: center; gap: 6px; }
 .pad-bar b { font: 400 18px/1 'Jersey 10', monospace; color: var(--text); text-shadow: var(--outline); letter-spacing: 0.5px; }

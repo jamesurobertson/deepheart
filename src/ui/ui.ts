@@ -8,7 +8,7 @@ import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, keepDoor, silhouette, spiritForm, sprite, spriteFit, spriteFrames } from './px.ts';
-import { ABILITY_PAD, padFamily, padGlyph, padHooks } from './gamepad.ts';
+import { ABILITY_PAD, padFamily, padGlyph, padHooks, padPick } from './gamepad.ts';
 import { skillIcon } from './icons.ts';
 import { kokoSvg } from './koko.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
@@ -877,7 +877,7 @@ export class Ui {
         }
         return;
       }
-      const key = t.dataset.set as 'sfxVol' | 'musicVol' | 'padSpeed' | undefined;
+      const key = t.dataset.set as 'sfxVol' | 'musicVol' | undefined;
       if (!key) return;
       this.game.s.settings[key] = Number(t.value) / 100;
       this.hooks.settings();
@@ -2141,20 +2141,25 @@ export class Ui {
     }
     if (state === this.hintState) return;
     this.hintState = state;
+    // (With a controller, the companion the hint is about is picked, so the button it names works on them.)
+    if (padFamily()) {
+      const comp = state === 'upgrade' ? upgradeRow : state === 'star' ? this.starPick() : ['hire', 'nudge', 'level'].includes(state) ? 0 : -1;
+      if (comp >= 0) padPick(comp);
+    }
     const pointing = state.startsWith('skill:') || ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'mark', 'auto', 'autohire'].includes(state);
     this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ';
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero');
     this.el.shop.classList.toggle('show-stars', state === 'star');
     this.el.hint.innerHTML = state === 'hero'
-      ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : padFamily() ? 'they follow your cursor' : 'they follow your mouse'}</small></b>`
-      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>${padFamily() ? `Point at their ${G.star()} and press ${padGlyph('a', 18)}` : `Click their ${G.star()} to switch`}</small></b>`
+      ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : padFamily() ? `walk them with ${padGlyph('ls', 18)}` : 'they follow your mouse'}</small></b>`
+      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>${padFamily() ? `Press ${padGlyph('r3', 18)} to switch` : `Click their ${G.star()} to switch`}</small></b>`
         : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>Companions fight for you, even while you're away</small></b>`
           : state === 'level' ? `<b>${padFamily() ? `Press ${padGlyph('rt', 20)} to level up` : `Keep ${this.touch ? 'tapping' : 'clicking'} to level up`}<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
             : state.startsWith('skill:') ? this.skillHint(state.slice(6) as AbilityId)
             : state === 'rampage' ? `<b>Rampage is ready!<small>${padFamily() ? `Press ${this.abilityButtons('rampage')}` : this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
-            : state === 'shop' ? `<b>An upgrade is ready!<small>${padFamily() ? `Pick its companion with ${padGlyph('rs', 18)}, then press ${padGlyph('x', 18)}` : this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
+            : state === 'shop' ? `<b>An upgrade is ready!<small>${padFamily() ? `Press ${padGlyph('x', 18)} to buy it` : this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
               : state === 'champ' ? this.champHint()
               : state === 'auto' ? `<b>Auto upgrades<small>Companion upgrades you've bought before buy themselves</small></b>`
               : state === 'autohire' ? `<b>Auto levels<small>Companion levels you've bought before buy themselves</small></b>`
@@ -2600,16 +2605,19 @@ export class Ui {
       const cap = (...keys: string[]) => keys.map((k) => `<kbd>${k}</kbd>`).join('');
       const pad = (...keys: string[]) => keys.map((k) => padGlyph(k, 26)).join('');
       const rows: [string, string][] = padFamily() ? [
-        [pad('ls'), 'Move the cursor (your hero follows)'],
-        [pad('a'), 'Attack, or press what the cursor is on'],
+        [pad('ls'), 'Move your hero'],
+        [pad('a'), 'Attack'],
         [pad('rs'), 'Pick a companion'],
         [pad('rt'), 'Level them'],
         [pad('x'), 'Buy their next upgrade'],
+        [pad('r3'), 'Make them your hero'],
         [pad('lb', 'rb'), 'Buy amount'],
         ...ABILITIES.filter((a) => ABILITY_PAD[a.id]).map((a): [string, string] => [pad(...ABILITY_PAD[a.id]), esc(a.name)]),
-        [pad('b'), 'Back'],
+        [pad('lt', 'left', 'right'), 'Floor down, floor up'],
+        [pad('lt', 'down'), 'Auto'],
         [pad('view'), 'Ascend'],
-        [pad('menu'), 'Options'],
+        [pad('menu'), 'Menu'],
+        [pad('b'), 'Back'],
       ] : [
         [cap('W', 'A', 'S', 'D'), 'Move'],
         [`${MOUSE_GLYPH}${cap('Space')}`, 'Attack'],
@@ -2627,7 +2635,6 @@ export class Ui {
         <div class="set">
           <label>Effects volume <input type="range" min="0" max="100" value="${Math.round(s.sfxVol * 100)}" data-set="sfxVol"></label>
           <label>Music volume <input type="range" min="0" max="100" value="${Math.round(s.musicVol * 100)}" data-set="musicVol"></label>
-          <label class="pad-only">Controller cursor speed <input type="range" min="0" max="100" step="25" value="${Math.round(s.padSpeed * 100)}" data-set="padSpeed"></label>
           <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('calm', s.calm, 'Reduce flashing')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
           <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button></div>
           <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
