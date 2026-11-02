@@ -664,7 +664,7 @@ export class Ui {
       if (e.key.toLowerCase() === 'h' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) this.setUiHidden(!this.uiHidden);
       else if (e.key === 'Escape') this.setUiHidden(false);
       // The number keys use the abilities in the column, in order.
-      if (/^[1-9]$/.test(e.key) && !e.repeat && !this.modal) {
+      if (/^[1-9]$/.test(e.key) && !e.repeat && !this.modal && !this.game.s.inKeep) {
         const id = KEYED[Number(e.key) - 1];
         const slot = id && this.el.abilities.querySelector<HTMLElement>(`[data-ability="${id}"]`);
         if (slot) {

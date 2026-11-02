@@ -1661,5 +1661,29 @@ body.over-act .blade-act { display: block; }
 .crash h1 { margin: 0; font: 400 64px/1 'Jersey 10', monospace; color: var(--text); text-shadow: 0 4px 0 var(--ink); }
 .crash p { margin: 0 0 10px; font: 400 13px/1 'Silkscreen', monospace; letter-spacing: 2px; color: #a8907c; }
 
-/* Controller: the focus ring shows once menu mode is on, and wherever a window or the title menu is up. */
-body.pad-nav :is(button, a, [tabindex="0"]):focus { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+/* (The pixel faces have no arrows or PlayStation shapes: the button tags use the system's.) */
+body { --f-pad: ui-sans-serif, system-ui, 'Segoe UI Symbol', 'Apple Symbols', sans-serif; }
+/* Controller: a focus ring where the d-pad lands, the cursor the left stick moves, the companion the right stick picks,
+   and each control's button named beside it (in the controller's own names, from --pad-*). */
+body.pad-on :is(button, a, [tabindex="0"]):focus-visible, body.pad-on :is(button, a, [tabindex="0"]):focus { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+.pad-cursor { position: fixed; left: 0; top: 0; z-index: 10000; width: 0; height: 0; pointer-events: none; }
+.pad-cursor::before { content: ''; position: absolute; left: -2px; top: -2px; width: 18px; height: 22px; background: var(--text);
+  clip-path: polygon(0 0, 100% 64%, 58% 66%, 78% 100%, 62% 100%, 42% 70%, 0 92%); filter: drop-shadow(0 0 0 var(--ink)) drop-shadow(1px 1px 0 var(--ink)) drop-shadow(-1px -1px 0 var(--ink)); }
+.pad-prompt { position: fixed; left: 0; top: 0; z-index: 9; display: flex; gap: 10px; padding: 3px 8px 4px; pointer-events: none; background: rgba(20, 12, 14, 0.92); box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--gold); font: 400 15px/1 'Jersey 10', monospace; color: var(--text); }
+.pad-prompt span { display: inline-flex; align-items: center; gap: 5px; }
+.pad-prompt kbd, body.pad-on .pad-key::after { font: 700 11px/1 var(--f-pad); color: var(--ink); background: linear-gradient(#fff4d6, #e9d6aa); padding: 2px 4px 1px; box-shadow: 0 0 0 1px var(--ink); }
+.gen.pad-pick { outline: 3px solid var(--gold-hi); outline-offset: -3px; }
+body.pad-on .ab::after, body.pad-on .dock [data-open="settings"]::after, body.pad-on .dock [data-open="abyss"]::after, body.pad-on .m-head [data-act="close"]::after {
+  position: absolute; right: -7px; bottom: -7px; z-index: 2; font: 700 13px/1 var(--f-pad); color: var(--ink); background: linear-gradient(#fff4d6, #e9d6aa); padding: 2px 4px 1px; box-shadow: 0 0 0 1px var(--ink); pointer-events: none; white-space: nowrap; }
+body.pad-on .ab[data-ability="flurry"]::after { content: '▲'; }
+body.pad-on .ab[data-ability="cleave"]::after { content: '▶'; }
+body.pad-on .ab[data-ability="treasure"]::after { content: '▼'; }
+body.pad-on .ab[data-ability="drums"]::after { content: '◀'; }
+body.pad-on .ab[data-ability="rampage"]::after { content: var(--pad-y); }
+body.pad-on .ab[data-ability="legion"]::after { content: var(--pad-lt) ' ▲'; }
+body.pad-on .dock [data-open="settings"]::after { content: var(--pad-menu); }
+body.pad-on .dock [data-open="abyss"]::after { content: var(--pad-view); }
+body.pad-on .m-head [data-act="close"] { position: relative; }
+body.pad-on .m-head [data-act="close"]::after { content: var(--pad-b); }
+body.pad-on .modes > span { white-space: nowrap; }
+body.pad-on .modes > span::after { content: var(--pad-lb) ' ' var(--pad-rb); margin-left: 6px; font: 700 11px/1 var(--f-pad); white-space: nowrap; color: var(--ink); background: linear-gradient(#fff4d6, #e9d6aa); padding: 2px 4px 1px; box-shadow: 0 0 0 1px var(--ink); }
