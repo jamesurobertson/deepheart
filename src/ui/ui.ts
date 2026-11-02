@@ -676,7 +676,7 @@ export class Ui {
       if (e.key.toLowerCase() === 'h' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) this.setUiHidden(!this.uiHidden);
       else if (e.key === 'Escape') this.setUiHidden(false);
       // The number keys use the abilities in the column, in order.
-      if (/^[1-9]$/.test(e.key) && !e.repeat && !this.modal && !this.game.s.inKeep) {
+      if (/^[1-9]$/.test(e.key) && !e.repeat && !this.modal) {
         const id = KEYED[Number(e.key) - 1];
         const slot = id && this.el.abilities.querySelector<HTMLElement>(`[data-ability="${id}"]`);
         if (slot) {
@@ -1578,12 +1578,6 @@ export class Ui {
       // Nothing to point at yet (monsters still coming up the stairs).
       this.el.hint.style.visibility = s ? 'visible' : 'hidden';
     }
-    // The first treasure goblin's hint runs along under it.
-    if (this.hintState === 'raid') {
-      const r = this.scene.raiderScreen(0);
-      if (r) this.el.hint.style.transform = `translate(${r.x}px, ${Math.min(r.y + 16, innerHeight - 120)}px)`;
-      this.el.hint.style.visibility = r ? 'visible' : 'hidden';
-    }
     // Flurry clicks wherever you point, like holding the attack down.
     const flurry = g.s.buffs.some((b) => b.id === 'flurry');
     g.aim = flurry && this.pointer && !this.modal ? { id: this.scene.pick(this.pointer.x, this.pointer.y), ...this.pointer } : null;
@@ -2130,10 +2124,11 @@ export class Ui {
     // The words stay put at the top of the battlefield (a hero on the move is hard to read beside); a small marker
     // bobs over the hero's head (moved every frame, in frame()).
     this.el.heroMark.hidden = state !== 'hero';
-    if (state === 'hero') {
+    // (The first treasure goblin's, on a controller, sits there too: the goblin keeps just its marker.)
+    if (state === 'hero' || state === 'raid') {
       this.el.hint.style.transform = `translate(${this.field.w / 2}px, ${this.hudTop + (this.hudTop ? 16 : 222)}px)`;
       this.el.hint.style.visibility = 'visible';
-      if (shown > 10_000) g.s.heroTips = 1;
+      if (state === 'hero' && shown > 10_000) g.s.heroTips = 1;
     } else if (state === 'star') {
       this.pointAt(this.rows[this.starPick()]?.querySelector('.gen-hero'));
       if (shown > 15_000) g.s.heroTips = 2;
@@ -2166,21 +2161,21 @@ export class Ui {
       if (comp >= 0) padPick(comp);
     }
     const pointing = state.startsWith('skill:') || ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'mark', 'auto', 'autohire'].includes(state);
-    this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ' && state !== 'raid';
+    this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ' && !(state === 'raid' && padFamily());
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
-    this.el.hint.classList.toggle('still', state === 'hero');
+    this.el.hint.classList.toggle('still', state === 'hero' || state === 'raid');
     this.el.shop.classList.toggle('show-stars', state === 'star');
     this.el.hint.innerHTML = state === 'hero'
       ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : padFamily() ? `walk them with ${padGlyph('ls', 18)}` : 'they follow your mouse'}</small></b>`
       : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>${padFamily() ? `Press ${padGlyph('r3', 18)} to switch` : `Click their ${G.star()} to switch`}</small></b>`
-        : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>${padFamily() ? `Press ${padGlyph('rt', 18)} to hire them` : this.touch ? 'Tap them to hire them' : 'Click them to hire them'}</small></b>`
+        : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>${padFamily() ? `Press ${padGlyph('rt', 18)} to hire them` : 'Companions fight for you, even while you\'re away'}</small></b>`
           : state === 'level' ? `<b>${padFamily() ? `Press ${padGlyph('rt', 20)} to level up` : `Keep ${this.touch ? 'tapping' : 'clicking'} to level up`}<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
             : state.startsWith('skill:') ? this.skillHint(state.slice(6) as AbilityId)
             : state === 'rampage' ? `<b>Rampage is ready!<small>${padFamily() ? `Press ${this.abilityButtons('rampage')}` : this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
             : state === 'shop' ? `<b>An upgrade is ready!<small>${padFamily() ? `Press ${padGlyph('x', 18)} to buy it` : this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
               : state === 'champ' ? this.champHint()
-              : state === 'raid' ? `<b>A treasure goblin!<small>${padFamily() ? `Walk into it with ${padGlyph('ls', 18)}` : this.touch ? 'Tap it' : 'Click it'} before it gets away</small></b>`
+              : state === 'raid' ? `<b>A treasure goblin!<small>Walk into it with ${padGlyph('ls', 18)} before it gets away</small></b>`
               : state === 'auto' ? `<b>Auto upgrades<small>Companion upgrades you've bought before buy themselves</small></b>`
               : state === 'autohire' ? `<b>Auto levels<small>Companion levels you've bought before buy themselves</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
