@@ -27,6 +27,7 @@ export const padCombo = (keys: string[], size: number) => keys.map((k) => padGly
 export type PadFamily = 'xbox' | 'ps' | 'switch';
 
 let family: PadFamily | null = null;
+const INPUT_KEY = 'deepheart-input';
 /** The controller in use, while it's the last thing you touched (null with the mouse, keyboard or touch). */
 export const padFamily = () => family;
 
@@ -214,8 +215,18 @@ export function installGamepad() {
     }
     document.querySelectorAll('.pad-fixed').forEach((g) => g.remove());
     barKey = '';
+    try {
+      if (f) localStorage.setItem(INPUT_KEY, f);
+      else localStorage.removeItem(INPUT_KEY);
+    } catch { /* storage off: it starts on the mouse */ }
     padHooks.change();
   };
+  // Back on the controller you last played with (after a wipe, a reload, the next launch): the browser won't say a
+  // controller is there until one of its buttons is pressed.
+  try {
+    const last = localStorage.getItem(INPUT_KEY);
+    if (last === 'xbox' || last === 'ps' || last === 'switch') use(last);
+  } catch { /* storage off */ }
   // The mouse, the keyboard or a finger puts the usual words back (only real input: the controller's own events are
   // made up, and don't count).
   addEventListener('pointermove', (e) => e.isTrusted && (e.movementX || e.movementY) && use(null), true);
@@ -300,10 +311,18 @@ export function installGamepad() {
     }
   };
 
+  let seen = false;
   const poll = (now: number) => {
     const pad = [...navigator.getGamepads()].find((p) => p?.connected) ?? null;
     if (!pad) {
-      use(null);
+      // (Unplugged: the mouse's words come back. Not yet seen since loading, it keeps the remembered controller.)
+      if (seen) use(null);
+      else if (family) {
+        const shown = !modalOpen() && !titleOpen();
+        fixGlyphs(shown);
+        showPick(shown, false);
+        showBar();
+      }
       for (const d of walking) press(ARROWS[d], ARROWS[d], false);
       walking.clear();
       requestAnimationFrame(poll);
@@ -317,6 +336,7 @@ export function installGamepad() {
     // The d-pad, or (in a window, on the title screen or along the dock) the left stick: a step in one direction.
     const stickDir: Dir | null = Math.hypot(lx, ly) < 0.5 ? null : Math.abs(lx) > Math.abs(ly) ? (lx < 0 ? 'left' : 'right') : (ly < 0 ? 'up' : 'down');
     const dpad: Dir | null = down.has('b12') ? 'up' : down.has('b13') ? 'down' : down.has('b14') ? 'left' : down.has('b15') ? 'right' : null;
+    seen = true;
     if ([...down].some((b) => !held.has(b)) || Math.hypot(lx, ly) > DEAD_ZONE || Math.abs(ry) > 0.5 || Math.abs(rx) > 0.5) use(familyOf(pad));
     const modal = modalOpen();
     const title = titleOpen();
