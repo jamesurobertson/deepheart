@@ -82,13 +82,24 @@ const visible = (el: HTMLElement) => {
   return box.width > 0 && box.height > 0 && !el.closest('[hidden]');
 };
 
-/** The nearest visible control in a direction, by distance along that direction with a penalty for drifting off it. */
+/** The nearest visible control in a direction. ▲ ▼ go a row at a time (the next row's closest, as reading goes);
+ *  ◀ ▶ stay on the same line (nothing there, nothing happens). */
 function neighbor(from: HTMLElement | null, dir: Dir, scope: ParentNode): HTMLElement | null {
   const reach = !(scope instanceof Element) ? REACH : scope.matches('.modal-wrap') ? REACH_WINDOW : scope.matches('#ui') ? REACH_SCREEN : REACH;
   const items = [...scope.querySelectorAll<HTMLElement>(reach)].filter((el) => !el.parentElement?.closest(reach) || el.matches('button, a, input')).filter((el) => visible(el) && !el.matches('canvas'));
   if (!from || !items.includes(from)) return items[0] ?? null;
   const origin = from.getBoundingClientRect();
   const [ox, oy] = [origin.left + origin.width / 2, origin.top + origin.height / 2];
+  if (dir === 'up' || dir === 'down') {
+    const ahead = items.filter((el) => el !== from).map((el) => ({ el, box: el.getBoundingClientRect() }))
+      .filter(({ box }) => (dir === 'down' ? box.top + box.height / 2 - oy : oy - box.top - box.height / 2) > 1);
+    const gap = ({ box }: { box: DOMRect }) => Math.max(0, dir === 'down' ? box.top - origin.bottom : origin.top - box.bottom);
+    const nearest = Math.min(...ahead.map(gap));
+    // (Within a few pixels counts as the same row: a row's buttons rarely line up exactly.)
+    const row = ahead.filter((c) => gap(c) <= nearest + 8);
+    const off = ({ box }: { box: DOMRect }) => Math.max(0, box.left - origin.right, origin.left - box.right) * 1000 + Math.abs(box.left + box.width / 2 - ox);
+    return row.sort((a, b) => off(a) - off(b))[0]?.el ?? null;
+  }
   let best: HTMLElement | null = null;
   let bestScore = Infinity;
   for (const el of items) {
@@ -96,10 +107,9 @@ function neighbor(from: HTMLElement | null, dir: Dir, scope: ParentNode): HTMLEl
     const box = el.getBoundingClientRect();
     const dx = box.left + box.width / 2 - ox;
     const dy = box.top + box.height / 2 - oy;
-    const along = dir === 'up' ? -dy : dir === 'down' ? dy : dir === 'left' ? -dx : dx;
-    const across = dir === 'up' || dir === 'down' ? Math.abs(dx) : Math.abs(dy);
-    if (along <= 1) continue;
-    const score = along + across * 2;
+    const along = dir === 'left' ? -dx : dx;
+    if (along <= 1 || box.bottom < origin.top - 8 || box.top > origin.bottom + 8) continue;
+    const score = along + Math.abs(dy) * 2;
     if (score < bestScore) [best, bestScore] = [el, score];
   }
   return best;
