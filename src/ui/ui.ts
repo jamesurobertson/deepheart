@@ -8,7 +8,7 @@ import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, keepDoor, silhouette, spiritForm, sprite, spriteFit, spriteFrames } from './px.ts';
-import { ABILITY_PAD, padFamily, padGlyph, padHooks, padPick } from './gamepad.ts';
+import { ABILITY_PAD, padCombo, padFamily, padGlyph, padHooks, padPick } from './gamepad.ts';
 import { skillIcon } from './icons.ts';
 import { kokoSvg } from './koko.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
@@ -275,6 +275,10 @@ export class Ui {
   private newsIdx = -1;
   private modal: string | null = null;
   private resetArmed = false;
+  /** The window to go back to when this one closes (one opened from Options). */
+  private modalBack: string | null = null;
+  /** Which page of Options is open. */
+  private setTab: 'sound' | 'display' | 'cursor' | 'game' | 'save' = 'sound';
   private hintState = '';
   /** When the current hint appeared (the hero tips time out). */
   private tourAt = 0;
@@ -666,10 +670,10 @@ export class Ui {
     addEventListener('keydown', (e) => {
       this.inputAt = performance.now();
       if ((e.target as HTMLElement).closest('input, textarea')) return;
-      if (e.key === 'Escape' && this.modal) this.closeModal();
+      if (e.key === 'Escape' && this.modal) this.backModal();
       // ? lists the shortcuts.
       if (e.key === '?' && !e.repeat) {
-        if (this.modal === 'keys') this.closeModal();
+        if (this.modal === 'keys') this.backModal();
         else if (!this.modal) this.openModal('keys');
       }
       // H hides the interface for screenshots; H again or Escape brings it back.
@@ -728,7 +732,8 @@ export class Ui {
         return;
       }
       const t = e.target as HTMLElement;
-      if (t.closest('.floor-n')) return this.jumpFloor();
+      // (A controller picks the floor's name box, not its number.)
+      if (t.closest('.floor-n') || (padFamily() && t.closest('.floor-name'))) return this.jumpFloor();
       const hero = t.closest<HTMLElement>('[data-hero]');
       if (hero) {
         if (this.game.setHero(Number(hero.dataset.hero))) {
@@ -784,6 +789,12 @@ export class Ui {
         this.hooks.sound('toggle', { vol: 0.5 });
         this.syncMode();
         this.rowCache.fill('');
+        return;
+      }
+      const setTab = t.closest<HTMLElement>('[data-settab]');
+      if (setTab) {
+        this.setTab = setTab.dataset.settab as typeof this.setTab;
+        this.renderModal();
         return;
       }
       const open = t.closest<HTMLElement>('[data-open]');
@@ -870,7 +881,7 @@ export class Ui {
       if (act) this.action(act.dataset.act!, act);
     });
     this.el.modalWrap.addEventListener('pointerdown', (e) => {
-      if (e.target === this.el.modalWrap) this.closeModal();
+      if (e.target === this.el.modalWrap) this.backModal();
     });
 
     r.addEventListener('input', (e) => {
@@ -886,6 +897,8 @@ export class Ui {
       const key = t.dataset.set as 'sfxVol' | 'musicVol' | undefined;
       if (!key) return;
       this.game.s.settings[key] = Number(t.value) / 100;
+      const shown = t.closest('.opt')?.querySelector('.opt-v b');
+      if (shown) shown.textContent = `${t.value}%`;
       this.hooks.settings();
     });
 
@@ -939,7 +952,7 @@ export class Ui {
     const g = this.game;
     const s = g.s.settings;
     switch (act) {
-      case 'close': this.closeModal(); break;
+      case 'close': this.backModal(); break;
       case 'autoUpg':
         g.s.settings.autoUpg = !g.s.settings.autoUpg;
         g.s.autoTipSeen = true;
@@ -1011,14 +1024,20 @@ export class Ui {
       case 'reset':
         if (!this.resetArmed) {
           this.resetArmed = true;
-          el.textContent = 'Really wipe everything?';
+          this.renderModal();
           setTimeout(() => {
             this.resetArmed = false;
-            if (el.isConnected) el.textContent = 'Wipe save';
+            if (this.modal === 'settings') this.renderModal();
           }, 3000);
-        } else this.hooks.reset();
+        } else {
+          // A third time, in a window of its own: what goes, and that it can't come back.
+          this.resetArmed = false;
+          this.renderWipeConfirm();
+        }
         break;
       case 'descend': this.renderDescendConfirm(); break;
+      case 'wipeGo': this.hooks.reset(); break;
+      case 'wipeBack': this.backModal(); break;
       case 'summon': {
         const id = this.legendPick;
         if (id && this.game.summonLegend(id)) {
@@ -1578,9 +1597,10 @@ export class Ui {
       // Nothing to point at yet (monsters still coming up the stairs).
       this.el.hint.style.visibility = s ? 'visible' : 'hidden';
     }
-    // Flurry clicks wherever you point, like holding the attack down.
+    // Flurry clicks wherever you point, like holding the attack down (on a controller: at the monster nearest your hero).
     const flurry = g.s.buffs.some((b) => b.id === 'flurry');
-    g.aim = flurry && this.pointer && !this.modal ? { id: this.scene.pick(this.pointer.x, this.pointer.y), ...this.pointer } : null;
+    const flurryAt = padFamily() ? this.scene.heroScreen(g) : this.pointer;
+    g.aim = flurry && flurryAt && !this.modal ? { id: this.scene.pick(flurryAt.x, flurryAt.y), ...flurryAt } : null;
     const feet = this.scene.heroFeet(g);
     this.sweepCoins([feet, this.coinPointer].filter((p) => p !== null));
     if (g.vault && this.coinPointer && !this.modal) this.scene.sweepVaultCoins(this.coinPointer.x, this.coinPointer.y, g);
@@ -1652,6 +1672,16 @@ export class Ui {
   }
 
   update() {
+    // The gold and damage readouts tell of the Patient's and the Sleeper's share only once you have them.
+    for (const [sel, id] of [['.bank', 'patient'], ['.dps-w', 'sleeper']] as const) {
+      const el = this.root.querySelector<HTMLElement>(sel);
+      if (!el) continue;
+      if (this.game.legendLv(id) > 0) el.dataset.tip = `idle:${id}`;
+      else if (el.dataset.tip) {
+        delete el.dataset.tip;
+        if (this.tipAnchor === el) this.hideTip();
+      }
+    }
     const g = this.game;
     const blade = this.cursorSprite();
     if (blade !== this.bladeSprite) {
@@ -2168,8 +2198,8 @@ export class Ui {
     this.el.hint.innerHTML = state === 'hero'
       ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : padFamily() ? `walk them with ${padGlyph('ls', 18)}` : 'they follow your mouse'}</small></b>`
       : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>${padFamily() ? `Press ${padGlyph('r3', 18)} to switch` : `Click their ${G.star()} to switch`}</small></b>`
-        : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>${padFamily() ? `Press ${padGlyph('rt', 18)} to hire them` : 'Companions fight for you, even while you\'re away'}</small></b>`
-          : state === 'level' ? `<b>${padFamily() ? `Press ${padGlyph('rt', 20)} to level up` : `Keep ${this.touch ? 'tapping' : 'clicking'} to level up`}<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
+        : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>${padFamily() ? `Press ${padGlyph('a', 18)} to hire them` : 'Companions fight for you, even while you\'re away'}</small></b>`
+          : state === 'level' ? `<b>${padFamily() ? `Press ${padGlyph('a', 20)} to level up` : `Keep ${this.touch ? 'tapping' : 'clicking'} to level up`}<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
             : state.startsWith('skill:') ? this.skillHint(state.slice(6) as AbilityId)
             : state === 'rampage' ? `<b>Rampage is ready!<small>${padFamily() ? `Press ${this.abilityButtons('rampage')}` : this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
@@ -2179,7 +2209,7 @@ export class Ui {
               : state === 'auto' ? `<b>Auto upgrades<small>Companion upgrades you've bought before buy themselves</small></b>`
               : state === 'autohire' ? `<b>Auto levels<small>Companion levels you've bought before buy themselves</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
-              : (padFamily() ? `<b>Attack the monsters!<small>Tap ${padGlyph('a', 18)} to attack, hold it to keep attacking</small></b>` : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`);
+              : (padFamily() ? `<b>Attack the monsters!<small>Tap ${padGlyph('rt', 18)} to attack, hold it to keep attacking</small></b>` : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`);
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
   }
@@ -2191,7 +2221,7 @@ export class Ui {
 
   /** The controller button(s) that use an ability. */
   private abilityButtons(id: AbilityId) {
-    return (ABILITY_PAD[id] ?? []).map((k) => padGlyph(k, 20)).join('');
+    return padCombo(ABILITY_PAD[id] ?? [], 20);
   }
 
   /** A skill just unlocked: its name, and how to use it (or that it's always on). */
@@ -2499,7 +2529,7 @@ export class Ui {
       const i = Number(id);
       const now = g.heroIndex() === i;
       return now
-        ? `<div class="tt-h"><b>The ${esc(COMPS[i].name)} is your hero</b></div><p class="tt-d">Click the ${G.star()} again to have no hero.</p>`
+        ? `<div class="tt-h"><b>The ${esc(COMPS[i].name)} is your hero</b></div><p class="tt-d">${padFamily() ? `Press ${padGlyph('r3', 18)} again` : `Click the ${G.star()} again`} to have no hero.</p>`
         : `<div class="tt-h"><b>Make the ${esc(COMPS[i].name)} your hero</b></div>`;
     }
     if (kind === 'fm') {
@@ -2562,6 +2592,8 @@ export class Ui {
   // ---------- modals ----------
 
   openModal(name: string) {
+    // Opened from Options (Shortcuts): Options waits behind it, and closing it goes back there.
+    this.modalBack = this.modal === 'settings' && name !== 'settings' ? 'settings' : null;
     this.modal = name;
     if (name === 'cards') this.newCards = 0;
     this.el.modalWrap.hidden = false;
@@ -2570,7 +2602,17 @@ export class Ui {
     this.el.modal.scrollTop = 0;
   }
 
+  /** You close the window (Escape, B, its ✕, a click outside it): back to the one it was opened from, or closed. */
+  backModal() {
+    const back = this.modalBack;
+    if (!back) return this.closeModal();
+    this.hideTip();
+    this.openModal(back);
+    this.hooks.sound('close', { vol: 0.4 });
+  }
+
   closeModal() {
+    this.modalBack = null;
     this.tripsBackDone();
     if (this.modal === 'offline') for (const card of this.offlineCards.splice(0)) this.showCard(card);
     this.modal = null;
@@ -2621,17 +2663,17 @@ export class Ui {
       const pad = (...keys: string[]) => keys.map((k) => padGlyph(k, 26)).join('');
       const rows: [string, string][] = padFamily() ? [
         [pad('ls'), 'Move your hero'],
-        [pad('a'), 'Attack'],
+        [pad('rt'), 'Attack'],
         [pad('up', 'down'), 'Pick a companion'],
-        [pad('rt'), 'Level them'],
+        [pad('a'), 'Level them'],
         [pad('x'), 'Buy their next upgrade'],
         [pad('r3'), 'Make them your hero'],
         [pad('left', 'right'), 'Buy amount'],
         ...ABILITIES.filter((a) => ABILITY_PAD[a.id]).map((a): [string, string] => [pad(...ABILITY_PAD[a.id]), esc(a.name)]),
         [pad('lt', 'left', 'right'), 'Floor down, floor up'],
         [pad('lt', 'down'), 'Auto'],
-        [pad('view'), 'Options'],
-        [pad('menu'), 'Browse the screen'],
+        [pad('menu'), 'Options'],
+        [pad('view'), 'Browse the screen'],
         [pad('b'), 'Back'],
       ] : [
         [cap('W', 'A', 'S', 'D'), 'Move'],
@@ -2644,26 +2686,7 @@ export class Ui {
       ];
       html = head('Shortcuts') + `<dl class="keys">${rows.map(([keys, what]) => `<dt>${keys}</dt><dd>${what}</dd>`).join('')}</dl>`;
     } else if (name === 'settings') {
-      const s = g.s.settings;
-      const tog = (act: string, on: boolean, label: string) => `<button class="btn toggle ${on ? 'on' : ''}" data-act="${act}">${label}: ${on ? 'On' : 'Off'}</button>`;
-      html = head('Options') + `
-        <div class="set">
-          <label>Effects volume <input type="range" min="0" max="100" value="${Math.round(s.sfxVol * 100)}" data-set="sfxVol"></label>
-          <label>Music volume <input type="range" min="0" max="100" value="${Math.round(s.musicVol * 100)}" data-set="musicVol"></label>
-          <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('calm', s.calm, 'Reduce flashing')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
-          <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button></div>
-          <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
-          <div class="cursors">${CURSORS.map((c) => {
-            const open = this.cursorOpen(c.id);
-            const spr = c.sprite;
-            return `<button class="cur ${open ? '' : 'locked'} ${s.cursor === c.id ? 'on' : ''}" data-cursor="${c.id}" data-tip="cur:${c.id}">${spriteFit(spr, 36)}${open ? '' : `<span class="cur-lock">${G.lock()}</span>`}</button>`;
-          }).join('')}</div>
-          <h3>Save</h3>
-          <p class="muted">Copy your save code to move it to another browser.</p>
-          <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
-          <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
-          <div class="set-row">${DEMO ? '' : `<a class="btn" href="${WIKI_URL}" target="_blank" rel="noopener">Wiki</a>`}<button class="btn" data-open="keys">Shortcuts</button>${document.body.classList.contains('at-menu') ? '' : '<button class="btn" data-act="mainMenu">Main menu</button>'}</div>
-        </div>`;
+      html = head('Options', '', this.settingsTabs()) + this.settingsHtml();
     }
     if (soft && (html === this.modalKey || performance.now() < this.modalHold)) return;
     this.modalKey = html;
@@ -3024,6 +3047,46 @@ export class Ui {
     const more = CARDS.some((c) => !seen(c)) ? '<p class="cards-more">More cards wait deeper down.</p>' : '';
     return bar + ZONES.map((z, i) => section(z.name, CARDS.filter((c) => c.zone === i), i === hereZone, i)).join('')
       + section('Treasure goblins', CARDS.filter((c) => c.zone < 0)) + more;
+  }
+
+  /** Options' pages (the cursor's only for a mouse: a controller has none). */
+  private settingsTabs() {
+    const tabs: [typeof this.setTab, string][] = [['sound', 'Sound'], ['display', 'Display'], ...(padFamily() ? [] : [['cursor', 'Cursor'] as [typeof this.setTab, string]]), ['game', 'Game'], ['save', 'Save']];
+    if (!tabs.some(([id]) => id === this.setTab)) this.setTab = 'sound';
+    return `<nav class="tabs">${tabs.map(([id, label]) => `<button class="tab ${this.setTab === id ? 'on' : ''}" data-settab="${id}">${label}</button>`).join('')}</nav>`;
+  }
+
+  /** One setting a row: its name, and its value with arrows either side (click the row, or ◀ ▶ on a controller). */
+  private settingsHtml(): string {
+    const s = this.game.s.settings;
+    const pick = (act: string, label: string, value: string, cls = '') => `<button class="opt ${cls}" data-act="${act}"><span>${label}</span><span class="opt-v"><i>◀</i><b>${value}</b><i>▶</i></span></button>`;
+    const onOff = (act: string, on: boolean, label: string) => pick(act, label, on ? 'On' : 'Off', on ? '' : 'off');
+    const volume = (key: 'sfxVol' | 'musicVol', label: string) => {
+      const v = Math.round(s[key] * 100);
+      return `<label class="opt opt-vol" tabindex="0"><span>${label}</span><span class="opt-v"><input type="range" min="0" max="100" step="5" value="${v}" data-set="${key}" tabindex="-1"><b>${v}%</b></span></label>`;
+    };
+    const go = (label: string, attrs: string, cls = '') => `<button class="opt opt-go ${cls}" ${attrs}><span>${label}</span><span class="opt-v"><i>▶</i></span></button>`;
+    let rows = '';
+    if (this.setTab === 'sound') rows = onOff('sound', !s.muted, 'Sound') + onOff('music', s.music, 'Music') + volume('sfxVol', 'Effects volume') + volume('musicVol', 'Music volume');
+    else if (this.setTab === 'display') {
+      rows = onOff('particles', s.particles, 'Particles') + onOff('calm', s.calm, 'Reduce flashing') + onOff('shake', s.shake, 'Screen shake')
+        + onOff('numbers', s.numbers, 'Damage numbers') + onOff('blood', s.blood, 'Blood') + onOff('cinematics', s.cinematics, 'Zone intros')
+        + pick('notation', 'Numbers', s.notation === 'short' ? '1.23M' : '1.23e6');
+    } else if (this.setTab === 'cursor') {
+      return `<div class="set"><h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
+        <div class="cursors">${CURSORS.map((c) => {
+          const open = this.cursorOpen(c.id);
+          return `<button class="cur ${open ? '' : 'locked'} ${s.cursor === c.id ? 'on' : ''}" data-cursor="${c.id}" data-tip="cur:${c.id}">${spriteFit(c.sprite, 36)}${open ? '' : `<span class="cur-lock">${G.lock()}</span>`}</button>`;
+        }).join('')}</div></div>`;
+    } else if (this.setTab === 'game') {
+      rows = go('Shortcuts', 'data-open="keys"') + (DEMO ? '' : `<a class="opt opt-go" href="${WIKI_URL}" target="_blank" rel="noopener"><span>Wiki</span><span class="opt-v"><i>▶</i></span></a>`)
+        + (document.body.classList.contains('at-menu') ? '' : go('Main menu', 'data-act="mainMenu"'));
+    } else {
+      rows = go('Copy save code', 'data-act="export"') + go('Load save code', 'data-act="import"')
+        + '<textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>'
+        + `<div class="opt-sep"></div>${go(this.resetArmed ? 'Really wipe everything?' : 'Wipe save', 'data-act="reset"', 'danger')}`;
+    }
+    return `<div class="opts">${rows}</div>`;
   }
 
   private statTabs(on: string) {
@@ -3523,6 +3586,20 @@ export class Ui {
   }
 
 
+  /** The last word before a wipe. Options waits behind it. */
+  private renderWipeConfirm() {
+    this.modalBack = 'settings';
+    this.modal = 'wipe';
+    this.modalKey = 'wipe';
+    this.el.modal.className = 'modal pnl m-confirm';
+    this.el.modal.innerHTML = `<header class="m-head"><h2>Wipe your save?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
+      <div class="confirm">
+        <p>Everything goes: gold, companions, souls, Spirits, cards and trophies. This can't be undone.</p>
+        <div class="set-row"><button class="btn big" data-act="wipeBack">Keep my save</button><button class="btn danger big" data-act="wipeGo">Wipe everything</button></div>
+      </div>`;
+    this.el.modal.querySelector<HTMLElement>('[data-act="wipeBack"]')?.focus({ preventScroll: true });
+  }
+
   private renderDescendConfirm() {
     if (DEMO) return;
     const g = this.game;
@@ -3627,7 +3704,7 @@ export class Ui {
     const ids = labels.map((l) => `${l.id}:${l.verb}:${l.tip ?? ''}`).join(' ') + (padFamily() ?? '');
     if (host.dataset.ids !== ids) {
       host.dataset.ids = ids;
-      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}${l.tip ? `<small>${esc(l.tip)}</small>` : ''}</b><em class="kp">${padFamily() ? padGlyph('a', 22) : `<kbd>E</kbd>${MOUSE_GLYPH}`}<span>${esc(l.verb)}</span></em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
+      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}${l.tip ? `<small>${esc(l.tip)}</small>` : ''}</b><em class="kp">${padFamily() ? padGlyph('y', 22) : `<kbd>E</kbd>${MOUSE_GLYPH}`}<span>${esc(l.verb)}</span></em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
       // Clicking a label walks you over and uses it when you get there.
       host.querySelectorAll<HTMLElement>('[data-station]').forEach((b) => {
         b.addEventListener('click', (e) => {

@@ -857,6 +857,27 @@ body.compact .m-top { top: -8px; margin: -8px -8px 0 -12px; padding: 8px 8px 0 1
 .stats dd { margin: 0; font: 400 22px/1 'Jersey 10'; text-align: right; }
 
 .set { display: flex; flex-direction: column; gap: 12px; }
+/* Options: one setting a row, its name on the left and its value on the right between arrows; the whole row lights
+   when pointed at or picked. */
+.opts { display: flex; flex-direction: column; gap: 4px; }
+/* (Every page as tall as the longest, so the window doesn't jump between them.) */
+.m-settings .opts, .m-settings .set { min-height: 352px; }
+.opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 46px; padding: 6px 14px; box-sizing: border-box; border: 0; cursor: pointer; text-align: left; text-decoration: none;
+  font: 400 22px/1 'Jersey 10', monospace; color: var(--text); background: rgba(255, 255, 255, 0.03); box-shadow: inset 0 0 0 2px transparent; }
+.opt:hover, .opt:focus, .opt:focus-within { outline: none !important; background: rgba(255, 224, 138, 0.08); box-shadow: inset 0 0 0 2px var(--gold); }
+body.pad-on .opt:focus, body.pad-on .opt:focus-within { box-shadow: inset 0 0 0 3px var(--gold-hi); }
+.opt-v { display: inline-flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.opt-v i { font-style: normal; font-size: 14px; color: var(--dim); }
+.opt-v b { min-width: 76px; font-weight: 400; text-align: center; color: var(--gold-hi); }
+.opt.off .opt-v b { color: var(--dim); }
+.opt-go .opt-v i { color: var(--gold); }
+.opt-vol input[type=range] { width: 180px; accent-color: var(--gold); }
+.opt-vol .opt-v b { min-width: 52px; text-align: right; }
+.opt.danger { color: #ff8a8a; }
+.opt.danger:hover, .opt.danger:focus { background: rgba(232, 69, 95, 0.12); box-shadow: inset 0 0 0 2px #e8455f; }
+.opt-sep { height: 12px; }
+.opts textarea { width: 100%; height: 64px; box-sizing: border-box; resize: none; background: #0c0709; color: var(--text); border: 2px solid #3b2e31; font: 400 12px/1.3 monospace; padding: 6px; user-select: text; }
+body.compact .opt-vol input[type=range] { width: 120px; }
 .set label { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--dim); }
 .set input[type=range] { width: 55%; accent-color: var(--gold); }
 .set-row { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -1674,6 +1695,8 @@ body.pad-on .blade { display: none !important; }
 .pad-bar b { font: 400 18px/1 'Jersey 10', monospace; color: var(--text); text-shadow: var(--outline); letter-spacing: 0.5px; }
 .pad-ab { position: fixed; left: 0; top: 0; z-index: 8; display: flex; gap: 2px; pointer-events: none; filter: drop-shadow(0 2px 0 var(--ink)); }
 .pad-ab[hidden] { display: none; }
+.pad-plus { display: inline-block; vertical-align: middle; margin: 0 1px; font: 400 18px/1 'Jersey 10'; color: var(--text); }
+.pad-ab { align-items: center; }
 .modes .pad-amount { display: inline-flex; flex: none; gap: 2px; margin-right: auto; }
 body.pad-on .modes > span:not(.pad-amount) { display: none; }
 /* (Above the news line along the bottom.) */

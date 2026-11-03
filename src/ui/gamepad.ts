@@ -1,8 +1,9 @@
 /** Controller support, with no cursor: everything has a button. The left stick walks your hero (it catches goblins and
  *  picks up what it walks over, as with the keys) and A attacks the monster nearest them. The d-pad's ▲ ▼ (or the right
  *  stick) pick a companion in your party: RT levels it, X buys its next upgrade, R3 makes it your hero; ◀ ▶ change how
- *  many levels a buy is. LB, RB and Y use abilities, and with LT held three more (LT with ◀ ▶ changes floor). Menu lets
- *  the d-pad step to any button on screen (reading its tooltip; A presses it), View opens Options, B backs out. In a window or on the title screen
+ *  many levels a buy is. LB, RB and Y use abilities, and with LT held three more (LT with ◀ ▶ changes floor). View lets
+ *  the d-pad step to any button on screen (reading its tooltip; A presses it), Menu opens Options, B backs out. A
+ *  number to type (a floor) steps instead: ◀ ▶ by 1, ▲ ▼ by 10, LB RB by 100. In a window or on the title screen
  *  the sticks and d-pad step between buttons and LB RB change tabs. Prompts show the controller's own buttons (Kenney's Input Prompts, by kind of pad) while it's the last
  *  thing used; the mouse, keyboard or a finger puts the usual words back. */
 const REACH = 'button:not([disabled]), a[href], [tabindex="0"], input:not([disabled])';
@@ -20,6 +21,8 @@ type Dir = keyof typeof ARROWS;
 const ABILITY_KEY: Record<string, [string, string]> = { b4: ['1', '4'], b5: ['3', '5'], b3: ['2', '6'] };
 /** Each ability's button(s), for its prompt. */
 export const ABILITY_PAD: Record<string, string[]> = { flurry: ['lb'], cleave: ['rb'], rampage: ['y'], treasure: ['lt', 'lb'], drums: ['lt', 'rb'], legion: ['lt', 'y'] };
+/** Buttons pressed together (LT + LB). */
+export const padCombo = (keys: string[], size: number) => keys.map((k) => padGlyph(k, size)).join('<span class="pad-plus">+</span>');
 
 export type PadFamily = 'xbox' | 'ps' | 'switch';
 
@@ -115,6 +118,8 @@ export function installGamepad() {
   let walking = new Set<Dir>();
   let repeatAt = 0;
   let buyAt = 0;
+  /** A went to a window, a card or the Heart: held on after, it doesn't start levelling. */
+  let aSpent = false;
   let picked = 0;
   let pickedRow: HTMLElement | null = null;
   let stickAt = 0;
@@ -130,6 +135,17 @@ export function installGamepad() {
   const scope = (): ParentNode => document.querySelector('.modal-wrap:not([hidden])') ?? document.querySelector('.title-menu') ?? document.getElementById('ui') ?? document;
   const rows = () => [...document.querySelectorAll<HTMLElement>('.gens .gen[data-comp]')].filter(visible);
   const focused = () => (document.activeElement && document.activeElement !== document.body ? document.activeElement as HTMLElement : null);
+  /** A number box with the focus (the floor to go to, an expedition's floor): the d-pad steps it. */
+  const numberBox = () => {
+    const el = focused();
+    return el instanceof HTMLInputElement && el.type === 'number' ? el : null;
+  };
+  const step = (box: HTMLInputElement, by: number) => {
+    const lo = Number(box.min || 1), hi = Number(box.max || Infinity);
+    box.value = String(Math.max(lo, Math.min(hi, Math.round(Number(box.value) || lo) + by)));
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  const keyOn = (el: HTMLElement, key: string) => el.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
   /** The d-pad (or a stick) lands on a button: focused, with its tooltip. */
   const land = (el: HTMLElement | null) => {
     if (!el) return;
@@ -140,6 +156,33 @@ export function installGamepad() {
     hover(focusTip, false);
     focusTip = el.closest<HTMLElement>('[data-tip]');
     hover(focusTip, true);
+  };
+  /** Press a setting's row and stay on it (the window redraws, so find it again by what it does). */
+  let lastRow = '';
+  /** Press something in a window and stay on it: the window often redraws (a Spirit picked, a setting changed), so it's
+   *  found again by what it is. (If it's gone, or a new window opened, the focus starts afresh there.) */
+  const KEYS = ['data-act', 'data-open', 'data-set', 'data-pick', 'data-settab', 'data-cursor', 'data-tip', 'data-trip', 'data-card-lap', 'data-card-gold'];
+  const keyOf = (el: HTMLElement) => KEYS.map((a) => (el.getAttribute(a) ? `[${a}="${CSS.escape(el.getAttribute(a)!)}"]` : '')).join('');
+  const pressKeeping = (el: HTMLElement) => {
+    const key = keyOf(el);
+    if (el.matches('.opt')) lastRow = key;
+    click(el);
+    if (!key) return;
+    setTimeout(() => {
+      if (el.isConnected && document.activeElement === el) return;
+      land(document.querySelector<HTMLElement>(`.modal-wrap:not([hidden]) ${el.tagName.toLowerCase()}${key}`));
+    }, 0);
+  };
+  /** A window opened from the dock: closing it goes back to the button that opened it, still roaming. */
+  let dockReturn = '';
+  let windowSeen = '';
+  /** A window that just opened starts on its main button (or its first setting, or the first thing in it), never the ✕:
+   *  B already closes it. */
+  const landFirst = () => {
+    const wrap = document.querySelector<HTMLElement>('.modal-wrap:not([hidden])');
+    if (!wrap || wrap.contains(document.activeElement)) return;
+    const all = [...wrap.querySelectorAll<HTMLElement>(REACH_WINDOW)].filter((el) => visible(el) && !el.closest('.m-head') && !el.matches('.tab'));
+    land(all.find((el) => el.matches('.btn.primary')) ?? all.find((el) => el.matches('.opts .opt')) ?? all[0] ?? null);
   };
   const leaveDock = () => {
     docked = false;
@@ -157,6 +200,7 @@ export function installGamepad() {
     else {
       delete document.body.dataset.pad;
       if (docked) leaveDock();
+      document.querySelectorAll<HTMLElement>('.ab[data-ability]').forEach((slot) => (slot.style.order = ''));
     }
     document.querySelectorAll('.pad-fixed').forEach((g) => g.remove());
     barKey = '';
@@ -175,6 +219,8 @@ export function installGamepad() {
     for (const slot of document.querySelectorAll<HTMLElement>('.ab[data-ability]')) {
       const id = slot.dataset.ability ?? '';
       const keys = ABILITY_PAD[id];
+      // On a controller the column follows the buttons (LB RB Y, then with LT), always-on skills last.
+      slot.style.order = family ? String(keys ? Object.keys(ABILITY_PAD).indexOf(id) : 99) : '';
       if (!keys) continue;
       let tag = abilityTags.get(id);
       if (!tag) {
@@ -189,7 +235,7 @@ export function installGamepad() {
       tag.hidden = !on;
       if (!on) continue;
       if (tag.dataset.family !== family) {
-        tag.innerHTML = keys.map((k) => padGlyph(k, 26)).join('');
+        tag.innerHTML = padCombo(keys, 26);
         tag.dataset.family = family ?? '';
       }
       tag.style.transform = `translate(${Math.round(box.left - tag.offsetWidth - 6)}px, ${Math.round(box.top + (box.height - tag.offsetHeight) / 2)}px)`;
@@ -205,12 +251,14 @@ export function installGamepad() {
       return;
     }
     const modal = modalOpen();
-    const items: [string[], string][] = modal ? [[['a'], 'Select'], [['b'], 'Back']]
+    const items: [string[], string][] = numberBox() ? [[['left', 'right'], '±1'], [['up', 'down'], '±10'], [['lb', 'rb'], '±100'], [['a'], 'Go'], [['b'], 'Cancel']]
+      : modal ? [[['a'], 'Select'], [['b'], 'Back']]
       : titleOpen() ? [[['a'], 'Select']]
       : docked ? [[['a'], 'Select'], [['b'], 'Back']]
-      : inKeep() ? [[['ls'], 'Walk'], [['a'], 'Use'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['view'], 'Options'], [['menu'], 'Menu']]
-      : [[['ls'], 'Move'], [['a'], 'Attack'], [['rt'], 'Level'], [['x'], 'Upgrade'], [['view'], 'Options'], [['menu'], 'Menu']];
-    if (modal && document.querySelector('.modal-wrap:not([hidden]) .tabs')) items.splice(1, 0, [['lb', 'rb'], 'Tabs']);
+      : inKeep() ? [[['ls'], 'Walk'], [['y'], 'Use'], [['a'], 'Level'], [['x'], 'Upgrade'], [['menu'], 'Options'], [['view'], 'Browse']]
+      : [[['ls'], 'Move'], [['rt'], 'Attack'], [['a'], 'Level'], [['x'], 'Upgrade'], [['menu'], 'Options'], [['view'], 'Browse']];
+    if (!numberBox() && modal && document.querySelector('.modal-wrap:not([hidden]) .tabs')) items.splice(1, 0, [['lb', 'rb'], 'Tabs']);
+    if (!numberBox() && modal && document.querySelector('.modal-wrap:not([hidden]) .opts .opt:not(.opt-go)')) items.splice(1, 0, [['left', 'right'], 'Change']);
     const key = family + items.map(([, w]) => w).join();
     if (key !== barKey) {
       barKey = key;
@@ -266,7 +314,30 @@ export function installGamepad() {
       if (modal || title) docked = false;
       else leaveDock();
     }
+    // A window opening (or one turning into another) gets its first focus; the last one closing hands the focus back.
+    const windowNow = modal ? `${document.querySelector('.modal-wrap .modal')?.className} ${document.querySelector('.modal-wrap h2')?.textContent}` : '';
+    if (windowNow !== windowSeen) {
+      if (family && modal) landFirst();
+      else if (!modal && dockReturn) {
+        const back = document.querySelector<HTMLElement>(`#ui ${dockReturn}`);
+        if (family && back && visible(back)) {
+          docked = true;
+          land(back);
+        }
+      }
+      if (!modal) dockReturn = '';
+      windowSeen = windowNow;
+    }
+    // Playing, nothing keeps the focus box (a button pressed before, a window's opener).
+    const stray = focused();
+    if (family && !modal && !title && !docked && stray && !(stray instanceof HTMLInputElement) && document.getElementById('ui')?.contains(stray)) {
+      hover(focusTip, false);
+      focusTip = null;
+      stray.blur();
+    }
     const nav = modal || title || docked;
+    if (!down.has('b0')) aSpent = false;
+    else if (nav) aSpent = true;
 
     // Walking: the left stick in the dungeon and the Keep, as the arrow keys (two at once on a diagonal).
     const want = new Set<Dir>();
@@ -280,27 +351,74 @@ export function installGamepad() {
     for (const d of want) if (!walking.has(d)) press(ARROWS[d], ARROWS[d], true);
     walking = want;
 
-    if (nav) {
-      // Stepping between buttons; A presses, LB RB change a window's tabs.
+    const box = numberBox();
+    if (nav && box) {
       const dir = dpad ?? stickDir;
       if (dir && (dir !== heldDir || now >= repeatAt)) {
-        land(neighbor(focused(), dir, scope()));
+        step(box, dir === 'right' ? 1 : dir === 'left' ? -1 : dir === 'up' ? 10 : -10);
+        repeatAt = now + (dir === heldDir ? 80 : REPEAT_MS * 1.4);
+      }
+      heldDir = dir;
+      if (fresh('b4')) step(box, -100);
+      if (fresh('b5')) step(box, 100);
+      // A goes (the floor box takes Enter; an expedition's just keeps its number), B leaves it as it was.
+      if (fresh('b0')) {
+        keyOn(box, 'Enter');
+        if (box.isConnected) land(box.closest('.trip')?.querySelector<HTMLElement>('[data-act="tripGo"]') ?? null);
+      }
+      if (fresh('b1')) {
+        keyOn(box, 'Escape');
+        if (box.isConnected) box.blur();
+      }
+    } else if (nav) {
+      // Stepping between buttons; A presses, LB RB change a window's tabs. On a setting's row (Options), ◀ ▶ change
+      // its value instead: a toggle flips, a choice steps, a volume moves a tenth.
+      const dir = dpad ?? stickDir;
+      if (dir && (dir !== heldDir || now >= repeatAt)) {
+        const opt = focused()?.closest<HTMLElement>('.opt');
+        if (opt && (dir === 'left' || dir === 'right')) {
+          const range = opt.querySelector<HTMLInputElement>('input[type=range]');
+          if (range) {
+            range.value = String(Math.max(0, Math.min(100, Number(range.value) + (dir === 'right' ? 10 : -10))));
+            range.dispatchEvent(new Event('input', { bubbles: true }));
+          } else if (!opt.classList.contains('opt-go')) pressKeeping(opt);
+        } else land(neighbor(focused(), dir, scope()));
         repeatAt = now + (dir === heldDir ? REPEAT_MS * 0.6 : REPEAT_MS);
       }
       heldDir = dir;
       if (fresh('b0')) {
-        click(focused() ?? neighbor(null, 'down', scope()));
+        const el = focused() ?? (modal ? null : neighbor(null, 'down', scope()));
+        if (!el && modal) landFirst();
+        else if (el && modal) pressKeeping(el);
+        else {
+          if (el && docked) dockReturn = keyOf(el);
+          click(el);
+        }
       }
       if (modal && (fresh('b4') || fresh('b5'))) {
         const tabs = [...document.querySelectorAll<HTMLElement>('.modal-wrap:not([hidden]) .tabs .tab')].filter(visible);
         const on = Math.max(0, tabs.findIndex((t) => t.classList.contains('on')));
-        if (tabs.length > 1) click(tabs[(on + (fresh('b5') ? 1 : tabs.length - 1)) % tabs.length]);
+        if (tabs.length > 1) {
+          click(tabs[(on + (fresh('b5') ? 1 : tabs.length - 1)) % tabs.length]);
+          // (A new page of rows: start on its first.)
+          setTimeout(() => land(document.querySelector<HTMLElement>('.modal-wrap:not([hidden]) .opts .opt')), 0);
+        }
       }
     } else {
       heldDir = dpad;
-      // A attacks (hold it to keep swinging); in the Keep it uses what you're at.
-      if (fresh('b0')) press(' ', 'Space', true);
-      if (letGo('b0')) press(' ', 'Space', false);
+      // RT attacks (hold it to keep swinging); in the Keep, Y uses what you're at.
+      if (inKeep()) {
+        if (fresh('b3')) tap(' ', 'Space');
+      } else {
+        if (fresh('b7')) press(' ', 'Space', true);
+        if (letGo('b7')) press(' ', 'Space', false);
+      }
+      // A card face up, or the Heart waking: A takes it (instead of levelling).
+      const waiting = document.querySelector<HTMLElement>('.card-reveal:not(.go) .cr-card, .awk:not(.out)');
+      if (waiting && fresh('b0')) {
+        click(waiting);
+        aSpent = true;
+      }
       // LB, RB and Y: abilities (with LT held, the other three). LT with the d-pad: the floor (◀ ▶) and Auto (▼).
       if (!inKeep()) {
         const lt = down.has('b6');
@@ -315,7 +433,7 @@ export function installGamepad() {
       }
     }
 
-    // Your party, always at hand (not under a window): the d-pad's ▲ ▼ or the right stick pick, RT levels, X upgrades,
+    // Your party, always at hand (not under a window): the d-pad's ▲ ▼ or the right stick pick, A levels, X upgrades,
     // R3 makes them your hero, ◀ ▶ the amount.
     let moved = false;
     if (!modal && !title) {
@@ -330,9 +448,9 @@ export function installGamepad() {
         moved = true;
       } else if (!step) stickAt = 0;
       const row = list[picked];
-      if (row && down.has('b7') && now >= buyAt) {
+      if (row && !aSpent && down.has('b0') && now >= buyAt) {
         click(row);
-        buyAt = now + (fresh('b7') ? BUY_REPEAT_MS * 2.5 : BUY_REPEAT_MS);
+        buyAt = now + (fresh('b0') ? BUY_REPEAT_MS * 2.5 : BUY_REPEAT_MS);
       }
       if (row && fresh('b2')) click(row.querySelector('.trait[data-trait]'));
       if (row && fresh('b11')) click(row.querySelector('[data-hero]'));
@@ -344,15 +462,22 @@ export function installGamepad() {
       }
       heldSide = dpad === 'left' || dpad === 'right' ? dpad : null;
       // (The tooltip goes with anything else you do.)
-      if (!moved && (fresh('b0') || Math.hypot(lx, ly) > DEAD_ZONE)) hover(pickedRow, false);
+      if (!moved && (fresh('b7') || Math.hypot(lx, ly) > DEAD_ZONE)) hover(pickedRow, false);
     }
     fixGlyphs(!!family && !modal && !title);
     showPick(!!family && !modal && !title, moved);
     showBar();
 
-    // B backs out; Menu lets the d-pad roam the screen (or stops it); View opens Options (either closes a window).
-    if (fresh('b1')) docked ? leaveDock() : tap('Escape');
-    if (fresh('b9')) {
+    // B backs out; View lets the d-pad roam the screen (or stops it); Menu opens Options (either closes a window).
+    if (fresh('b1') && !box) {
+      if (docked) leaveDock();
+      else {
+        tap('Escape');
+        // (Back in the window it came from, Options: on the row that opened it.)
+        if (lastRow) setTimeout(() => land(document.querySelector<HTMLElement>(`.modal-wrap:not([hidden]) .opt${lastRow}`)), 0);
+      }
+    }
+    if (fresh('b8') && !box) {
       if (modal) tap('Escape');
       else if (docked) leaveDock();
       else if (!title) {
@@ -360,7 +485,7 @@ export function installGamepad() {
         land(document.querySelector<HTMLElement>('.dock button') ?? neighbor(null, 'right', document));
       }
     }
-    if (fresh('b8') && !title) modal ? tap('Escape') : click(document.querySelector('[data-open="settings"]'));
+    if (fresh('b9') && !title && !box) modal ? tap('Escape') : click(document.querySelector('[data-open="settings"]'));
 
     held = down;
     requestAnimationFrame(poll);
