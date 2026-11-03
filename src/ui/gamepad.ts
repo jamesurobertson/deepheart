@@ -43,6 +43,21 @@ export const padPick = (comp: number) => {
 /** Runs when the controller starts or stops being the thing in use (so prompts can change their words). */
 export const padHooks = { change: () => {} };
 
+/** Prompts that move, frame by frame as prompt art does: a stick to move tilts up, right, down and left; a stick to
+ *  press goes in and out. */
+const ANIMATED: Record<string, string[]> = { ls: ['ls_up', 'ls_right', 'ls_down', 'ls_left'], rs: ['rs_up', 'rs_right', 'rs_down', 'rs_left'], r3: ['rs', 'r3'] };
+const FRAME_MS = 320;
+if (typeof window !== 'undefined' && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  setInterval(() => {
+    if (!family) return;
+    const tick = Math.floor(performance.now() / FRAME_MS);
+    for (const img of document.querySelectorAll<HTMLImageElement>('img.pad-g[data-k]')) {
+      const frames = ANIMATED[img.dataset.k ?? ''];
+      if (frames) img.src = `${import.meta.env.BASE_URL}assets/prompts/${family}/${frames[tick % frames.length]}.png`;
+    }
+  }, FRAME_MS);
+}
+
 /** Which kind of controller this is, from the id the browser gives it (it carries the maker's USB vendor id). */
 function familyOf(pad: Gamepad): PadFamily {
   const id = pad.id.toLowerCase();
