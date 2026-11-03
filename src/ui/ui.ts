@@ -8,6 +8,7 @@ import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, keepDoor, silhouette, spiritForm, sprite, spriteFit, spriteFrames } from './px.ts';
+import { ABILITY_PAD, padCombo, padFamily, padGlyph, padHooks, padPick } from './gamepad.ts';
 import { skillIcon } from './icons.ts';
 import { kokoSvg } from './koko.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
@@ -53,6 +54,8 @@ const SKILL_TIP_MS = 6000;
 const COIN_REACH = 52;
 /** Coins start leaning toward whoever's collecting from this far out (px). */
 const COIN_MAGNET = 110;
+/** On a controller there's no quick mouse to sweep gold up: your hero reaches this much further. */
+const PAD_COIN_REACH = 2.6;
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -164,6 +167,8 @@ const abilityKey = (id: AbilityId) => KEYED.indexOf(id) + 1;
 /** "4:05" for a cooldown. */
 /** The same words for a finger: "click" in tooltips (and the game's copy) reads "tap" on a touch screen. */
 const tapWords = (html: string) => html.replace(/\b([Cc])lick(s|ed|ing)?\b/g, (_, c: string, end = '') => `${c === 'C' ? 'T' : 't'}ap${end === 'ed' ? 'ped' : end === 'ing' ? 'ping' : end}`);
+/** A tooltip's mouse words, for a controller: its A button presses what the cursor is on. */
+const padWords = (html: string) => html.replace(/\bClick (to|the)\b/g, (_, w: string) => `Press ${padGlyph('a', 18)} ${w === 'the' ? 'on the' : 'to'}`).replace(/\bclicking\b/g, 'attacking');
 /** The ✦ on a trait square, drawn as that square where a hint names it. */
 const TRAIT_KEY = '<span class="hint-trait">✦</span>';
 const clock = (s: number) => {
@@ -270,6 +275,10 @@ export class Ui {
   private newsIdx = -1;
   private modal: string | null = null;
   private resetArmed = false;
+  /** The window to go back to when this one closes (one opened from Options). */
+  private modalBack: string | null = null;
+  /** Which page of Options is open. */
+  private setTab: 'sound' | 'display' | 'cursor' | 'game' | 'save' = 'sound';
   private hintState = '';
   /** When the current hint appeared (the hero tips time out). */
   private tourAt = 0;
@@ -550,6 +559,13 @@ export class Ui {
 
   private bind() {
     const r = this.root;
+    // Picking up the controller (or putting it down): the hint, the open tooltip and the Keep's prompts change words.
+    padHooks.change = () => {
+      this.hintState = '~';
+      delete this.el.keepLabels.dataset.ids;
+      this.refreshTip();
+      if (this.modal === 'keys') this.renderModal(true);
+    };
     // Clicking the chamber: the treasure goblin first, then whichever monster is nearest.
     addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || this.modal || this.descending) return;
@@ -654,10 +670,10 @@ export class Ui {
     addEventListener('keydown', (e) => {
       this.inputAt = performance.now();
       if ((e.target as HTMLElement).closest('input, textarea')) return;
-      if (e.key === 'Escape' && this.modal) this.closeModal();
+      if (e.key === 'Escape' && this.modal) this.backModal();
       // ? lists the shortcuts.
       if (e.key === '?' && !e.repeat) {
-        if (this.modal === 'keys') this.closeModal();
+        if (this.modal === 'keys') this.backModal();
         else if (!this.modal) this.openModal('keys');
       }
       // H hides the interface for screenshots; H again or Escape brings it back.
@@ -678,9 +694,13 @@ export class Ui {
       if ((e.key === ' ' || e.key === 'Enter') && !e.repeat && !this.modal && !(e.target as HTMLElement).closest('button')) {
         e.preventDefault();
         if (this.scene.busy) return;
-        // The sword swings at the monster under the cursor, or at the front one if the cursor's off the field.
-        const at = this.pointer ?? { x: -1, y: -1 };
-        const id = this.pointer ? this.scene.pick(at.x, at.y) : null;
+        // The sword swings at the monster under the cursor, or at the front one if the cursor's off the field. On a
+        // controller there's no cursor: at the one nearest your hero.
+        const aim = padFamily() ? this.scene.heroScreen(this.game) : this.pointer;
+        const at = aim ?? { x: -1, y: -1 };
+        const id = aim ? this.scene.pick(at.x, at.y) : null;
+        // (A controller's attack counts as being at a monster, as the mouse over one does, for the hints that wait on it.)
+        if (padFamily() && id !== null) this.onMonsterAt = performance.now();
         if (e.key === ' ') {
           this.spaceHeld = true;
           this.game.hold = { id, ...at };
@@ -712,7 +732,8 @@ export class Ui {
         return;
       }
       const t = e.target as HTMLElement;
-      if (t.closest('.floor-n')) return this.jumpFloor();
+      // (A controller picks the floor's name box, not its number.)
+      if (t.closest('.floor-n') || (padFamily() && t.closest('.floor-name'))) return this.jumpFloor();
       const hero = t.closest<HTMLElement>('[data-hero]');
       if (hero) {
         if (this.game.setHero(Number(hero.dataset.hero))) {
@@ -768,6 +789,12 @@ export class Ui {
         this.hooks.sound('toggle', { vol: 0.5 });
         this.syncMode();
         this.rowCache.fill('');
+        return;
+      }
+      const setTab = t.closest<HTMLElement>('[data-settab]');
+      if (setTab) {
+        this.setTab = setTab.dataset.settab as typeof this.setTab;
+        this.renderModal();
         return;
       }
       const open = t.closest<HTMLElement>('[data-open]');
@@ -854,7 +881,7 @@ export class Ui {
       if (act) this.action(act.dataset.act!, act);
     });
     this.el.modalWrap.addEventListener('pointerdown', (e) => {
-      if (e.target === this.el.modalWrap) this.closeModal();
+      if (e.target === this.el.modalWrap) this.backModal();
     });
 
     r.addEventListener('input', (e) => {
@@ -870,6 +897,8 @@ export class Ui {
       const key = t.dataset.set as 'sfxVol' | 'musicVol' | undefined;
       if (!key) return;
       this.game.s.settings[key] = Number(t.value) / 100;
+      const shown = t.closest('.opt')?.querySelector('.opt-v b');
+      if (shown) shown.textContent = `${t.value}%`;
       this.hooks.settings();
     });
 
@@ -923,7 +952,7 @@ export class Ui {
     const g = this.game;
     const s = g.s.settings;
     switch (act) {
-      case 'close': this.closeModal(); break;
+      case 'close': this.backModal(); break;
       case 'autoUpg':
         g.s.settings.autoUpg = !g.s.settings.autoUpg;
         g.s.autoTipSeen = true;
@@ -995,14 +1024,20 @@ export class Ui {
       case 'reset':
         if (!this.resetArmed) {
           this.resetArmed = true;
-          el.textContent = 'Really wipe everything?';
+          this.renderModal();
           setTimeout(() => {
             this.resetArmed = false;
-            if (el.isConnected) el.textContent = 'Wipe save';
+            if (this.modal === 'settings') this.renderModal();
           }, 3000);
-        } else this.hooks.reset();
+        } else {
+          // A third time, in a window of its own: what goes, and that it can't come back.
+          this.resetArmed = false;
+          this.renderWipeConfirm();
+        }
         break;
       case 'descend': this.renderDescendConfirm(); break;
+      case 'wipeGo': this.hooks.reset(); break;
+      case 'wipeBack': this.backModal(); break;
       case 'summon': {
         const id = this.legendPick;
         if (id && this.game.summonLegend(id)) {
@@ -1244,7 +1279,7 @@ export class Ui {
         this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 });
         break;
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
-      case 'fever': if (ev.on) this.banner(`RAMPAGE ×${fmt(g.feverMult())}!`, `Keep ${this.touch ? 'tapping' : 'clicking'} for ×${fmt(g.rampageNext()?.mult ?? g.feverMult())}`, 'rampage'); break;
+      case 'fever': if (ev.on) this.banner(`RAMPAGE ×${fmt(g.feverMult())}!`, `Keep ${this.attacking()} for ×${fmt(g.rampageNext()?.mult ?? g.feverMult())}`, 'rampage'); break;
       case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, 'Full power', `rampage tier${ev.tier}`); break;
       case 'vaultPick': this.showVaultPick(); break;
       case 'vault':
@@ -1520,6 +1555,12 @@ export class Ui {
   // ---------- per-frame ----------
 
   frame(dt: number) {
+    // Holding attack on a controller keeps swinging at whichever monster is nearest your hero as they fall.
+    if (padFamily() && this.spaceHeld && this.game.hold) {
+      const at = this.scene.heroScreen(this.game);
+      if (at) this.game.hold = { id: this.scene.pick(at.x, at.y), ...at };
+      if (this.game.hold?.id != null) this.onMonsterAt = performance.now();
+    }
     const g = this.game;
     if (!DEMO && g.s.inKeep && !this.keepView) {
       this.keepView = new KeepView(g, this.root);
@@ -1556,9 +1597,10 @@ export class Ui {
       // Nothing to point at yet (monsters still coming up the stairs).
       this.el.hint.style.visibility = s ? 'visible' : 'hidden';
     }
-    // Flurry clicks wherever you point, like holding the attack down.
+    // Flurry clicks wherever you point, like holding the attack down (on a controller: at the monster nearest your hero).
     const flurry = g.s.buffs.some((b) => b.id === 'flurry');
-    g.aim = flurry && this.pointer && !this.modal ? { id: this.scene.pick(this.pointer.x, this.pointer.y), ...this.pointer } : null;
+    const flurryAt = padFamily() ? this.scene.heroScreen(g) : this.pointer;
+    g.aim = flurry && flurryAt && !this.modal ? { id: this.scene.pick(flurryAt.x, flurryAt.y), ...flurryAt } : null;
     const feet = this.scene.heroFeet(g);
     this.sweepCoins([feet, this.coinPointer].filter((p) => p !== null));
     if (g.vault && this.coinPointer && !this.modal) this.scene.sweepVaultCoins(this.coinPointer.x, this.coinPointer.y, g);
@@ -1630,6 +1672,16 @@ export class Ui {
   }
 
   update() {
+    // The gold and damage readouts tell of the Patient's and the Sleeper's share only once you have them.
+    for (const [sel, id] of [['.bank', 'patient'], ['.dps-w', 'sleeper']] as const) {
+      const el = this.root.querySelector<HTMLElement>(sel);
+      if (!el) continue;
+      if (this.game.legendLv(id) > 0) el.dataset.tip = `idle:${id}`;
+      else if (el.dataset.tip) {
+        delete el.dataset.tip;
+        if (this.tipAnchor === el) this.hideTip();
+      }
+    }
     const g = this.game;
     const blade = this.cursorSprite();
     if (blade !== this.bladeSprite) {
@@ -1662,7 +1714,7 @@ export class Ui {
     if (fever) {
       this.el.feverBar.style.width = `${(fever.t / fever.dur) * 100}%`;
       const next = g.rampageNext();
-      const label = next ? `×${fmt(g.feverMult())} · keep ${this.touch ? 'tapping' : 'clicking'}!` : `×${fmt(g.feverMult())}!`;
+      const label = next ? `×${fmt(g.feverMult())} · keep ${this.attacking()}!` : `×${fmt(g.feverMult())}!`;
       if (this.el.feverLabel.textContent !== label) this.el.feverLabel.textContent = label;
     }
 
@@ -1960,7 +2012,8 @@ export class Ui {
     if (this.modal || !collectors.length) return;
     const now = performance.now();
     for (const [id, pile] of this.coinPiles) {
-      if (now >= pile.landsAt && this.scene.sweepCoins(id, collectors, COIN_REACH, COIN_MAGNET)) this.game.collectGold(id);
+      const k = padFamily() ? PAD_COIN_REACH : 1;
+      if (now >= pile.landsAt && this.scene.sweepCoins(id, collectors, COIN_REACH * k, COIN_MAGNET * k)) this.game.collectGold(id);
     }
   }
 
@@ -2101,10 +2154,11 @@ export class Ui {
     // The words stay put at the top of the battlefield (a hero on the move is hard to read beside); a small marker
     // bobs over the hero's head (moved every frame, in frame()).
     this.el.heroMark.hidden = state !== 'hero';
-    if (state === 'hero') {
+    // (The first treasure goblin's, on a controller, sits there too: the goblin keeps just its marker.)
+    if (state === 'hero' || state === 'raid') {
       this.el.hint.style.transform = `translate(${this.field.w / 2}px, ${this.hudTop + (this.hudTop ? 16 : 222)}px)`;
       this.el.hint.style.visibility = 'visible';
-      if (shown > 10_000) g.s.heroTips = 1;
+      if (state === 'hero' && shown > 10_000) g.s.heroTips = 1;
     } else if (state === 'star') {
       this.pointAt(this.rows[this.starPick()]?.querySelector('.gen-hero'));
       if (shown > 15_000) g.s.heroTips = 2;
@@ -2131,33 +2185,49 @@ export class Ui {
     }
     if (state === this.hintState) return;
     this.hintState = state;
+    // (With a controller, the companion the hint is about is picked, so the button it names works on them.)
+    if (padFamily()) {
+      const comp = state === 'upgrade' ? upgradeRow : state === 'star' ? this.starPick() : ['hire', 'nudge', 'level'].includes(state) ? 0 : -1;
+      if (comp >= 0) padPick(comp);
+    }
     const pointing = state.startsWith('skill:') || ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'mark', 'auto', 'autohire'].includes(state);
-    this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ';
+    this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ' && !(state === 'raid' && padFamily());
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
-    this.el.hint.classList.toggle('still', state === 'hero');
+    this.el.hint.classList.toggle('still', state === 'hero' || state === 'raid');
     this.el.shop.classList.toggle('show-stars', state === 'star');
     this.el.hint.innerHTML = state === 'hero'
-      ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : 'they follow your mouse'}</small></b>`
-      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>Click their ${G.star()} to switch</small></b>`
-        : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>Companions fight for you, even while you're away</small></b>`
-          : state === 'level' ? `<b>Keep ${this.touch ? 'tapping' : 'clicking'} to level up<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
+      ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : padFamily() ? `walk them with ${padGlyph('ls', 18)}` : 'they follow your mouse'}</small></b>`
+      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>${padFamily() ? `Press ${padGlyph('r3', 18)} to switch` : `Click their ${G.star()} to switch`}</small></b>`
+        : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>${padFamily() ? `Press ${padGlyph('a', 18)} to hire them` : 'Companions fight for you, even while you\'re away'}</small></b>`
+          : state === 'level' ? `<b>${padFamily() ? `Press ${padGlyph('a', 20)} to level up` : `Keep ${this.touch ? 'tapping' : 'clicking'} to level up`}<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
             : state.startsWith('skill:') ? this.skillHint(state.slice(6) as AbilityId)
-            : state === 'rampage' ? `<b>Rampage is ready!<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
+            : state === 'rampage' ? `<b>Rampage is ready!<small>${padFamily() ? `Press ${this.abilityButtons('rampage')}` : this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
             : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
-            : state === 'shop' ? `<b>An upgrade is ready!<small>${this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
+            : state === 'shop' ? `<b>An upgrade is ready!<small>${padFamily() ? `Press ${padGlyph('x', 18)} to buy it` : this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
               : state === 'champ' ? this.champHint()
+              : state === 'raid' ? `<b>A treasure goblin!<small>Walk into it with ${padGlyph('ls', 18)} before it gets away</small></b>`
               : state === 'auto' ? `<b>Auto upgrades<small>Companion upgrades you've bought before buy themselves</small></b>`
               : state === 'autohire' ? `<b>Auto levels<small>Companion levels you've bought before buy themselves</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
-              : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`;
+              : (padFamily() ? `<b>Attack the monsters!<small>Tap ${padGlyph('rt', 18)} to attack, hold it to keep attacking</small></b>` : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`);
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
+  }
+
+  /** The word for attacking the way you're playing. */
+  private attacking() {
+    return padFamily() ? 'attacking' : this.touch ? 'tapping' : 'clicking';
+  }
+
+  /** The controller button(s) that use an ability. */
+  private abilityButtons(id: AbilityId) {
+    return padCombo(ABILITY_PAD[id] ?? [], 20);
   }
 
   /** A skill just unlocked: its name, and how to use it (or that it's always on). */
   private skillHint(id: AbilityId) {
     const a = ABILITY_BY_ID.get(id)!;
-    const how = a.kind === 'button' ? `<small>${this.touch ? 'Tap it' : `Click it or press ${abilityKey(id)}`} to use it</small>` : a.kind === 'passive' ? '<small>Always on</small>' : '';
+    const how = a.kind === 'button' ? `<small>${padFamily() ? `Press ${this.abilityButtons(id)}` : this.touch ? 'Tap it' : `Click it or press ${abilityKey(id)}`} to use it</small>` : a.kind === 'passive' ? '<small>Always on</small>' : '';
     return `<b>${esc(a.name)} unlocked!${how}</b>`;
   }
 
@@ -2176,6 +2246,12 @@ export class Ui {
   private firstUpgradeHint(row: number) {
     const id = `m${row}_0`;
     const skill = ABILITY_BY_UPGRADE.get(id);
+    if (padFamily()) {
+      const x = padGlyph('x', 18);
+      if (skill) return `Press ${x} to unlock the ${esc(skill.name)}`;
+      const u = UPG_BY_ID.get(id);
+      return u?.effect.t === 'comp' ? `Press ${x} to double ${esc(COMPS[row].name)}'s damage` : `Press ${x}: ${esc(u?.desc ?? '')}`;
+    }
     const press = this.touch ? 'Tap' : 'Click';
     if (skill) return `${press} the ${TRAIT_KEY} to unlock the ${esc(skill.name)}`;
     const u = UPG_BY_ID.get(id);
@@ -2240,7 +2316,7 @@ export class Ui {
       if (!a) return this.hideTip();
       this.tipAnchor = a;
     }
-    const html = this.touch ? tapWords(this.tipHtml(this.tipKey)) : this.tipHtml(this.tipKey);
+    const html = padFamily() ? padWords(this.tipHtml(this.tipKey)) : this.touch ? tapWords(this.tipHtml(this.tipKey)) : this.tipHtml(this.tipKey);
     if (!html) return this.hideTip();
     const tip = this.el.tip;
     if (tip.innerHTML !== html) tip.innerHTML = html;
@@ -2319,7 +2395,7 @@ export class Ui {
       const a = ABILITY_BY_ID.get(id as AbilityId)!;
       const comp = COMPS[a.comp];
       const cd = g.abilityCooldown(a.id);
-      const key = this.touch ? '' : ` (or press ${abilityKey(a.id)})`;
+      const key = this.touch || padFamily() ? '' : ` (or press ${abilityKey(a.id)})`;
       const fever = a.id === 'rampage' ? g.s.buffs.find((b) => b.id === 'fever') : undefined;
       const next = fever ? g.rampageNext() : null;
       const status = !DEMO && g.away(a.comp)
@@ -2329,9 +2405,9 @@ export class Ui {
         : a.kind === 'passive' ? ''
           : fever ? (next ? `×${fmt(g.feverMult())}. Keep clicking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
             : a.kind === 'charge' && g.s.fervor < 1 ? `${Math.floor(g.s.fervor * 100)}% charged.`
-              : cd > 0 ? `Ready again in ${duration(cd)}.` : `Ready. Click to use it${key}.`;
+              : cd > 0 ? `Ready again in ${duration(cd)}.` : padFamily() ? `Ready. Press ${this.abilityButtons(a.id)} to use it.` : `Ready. Click to use it${key}.`;
       const timing = a.kind === 'button' ? `<ul class="tt-l"><li>Lasts ${+g.abilityDuration(a.id).toFixed(1)}s · cooldown ${duration(a.cooldown ?? 0)}</li></ul>` : '';
-      return `<div class="tt-h"><b>${esc(a.name)}</b><span class="tt-own">${a.kind === 'passive' ? 'always on' : this.touch ? 'ability' : `key ${abilityKey(a.id)}`}</span></div>
+      return `<div class="tt-h"><b>${esc(a.name)}</b><span class="tt-own">${a.kind === 'passive' ? 'always on' : padFamily() ? this.abilityButtons(a.id) : this.touch ? 'ability' : `key ${abilityKey(a.id)}`}</span></div>
         <p class="tt-d">${esc(g.abilityText(a.id))}</p>${timing}${status ? `<p class="tt-f">${status}</p>` : ''}`;
     }
     if (kind === 'tro') {
@@ -2453,7 +2529,7 @@ export class Ui {
       const i = Number(id);
       const now = g.heroIndex() === i;
       return now
-        ? `<div class="tt-h"><b>The ${esc(COMPS[i].name)} is your hero</b></div><p class="tt-d">Click the ${G.star()} again to have no hero.</p>`
+        ? `<div class="tt-h"><b>The ${esc(COMPS[i].name)} is your hero</b></div><p class="tt-d">${padFamily() ? `Press ${padGlyph('r3', 18)} again` : `Click the ${G.star()} again`} to have no hero.</p>`
         : `<div class="tt-h"><b>Make the ${esc(COMPS[i].name)} your hero</b></div>`;
     }
     if (kind === 'fm') {
@@ -2516,6 +2592,8 @@ export class Ui {
   // ---------- modals ----------
 
   openModal(name: string) {
+    // Opened from Options (Shortcuts): Options waits behind it, and closing it goes back there.
+    this.modalBack = this.modal === 'settings' && name !== 'settings' ? 'settings' : null;
     this.modal = name;
     if (name === 'cards') this.newCards = 0;
     this.el.modalWrap.hidden = false;
@@ -2524,7 +2602,17 @@ export class Ui {
     this.el.modal.scrollTop = 0;
   }
 
+  /** You close the window (Escape, B, its ✕, a click outside it): back to the one it was opened from, or closed. */
+  backModal() {
+    const back = this.modalBack;
+    if (!back) return this.closeModal();
+    this.hideTip();
+    this.openModal(back);
+    this.hooks.sound('close', { vol: 0.4 });
+  }
+
   closeModal() {
+    this.modalBack = null;
     this.tripsBackDone();
     if (this.modal === 'offline') for (const card of this.offlineCards.splice(0)) this.showCard(card);
     this.modal = null;
@@ -2572,7 +2660,22 @@ export class Ui {
       html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${who === 'dan' ? 'Dan' : 'Victor'}`, who === 'dan' ? `Trade ${DAN_GIVES} cards for a random card` : `Trade ${VICTOR_GIVES} cards for 1 gold card`) + this.tradeHtml(who);
     } else if (name === 'keys') {
       const cap = (...keys: string[]) => keys.map((k) => `<kbd>${k}</kbd>`).join('');
-      const rows: [string, string][] = [
+      const pad = (...keys: string[]) => keys.map((k) => padGlyph(k, 26)).join('');
+      const rows: [string, string][] = padFamily() ? [
+        [pad('ls'), 'Move your hero'],
+        [pad('rt'), 'Attack'],
+        [pad('up', 'down'), 'Pick a companion'],
+        [pad('a'), 'Level them'],
+        [pad('x'), 'Buy their next upgrade'],
+        [pad('r3'), 'Make them your hero'],
+        [pad('left', 'right'), 'Buy amount'],
+        ...ABILITIES.filter((a) => ABILITY_PAD[a.id]).map((a): [string, string] => [pad(...ABILITY_PAD[a.id]), esc(a.name)]),
+        [pad('lt', 'left', 'right'), 'Floor down, floor up'],
+        [pad('lt', 'down'), 'Auto'],
+        [pad('menu'), 'Options'],
+        [pad('view'), 'Browse the screen'],
+        [pad('b'), 'Back'],
+      ] : [
         [cap('W', 'A', 'S', 'D'), 'Move'],
         [`${MOUSE_GLYPH}${cap('Space')}`, 'Attack'],
         [`${cap('1')}–${cap(String(KEYED.length))}`, 'Abilities'],
@@ -2583,26 +2686,7 @@ export class Ui {
       ];
       html = head('Shortcuts') + `<dl class="keys">${rows.map(([keys, what]) => `<dt>${keys}</dt><dd>${what}</dd>`).join('')}</dl>`;
     } else if (name === 'settings') {
-      const s = g.s.settings;
-      const tog = (act: string, on: boolean, label: string) => `<button class="btn toggle ${on ? 'on' : ''}" data-act="${act}">${label}: ${on ? 'On' : 'Off'}</button>`;
-      html = head('Options') + `
-        <div class="set">
-          <label>Effects volume <input type="range" min="0" max="100" value="${Math.round(s.sfxVol * 100)}" data-set="sfxVol"></label>
-          <label>Music volume <input type="range" min="0" max="100" value="${Math.round(s.musicVol * 100)}" data-set="musicVol"></label>
-          <div class="set-row">${tog('sound', !s.muted, 'Sound')}${tog('music', s.music, 'Music')}${tog('particles', s.particles, 'Particles')}${tog('calm', s.calm, 'Reduce flashing')}${tog('shake', s.shake, 'Screen shake')}${tog('numbers', s.numbers, 'Damage numbers')}${tog('blood', s.blood, 'Blood')}${tog('cinematics', s.cinematics, 'Zone intros')}
-          <button class="btn toggle" data-act="notation">Numbers: ${s.notation === 'short' ? '1.23M' : '1.23e6'}</button></div>
-          <h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
-          <div class="cursors">${CURSORS.map((c) => {
-            const open = this.cursorOpen(c.id);
-            const spr = c.sprite;
-            return `<button class="cur ${open ? '' : 'locked'} ${s.cursor === c.id ? 'on' : ''}" data-cursor="${c.id}" data-tip="cur:${c.id}">${spriteFit(spr, 36)}${open ? '' : `<span class="cur-lock">${G.lock()}</span>`}</button>`;
-          }).join('')}</div>
-          <h3>Save</h3>
-          <p class="muted">Copy your save code to move it to another browser.</p>
-          <textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>
-          <div class="set-row"><button class="btn" data-act="export">Copy save code</button><button class="btn" data-act="import">Load save code</button><button class="btn danger" data-act="reset">Wipe save</button></div>
-          <div class="set-row">${DEMO ? '' : `<a class="btn" href="${WIKI_URL}" target="_blank" rel="noopener">Wiki</a>`}<button class="btn" data-open="keys">Shortcuts</button>${document.body.classList.contains('at-menu') ? '' : '<button class="btn" data-act="mainMenu">Main menu</button>'}</div>
-        </div>`;
+      html = head('Options', '', this.settingsTabs()) + this.settingsHtml();
     }
     if (soft && (html === this.modalKey || performance.now() < this.modalHold)) return;
     this.modalKey = html;
@@ -2965,6 +3049,46 @@ export class Ui {
       + section('Treasure goblins', CARDS.filter((c) => c.zone < 0)) + more;
   }
 
+  /** Options' pages (the cursor's only for a mouse: a controller has none). */
+  private settingsTabs() {
+    const tabs: [typeof this.setTab, string][] = [['sound', 'Sound'], ['display', 'Display'], ...(padFamily() ? [] : [['cursor', 'Cursor'] as [typeof this.setTab, string]]), ['game', 'Game'], ['save', 'Save']];
+    if (!tabs.some(([id]) => id === this.setTab)) this.setTab = 'sound';
+    return `<nav class="tabs">${tabs.map(([id, label]) => `<button class="tab ${this.setTab === id ? 'on' : ''}" data-settab="${id}">${label}</button>`).join('')}</nav>`;
+  }
+
+  /** One setting a row: its name, and its value with arrows either side (click the row, or ◀ ▶ on a controller). */
+  private settingsHtml(): string {
+    const s = this.game.s.settings;
+    const pick = (act: string, label: string, value: string, cls = '') => `<button class="opt ${cls}" data-act="${act}"><span>${label}</span><span class="opt-v"><i>◀</i><b>${value}</b><i>▶</i></span></button>`;
+    const onOff = (act: string, on: boolean, label: string) => pick(act, label, on ? 'On' : 'Off', on ? '' : 'off');
+    const volume = (key: 'sfxVol' | 'musicVol', label: string) => {
+      const v = Math.round(s[key] * 100);
+      return `<label class="opt opt-vol" tabindex="0"><span>${label}</span><span class="opt-v"><input type="range" min="0" max="100" step="5" value="${v}" data-set="${key}" tabindex="-1"><b>${v}%</b></span></label>`;
+    };
+    const go = (label: string, attrs: string, cls = '') => `<button class="opt opt-go ${cls}" ${attrs}><span>${label}</span><span class="opt-v"><i>▶</i></span></button>`;
+    let rows = '';
+    if (this.setTab === 'sound') rows = onOff('sound', !s.muted, 'Sound') + onOff('music', s.music, 'Music') + volume('sfxVol', 'Effects volume') + volume('musicVol', 'Music volume');
+    else if (this.setTab === 'display') {
+      rows = onOff('particles', s.particles, 'Particles') + onOff('calm', s.calm, 'Reduce flashing') + onOff('shake', s.shake, 'Screen shake')
+        + onOff('numbers', s.numbers, 'Damage numbers') + onOff('blood', s.blood, 'Blood') + onOff('cinematics', s.cinematics, 'Zone intros')
+        + pick('notation', 'Numbers', s.notation === 'short' ? '1.23M' : '1.23e6');
+    } else if (this.setTab === 'cursor') {
+      return `<div class="set"><h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
+        <div class="cursors">${CURSORS.map((c) => {
+          const open = this.cursorOpen(c.id);
+          return `<button class="cur ${open ? '' : 'locked'} ${s.cursor === c.id ? 'on' : ''}" data-cursor="${c.id}" data-tip="cur:${c.id}">${spriteFit(c.sprite, 36)}${open ? '' : `<span class="cur-lock">${G.lock()}</span>`}</button>`;
+        }).join('')}</div></div>`;
+    } else if (this.setTab === 'game') {
+      rows = go('Shortcuts', 'data-open="keys"') + (DEMO ? '' : `<a class="opt opt-go" href="${WIKI_URL}" target="_blank" rel="noopener"><span>Wiki</span><span class="opt-v"><i>▶</i></span></a>`)
+        + (document.body.classList.contains('at-menu') ? '' : go('Main menu', 'data-act="mainMenu"'));
+    } else {
+      rows = go('Copy save code', 'data-act="export"') + go('Load save code', 'data-act="import"')
+        + '<textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>'
+        + `<div class="opt-sep"></div>${go(this.resetArmed ? 'Really wipe everything?' : 'Wipe save', 'data-act="reset"', 'danger')}`;
+    }
+    return `<div class="opts">${rows}</div>`;
+  }
+
   private statTabs(on: string) {
     const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
     return `<nav class="tabs">${tab('stats', 'Bonuses')}${tab('party', 'Companions')}${tab('records', 'Records')}${DEMO ? '' : tab('ascents', 'Ascents')}</nav>`;
@@ -3227,7 +3351,7 @@ export class Ui {
     const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
       <div class="cr-card">${ev.gold ? GOLD_DAZZLE : ''}<div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96, ev.lap)}</div></div></div>
-      <div class="cr-text"><small>${head}</small><b>${esc(cardName(d.name, ev.lap))} Card${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
+      <div class="cr-text"><small>${head}</small><b>${esc(cardName(d.name, ev.lap))} Card${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${padFamily() ? `Press ${padGlyph('a', 18)}` : this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
     this.el.banner.parentElement!.appendChild(el);
     // The sound lands with the flip.
     setTimeout(() => this.hooks.sound(ev.gold || d.kind !== 'monster' ? 'drop4' : 'drop3', { vol: 0.8 }), 380);
@@ -3343,7 +3467,7 @@ export class Ui {
     el.innerHTML = `<div class="awk-embers">${embers}</div><div class="awk-souls">${souls}</div><div class="awk-sparks">${sparks}</div><div class="awk-ring">${ring}</div>
       <div class="awk-heart">${G.heart(18)}<i class="awk-wave"></i></div><div class="awk-flash"></div>
       <div class="awk-text"><b>${esc(title)}</b><span class="awk-gain">${boundGlyph(3)}<em>0</em><small>bound souls</small></span></div>
-      <span class="awk-tap">${this.touch ? 'Tap' : 'Click'} to continue</span>`;
+      <span class="awk-tap">${padFamily() ? `Press ${padGlyph('a', 18)}` : this.touch ? 'Tap' : 'Click'} to continue</span>`;
     this.root.appendChild(el);
     const timers: number[] = [];
     const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
@@ -3462,6 +3586,20 @@ export class Ui {
   }
 
 
+  /** The last word before a wipe. Options waits behind it. */
+  private renderWipeConfirm() {
+    this.modalBack = 'settings';
+    this.modal = 'wipe';
+    this.modalKey = 'wipe';
+    this.el.modal.className = 'modal pnl m-confirm';
+    this.el.modal.innerHTML = `<header class="m-head"><h2>Wipe your save?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
+      <div class="confirm">
+        <p>Everything goes: gold, companions, souls, Spirits, cards and trophies. This can't be undone.</p>
+        <div class="set-row"><button class="btn big" data-act="wipeBack">Keep my save</button><button class="btn danger big" data-act="wipeGo">Wipe everything</button></div>
+      </div>`;
+    this.el.modal.querySelector<HTMLElement>('[data-act="wipeBack"]')?.focus({ preventScroll: true });
+  }
+
   private renderDescendConfirm() {
     if (DEMO) return;
     const g = this.game;
@@ -3563,10 +3701,10 @@ export class Ui {
       document.body.classList.remove('over-act');
       return;
     }
-    const ids = labels.map((l) => `${l.id}:${l.verb}:${l.tip ?? ''}`).join(' ');
+    const ids = labels.map((l) => `${l.id}:${l.verb}:${l.tip ?? ''}`).join(' ') + (padFamily() ?? '');
     if (host.dataset.ids !== ids) {
       host.dataset.ids = ids;
-      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}${l.tip ? `<small>${esc(l.tip)}</small>` : ''}</b><em class="kp"><kbd>E</kbd>${MOUSE_GLYPH}<span>${esc(l.verb)}</span></em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
+      host.innerHTML = labels.map((l) => `<button class="keep-label${l.id === 'heart' || l.id.startsWith('bound:') ? ' heart' : l.id.includes(':') ? ' soul' : ''}${l.below ? ' below' : ''}" data-station="${l.id}">${l.below ? '<i>▲</i>' : ''}<b>${esc(l.label)}${l.tip ? `<small>${esc(l.tip)}</small>` : ''}</b><em class="kp">${padFamily() ? padGlyph('y', 22) : `<kbd>E</kbd>${MOUSE_GLYPH}`}<span>${esc(l.verb)}</span></em>${l.below ? '' : '<i>▼</i>'}</button>`).join('');
       // Clicking a label walks you over and uses it when you get there.
       host.querySelectorAll<HTMLElement>('[data-station]').forEach((b) => {
         b.addEventListener('click', (e) => {
