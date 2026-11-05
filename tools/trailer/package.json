@@ -8,6 +8,6 @@
     "cut": "node cut.mjs"
   },
   "dependencies": {
-    "puppeteer-core": "^24.43.1"
+    "puppeteer-core": "^25.16.0"
   }
 }
