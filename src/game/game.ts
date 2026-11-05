@@ -293,6 +293,12 @@ export interface SaveState {
   /** Legend offers come from this seed and a count of rolls, so reloading (or an older save) can't fish for better ones. */
   legendSeed: number;
   legendRolls: number;
+  /** The offer a respec goes back to, and the roll count after it, so respeccing can't fish for better offers: until
+   *  your second ascent the first one you had, after that the last you had with no Spirits. (Missing in older saves: a
+   *  respec rolls a new one.) */
+  emptyOffer?: { offer: string[]; rolls: number };
+  /** Souls spent on rerolls before your second ascent: a respec then gives them back too. */
+  rerollSpent?: number;
   /** Each ascent brings one free reroll of the Spirits on offer (not kept past the next ascent). */
   freeReroll: boolean;
   /** This run's seed for gold boss rolls: whether a floor's boss is gold is settled for the run. */
@@ -382,6 +388,8 @@ export interface SaveState {
   keepSpot: [number, number] | null;
   /** Cards you've got (found, traded or dug up) but not yet seen in the binder, as `id:lap:gold`; they slam in when you look. */
   dreamCards: string[];
+  /** First copies (in that lap's color, gold or not) not yet looked at in the Cards window, as `id:lap:gold`. */
+  cardsNew?: string[];
   /** Trades made with the brothers. */
   trades: number;
   /** The hidden cards (in your room and around town) you've found. */
@@ -2206,7 +2214,10 @@ export class Game {
   }
 
   private rollOffer() {
-    this.s.legendOffer = this.pickOffer(this.s.legendRolls++);
+    const s = this.s;
+    s.legendOffer = this.pickOffer(s.legendRolls++);
+    // (Before your second ascent a respec undoes everything, rerolls too: the offer goes back to the first one.)
+    if (!this.legendsOwned() && !(this.respecFree() && s.emptyOffer)) s.emptyOffer = { offer: [...s.legendOffer], rolls: s.legendRolls };
   }
 
   /** The first offer, before Legends open: what the circle will hold once they do. */
@@ -2237,6 +2248,7 @@ export class Game {
     const price = this.rerollPrice();
     if (!this.legendsOpen() || this.soulsFree() < price || this.legendsOwned() >= LEGENDS.length - OFFER_SIZE) return false;
     if (price) this.spendSouls(price, false);
+    if (price && this.respecFree()) this.s.rerollSpent = (this.s.rerollSpent ?? 0) + price;
     this.s.freeReroll = false;
     this.rollOffer();
     return true;
@@ -2264,16 +2276,33 @@ export class Game {
     return this.legendLv(id) >= this.legendMax(id);
   }
 
-  /** Every Legend is let go; RESPEC_REFUND of the souls they took comes back. */
+  /** Souls a respec gives back: until your second ascent every one (rerolls too), RESPEC_REFUND of the Spirits' after
+   *  (rounded up, so a small build isn't sent away for nothing). */
+  respecBack() {
+    return this.respecFree() ? this.s.legendSpent + (this.s.rerollSpent ?? 0) : Math.ceil(this.s.legendSpent * RESPEC_REFUND);
+  }
+
+  respecFree() {
+    return this.s.descents <= 1;
+  }
+
+  /** Every Legend is let go, and respecBack() of the souls they took comes back. */
   respecLegends() {
     if (DEMO) return false;
     const s = this.s;
-    if (!this.legendsOwned()) return false;
-    s.spentSouls -= Math.floor(s.legendSpent * RESPEC_REFUND);
+    if (!this.respecBack()) return false;
+    if (this.respecFree()) s.freeReroll = true;
+    s.spentSouls -= this.respecBack();
     s.legendSpent = 0;
+    s.rerollSpent = 0;
     s.legends = {};
-    s.legendOffer = [];
-    this.rollOffer();
+    if (s.emptyOffer) {
+      s.legendOffer = [...s.emptyOffer.offer];
+      s.legendRolls = s.emptyOffer.rolls;
+    } else {
+      s.legendOffer = [];
+      this.rollOffer();
+    }
     this.invalidate();
     return true;
   }
@@ -2712,14 +2741,28 @@ export class Game {
     const newColor = (gold ? c.gold : c.n)[lap] === 0;
     (gold ? c.gold : c.n)[lap]++;
     this.unseen(id, lap, gold);
+    if (newColor) this.markNew(id, lap, gold);
     // (A card can finish a set.)
     this.invalidate();
     this.events.push({ t: 'card', id, gold, lap, count: this.cardCount(id), first, newColor, src, kill });
   }
 
+  private markNew(id: string, lap: number, gold: boolean) {
+    const key = `${id}:${lap}:${gold ? 1 : 0}`;
+    const fresh = (this.s.cardsNew ??= []);
+    if (!fresh.includes(key)) fresh.push(key);
+  }
+
   private unseen(id: string, lap: number, gold: boolean) {
     const key = `${id}:${lap}:${gold ? 1 : 0}`;
     if (!this.s.dreamCards.includes(key) && this.s.dreamCards.length < 999) this.s.dreamCards.push(key);
+  }
+
+  /** The Cards window opened: these are new to you, and from now on they're not. */
+  takeNewCards() {
+    const fresh = new Set(this.s.cardsNew ?? []);
+    this.s.cardsNew = [];
+    return fresh;
   }
 
   /** You've looked through the binder: nothing in it is new any more. */
@@ -2840,8 +2883,10 @@ export class Game {
     else if (first) c.via = from;
     // Later-lap newcomers have no plain copy: they arrive in the first color they come in.
     const lap = Math.min(lapOf(CARD_BY_ID.get(id)!.floor), CORRUPTION.length - 1);
+    const newColor = (gold ? c.gold : c.n)[lap] === 0;
     (gold ? c.gold : c.n)[lap]++;
     this.unseen(id, lap, gold);
+    if (newColor) this.markNew(id, lap, gold);
     // (A card can finish a set.)
     this.invalidate();
     this.checkTrophies();
@@ -3247,6 +3292,7 @@ export class Game {
     this.s.buffs = this.s.buffs.filter((b) => (b.t -= seconds) > 0);
     for (const id in this.s.cooldowns) if ((this.s.cooldowns[id] -= seconds) <= 0) delete this.s.cooldowns[id];
     this.invalidate();
+    this.sinceAttack += seconds;
     // Away counts as idle: the Sleeper and the Patient work through it.
     const sleeper = 1 + 0.25 * this.legendLv('sleeper');
     const before = this.events.length;

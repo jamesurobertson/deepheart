@@ -20,6 +20,7 @@
   --f-btn-hi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%23704f37' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23b3845a' d='M1 1h4v1H1z'/%3E%3Cpath fill='%233a2619' d='M1 4h4v1H1z'/%3E%3C/svg%3E");
   --f-btn-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%233b2a1e' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23221710' d='M1 1h4v1H1z'/%3E%3C/svg%3E");
   --f-primary: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%23d0902f' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23ffe08a' d='M1 1h4v1H1z'/%3E%3Cpath fill='%23855415' d='M1 4h4v1H1z'/%3E%3C/svg%3E");
+  --f-soul: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%237b55c9' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23c9a8ff' d='M1 1h4v1H1z'/%3E%3Cpath fill='%2346297e' d='M1 4h4v1H1z'/%3E%3C/svg%3E");
   --f-danger: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%238c2a26' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23d0524a' d='M1 1h4v1H1z'/%3E%3Cpath fill='%23511511' d='M1 4h4v1H1z'/%3E%3C/svg%3E");
   --f-cell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%23130e10' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23060305' d='M1 1h4v1H1zM1 1h1v4H1z'/%3E%3Cpath fill='%233b2e31' d='M1 4h4v1H1zM4 1h1v4H4z'/%3E%3C/svg%3E");
 }
@@ -130,6 +131,10 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .btn.primary { border-image-source: var(--f-primary); color: #2a1604; text-shadow: 1px 1px 0 rgba(255, 240, 200, 0.5); }
 .btn.primary:hover { filter: brightness(1.1); }
 .btn.danger { border-image-source: var(--f-danger); }
+/* Spends souls: purple, like the souls themselves. */
+.btn.soul, .btn.soul:hover:not(:disabled) { border-image-source: var(--f-soul); color: #f6efff; }
+.btn.soul:hover:not(:disabled) { filter: brightness(1.12); }
+.btn.soul .glyph.g-soul { color: #f6efff; }
 .btn.big { min-height: 48px; font-size: 20px; padding: 0 18px; }
 .btn.small { min-height: 28px; font-size: 14px; padding: 0 6px; }
 .btn.icon { width: 44px; height: 44px; padding: 0; }
@@ -717,33 +722,23 @@ body.compact .m-top { top: -8px; margin: -8px -8px 0 -12px; padding: 8px 8px 0 1
 .aby.locked { opacity: 0.4; }
 .aby.avail { opacity: 0.8; }
 
-/* The Ascend strip atop the window: a ledger of this run's souls, and the total with the way up. */
+/* The Ascend strip atop the window: what an ascent pays, and the button (or the floors still to go). */
 .ascend { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 12px; padding: 12px; margin-bottom: 12px; background: rgba(179, 140, 255, 0.06); box-shadow: inset 0 0 0 2px rgba(179, 140, 255, 0.28); }
-.as-rows { display: grid; gap: 6px; align-content: start; min-width: 0; }
-.as-h { display: flex; align-items: center; gap: 8px; font: 400 11px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; }
-.as-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 6px 10px; background: rgba(0, 0, 0, 0.25); }
-.as-row span { color: var(--text); min-width: 0; }
-.as-row em { font: 400 20px/1 'Jersey 10'; font-style: normal; color: var(--gold-hi); margin-left: 4px; }
-.as-row small { font: 400 15px/1 'Jersey 10'; color: var(--dim); white-space: nowrap; }
-.as-row b { display: inline-flex; align-items: center; gap: 4px; font: 400 24px/1 'Jersey 10'; color: var(--soul); }
-.as-row b .glyph { color: var(--soul); }
-.as-bar { height: 6px; background: #140c10; box-shadow: 0 0 0 1px var(--ink); }
-.as-bar i { display: block; height: 100%; background: linear-gradient(#d6b8ff, #8a5cd8); }
+.as-gain { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 4px 6px; color: var(--soul); }
+.as-gain .glyph { color: var(--soul); }
+.as-gain b { font: 400 44px/1 'Jersey 10'; color: var(--soul); text-shadow: 0 0 16px rgba(179, 140, 255, 0.55); }
+.as-gain span { font: 400 22px/1 'Jersey 10'; color: var(--text); }
 .as-go { display: grid; justify-items: center; align-content: center; gap: 6px; padding: 8px; text-align: center; background: radial-gradient(ellipse at 50% 40%, rgba(179, 140, 255, 0.2), transparent 70%); }
 .as-go small { font-size: 13px; color: var(--dim); }
-.as-total { display: inline-flex; align-items: center; gap: 6px; font: 400 44px/1 'Jersey 10'; color: var(--soul); text-shadow: 0 0 16px rgba(179, 140, 255, 0.55); }
-.as-total .glyph { color: var(--soul); }
 .as-go .btn { width: 100%; justify-content: center; }
 .as-go.locked { background: rgba(0, 0, 0, 0.22); }
 .as-floor { font: 400 22px/1 'Jersey 10'; color: var(--text); }
 .as-go .bar { width: 100%; margin: 0; }
-.soul-help { display: inline-grid; place-items: center; width: 18px; height: 18px; font: 400 15px/1 'Jersey 10'; color: var(--ink); background: var(--soul); border-radius: 50%; cursor: help; text-transform: none; }
 /* The demo's: just the way up. */
 .ascend:has(> .as-go:only-child) { grid-template-columns: 1fr; }
 @media (max-width: 560px) { .ascend { grid-template-columns: 1fr; } }
 
 /* Summoning: three Spirits on stone pedestals. Not yours yet, a Spirit is a ghost; the picked one materializes. */
-.legend-warn { margin: 4px 0 10px; text-align: center; font: 700 17px/1.3 var(--f-text); color: var(--soul); }
 .legend-warn b { color: var(--text); white-space: nowrap; }
 .pedestals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
 .pedestal { position: relative; display: grid; justify-items: center; align-content: end; gap: 0; padding: 6px 4px 8px; background: none; border: 0; cursor: pointer; }
@@ -800,11 +795,30 @@ body.compact .m-top { top: -8px; margin: -8px -8px 0 -12px; padding: 8px 8px 0 1
 .legend-await { display: grid; gap: 10px; padding: 18px 12px 16px; background: radial-gradient(ellipse at 50% 60%, rgba(179, 140, 255, 0.12), transparent 70%), rgba(0, 0, 0, 0.18); box-shadow: inset 0 0 0 2px #3b2b2e; }
 .legend-await p { margin: 0; text-align: center; font: 400 26px/1 'Jersey 10'; color: var(--soul); text-shadow: 0 0 14px rgba(179, 140, 255, 0.5); animation: shimmer 3.2s ease-in-out infinite; }
 @keyframes shimmer { 50% { color: #d8c6ff; text-shadow: 0 0 20px rgba(179, 140, 255, 0.85); } }
-.legend-reroll { display: flex; justify-content: center; margin: -2px 0 10px; }
+/* A soul's two uses, side by side and equal: neither is the right one. */
+.legend-why { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 8px 16px; width: fit-content; max-width: 100%; margin: 0 auto 6px; padding: 8px 16px; box-sizing: border-box; background: rgba(179, 140, 255, 0.06); box-shadow: inset 0 0 0 2px rgba(179, 140, 255, 0.22); font: 400 20px/1 'Jersey 10'; color: var(--text); }
+.legend-why span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-why small { margin-right: 2px; font: 400 11px/1 'Silkscreen', monospace; color: var(--dim); text-transform: uppercase; }
+.legend-why em { font-style: normal; color: var(--green); }
+.legend-why i { font: 400 15px/1 var(--f-text); font-style: normal; color: var(--faint); }
+.legend-why .glyph { color: var(--soul); }
+.respec-back { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 4px 0 10px !important; font: 400 34px/1 'Jersey 10'; color: var(--soul) !important; text-shadow: 0 0 14px rgba(179, 140, 255, 0.45); }
+.legend-reroll { display: flex; justify-content: center; align-items: center; gap: 10px; margin: -2px 0 10px; }
 .legend-panel { padding: 10px 12px; margin-bottom: 8px; background: rgba(0, 0, 0, 0.25); box-shadow: inset 0 0 0 2px #3b2b2e; }
+/* The one picked to summon, under the pedestals: one width for every Spirit, so picking another doesn't jump. */
+.legend-panel.pick { width: min(420px, 100%); margin: 0 auto 8px; box-sizing: border-box; }
 .legend-panel .set-row { margin-top: 8px; }
 /* A Spirit's details, in the panel and its tooltip: now in soul purple, the next levels in white. */
 .od-what { margin: 4px 0; color: var(--text); }
+/* A Spirit's reward, as big as what it costs. */
+.od-val { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 10px; margin: 6px 0 10px; color: var(--text); }
+.od-val b { font: 400 34px/1 'Jersey 10'; color: var(--green); text-shadow: 0 0 12px rgba(125, 219, 106, 0.3); }
+.od-val span { font: 400 20px/1.1 'Jersey 10'; }
+.tip .od-val b { font-size: 26px; }
+.od-ladder tr { opacity: 0.6; }
+.od-ladder tr.next { opacity: 1; }
+.od-ladder tr.next td { color: var(--green); }
+.od-ladder td:first-child { width: 12px; padding-right: 6px; font-size: 11px; }
 .od-now { color: var(--soul); }
 .od-lv { border-collapse: collapse; margin: 4px 0; font-size: 13px; }
 .od-lv td { padding: 1px 12px 1px 0; color: var(--dim); white-space: nowrap; }
@@ -825,14 +839,17 @@ body.compact .m-top { top: -8px; margin: -8px -8px 0 -12px; padding: 8px 8px 0 1
 .lc-nm b { font: 400 24px/1 'Jersey 10'; color: var(--text); }
 .lc-lv { margin-left: auto; font: 400 11px/1 'Silkscreen'; color: var(--faint); text-transform: uppercase; white-space: nowrap; }
 .lc-lv span { font: 400 26px/1 'Jersey 10'; color: var(--gold-hi); margin-left: 4px; }
-.lc-val { font: 400 32px/1 'Jersey 10'; color: var(--soul); text-shadow: 0 0 14px rgba(179, 140, 255, 0.45); }
+/* What a Spirit gives is green, apart from the purple of the souls it costs. */
+.lc-val { font: 400 32px/1 'Jersey 10'; color: var(--green); text-shadow: 0 0 14px rgba(125, 219, 106, 0.35); }
 .lc-what { font-size: 13px; color: var(--dim); }
 .lc-next { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; padding-top: 8px; border-top: 2px solid #3b2b2e; font-size: 13px; color: var(--text); }
 .lc-next .lc-up { margin-left: auto; }
 /* A greyed-out Level up still shows its tooltip: the hover goes to the wrapper. */
 .lc-up .btn:disabled { pointer-events: none; }
 .lc-max { color: var(--gold); }
-.lc-head .lc-respec { margin-left: auto; align-self: center; color: var(--dim); }
+/* Respec, always along the bottom of the Spirits window, however far it's scrolled. */
+.legend-foot { position: sticky; bottom: -18px; z-index: 2; display: flex; justify-content: flex-end; margin: 14px -12px -18px -18px; padding: 10px 12px 14px 18px; background: #1c1517; box-shadow: 0 -2px 0 #2a2023; }
+.legend-foot .btn { color: var(--dim); }
 .lcard.flaring { animation: pop 0.45s ease-out; }
 @keyframes pop { 30% { transform: scale(1.025); filter: brightness(1.35); } }
 .lcard.flaring .lc-val { animation: valpop 0.6s ease-out; }
@@ -904,6 +921,9 @@ body.compact .opt-vol input[type=range] { width: 120px; }
 .omen { color: var(--soul) !important; font-style: italic; }
 .offline-v { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 8px 0 0; }
 .offline-v b { font: 400 64px/1 'Jersey 10'; color: #fff4ea; text-shadow: var(--outline); }
+.away-spirits { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin: 10px 0 4px; }
+.away-spirit { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); }
+.away-spirit b { color: var(--green); }
 .offline .btn { margin-top: 10px; }
 .m-offline { width: min(440px, calc(100vw - 24px)); }
 .m-confirm, .modal:has(.confirm) { width: min(480px, calc(100vw - 24px)); }
@@ -1229,7 +1249,11 @@ body.compact .modal.m-stats, body.compact .modal.m-party, body.compact .modal.m-
 .mcard.gilded .mc-art { background: linear-gradient(160deg, #3a2a1c, #241a2c 60%); }
 @keyframes gilded { from { box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #fff6c8, 0 0 4px rgba(255, 208, 112, 0.4); } to { box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 1px #fff6c8, 0 0 16px rgba(255, 208, 112, 0.95); } }
 .mc-cell .mcard { max-width: 64px; margin: 0 auto; }
-.tab-new { font: 400 16px/1 'Jersey 10'; font-style: normal; color: #7fd8ff; }
+/* The dock's bobbing count, on a tab that leads to new cards. */
+.tab:has(> .badge), .sub:has(> .badge) { position: relative; }
+.tab > .badge { top: -14px; right: 6px; z-index: 1; font-size: 16px; padding: 1px 5px 2px; }
+.sub:has(> .badge) { padding-right: 20px; }
+.sub > .badge { top: -12px; right: -6px; z-index: 1; font-size: 14px; padding: 1px 4px 2px; }
 body.compact .card-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px 6px; }
 @media (prefers-reduced-motion: reduce) { .mcard.gilded, .mc-art .rainbow { animation: none; } }
 
@@ -1297,6 +1321,8 @@ body.compact .cr-logo { font-size: 15px; }
 .cards-more { margin: 20px 0 4px; font: 400 20px/1 'Jersey 10'; color: var(--faint); text-align: center; }
 .tt-got { margin: 6px 0 0; font-size: 14px; color: var(--gold-hi); }
 .here-mark { margin-left: 8px; font: 400 11px/1 'Silkscreen'; font-style: normal; letter-spacing: 0.5px; color: var(--gold); opacity: 0.85; }
+/* A card you hadn't seen here yet. */
+.mc-cell.new .mcard::before { content: 'NEW'; position: absolute; z-index: 1; top: -8px; left: 50%; transform: translateX(-50%); padding: 2px 4px 1px; font: 400 10px/1 'Silkscreen', monospace; color: #0b0710; background: #7fd8ff; box-shadow: 0 0 0 2px var(--ink), 0 0 10px rgba(127, 216, 255, 0.6); }
 .mc-cell.here .mcard::after { content: ''; position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; background: var(--gold-hi); box-shadow: 0 0 0 2px var(--ink), 0 0 8px rgba(255, 210, 100, 0.8); }
 .offline-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 2px 0 14px; }
 .offline-cards .mcard { width: 52px; height: 70px; padding: 2px; }
@@ -1538,7 +1564,8 @@ body.card-up .keep-labels { visibility: hidden; }
 .aw-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; text-align: left; }
 @media (max-width: 560px) { .aw-cols { grid-template-columns: 1fr; } }
 .aw-cols h4 { margin: 0 0 8px; font: 400 12px/1 'Silkscreen'; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); }
-.aw-gain { padding-right: 18px; border-right: 2px solid #3b2b2e; }
+.aw-gain { padding-right: 18px; border-right: 2px solid #3b2b2e; text-align: center; }
+.aw-gain .aw-big { justify-content: center; }
 @media (max-width: 560px) { .aw-gain { padding-right: 0; border-right: 0; } }
 .aw-big { display: flex; align-items: center; gap: 10px; }
 .aw-big b { font: 400 60px/0.9 'Jersey 10'; color: var(--ess-hi); text-shadow: 0 0 18px rgba(255, 90, 126, 0.55); }
@@ -1685,7 +1712,7 @@ body.over-act .blade-act { display: block; }
 /* Controller: a focus ring where the d-pad lands, the companion the right stick picks (framed), each ability's button
    by its square, LB and RB where the buy amounts' label is, and a bar of what the buttons do here. Only while the
    controller is the thing in use. */
-body.pad-on :is(button, a, [tabindex="0"], [tabindex="-1"]):focus { outline: 3px solid var(--gold-hi); outline-offset: 2px; }
+body.pad-on :is(button, a, [tabindex="0"], [tabindex="-1"]):focus, :is(button, a, [tabindex="0"], [tabindex="-1"]):focus-visible { outline: 3px solid var(--gold-hi); outline-offset: 2px; }
 /* No mouse pointer (nor the game's sword) while you play on the controller; moving the mouse brings it back. */
 body.pad-on, body.pad-on * { cursor: none !important; }
 body.pad-on .blade { display: none !important; }
@@ -1703,3 +1730,5 @@ body.pad-on .modes > span:not(.pad-amount) { display: none; }
 .pad-bar { position: fixed; z-index: 30; left: 0; bottom: calc(42px + var(--safe-b, 0px)); width: var(--free-w, 100%); display: flex; justify-content: flex-end; gap: 18px; padding: 0 18px; box-sizing: border-box; pointer-events: none; }
 .pad-bar.over { width: 100%; justify-content: center; z-index: 60; bottom: calc(16px + var(--safe-b, 0px)); }
 body.phone .pad-bar { display: none; }
+/* (Purple doesn't read on gold: a price on a gold button is drawn in the button's own ink.) */
+.btn.primary .glyph.g-soul { color: currentColor; }

@@ -559,7 +559,7 @@ export class KeepView {
     if (id === 'trips') return 'Send';
     if (id === 'koko') return 'Pet';
     if (id === 'heart') return this.game.canAwaken() ? 'Awaken' : 'Open';
-    if (id.startsWith('offer:')) return 'Summon';
+    if (id.startsWith('offer:')) return 'View';
     return 'Open';
   }
 

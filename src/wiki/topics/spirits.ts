@@ -109,7 +109,7 @@ const listBody = () => {
     ${h2('All Spirits')}
     ${table(['Spirit', 'Type', 'Boosts', 'Level 1', 'Level cost', 'Cap'], LEGENDS.map(row))}
     ${h2('Respec')}
-    <p>Respec sends every Spirit away and gives back ${pct(RESPEC_REFUND, 0)} of the souls you spent summoning and leveling them (rerolls don't count). Their levels are lost, and the summon cost starts over from 1.</p>
+    <p>Respec sends every Spirit away. Their levels are lost and the summon cost starts over from 1. Until your second ascent it undoes everything: every soul you spent comes back (rerolls too), along with your free reroll and the first offer you had. After that it gives back ${pct(RESPEC_REFUND, 0)} of the souls you spent summoning and leveling, rounded up (rerolls don't count), and the offer goes back to the last one you had with no Spirits.</p>
     ${h2('Kept souls')}
     <p>Every soul you haven't spent adds +${pct(TUNE.soulPower, 0)} to all damage. Souls spent on Spirits don't.</p>`;
 };

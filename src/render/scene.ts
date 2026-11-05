@@ -552,7 +552,7 @@ export class Scene {
   /** The demo stops on the stairs down into this zone: they fade to black and stay there, and `onEnd` is called. */
   endBefore = -1;
   onEnd: (() => void) | null = null;
-  private cine: { phase: 'exit' | 'stairs' | 'arrive' | 'end'; t: number; zone: number; walkers: PixelSprite[]; shadows: BlobShadow[]; well: THREE.Group | null; flames: THREE.Mesh[]; queue: CompView[]; down: Set<CompView>; gone: number } | null = null;
+  private cine: { phase: 'exit' | 'stairs' | 'arrive' | 'end'; t: number; zone: number; walkers: PixelSprite[]; shadows: BlobShadow[]; well: THREE.Group | null; flames: THREE.Mesh[]; queue: CompView[]; down: Set<CompView>; gone: number; lanes: Map<CompView, number> } | null = null;
   /** Black card in front of the camera for fades. */
   private fade: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   /** The floor we were last on: stepping down into a new zone plays the staircase. */
@@ -2465,7 +2465,9 @@ export class Scene {
     // The queue for the stairs: your hero first, then whoever's nearest.
     const to = this.stairsAt();
     const queue = [...this.party].sort((x, y) => (x.comp === this.heroComp ? -1 : y.comp === this.heroComp ? 1 : x.body.position.distanceTo(to) - y.body.position.distanceTo(to)));
-    this.cine = { phase: 'exit', t: 0, zone, walkers: [], shadows: [], well: null, flames: [], queue, down: new Set(), gone: 0 };
+    // Each heads straight for the stairs from the depth they're standing at (kept within the flight's width).
+    const lanes = new Map(queue.map((p) => [p, Math.max(STAIRS_LANES[0], Math.min(STAIRS_LANES[1], p.body.position.z))] as const));
+    this.cine = { phase: 'exit', t: 0, zone, walkers: [], shadows: [], well: null, flames: [], queue, down: new Set(), gone: 0, lanes };
   }
 
   private descend() {
@@ -2558,14 +2560,14 @@ export class Scene {
     this.fade.material.color.setHex(0x000000);
     let fade = 0;
     if (c.phase === 'exit') {
-      // Single file to the stairs, hero first, then down them out of sight.
-      // To the top of the flight (its left end), along it down to the bottom, and on out of sight.
+      // To the stairs one after another, hero first: straight across to the flight's left end at the depth each was
+      // standing, along it down to the bottom, and on out of sight.
       const { x: sx } = this.layout.stairs;
       let down = 0;
       c.queue.forEach((p, i) => {
         const b = p.body.position;
         if (c.t > i * Math.min(EXIT_STAGGER, EXIT_SETOFF / c.queue.length)) {
-          const lane = STAIRS_LANES[0] + ((i * 0.37) % 1) * (STAIRS_LANES[1] - STAIRS_LANES[0]);
+          const lane = c.lanes.get(p) ?? STAIRS_LANES[0];
           // (Once at the top it's on its way down: checked by where it stands, one stopping just short of the top
           // stood there for good.)
           const onFlight = c.down.has(p);

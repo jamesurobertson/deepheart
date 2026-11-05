@@ -45,6 +45,10 @@ export const padPick = (comp: number) => {
 };
 
 /** Runs when the controller starts or stops being the thing in use (so prompts can change their words). */
+const KEYS = ['data-act', 'data-open', 'data-set', 'data-pick', 'data-settab', 'data-cursor', 'data-tip', 'data-trip', 'data-card-lap', 'data-card-gold'];
+/** A selector for what an element does, to find the same button again once its window has been redrawn. */
+export const keyOf = (el: HTMLElement) => KEYS.map((a) => (el.getAttribute(a) ? `[${a}="${CSS.escape(el.getAttribute(a)!)}"]` : '')).join('');
+
 export const padHooks = { change: () => {} };
 
 /** Prompts that move, frame by frame as prompt art does: a stick to move tilts up, right, down and left; a stick to
@@ -75,7 +79,7 @@ const press = (key: string, code: string, down: boolean) =>
 const tap = (key: string, code = key) => (press(key, code, true), press(key, code, false));
 const click = (el: Element | null | undefined) => el?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
 /** Its tooltip, as pointing at it with the mouse shows it (or takes it away). */
-const hover = (el: Element | null | undefined, on: boolean) =>
+export const hover = (el: Element | null | undefined, on: boolean) =>
   el?.dispatchEvent(new PointerEvent(on ? 'pointerover' : 'pointerout', { bubbles: true, pointerType: 'mouse', relatedTarget: null }));
 
 const visible = (el: HTMLElement) => {
@@ -85,7 +89,7 @@ const visible = (el: HTMLElement) => {
 
 /** The nearest visible control in a direction. ▲ ▼ go a row at a time (the next row's closest, as reading goes);
  *  ◀ ▶ stay on the same line (nothing there, nothing happens). */
-function neighbor(from: HTMLElement | null, dir: Dir, scope: ParentNode): HTMLElement | null {
+export function neighbor(from: HTMLElement | null, dir: Dir, scope: ParentNode): HTMLElement | null {
   const reach = !(scope instanceof Element) ? REACH : scope.matches('.modal-wrap') ? REACH_WINDOW : scope.matches('#ui') ? REACH_SCREEN : REACH;
   const items = [...scope.querySelectorAll<HTMLElement>(reach)].filter((el) => !el.parentElement?.closest(reach) || el.matches('button, a, input')).filter((el) => visible(el) && !el.matches('canvas'));
   if (!from || !items.includes(from)) return items[0] ?? null;
@@ -172,8 +176,6 @@ export function installGamepad() {
   let lastRow = '';
   /** Press something in a window and stay on it: the window often redraws (a Spirit picked, a setting changed), so it's
    *  found again by what it is. (If it's gone, or a new window opened, the focus starts afresh there.) */
-  const KEYS = ['data-act', 'data-open', 'data-set', 'data-pick', 'data-settab', 'data-cursor', 'data-tip', 'data-trip', 'data-card-lap', 'data-card-gold'];
-  const keyOf = (el: HTMLElement) => KEYS.map((a) => (el.getAttribute(a) ? `[${a}="${CSS.escape(el.getAttribute(a)!)}"]` : '')).join('');
   const pressKeeping = (el: HTMLElement) => {
     const key = keyOf(el);
     if (el.matches('.opt')) lastRow = key;
@@ -193,7 +195,7 @@ export function installGamepad() {
     const wrap = document.querySelector<HTMLElement>('.modal-wrap:not([hidden])');
     if (!wrap || wrap.contains(document.activeElement)) return;
     const all = [...wrap.querySelectorAll<HTMLElement>(REACH_WINDOW)].filter((el) => visible(el) && !el.closest('.m-head') && !el.matches('.tab'));
-    land(all.find((el) => el.matches('.btn.primary')) ?? all.find((el) => el.matches('.opts .opt')) ?? all[0] ?? null);
+    land(all.find((el) => el.matches('.btn.primary, .btn.soul')) ?? all.find((el) => el.matches('.opts .opt')) ?? all[0] ?? null);
   };
   const leaveDock = () => {
     docked = false;
