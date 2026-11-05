@@ -597,6 +597,8 @@ export interface LegendDef {
   value: (lv: number) => string;
   /** The rule a player needs to know (what counts as idle, when a streak ends), if any. */
   note?: string;
+  /** The word in `what` the note explains: underlined, with the note as its tooltip. */
+  term?: string;
   /** The level that ends it (only the Thinning has one). */
   maxLv?: number;
   /** The ability it makes last longer, by this many seconds a level. */
@@ -609,7 +611,7 @@ export const legendShare = (lv: number) => 1 - 0.9 ** lv;
 /** Souls to raise a Legend from `lv` to lv + 1. */
 export function legendCost(def: LegendDef, lv: number) {
   if (def.kind === 'sink') return 1;
-  if (def.kind === 'utility') return 2 ** (lv + 1);
+  if (def.kind === 'utility') return 2 ** lv;
   return def.id === 'unbroken' ? Math.ceil((lv + 1) ** 1.5) : lv + 1;
 }
 
@@ -631,29 +633,29 @@ const longer = (ability: AbilityId, secs: number) => ({ lengthens: { ability, se
 
 export const LEGENDS: LegendDef[] = DEMO ? [] : [
   o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Damage while idle', value: per(0.25) }),
-  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Your clicks and the Phantom Blade', value: per(0.1) }),
+  o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Attack and Phantom Blade', value: per(0.1) }),
   o({ id: 'breaker', name: 'The Breaker', kind: 'power', sprite: 'sd_large_knight_elite', what: 'Critical hit damage', value: per(0.15) }),
   o({ id: 'needle', name: 'The Needle', kind: 'utility', sprite: 'sd_executioner', what: 'Critical hit chance', value: share(NEEDLE_CRIT, (n) => `+${pct(n)}`) }),
   o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'sd_mountain_king', what: 'All gold', value: per(0.05) }),
   o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'sm_sohei', what: 'Gold while idle', value: per(0.5) }),
-  o({ id: 'goblinking', name: 'The Wish', kind: 'power', sprite: 'ef_fairy', what: 'Gold from treasure goblins and the Rainbow Vault', value: per(0.5) }),
-  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'sm_large_samurai', what: 'All damage, for each click in your streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}% per click`, note: 'A streak ends 2 seconds after your last click, and counts up to 2,000 clicks.' }),
+  o({ id: 'goblinking', name: 'The Wish', kind: 'power', sprite: 'ef_fairy', what: 'Goblin and vault gold', value: per(0.5) }),
+  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'sm_large_samurai', what: 'Damage per streak attack', term: 'streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}%`, note: 'A streak ends 2 seconds after your last attack, and counts up to 2,000 attacks.' }),
   o({ id: 'hourglass', name: 'The Hourglass', kind: 'utility', sprite: 'sd_magic_shopkeeper', what: 'Time to beat a boss', value: share(30, (n) => `+${+n.toFixed(1)}s`) }),
   o({ id: 'wither', name: 'The Wither', kind: 'utility', sprite: 'sd_bishop', what: 'Boss health', value: share(0.5, (n) => `−${pct(n)}`) }),
   o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${lv}`, maxLv: 10 }),
   o({ id: 'haggler', name: 'The Haggler', kind: 'utility', sprite: 'sm_merchant', what: 'Companion level costs', value: (lv) => `−${pct(1 - 0.95 ** lv)}` }),
   o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'sm_kabuki', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`) }),
-  o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Increased chance a boss is a champion (starting on floor 100)', value: share(0.75, (n) => pct(0.25 + n)) }),
-  o({ id: 'lure', name: 'The Lure', kind: 'utility', sprite: 'chest_mimic_open', what: 'How often treasure goblins come', value: share(2, (n) => `+${pct(n)}`) }),
+  o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Champion boss chance', term: 'Champion', note: 'Bosses can be champions from floor 100.', value: share(0.75, (n) => pct(0.25 + n)) }),
+  o({ id: 'lure', name: 'The Lure', kind: 'utility', sprite: 'chest_mimic_open', what: 'Treasure goblin rate', value: share(2, (n) => `+${pct(n)}`) }),
   o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'sd_princess', what: 'Card drop chance', value: share(1.5, (n) => `+${pct(n)}`) }),
-  o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance from overkill', value: (lv) => `up to ×${+(1 + lv / 4).toFixed(2)}`, note: "A kill that deals N× a monster's health has N× the chance to drop its card." }),
-  o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'sm_geisha', what: 'How long Rampage lasts', ...longer('rampage', 1) }),
-  o({ id: 'whirl', name: 'The Whirl', kind: 'utility', sprite: 'ef_ranger', what: 'How long Flurry lasts', ...longer('flurry', 2) }),
-  o({ id: 'headsman', name: 'The Headsman', kind: 'utility', sprite: 'sd_knight_heavy', what: 'How long Cleave lasts', ...longer('cleave', 4) }),
-  o({ id: 'magpie', name: 'The Magpie', kind: 'utility', sprite: 'sd_merchant', what: 'How long Treasure Sense lasts', ...longer('treasure', 2) }),
-  o({ id: 'drummer', name: 'The Drummer', kind: 'utility', sprite: 'cr_nutcracker', what: 'How long War Drums last', ...longer('drums', 2) }),
-  o({ id: 'host', name: 'The Host', kind: 'utility', sprite: 'ef_tallcleric', what: 'How long Phantom Legion lasts', ...longer('legion', 2) }),
-  o({ id: 'hungry', name: 'The Hungry Dark', kind: 'sink', sprite: 'sm_oni_king', what: 'All damage, for every soul fed to it', value: (lv) => `+${lv * 11}%`, note: 'A soul you keep gives +10%. One fed here gives +11%, but you can only get it back with a respec.' }),
+  o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance from overkill', term: 'overkill', value: (lv) => `up to ×${+(1 + lv / 4).toFixed(2)}`, note: "A kill that deals N× a monster's health has N× the chance to drop its card." }),
+  o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'sm_geisha', what: 'Rampage duration', ...longer('rampage', 1) }),
+  o({ id: 'whirl', name: 'The Whirl', kind: 'utility', sprite: 'ef_ranger', what: 'Flurry duration', ...longer('flurry', 2) }),
+  o({ id: 'headsman', name: 'The Headsman', kind: 'utility', sprite: 'sd_knight_heavy', what: 'Cleave duration', ...longer('cleave', 4) }),
+  o({ id: 'magpie', name: 'The Magpie', kind: 'utility', sprite: 'sd_merchant', what: 'Treasure Sense duration', ...longer('treasure', 2) }),
+  o({ id: 'drummer', name: 'The Drummer', kind: 'utility', sprite: 'cr_nutcracker', what: 'War Drums duration', ...longer('drums', 2) }),
+  o({ id: 'host', name: 'The Host', kind: 'utility', sprite: 'ef_tallcleric', what: 'Phantom Legion duration', ...longer('legion', 2) }),
+  o({ id: 'hungry', name: 'The Hungry Dark', kind: 'sink', sprite: 'sm_oni_king', what: 'All damage', value: (lv) => `+${lv * 11}%` }),
 ];
 export const LEGEND_BY_ID = new Map(LEGENDS.map((d) => [d.id, d]));
 

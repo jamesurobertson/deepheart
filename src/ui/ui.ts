@@ -1,5 +1,5 @@
 import { morph } from './morph.ts';
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MOD_BY_ID, NEWS, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MOD_BY_ID, NEWS, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { AWAKEN_ON, AWAKEN_TEASE, GOLD_SET_BONUS, SET_BONUS, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -8,7 +8,7 @@ import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
 import { G, cardArt, charFit, keepDoor, silhouette, spiritForm, sprite, spriteFit, spriteFrames } from './px.ts';
-import { ABILITY_PAD, padCombo, padFamily, padGlyph, padHooks, padPick } from './gamepad.ts';
+import { ABILITY_PAD, hover, keyOf, neighbor, padCombo, padFamily, padGlyph, padHooks, padPick } from './gamepad.ts';
 import { skillIcon } from './icons.ts';
 import { kokoSvg } from './koko.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
@@ -107,17 +107,23 @@ function skillText(what: string) {
   return out;
 }
 
-/** A Legend in full: what it boosts and by how much now (level 1, if not summoned), the next four levels with their
- *  cost, and the rule worth knowing. */
-function legendDetail(d: LegendDef, lv: number): string {
-  const now = Math.max(1, lv);
-  const rows = Array.from({ length: 4 }, (_, k) => now + 1 + k)
-    .filter((n) => !d.maxLv || n <= d.maxLv)
-    .map((n) => `<tr><td>Level ${n}</td><td>${G.soul(1.2)} ${fmt(legendCost(d, n - 1))}</td><td>${esc(d.value(n))}</td></tr>`).join('');
-  return `<p class="od-what">${skillText(d.what)}: <b class="od-now">${esc(d.value(now))}</b>${lv ? '' : ' at level 1'}</p>
-    ${rows ? `<table class="od-lv">${rows}</table>` : ''}
-    ${d.maxLv ? `<p class="od-max">Max level ${d.maxLv}</p>` : ''}
-    ${d.note ? `<p class="od-note">${esc(d.note)}</p>` : ''}`;
+/** What a Spirit boosts, with the word its rule explains underlined (the rule as its tooltip). */
+function legendWhat(d: LegendDef) {
+  const what = skillText(d.what);
+  return d.term && d.note ? what.replace(d.term, `<span class="skill-u" data-tip="note:${esc(d.note)}">${d.term}</span>`) : what;
+}
+
+/** A Spirit's bonus now (level 1, if not summoned), big, beside what it boosts. */
+const legendValue = (d: LegendDef, lv: number) => `<p class="od-val"><b>${esc(d.value(Math.max(1, lv)))}</b><span>${legendWhat(d)}</span></p>`;
+
+/** A Spirit in full: its bonus, then the levels ahead, starting at the one a buy gets you, lit (level 1 for a summon,
+ *  the next on a Spirit you have). */
+function legendDetail(d: LegendDef, lv: number) {
+  const levels = Array.from({ length: lv ? 4 : 5 }, (_, k) => lv + 1 + k).filter((n) => !d.maxLv || n <= d.maxLv);
+  const rows = levels.map((n, k) => `<tr${k ? '' : ' class="next"'}><td>${k ? '' : '▶'}</td><td>Level ${n}</td><td>${n > 1 ? soulPrice(legendCost(d, n - 1), 1.2) : ''}</td><td>${esc(d.value(n))}</td></tr>`).join('');
+  return `${legendValue(d, lv)}
+    ${rows ? `<table class="od-lv od-ladder">${rows}</table>` : ''}
+    ${!d.term && d.note ? `<p class="od-note">${esc(d.note)}</p>` : ''}`;
 }
 
 /** The figures behind a Spirit's pedestal: a few soul wisps, placed by index so a re-render draws the same ones. */
@@ -159,6 +165,8 @@ const MOUSE_GLYPH = '<svg class="k-mouse" viewBox="0 0 9 12" width="18" height="
 
 /** What this many kept souls add to all damage, as a percentage ("+300%"). */
 const soulPct = (n: number) => `+${fmt(n * TUNE.soulPower * 100)}%`;
+/** A price in souls, the word spelled out: a new player may not know the icon yet. */
+const soulPrice = (n: number, size = 1.5) => `${G.soul(size)} ${fmt(n)} soul${n === 1 ? '' : 's'}`;
 
 /** The skills you press, in column order: their number keys (passive abilities don't get one). */
 const KEYED = ABILITIES.filter((a) => a.kind !== 'passive').map((a) => a.id);
@@ -322,7 +330,8 @@ export class Ui {
   private pressAt = { x: 0, y: 0 };
   private hudTop = 0;
   private pendingZone = 0;
-  private newCards = 0;
+  /** Cards marked NEW while the Collection window is open (`id:lap:gold`): they lose the mark once it closes. */
+  private newCardsShown = new Set<string>();
   /** The card collection being looked at: which lap's cards, and the gold copies or the ordinary ones. */
   private cardLap = 0;
   private cardGold = false;
@@ -669,6 +678,9 @@ export class Ui {
     }, true);
     addEventListener('keydown', (e) => {
       this.inputAt = performance.now();
+      if (e.key === 'Tab' && this.modal) this.tabInModal(e);
+      // (Only real keys: a controller sends arrows of its own to walk your hero.)
+      if (e.key.startsWith('Arrow') && this.modal && e.isTrusted && !(e.target as HTMLElement).closest('input[type=number], textarea')) this.arrowInModal(e);
       if ((e.target as HTMLElement).closest('input, textarea')) return;
       if (e.key === 'Escape' && this.modal) this.backModal();
       // ? lists the shortcuts.
@@ -1075,19 +1087,10 @@ export class Ui {
         if (this.game.rerollLegends()) this.rerollFx();
         else this.deny(el);
         break;
-      case 'respec':
-        if (!this.respecArmed) {
-          this.respecArmed = true;
-          el.textContent = 'Really respec?';
-          setTimeout(() => {
-            this.respecArmed = false;
-            if (el.isConnected) this.renderModal();
-          }, 3000);
-        } else {
-          this.respecArmed = false;
-          this.game.respecLegends();
-          this.renderModal();
-        }
+      case 'respec': this.renderRespecConfirm(); break;
+      case 'respecGo':
+        this.game.respecLegends();
+        this.backModal();
         break;
       case 'awaken': this.renderAwakenConfirm(); break;
       case 'keep': this.toggleKeep(); break;
@@ -1096,7 +1099,14 @@ export class Ui {
         this.game.recallAll();
         this.closeModal();
         break;
-      case 'heartBack': this.modal = 'heart'; this.renderModal(); break;
+      case 'heartBack':
+        // (Before the first awakening the Heart's own window has nothing more to show: Not yet closes.)
+        if (!this.game.s.awakens) this.closeModal();
+        else {
+          this.modal = 'heart';
+          this.renderModal();
+        }
+        break;
       case 'descendGo': this.doDescend(); break;
       case 'leaveVault': this.game.leaveVault(); break;
       case 'showUi': this.setUiHidden(false); break;
@@ -1234,7 +1244,7 @@ export class Ui {
         break;
       case 'bossFail':
         // The first wall: this is where the game teaches you to descend.
-        if (g.s.descents === 0 && ev.floor >= DESCEND_FLOOR && g.canDescend()) this.banner('The way up opens', 'Ascend to come back stronger', 'fail');
+        if (g.s.descents === 0 && ev.floor >= DESCEND_FLOOR && g.canDescend()) this.banner('You can ascend', 'Come back stronger', 'fail');
         else this.banner('The boss held', 'Your party falls back to grow stronger', 'fail');
         break;
       case 'buyComp':
@@ -1574,7 +1584,7 @@ export class Ui {
     if (this.keepView) {
       const keys = this.modal ? { x: 0, y: 0 } : { x: (this.keys.has('right') ? 1 : 0) - (this.keys.has('left') ? 1 : 0), y: (this.keys.has('down') ? 1 : 0) - (this.keys.has('up') ? 1 : 0) };
       // The Legend picked in the menu is the one lit in the shrine behind it.
-      if (this.modal === 'abyss' && this.legendPick) this.keepView.pinned = `offer:${this.legendPick}`;
+      if ((this.modal === 'abyss' || this.modal === 'spirits') && this.legendPick) this.keepView.pinned = `offer:${this.legendPick}`;
       this.keepView.frame(dt, keys, this.field.w, this.field.h, this.field.shownW);
     }
     this.keepLabelsFrame();
@@ -1729,7 +1739,8 @@ export class Ui {
 
     const pending = g.pendingSouls();
     const ab = this.el.abyssBadge;
-    ab.hidden = DEMO || pending < 1;
+    // (Only once you can ascend: the window says nothing of souls before.)
+    ab.hidden = DEMO || pending < 1 || !g.descendOpen();
     setText(ab, fmt(pending));
     // Worth it at +50% souls: the genre's rule of thumb for a reset.
     ab.classList.toggle('hot', g.canDescend() && pending >= g.s.souls / 2);
@@ -1760,11 +1771,12 @@ export class Ui {
     }
     document.body.classList.toggle('in-keep', g.s.inKeep);
     const cb = this.el.cardBadge;
-    cb.hidden = this.newCards < 1;
-    setText(cb, `+${this.newCards}`);
+    const newCards = g.s.cardsNew?.length ?? 0;
+    cb.hidden = newCards < 1;
+    setText(cb, `+${newCards}`);
 
     this.hints();
-    if (this.modal && ['trophies', 'cards', 'abyss', 'marks', 'heart', 'trips', 'stats', 'party', 'records', 'ascents'].includes(this.modal) && !this.descending) this.renderModal(true);
+    if (this.modal && ['trophies', 'cards', 'abyss', 'spirits', 'marks', 'heart', 'trips', 'stats', 'party', 'records', 'ascents'].includes(this.modal) && !this.descending) this.renderModal(true);
     if (this.tripsBack.length && (!this.modal || this.modal === 'trips') && !this.descending && !this.keepFading) this.showTripsBack(this.modal === 'trips');
     this.tellTripFinds();
     this.refreshTip();
@@ -2448,18 +2460,6 @@ export class Ui {
     }
     if (kind === 'note') return `<p class="tt-d">${esc(key.slice(5))}</p>`;
     if (!DEMO) {
-      if (kind === 'souls') {
-        return `<div class="tt-h"><b>How souls work</b></div>
-          <p class="tt-d">You get them when you ascend.</p>
-          <ul class="tt-l"><li>1 soul for every ${fmt(TUNE.levelsPerSoul)} companion levels.</li>
-          <li>Champion bosses (from floor ${fmt(TUNE.goldBossFrom)}+) give souls the first time you defeat them each run.</li></ul>
-          <p class="tt-d">Each soul gives ${soulPct(1)} damage, or spend them on Spirits.</p>`;
-      }
-      if (kind === 'respec') {
-        const back = Math.floor(g.s.legendSpent * RESPEC_REFUND);
-        return `<div class="tt-h"><b>Respec</b></div><p class="tt-d">Every Spirit leaves. You get back ${RESPEC_REFUND * 100}% of the souls spent on them.</p>
-          <p class="tt-f">Spent ${G.soul(1.2)} ${fmt(g.s.legendSpent)} · back ${G.soul(1.2)} ${fmt(back)}</p>`;
-      }
       if (kind === 'bound') {
         const b = BOUND.find((x) => x.id === id)!;
         const lv = g.boundLv(b.id);
@@ -2546,8 +2546,8 @@ export class Ui {
       const named = document.body.classList.contains('compact');
       const text: Record<string, string> = {
         trophies: `Trophies ${g.s.trophies.length}/${shownTrophies(g).length}. Cards ${g.cardVersions()}/${g.cardVersionsTotal()}.`,
-        abyss: DEMO ? `The way up opens at floor ${fmt(g.ascendFloor())}.`
-          : g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `The way up opens at floor ${fmt(g.ascendFloor())}.`,
+        abyss: DEMO ? `Ascend at floor ${fmt(g.ascendFloor())}.`
+          : g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `Ascend at floor ${fmt(g.ascendFloor())}.`,
         ...(DEMO ? {} : {
           heart: g.canAwaken() ? `Awaken for ${fmt(g.pendingBound())} bound souls` : `Bound souls ${fmt(g.boundFree())}`,
           keep: g.s.inKeep ? `Back to floor ${fmt(g.s.floor)}` : named ? 'The Keep' : '',
@@ -2594,13 +2594,84 @@ export class Ui {
   openModal(name: string) {
     // Opened from Options (Shortcuts): Options waits behind it, and closing it goes back there.
     this.modalBack = this.modal === 'settings' && name !== 'settings' ? 'settings' : null;
+    const from = this.modal;
     this.modal = name;
-    if (name === 'cards') this.newCards = 0;
+    // The Collection opening (on either tab, not a switch between them): what's new is marked until it closes.
+    const collection = (m: string | null) => m === 'trophies' || m === 'cards';
+    if (collection(name) && !collection(from)) this.newCardsShown = this.game.takeNewCards();
     this.el.modalWrap.hidden = false;
+    const was = document.activeElement as HTMLElement | null;
+    if (was && !this.el.modalWrap.contains(was)) was.blur();
     this.renderModal();
+    // The Heart ready for its first awakening: straight to what it takes and gives.
+    if (name === 'heart' && !DEMO && !this.game.s.awakens && this.game.canAwaken()) this.renderAwakenConfirm();
     // Every menu (and tab) opens at the top, not wherever the last one was scrolled to.
     this.el.modal.scrollTop = 0;
   }
+
+  /** The souls you have, and the damage they give. */
+  private soulsSub() {
+    const free = this.game.soulsFree();
+    return `${soulPrice(free, 2)} · ${soulPct(free)} damage`;
+  }
+
+  /** Tab keeps to the open window, wrapping at either end; from outside it, it lands on the first thing past the ✕. */
+  private tabInModal(e: KeyboardEvent) {
+    const items = [...this.el.modalWrap.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([tabindex="-1"]), textarea, [tabindex="0"]')]
+      .filter((el) => el.getClientRects().length > 0);
+    if (!items.length) return;
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    let next: HTMLElement | undefined;
+    if (at < 0) next = e.shiftKey ? items[items.length - 1] : items.find((el) => !el.closest('.m-head')) ?? items[0];
+    else if (!e.shiftKey && at === items.length - 1) next = items[0];
+    else if (e.shiftKey && at === 0) next = items[items.length - 1];
+    if (!next) return;
+    e.preventDefault();
+    next.focus({ preventScroll: false });
+  }
+
+  /** The arrow keys in a window: ▲ ▼ go a row at a time and ◀ ▶ along it, except on a setting (◀ ▶ change its value)
+   *  and on the tabs (◀ ▶ open the next one). Whatever they land on shows its tooltip. */
+  private arrowInModal(e: KeyboardEvent) {
+    const dirs: Record<string, 'up' | 'down' | 'left' | 'right'> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+    const dir = dirs[e.key];
+    if (!dir) return;
+    e.preventDefault();
+    const wrap = this.el.modalWrap;
+    const at = wrap.contains(document.activeElement) ? document.activeElement as HTMLElement : null;
+    const sideways = dir === 'left' || dir === 'right';
+    const tab = at?.closest<HTMLElement>('.tabs .tab');
+    if (tab && sideways) {
+      const tabs = [...tab.parentElement!.querySelectorAll<HTMLElement>('.tab')].filter((el) => el.getClientRects().length > 0);
+      const next = tabs[(tabs.indexOf(tab) + (dir === 'right' ? 1 : tabs.length - 1)) % tabs.length];
+      const key = keyOf(next);
+      next.click();
+      wrap.querySelector<HTMLElement>(`.tab${key}`)?.focus({ preventScroll: true });
+      return;
+    }
+    const opt = at?.closest<HTMLElement>('.opt');
+    if (opt && sideways) {
+      const range = opt.querySelector<HTMLInputElement>('input[type=range]');
+      if (range) {
+        range.value = String(Math.max(0, Math.min(100, Number(range.value) + (dir === 'right' ? 5 : -5))));
+        range.dispatchEvent(new Event('input', { bubbles: true }));
+      } else if (!opt.classList.contains('opt-go')) opt.click();
+      return;
+    }
+    let next = neighbor(at, dir, wrap);
+    if (!next) return;
+    // Up into the tabs: the one you're on, not whichever sits above.
+    if (next.matches('.tabs .tab') && !at?.closest('.tabs')) next = next.parentElement!.querySelector<HTMLElement>('.tab.on') ?? next;
+    // (A trophy or a card isn't a button: it takes the focus all the same, just not from Tab.)
+    if (!next.matches('button, a[href], input, textarea, [tabindex]')) next.tabIndex = -1;
+    next.focus({ preventScroll: true });
+    next.scrollIntoView({ block: 'nearest' });
+    hover(this.keyTip, false);
+    this.keyTip = next.closest<HTMLElement>('[data-tip]');
+    hover(this.keyTip, true);
+  }
+  /** What the arrow keys last landed on that has a tooltip. */
+  private keyTip: HTMLElement | null = null;
 
   /** You close the window (Escape, B, its ✕, a click outside it): back to the one it was opened from, or closed. */
   backModal() {
@@ -2613,6 +2684,11 @@ export class Ui {
 
   closeModal() {
     this.modalBack = null;
+    // (A card that arrived with the Collection open was seen coming in.)
+    if (this.modal === 'trophies' || this.modal === 'cards') {
+      this.game.takeNewCards();
+      this.newCardsShown = new Set();
+    }
     this.tripsBackDone();
     if (this.modal === 'offline') for (const card of this.offlineCards.splice(0)) this.showCard(card);
     this.modal = null;
@@ -2637,8 +2713,11 @@ export class Ui {
 
     } else if (DEMO && name === 'abyss') {
       html = head('Ascend') + this.ascendHtml();
+    } else if (!DEMO && name === 'spirits') {
+      // (From the Keep's summoning circle: the Spirits alone. Ascend, from the dock, has them along with the way up.)
+      html = head('Spirits', this.soulsSub()) + this.legendsHtml();
     } else if (!DEMO && (name === 'abyss' || name === 'marks')) {
-      const sub = `${G.soul()} ${fmt(g.soulsFree())} souls · ${soulPct(g.soulsFree())} damage`;
+      const sub = g.s.descents ? this.soulsSub() : '';
       html = head('Ascend', sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
     } else if (!DEMO && name === 'bound' && this.boundFocus) {
       const b = BOUND.find((x) => x.id === this.boundFocus)!;
@@ -2646,7 +2725,7 @@ export class Ui {
         <div class="legend-panel">${boundDetail(b, g.boundLv(b.id))}</div>`;
     } else if (!DEMO && name === 'legend' && this.legendFocus) {
       const d = LEGEND_BY_ID.get(this.legendFocus)!;
-      html = head(esc(d.name), `${G.soul()} ${fmt(g.soulsFree())} souls`) + `<div class="lcards one">${this.legendCard(d)}</div>
+      html = head(esc(d.name), this.soulsSub()) + `<div class="lcards one">${this.legendCard(d)}</div>
         <div class="legend-panel">${legendDetail(d, g.legendLv(d.id))}</div>`;
     } else if (!DEMO && name === 'trips') {
       const out = g.s.expeditions.length;
@@ -2692,34 +2771,27 @@ export class Ui {
     this.modalKey = html;
     this.el.modal.className = `modal pnl m-${name}`;
     // A tick's refresh changes only what moved; a click (or a new panel) builds it fresh.
-    if (soft) morph(this.el.modal, html);
-    else this.el.modal.innerHTML = html;
+    if (soft) return morph(this.el.modal, html);
+    // A keyboard press redraws the window under the focus: put it back on the same button.
+    const was = document.activeElement as HTMLElement | null;
+    const key = was && this.el.modal.contains(was) && was.matches(':focus-visible') ? keyOf(was) : '';
+    this.el.modal.innerHTML = html;
+    if (key) this.el.modal.querySelector<HTMLElement>(`${was!.tagName.toLowerCase()}${key}`)?.focus({ preventScroll: true });
   }
 
-  /** The Ascend strip atop the window: where this run's souls come from (companion levels, with the way to the next
-   *  soul, and champion bosses), and either the way up's progress or the Ascend button. */
+  /** The Ascend strip atop the window: what an ascent pays now, and either the floors left to go or the Ascend button. */
   private ascendHtml(): string {
     const g = this.game;
-    const locked = `<div class="as-go locked"><small>The way up opens at floor ${fmt(g.ascendFloor())}</small>
-        <span class="as-floor">Floor ${fmt(g.s.maxFloor)} / ${g.ascendFloor()}</span>
+    const locked = `<div class="as-go locked"><span class="as-floor">Floor ${fmt(g.s.maxFloor)} / ${g.ascendFloor()}</span>
         <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / g.ascendFloor()) * 100)}%"></i></div></div>`;
     // The demo shows there's a way up, and nothing past it.
     if (DEMO) return `<div class="ascend">${locked}</div>`;
-    const help = '<span class="soul-help" data-tip="souls:" tabindex="0" aria-label="How souls work">?</span>';
-    const levels = g.runLevels();
-    const per = TUNE.levelsPerSoul;
-    const rows = `<div class="as-rows">
-        <div class="as-h">Souls this run ${help}</div>
-        <div class="as-row"><span>Companion levels <em>${fmt(levels)}</em></span><b>${G.soul()} ${fmt(Math.floor(levels / per))}</b>
-          <div class="as-bar"><i style="width:${((levels % per) / per) * 100}%"></i></div><small>${fmt(levels % per)} / ${fmt(per)}</small></div>
-        <div class="as-row"><span>Champion bosses</span><b>${G.soul()} ${fmt(g.s.bossSouls)}</b></div>
-      </div>`;
-    if (!g.descendOpen()) {
-      return `<div class="ascend">${rows}${locked}</div>`;
-    }
     const pending = g.pendingSouls();
+    const pay = `<div class="as-gain">${G.soul(3.6)}<b>+${fmt(pending)}</b><span>soul${pending === 1 ? '' : 's'} · ${soulPct(pending)} damage</span></div>`;
+    // (The first run shows how far there is to go; later ones, nothing until you can ascend.)
+    if (!g.descendOpen()) return g.s.descents ? '' : `<div class="ascend">${locked}</div>`;
     const go = `<button class="btn primary${g.s.descents ? '' : ' big'}" data-act="descend" ${g.canDescend() ? '' : 'disabled'}>Ascend</button>`;
-    return `<div class="ascend">${rows}<div class="as-go"><span class="as-total">${G.soul(2.4)} ${fmt(pending)}</span>${go}</div></div>`;
+    return `<div class="ascend">${pay}<div class="as-go">${go}</div></div>`;
   }
 
   /** The soul shop. Before your first ascent: three Legends asleep as silhouettes (spirits once the way up opens). After:
@@ -2747,21 +2819,24 @@ export class Ui {
       const on = id === this.legendPick;
       return `<button class="pedestal ${on ? 'on' : 'ghost'}" data-pick="${id}"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(on ? d.sprite : spiritForm(d.sprite), 72, 96)}</span><span class="ped-stone"></span><b>${esc(d.name)}</b></button>`;
     }).join('');
+    // Along the bottom of the window, once a respec would give something back.
+    const respec = g.respecBack() > 0 ? `<div class="legend-foot"><button class="btn small" data-act="respec">Respec · ${G.soul(1.2)} +${fmt(g.respecBack())} soul${g.respecBack() === 1 ? '' : 's'}</button></div>` : '';
+    // Both uses of a soul, side by side: neither is the right one.
+    const why = `<div class="legend-why"><span><small>Keep</small>${G.soul(1.5)} souls for <em>${soulPct(1)} damage</em> each</span><i>or</i><span><small>Spend</small>${G.soul(1.5)} souls on Spirits</span></div>`;
     const summon = pick
-      ? `<p class="legend-warn">Summon a Spirit for <b>${G.soul(2)} ${fmt(price)} soul${price === 1 ? '' : 's'}</b>. Every soul you spend gives up ${soulPct(1)} damage.</p>
-        <div class="pedestals">${pedestals}</div>
-        ${LEGENDS.length - g.legendsOwned() > OFFER_SIZE ? `<div class="legend-reroll"><button class="btn" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>Reroll all three · ${g.rerollPrice() ? `${G.soul(1.5)} ${fmt(g.rerollPrice())}` : 'Free'}</button></div>` : ''}
-        <div class="legend-panel">
+      ? `${why}<div class="pedestals">${pedestals}</div>
+        ${LEGENDS.length - g.legendsOwned() > OFFER_SIZE ? `<div class="legend-reroll"><button class="btn soul" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>${G.reroll()} Reroll Spirits · ${g.rerollPrice() ? soulPrice(g.rerollPrice()) : 'Free'}</button></div>` : ''}
+        <div class="legend-panel pick">
           <div class="tt-h"><b>${esc(pick.name)}</b><span class="tt-own">${KIND_NAME[pick.kind]}</span></div>
           ${legendDetail(pick, 0)}
-          <div class="set-row"><button class="btn primary" data-act="summon" ${free >= price ? '' : 'disabled'}>Summon ${esc(pick.name)}</button></div>
+          <div class="set-row"><button class="btn soul" data-act="summon" ${free >= price ? '' : 'disabled'}>Summon · ${soulPrice(price)}</button></div>
         </div>`
       : '<p class="muted">Every Spirit has joined you.</p>';
     const owned = LEGENDS.filter((d) => g.legendLv(d.id) > 0);
     const cards = owned.map((d) => this.legendCard(d)).join('');
-    const respec = `<button class="btn small lc-respec" data-act="respec" data-tip="respec">Respec · ${G.soul(1.2)} +${fmt(Math.floor(g.s.legendSpent * RESPEC_REFUND))}</button>`;
     return `${summon}
-      ${owned.length ? `<div class="lc-head"><h3>Your Spirits</h3><small>${owned.length}</small>${respec}</div><div class="lcards">${cards}</div>` : ''}`;
+      ${owned.length ? `<div class="lc-head"><h3>Your Spirits</h3><small>${owned.length}</small></div><div class="lcards">${cards}</div>` : ''}
+      ${respec}`;
   }
 
   /** Until then, ticks leave the open panel alone, so an animation in it plays out. */
@@ -2791,12 +2866,12 @@ export class Ui {
     const cost = g.legendLevelCost(d.id);
     const next = g.legendMaxed(d.id)
       ? `<span class="lc-max" data-tip="legend:${d.id}">Max level</span>`
-      : `<span>Next: ${esc(d.value(lv + 1))}</span><span class="lc-up" data-tip="legend:${d.id}" data-legend="${d.id}"><button class="btn primary" ${g.soulsFree() >= cost ? '' : 'disabled'}>Level up · ${G.soul(1.5)} ${fmt(cost)}</button></span>`;
+      : `<span>Next: ${esc(d.value(lv + 1))}</span><span class="lc-up" data-tip="legend:${d.id}" data-legend="${d.id}"><button class="btn soul" ${g.soulsFree() >= cost ? '' : 'disabled'}>Level up · ${soulPrice(cost)}</button></span>`;
     return `<div class="lcard" data-card="${d.id}">
       <div class="lc-fig"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 88, 96)}</span><span class="ped-stone"></span></div>
       <div class="lc-nm"><b>${esc(d.name)}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
       <div class="lc-val">${esc(d.value(lv))}</div>
-      <div class="lc-what">${skillText(d.what)}</div>
+      <div class="lc-what">${legendWhat(d)}</div>
       <div class="lc-next">${next}</div>
     </div>`;
   }
@@ -2854,13 +2929,12 @@ export class Ui {
       <section class="bd wide bd-marks"><table><thead><tr><th>Companion</th><td>Marks</td><td>Damage</td><td></td><td></td></tr></thead>${rows}</table></section>`;
   }
 
-  private respecArmed = false;
   /** The Legend picked on the summon pedestals. */
   private legendPick: LegendId | null = null;
 
   private troTabs(on: 'trophies' | 'cards') {
     const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
-    return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${this.newCards ? ` <em class="tab-new">+${this.newCards}</em>` : ''}`)}</nav>`;
+    return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${on !== 'cards' && this.newCardsShown.size ? `<em class="badge new">+${this.newCardsShown.size}</em>` : ''}`)}</nav>`;
   }
 
   /** Trading with Dan or Victor: the spares you've put down, the card you got last, and what he just said. */
@@ -3020,7 +3094,8 @@ export class Ui {
     const hereCards = new Set(hereLap ? (isBossFloor(floor) ? [bossFor(floor)] : bandFor(floor)).map((d) => cardId(d.name)) : []);
     const face = (c: (typeof CARDS)[number]) => {
       const got = owned(c);
-      return `<span class="mc-cell${hereCards.has(c.id) ? ' here' : ''}" data-tip="card:${c.id}">${cardFace(c, got ? 'got' : 'locked', gold && got, 44, view)}</span>`;
+      const isNew = got && this.newCardsShown.has(`${c.id}:${view}:${gold ? 1 : 0}`);
+      return `<span class="mc-cell${hereCards.has(c.id) ? ' here' : ''}${isNew ? ' new' : ''}" data-tip="card:${c.id}">${cardFace(c, got ? 'got' : 'locked', gold && got, 44, view)}</span>`;
     };
     const section = (title: string, all: typeof CARDS, here = false, zone = -1) => {
       const cards = all.filter((c) => inView(c));
@@ -3036,14 +3111,17 @@ export class Ui {
       const cards = CARDS.filter((c) => inView(c, l));
       return `${cards.filter((c) => owned(c, l)).length}/${cards.length}`;
     };
+    // New cards elsewhere, for the tabs that lead to them.
+    const newIn = (l: number, inGold: boolean) => [...this.newCardsShown].filter((key) => key.endsWith(`:${l}:${inGold ? 1 : 0}`)).length;
+    const newTag = (n: number) => (n ? `<em class="badge new">+${n}</em>` : '');
     const lapTab = (l: number) => {
       const c = corruptionOf(l);
       const color = `#${(l ? c.tint : 0xc9b8a0).toString(16).padStart(6, '0')}`;
       const here = l === Math.min(lap, CORRUPTION.length - 1);
-      return `<button class="sub${l === view ? ' on' : ''}${here ? ' here' : ''}" data-card-lap="${l}">${here ? '<em class="sub-here"></em>' : ''}<span class="sub-dot" style="--lc:${color}"></span>${l ? c.name : 'Plain'} <i>${tally(l)}</i></button>`;
+      return `<button class="sub${l === view ? ' on' : ''}${here ? ' here' : ''}" data-card-lap="${l}">${here ? '<em class="sub-here"></em>' : ''}<span class="sub-dot" style="--lc:${color}"></span>${l ? c.name : 'Plain'} <i>${tally(l)}</i>${l === view ? '' : newTag(newIn(l, gold))}</button>`;
     };
     const bar = `<nav class="subbar">${Array.from({ length: lapsReached + 1 }, (_, l) => lapTab(l)).join('')}
-      <span class="sub-toggle"><button class="sub ${gold ? '' : 'on'}" data-card-gold="0">Normal</button><button class="sub gold-tab ${gold ? 'on' : ''}" data-card-gold="1">★ Gold</button></span></nav>`;
+      <span class="sub-toggle"><button class="sub ${gold ? '' : 'on'}" data-card-gold="0">Normal${gold ? newTag(newIn(view, false)) : ''}</button><button class="sub gold-tab ${gold ? 'on' : ''}" data-card-gold="1">★ Gold${gold ? '' : newTag(newIn(view, true))}</button></span></nav>`;
     const more = CARDS.some((c) => !seen(c)) ? '<p class="cards-more">More cards wait deeper down.</p>' : '';
     return bar + ZONES.map((z, i) => section(z.name, CARDS.filter((c) => c.zone === i), i === hereZone, i)).join('')
       + section('Treasure goblins', CARDS.filter((c) => c.zone < 0)) + more;
@@ -3323,7 +3401,6 @@ export class Ui {
   }
 
   private showCard(ev: Extract<Drop, { t: 'card' }>) {
-    if (this.modal !== 'cards' && ev.newColor) this.newCards++;
     this.cardQueue.push(ev);
     if (this.cardQueue.length === 1) this.revealCard();
   }
@@ -3586,6 +3663,24 @@ export class Ui {
   }
 
 
+  /** Before a respec: what it gives back (all of it, until your second ascent). The Spirits window waits behind it. */
+  private renderRespecConfirm() {
+    const g = this.game;
+    const back = g.respecBack();
+    const lost = g.s.legendSpent - back;
+    this.modalBack = this.modal;
+    this.modal = 'respec';
+    this.modalKey = 'respec';
+    this.el.modal.className = 'modal pnl m-confirm';
+    this.el.modal.innerHTML = `<header class="m-head"><h2>Respec?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
+      <div class="confirm">
+        <p class="respec-back">${G.soul(3)} +${fmt(back)} soul${back === 1 ? '' : 's'} back</p>
+        ${!DEMO && g.legendsOwned() ? '<p>Every Spirit leaves.</p>' : ''}
+        <p>${g.respecFree() ? '<b>Free until your second ascent.</b>' : `<b>${G.soul()} ${fmt(lost)}</b> lost.`}</p>
+        <div class="set-row"><button class="btn" data-act="close">Not yet</button><button class="btn primary big" data-act="respecGo">Respec</button></div>
+      </div>`;
+  }
+
   /** The last word before a wipe. Options waits behind it. */
   private renderWipeConfirm() {
     this.modalBack = 'settings';
@@ -3794,7 +3889,7 @@ export class Ui {
     if (id.startsWith('offer:')) {
       // The one you're standing at is the one picked, ready to summon.
       this.legendPick = id.slice(6) as LegendId;
-      this.openModal('abyss');
+      this.openModal('spirits');
     } else if (id.startsWith('legend:')) {
       this.legendFocus = id.slice(7) as LegendId;
       this.openModal('legend');
@@ -3886,11 +3981,19 @@ export class Ui {
         <p>Your party kept fighting, killed <b>${kills}</b>${o.floor ? ` and reached <b>floor ${fmt(o.floor)}</b>` : ''}, and looted</p>
         <div class="offline-v">${sprite('coin', 5)}<b>${fmt(o.gold)}</b></div>
         <p class="muted">gold</p>
+        ${this.awaySpiritsHtml()}
         ${o.cards.length ? `<p>and found <b>${o.cards.length === 1 ? 'a card' : `${o.cards.length} cards`}</b></p><div class="offline-cards">${this.offlineCardsHtml(o.cards)}</div>` : ''}
         <button class="btn primary big" data-act="close">Collect</button>
       </div>`;
     // Collecting spins each card once, with how many came.
     this.offlineCards = this.groupCards(o.cards);
+  }
+
+  /** The idle Spirits that worked while you were away. */
+  private awaySpiritsHtml() {
+    const working = (['sleeper', 'patient'] as const).filter((id) => this.game.legendLv(id) > 0).map((id) => LEGEND_BY_ID.get(id)!);
+    if (!working.length) return '';
+    return `<div class="away-spirits">${working.map((d) => `<span class="away-spirit">${charFit(d.sprite, 32)}<b>${esc(d.value(this.game.legendLv(d.id)))}</b>${legendWhat(d)}</span>`).join('')}</div>`;
   }
 
   /** Cards found while away as one per card, color and gold-or-not, carrying how many came; new ones first. */

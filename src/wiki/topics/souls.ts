@@ -7,7 +7,7 @@ import type { Page } from '../pages.ts';
 const soulsBody = () => `<p class="lede">Reach floor ${DESCEND_FLOOR} and you can ascend: leave the dungeon, start a new run from floor 1, and take souls with you.</p>
   ${toc('souls', ['Ascending', 'Earning souls', 'What souls do', 'What an ascent keeps'])}
   ${h2('Ascending')}
-  <p>The way up opens once you reach floor ${DESCEND_FLOOR}. Ascending ends the run: you're back on floor 1 with no gold and no companions, and the souls you earned this run are paid out. You need at least one soul to ascend.</p>
+  <p>You can ascend once you reach floor ${DESCEND_FLOOR}. Ascending ends the run: you're back on floor 1 with no gold and no companions, and the souls you earned this run are paid out. You need at least one soul to ascend.</p>
   ${h2('Earning souls')}
   ${table(['Source', 'Souls'], [
     ['Companion levels', `1 for every ${TUNE.levelsPerSoul.toLocaleString('en-US')} companion levels you bought this run, all companions added together`],
@@ -60,7 +60,7 @@ const marksBody = () => `<p class="lede">Heartmarks are bonus damage that lands 
   <p>Souls spent moving Heartmarks don't come back with a Spirit respec.</p>`;
 
 export const SOUL_PAGES: Page[] = [
-  { id: 'souls', group: 'Souls', title: 'Souls and ascending', summary: 'The way up, how souls are earned, what they do and what an ascent keeps.', body: soulsBody },
+  { id: 'souls', group: 'Souls', title: 'Souls and ascending', summary: 'When you can ascend, how souls are earned, what they do and what an ascent keeps.', body: soulsBody },
   { id: 'heartmarks', group: 'Souls', title: 'Heartmarks', summary: 'Earning, using and moving Heartmarks.', body: marksBody },
   { id: 'awakening', group: 'Souls', title: 'Awakening and the Bound', summary: 'Bound souls, what awakening keeps, the Bound and wake-up gifts.', body: awakenBody },
 ];
