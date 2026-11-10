@@ -49,8 +49,8 @@ const CREDITS: { what: string; items: { name: string; by?: string; url: string }
 ];
 
 /** The beating pixel heart, as in the title card. */
-const HEART = `<svg class="mm-heart" viewBox="0 0 9 8" width="72" height="64" shape-rendering="crispEdges" aria-hidden="true"><path fill="#140a12" d="M2 0h2v1H2zM5 0h2v1H5zM1 1h1v1H1zM4 1h1v1H4zM7 1h1v1H7zM0 2h1v2H0zM8 2h1v2H8zM1 4h1v1H1zM7 4h1v1H7zM2 5h1v1H2zM6 5h1v1H6zM3 6h1v1H3zM5 6h1v1H5zM4 7h1v1H4z"/><path fill="#e8455f" d="M2 1h2v1H2zM5 1h2v1H5zM1 2h1v2H1zM3 2h5v2H3zM2 4h5v1H2zM3 5h3v1H3zM4 6h1v1H4z"/><path fill="#ffb3c4" d="M2 2h1v1H2z"/></svg>`;
-const LOGO = '<h1 class="mm-logo"><span class="mm-ink">DEEPHEART</span><span class="mm-gold">DEEPHEART</span></h1>';
+export const HEART = `<svg class="mm-heart" viewBox="0 0 9 8" width="72" height="64" shape-rendering="crispEdges" aria-hidden="true"><path fill="#140a12" d="M2 0h2v1H2zM5 0h2v1H5zM1 1h1v1H1zM4 1h1v1H4zM7 1h1v1H7zM0 2h1v2H0zM8 2h1v2H8zM1 4h1v1H1zM7 4h1v1H7zM2 5h1v1H2zM6 5h1v1H6zM3 6h1v1H3zM5 6h1v1H5zM4 7h1v1H4z"/><path fill="#e8455f" d="M2 1h2v1H2zM5 1h2v1H5zM1 2h1v2H1zM3 2h5v2H3zM2 4h5v1H2zM3 5h3v1H3zM4 6h1v1H4z"/><path fill="#ffb3c4" d="M2 2h1v1H2z"/></svg>`;
+export const LOGO = '<h1 class="mm-logo"><span class="mm-ink">DEEPHEART</span><span class="mm-gold">DEEPHEART</span></h1>';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 

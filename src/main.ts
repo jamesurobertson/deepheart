@@ -18,6 +18,7 @@ import { PlayRecorder } from './record.ts';
 import { olderVersion } from './version.ts';
 import { installCrashScreen } from './crash.ts';
 import { installGamepad } from './ui/gamepad.ts';
+import { isPhone, showComingSoon } from './ui/soon.ts';
 
 installCrashScreen();
 installGamepad();
@@ -92,6 +93,7 @@ const fontsReady = () => Promise.race([
 ]);
 
 async function boot() {
+  if (isPhone()) return showComingSoon();
   // Black until the menu is drawn: no flash of the room or the HUD first.
   if (!SKIP_MENU) document.body.classList.add('at-menu');
   const atlas = await Atlas.load(`${BASE}assets/sprites/atlas.png`, `${BASE}assets/sprites/atlas.txt`);
