@@ -21,6 +21,7 @@
   --f-btn-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%233b2a1e' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23221710' d='M1 1h4v1H1z'/%3E%3C/svg%3E");
   --f-primary: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%23d0902f' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23ffe08a' d='M1 1h4v1H1z'/%3E%3Cpath fill='%23855415' d='M1 4h4v1H1z'/%3E%3C/svg%3E");
   --f-soul: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%237b55c9' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23c9a8ff' d='M1 1h4v1H1z'/%3E%3Cpath fill='%2346297e' d='M1 4h4v1H1z'/%3E%3C/svg%3E");
+  --f-bound: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%23e0466b' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23ffb3c4' d='M1 1h4v1H1z'/%3E%3Cpath fill='%238a1f3a' d='M1 4h4v1H1z'/%3E%3C/svg%3E");
   --f-danger: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%238c2a26' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23d0524a' d='M1 1h4v1H1z'/%3E%3Cpath fill='%23511511' d='M1 4h4v1H1z'/%3E%3C/svg%3E");
   --f-cell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' shape-rendering='crispEdges'%3E%3Cpath fill='%230b0710' d='M1 0h4v1H1zM0 1h1v4H0zM5 1h1v4H5zM1 5h4v1H1z'/%3E%3Cpath fill='%23130e10' d='M1 1h4v4H1z'/%3E%3Cpath fill='%23060305' d='M1 1h4v1H1zM1 1h1v4H1z'/%3E%3Cpath fill='%233b2e31' d='M1 4h4v1H1zM4 1h1v4H4z'/%3E%3C/svg%3E");
 }
@@ -128,6 +129,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .btn:hover:not(:disabled) { border-image-source: var(--f-btn-hi); }
 .btn:active:not(:disabled), .btn.on { border-image-source: var(--f-btn-down); transform: translateY(2px); }
 .btn:disabled { opacity: 0.45; cursor: default; }
+/* (A price you can't meet yet still reads as souls or bound souls.) */
+.btn.soul:disabled, .btn.bound:disabled { opacity: 0.72; }
 .btn.primary { border-image-source: var(--f-primary); color: #2a1604; text-shadow: 1px 1px 0 rgba(255, 240, 200, 0.5); }
 .btn.primary:hover { filter: brightness(1.1); }
 .btn.danger { border-image-source: var(--f-danger); }
@@ -135,6 +138,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .btn.soul, .btn.soul:hover:not(:disabled) { border-image-source: var(--f-soul); color: #f6efff; }
 .btn.soul:hover:not(:disabled) { filter: brightness(1.12); }
 .btn.soul .glyph.g-soul { color: #f6efff; }
+.btn.bound, .btn.bound:hover:not(:disabled) { border-image-source: var(--f-bound); color: #fff0f3; }
+.btn.bound:hover:not(:disabled) { filter: brightness(1.12); }
+.btn.bound .glyph.g-soul { color: #fff0f3; }
 .btn.big { min-height: 48px; font-size: 20px; padding: 0 18px; }
 .btn.small { min-height: 28px; font-size: 14px; padding: 0 6px; }
 .btn.icon { width: 44px; height: 44px; padding: 0; }
@@ -685,7 +691,8 @@ body.compact .m-top { top: -8px; margin: -8px -8px 0 -12px; padding: 8px 8px 0 1
 
 .tro-grid { display: grid; grid-template-columns: repeat(auto-fill, 48px); gap: 6px; }
 .tro { width: 48px; height: 48px; display: grid; place-items: center; border: 6px solid transparent; border-image: var(--f-cell) 2 fill / 6px stretch; }
-.tro:not(.got) .ico > .px, .tro:not(.got) .ico > .glyph { filter: brightness(0) opacity(0.5); }
+/* animation: none, or a rainbow sprite's hue-cycle animation overrides the silhouette filter. */
+.tro:not(.got) .ico > :is(.px, .glyph, .icon) { filter: brightness(0) opacity(0.5); animation: none; }
 .tro:not(.got) .tier { opacity: 0.3; }
 .tro.got { box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.5); }
 
@@ -1504,11 +1511,12 @@ body.card-up .keep-labels { visibility: hidden; }
 /* Awakening: bound souls, the Bound, the Heart's labels in the Keep. */
 
 /* The Bound, as cards like the Spirits', in the Heart's red. */
+.bcard { grid-template-columns: 80px minmax(0, 1fr); }
+/* ("bound souls" is longer than "souls": a step smaller, so a price up to 99 fits the card.) */
+.bcard .lc-up .btn { font-size: 14px; padding: 0 6px; gap: 4px; }
 .bcard::before { background: radial-gradient(ellipse at 18% 70%, rgba(255, 90, 126, 0.16), transparent 55%); }
-.bcard .lc-val { color: var(--ess-hi); text-shadow: 0 0 14px rgba(255, 90, 126, 0.45); }
 .bcard .ped-stone { background: radial-gradient(ellipse at 50% 35%, #8a5560 0 30%, #5e3640 31% 62%, #301c22 63%); }
-.bcard.unbought .ped-fig { filter: grayscale(0.7) brightness(0.6); }
-.bcard.unbought .lc-val { color: var(--faint); text-shadow: none; }
+.bcard.unbought .ped-fig { opacity: 0.86; filter: grayscale(1) sepia(1) hue-rotate(308deg) saturate(2.6) brightness(1.15) drop-shadow(0 0 3px rgba(255, 90, 126, 0.9)); }
 .bsparks { position: absolute; left: 50%; bottom: 6px; width: 100px; height: 110px; translate: -50% 0; pointer-events: none; }
 .bsparks::before { content: ''; position: absolute; inset: 10% 8% 0; border-radius: 50%; background: radial-gradient(ellipse at 50% 70%, rgba(255, 90, 126, 0.35), rgba(200, 40, 80, 0.1) 45%, transparent 70%); animation: aura 3.2s ease-in-out infinite; }
 .bsparks i { position: absolute; bottom: 6px; left: var(--x); width: 3px; height: 3px; background: #ffb3c4; box-shadow: 0 0 6px var(--ess); opacity: 0; transform: scale(var(--s)); animation: wisp var(--d) ease-in var(--w) infinite; }

@@ -50,6 +50,8 @@ const PLAYTEST = location.pathname.startsWith('/dev-deepheart/');
 // ?sim=300 (dev only): play from where a nonstop player first reaches floor 300, in its own slot. It's built the first
 // time (the pacing bot plays it out, a few seconds); &fresh builds it again.
 const SIM_FLOOR = import.meta.env.DEV ? Number(params.get('sim')) || 0 : 0;
+// ?sim=ascend (dev only): the same, the moment before that player's first ascent.
+const SIM_ASCEND = import.meta.env.DEV && params.get('sim') === 'ascend';
 // ?quick (dev only): its own save, with a Next floor button (or N) that wins the floor
 // you're on for everything it'd pay, and a +10 one (or Shift+N); &fresh starts it over.
 const QUICK = import.meta.env.DEV && params.has('quick');
@@ -57,7 +59,7 @@ const QUICK = import.meta.env.DEV && params.has('quick');
 // never past your deepest), and keeps it: every refresh pays another 100 hours.
 const AWAY_HOURS = import.meta.env.DEV ? Number(params.get('timeaway')) || 0 : 0;
 const AWAY_FLOOR = Number(params.get('floor') ?? params.get('level')) || 0;
-const SLOT = (import.meta.env.DEV ? params.get('slot') : null) ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (SIM_FLOOR ? `sim-${SIM_FLOOR}` : null) ?? (QUICK ? 'quick' : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
+const SLOT = (import.meta.env.DEV ? params.get('slot') : null) ?? (TEST_STATE ? `state-${TEST_STATE}` : null) ?? (SIM_FLOOR ? `sim-${SIM_FLOOR}` : SIM_ASCEND ? 'sim-ascend' : null) ?? (QUICK ? 'quick' : null) ?? (DEMO ? 'demo' : PLAYTEST ? 'playtest' : null);
 const SAVE_KEY = 'deepheart-save' + (SLOT ? `:${SLOT}` : '');
 // The game opens on its main menu once a visit: a refresh after you've started playing (or the menu's own New Game,
 // which wipes the save and reloads) goes straight back in, as do test runs (?slot=, ?state=) and ?menu=0. Closing the
@@ -70,7 +72,7 @@ const inGame = () => {
     return false;
   }
 };
-const SKIP_MENU = (import.meta.env.DEV && (params.get('menu') === '0' || params.has('slot') || !!TEST_STATE || !!SIM_FLOOR || !!AWAY_HOURS)) || QUICK || inGame();
+const SKIP_MENU = (import.meta.env.DEV && (params.get('menu') === '0' || params.has('slot') || !!TEST_STATE || !!SIM_FLOOR || SIM_ASCEND || !!AWAY_HOURS)) || QUICK || inGame();
 const STEP = 1 / 30;
 /** Away (tab hidden or closed) longer than this is paid in one go, with a summary. Shorter is played out frame by frame. */
 const OFFLINE_AFTER = 60;
@@ -120,9 +122,9 @@ async function boot() {
   const atlas = await Atlas.load(`${BASE}assets/sprites/atlas.png`, `${BASE}assets/sprites/atlas.txt`);
   setAtlas(atlas);
 
-  if (import.meta.env.DEV && SIM_FLOOR > 1 && (!load() || params.has('fresh'))) {
-    const { playTo } = await import('../scripts/bot.ts');
-    const { save, hours } = playTo(SIM_FLOOR);
+  if (import.meta.env.DEV && (SIM_FLOOR > 1 || SIM_ASCEND) && (!load() || params.has('fresh'))) {
+    const { playTo, playToFirstAscent } = await import('../scripts/bot.ts');
+    const { save, hours } = SIM_ASCEND ? playToFirstAscent() : playTo(SIM_FLOOR);
     // (Now, so the time it took isn't paid out as time away.)
     save.lastSave = Date.now();
     store.set(SAVE_KEY, JSON.stringify(save));
@@ -485,7 +487,7 @@ async function boot() {
   setInterval(save, 5000);
   addEventListener('beforeunload', save);
   // The play log (see record.ts): your own sessions on the dev server and in the desktop app, never test runs.
-  const recording = (import.meta.env.DEV && !navigator.webdriver && !TEST_STATE && !SIM_FLOOR && !QUICK) || !!window.deepheart?.log;
+  const recording = (import.meta.env.DEV && !navigator.webdriver && !TEST_STATE && !SIM_FLOOR && !SIM_ASCEND && !QUICK) || !!window.deepheart?.log;
   recorder = recording
     ? new PlayRecorder(game, SLOT, (text) => {
       if (window.deepheart?.log) window.deepheart.log(text);

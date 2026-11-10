@@ -15,7 +15,6 @@ const traitText = (u: UpgDef) => {
   return ability ? `Unlocks ${link('abilities', ability.name, ability.name)}.` : esc(u.desc);
 };
 const compId = (c: CompDef) => `companion-${c.id}`;
-const joins = (c: CompDef) => (c.floor ? `Floor ${c.floor}` : 'From the start');
 
 const levelCost = (c: CompDef, lv: number) => c.cost * TUNE.costGrowth ** (lv - 1);
 const totalCost = (c: CompDef, lv: number) => (c.cost * (TUNE.costGrowth ** lv - 1)) / (TUNE.costGrowth - 1);
@@ -30,12 +29,10 @@ function companionPage(c: CompDef, i: number): Page {
     body: () => `${infobox(spr(c.sprite, 96), [
       ['Hire', `${fmt(c.cost)} gold`],
       ['Damage', `${fmt(c.dps)} a level`],
-      ['Joins', joins(c)],
       ['Attack', c.attack],
       ['Upgrades', String(traits.length)],
     ], c.flavor)}
       <p class="lede">${esc(c.flavor)}</p>
-      ${c.floor ? `<p>Joins once your deepest floor ever reaches ${c.floor}. After that it stays available on every run.</p>` : ''}
       ${h2('Upgrades')}
       <p>An upgrade opens when ${c.name} reaches its level, and is bought with gold on ${c.name}'s row. Upgrades are bought again every run.</p>
       ${table([{ h: 'Level', cls: 'c' }, 'Upgrade', { h: 'Cost', cls: 'num' }, 'Effect'], traits.map((u) => [`<b>${traitLevel(u)}</b>`, esc(u.name), fmt(u.cost), traitText(u)]))}
@@ -50,11 +47,11 @@ function companionPage(c: CompDef, i: number): Page {
 const companionsBody = () => `<p class="lede">Companions fight for you. Hire them with gold, level them up, and buy their upgrades. Their damage is most of your damage.</p>
   ${toc('companions', ['The roster', 'Hiring and leveling', 'Level milestones', 'Your hero', 'Heartmarks'])}
   ${h2('The roster')}
-  ${table(['Companion', { h: 'Hire', cls: 'num' }, { h: 'Damage / level', cls: 'num' }, 'Joins', { h: 'Upgrades', cls: 'c' }], COMPS.map((c, i) => [
-    `<a class="who" href="#/${compId(c)}">${spr(c.sprite, 28)}${c.name}</a>`, fmt(c.cost), fmt(c.dps), joins(c), traitsOf(i).length,
+  ${table(['Companion', { h: 'Hire', cls: 'num' }, { h: 'Damage / level', cls: 'num' }, { h: 'Upgrades', cls: 'c' }], COMPS.map((c, i) => [
+    `<a class="who" href="#/${compId(c)}">${spr(c.sprite, 28)}${c.name}</a>`, fmt(c.cost), fmt(c.dps), traitsOf(i).length,
   ]))}
   ${h2('Hiring and leveling')}
-  <p>The first level of a companion costs its hire price. Each level after costs ×${TUNE.costGrowth} the one before. The next companion in the roster shows up once you've had ${pct(REVEAL_AT, 0)} of its hire price this run. The last six wait on a floor: they join once your deepest floor ever has reached it, and stay available after that.</p>
+  <p>The first level of a companion costs its hire price. Each level after costs ×${TUNE.costGrowth} the one before. The next companion in the roster shows up once you've had ${pct(REVEAL_AT, 0)} of its hire price this run.</p>
   <p>The buy buttons above the roster set how many levels a click buys:</p>
   ${table(['Button', 'Buys'], [
     ['×1, ×10, ×100', 'That many levels'],

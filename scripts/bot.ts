@@ -20,6 +20,9 @@ export interface Profile {
   ascendMin?: number;
   /** Awaken once stalled if the heartstones on offer are at least this share of all heartstones earned. */
   awakenRatio: number;
+  /** Or, when set: awaken once stalled after this many ascents made while an awakening would pay (Clicker Heroes'
+   *  advice: once a Transcension would gain, ascend 3 or 4 more times, then transcend). */
+  awakenAfter?: number;
   /** Seconds without a new deepest floor (this descent) before the player gives up on the run. */
   stall: number;
   /** Chance per tick of catching a treasure goblin that's on screen. */
@@ -36,8 +39,8 @@ export interface Profile {
 /** Legends in the order each kind of player wants them, and what a level of each power one is worth to them (the
  *  share of all damage it adds, roughly). */
 const OLD_PREF: Record<'active' | 'idle', LegendId[]> = {
-  active: ['fist', 'unbroken', 'hoard', 'needle', 'thinning', 'hourglass', 'wither', 'soulcaller', 'restless', 'lingering', 'haggler', 'lure', 'goblinking', 'collector', 'ronin', 'hungry', 'sleeper', 'patient', 'whirl', 'headsman', 'magpie', 'drummer', 'host'],
-  idle: ['sleeper', 'patient', 'hoard', 'thinning', 'hourglass', 'wither', 'soulcaller', 'haggler', 'lure', 'goblinking', 'restless', 'lingering', 'collector', 'ronin', 'hungry', 'needle', 'fist', 'unbroken', 'whirl', 'headsman', 'magpie', 'drummer', 'host'],
+  active: ['fist', 'engraver', 'unbroken', 'hoard', 'needle', 'thinning', 'hourglass', 'wither', 'soulcaller', 'restless', 'lingering', 'haggler', 'lure', 'goblinking', 'collector', 'ronin', 'hungry', 'sleeper', 'patient', 'whirl', 'headsman', 'magpie', 'drummer', 'host'],
+  idle: ['sleeper', 'engraver', 'patient', 'hoard', 'thinning', 'hourglass', 'wither', 'soulcaller', 'haggler', 'lure', 'goblinking', 'restless', 'lingering', 'collector', 'ronin', 'hungry', 'needle', 'fist', 'unbroken', 'whirl', 'headsman', 'magpie', 'drummer', 'host'],
 };
 const OLD_WORTH: Record<'active' | 'idle', Partial<Record<LegendId, number>>> = {
   active: { fist: 0.075, unbroken: 0.1, needle: 0.08, hoard: 0.04, goblinking: 0.01 },
@@ -66,6 +69,26 @@ export function playTo(floor: number, maxHours = 48): { save: SaveState; hours: 
   sim.startSession(maxHours * 3600);
   while (sim.game.s.bestFloor < floor && sim.t < maxHours * 3600) sim.runUntil(sim.t + 10);
   Math.random = random;
+  sim.game.bankAllDrops();
+  return { save: sim.game.saveState(), hours: sim.t / 3600 };
+}
+
+/** The save of a nonstop player the moment before their first ascent (the dev build's ?sim=ascend). */
+export function playToFirstAscent(maxHours = 48): { save: SaveState; hours: number } {
+  const random = Math.random;
+  seedRandom(1);
+  let before: { save: SaveState; hours: number } | null = null;
+  const sim = new Sim(NONSTOP, {
+    descend: (_, at) => {
+      if (before) return;
+      at.game.bankAllDrops();
+      before = { save: JSON.parse(JSON.stringify(at.game.saveState())), hours: at.t / 3600 };
+    },
+  });
+  sim.startSession(maxHours * 3600);
+  while (!before && sim.t < maxHours * 3600) sim.runUntil(sim.t + 10);
+  Math.random = random;
+  if (before) return before;
   sim.game.bankAllDrops();
   return { save: sim.game.saveState(), hours: sim.t / 3600 };
 }
@@ -102,6 +125,8 @@ export class Sim {
   private stallSeen = false;
   /** The depth of the last awakening: the bot awakens again only once it's past it. */
   private lastAwakenDepth = 0;
+  /** Ascents this cycle made while an awakening would already have paid. */
+  private paidAscents = 0;
   /** Played and away time together (ms): the clock expeditions run on. */
   private clock = 0;
 
@@ -203,6 +228,7 @@ export class Sim {
       : profile.descendRatio > 0 && game.pendingSouls() >= Math.max(10, game.s.souls * profile.descendRatio);
     if ((stalled || (profile.ascendEager && worthIt)) && game.canDescend() && worthIt) {
       const souls = game.pendingSouls();
+      if (game.canAwaken()) this.paidAscents++;
       game.recallAll();
       this.descents++;
       this.hooks.descend?.(souls, this);
@@ -212,8 +238,12 @@ export class Sim {
       this.feedLegends();
     }
     // Awaken once stalled with the payout worth a share of what's been earned so far (the first time, as soon as it opens).
-    if (stalled && game.canAwaken() && game.s.cycleBest >= this.lastAwakenDepth && game.pendingBound() >= Math.max(1, Math.ceil(game.s.boundEarned * profile.awakenRatio))) {
+    const awakenNow = profile.awakenAfter !== undefined
+      ? this.paidAscents >= profile.awakenAfter
+      : game.pendingBound() >= Math.max(1, Math.ceil(game.s.boundEarned * profile.awakenRatio));
+    if (stalled && game.canAwaken() && game.s.cycleBest >= this.lastAwakenDepth && awakenNow) {
       this.lastAwakenDepth = game.s.cycleBest;
+      this.paidAscents = 0;
       const bound = game.pendingBound();
       this.awakens++;
       this.hooks.awaken?.(bound, this);
@@ -361,7 +391,10 @@ export class Sim {
         if (cost > game.soulsFree()) continue;
         const p = worth[id];
         const keep = (cost * TUNE.soulPower) / game.soulMult();
-        const buy = def.kind === 'power' ? p !== undefined && p / (1 + p * lv) > keep : def.kind === 'utility' && cost <= game.soulsFree() * 0.05;
+        // (The Engraver's level is worth 2% of every Heartmark on whoever carries them, against the bonus they give now.)
+        const marks = Math.max(...game.s.marks);
+        const gain = id === 'engraver' ? (0.02 * marks) / (1 + game.markPower() * marks) : p !== undefined ? p / (1 + p * lv) : 0;
+        const buy = def.kind === 'power' ? gain > keep : def.kind === 'utility' && cost <= game.soulsFree() * 0.05;
         if (buy && game.levelLegend(id)) did = true;
       }
       if (!did) break;

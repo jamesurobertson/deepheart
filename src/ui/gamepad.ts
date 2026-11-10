@@ -195,7 +195,7 @@ export function installGamepad() {
     const wrap = document.querySelector<HTMLElement>('.modal-wrap:not([hidden])');
     if (!wrap || wrap.contains(document.activeElement)) return;
     const all = [...wrap.querySelectorAll<HTMLElement>(REACH_WINDOW)].filter((el) => visible(el) && !el.closest('.m-head') && !el.matches('.tab'));
-    land(all.find((el) => el.matches('.btn.primary, .btn.soul')) ?? all.find((el) => el.matches('.opts .opt')) ?? all[0] ?? null);
+    land(all.find((el) => el.matches('.btn.primary, .btn.soul, .btn.bound')) ?? all.find((el) => el.matches('.opts .opt')) ?? all[0] ?? null);
   };
   const leaveDock = () => {
     docked = false;
