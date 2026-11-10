@@ -6,7 +6,7 @@
  * minutes, for comparison. TUNE='{"deepGold":1.13}' overrides pacing knobs.
  */
 import { TUNE } from '../src/game/game.ts';
-import { COMPS } from '../src/game/data.ts';
+import { COMPS, GAP_SLOT } from '../src/game/data.ts';
 import { duration } from '../src/game/format.ts';
 import { NONSTOP, Sim, seedRandom, type Profile } from './bot.ts';
 
@@ -53,7 +53,7 @@ const sim = new Sim(PLAYER, {
     game.s.owned.forEach((level, i) => {
       if (level === 0 || hired.has(i)) return;
       hired.add(i);
-      if (i % 4 === 3 || COMPS[i].floor) lines.push(`${duration(t)}  ${COMPS[i].name} hired at level ${level}`);
+      if (i % 4 === 3 || i >= GAP_SLOT) lines.push(`${duration(t)}  ${COMPS[i].name} hired at level ${level}`);
     });
     if (game.baseDps().gt(0) && Math.random() < 0.05) {
       const crit = 1 + game.critChance() * (game.critMult() - 1);

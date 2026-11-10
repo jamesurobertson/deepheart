@@ -3,7 +3,7 @@ import { GAME_VERSION } from '../version.ts';
 import Decimal from 'break_infinity.js';
 import {
   CARD_BY_ID, COST_GROWTH, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, BOUND, BOUND_BY_ID, boundCost, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, featuredFor, modsFor, pickMonster,
-  CARDS, CORRUPTION, ZONES, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, levelMult, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
+  CARDS, CORRUPTION, ZONES, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, LEVEL_BONUS, levelBonuses, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
   LEGENDS, LEGEND_BY_ID, NEEDLE_CRIT, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost,
   type AbilityId, type LegendId, type BoundId,
   type Attack, type Effect, type ModId, type MonsterDef, type RaidReward, type Req, type TrophyReq, type UpgDef,
@@ -183,7 +183,7 @@ export const BASE_CRIT = 0.03;
 export const BASE_CRIT_MULT = 2;
 export const AWAKEN_ON = true;
 /** The Heart shows itself this many floors before it can first be awakened. */
-export const AWAKEN_TEASE = 50;
+export const AWAKEN_TEASE = 100;
 /** The way up first opens at this floor's boss. */
 export const DESCEND_FLOOR = 100;
 /**
@@ -194,20 +194,18 @@ export const DESCEND_FLOOR = 100;
  *   Each soul you keep adds `soulPower` (+10%) to all damage; Legends are the other thing to do with them.
  * - Bound souls a level up, as Clicker Heroes' Ancient Souls: floor(5 × log10(souls earned this cycle)) in all; an
  *   awakening pays what's above the best so far. Bound souls pull champion souls up with depth, as Clicker Heroes'
- *   Transcendent Power: ×(1 + p)^((floor − 100) / 5), p from `pullFloor` with your first bound soul toward `pullCap`
- *   (1 − e^(−bound / `pullScale`) of the way there). The Pit Lord multiplies them ×(1 + 10·level²), as Ponyboy.
- * - The wall: from floor `wallFrom` monsters get tougher by the same factor every floor, reaching `wall`× the health at
- *   `wallTo` and staying there (Clicker Heroes' wall past zone 500): a run that hasn't awakened slows to a stop on the
- *   way up it; the Bound and bound souls carry you past it. (Past it health grows no faster than before: a steeper
- *   climb there outran the Pit Lord and the pull, and every cycle stalled near floor 970.)
+ *   Transcendent Power: 20 × Pit Lord × ((1 + p)^(floor / 5 − 20) − 1) more, p from `pullFloor` with your first bound
+ *   soul toward `pullCap` (1 − e^(−bound / `pullScale`) of the way there: Clicker Heroes' 2% to 25% over about 3,333
+ *   Ancient Souls). The Pit Lord multiplies them ×(1 + 10·level²), as Ponyboy.
  * - The Ogre Chieftain adds `ogre` (×100%) to all damage per level. Zone bosses have `zoneBoss`× the health of mid-bosses.
- * - Up to floor `deepFrom` each floor has about `hpBase`× the health of the last, past it `deepHp`×. A floor's gold
+ * - Up to floor `deepFrom` each floor has about `hpBase`× the health of the last, past it `deepHp`× (`hpStep` more every
+ *   500 floors). A floor's gold
  *   starts at `goldBase` and grows `goldGrowth`× a floor, `deepGold`× past `deepFrom`. Companion damage grows about
  *   gold^0.82 once levels pass 200 (×1.07 a level against ×4 every 25), so past `deepFrom` every floor is about 2%
  *   further out of reach than the last: the gap souls, Legends and Heartmarks close.
  *   A floor's health and gold are shared across its 25 monsters.
  */
-export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.62, deepGold: 1.15, levelsPerSoul: 500, goldBossFrom: 100, goldBossChance: 0.25, soulPower: 0.1, deepHp: 1.145, deepFrom: 100, zoneBoss: 1, hpCreep: 0.0005, awakenFloor: AWAKEN_FLOOR, pullFloor: 0.02, pullCap: 0.15, pullScale: 187, ogre: 1, wallFrom: AWAKEN_FLOOR, wallTo: AWAKEN_FLOOR + 100, wall: 1000, costGrowth: COST_GROWTH };
+export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpBase: 1.55, goldBase: 1, goldGrowth: 1.62, deepGold: 1.15, levelsPerSoul: 2000, goldBossFrom: 100, goldBossChance: 0.25, soulPower: 0.1, deepHp: 1.145, deepFrom: 100, zoneBoss: 1, hpStep: 0.001, awakenFloor: AWAKEN_FLOOR, pullFloor: 0.02, pullCap: 0.25, pullScale: 3333, ogre: 1, costGrowth: COST_GROWTH };
 
 /** How gold on the floor reached the bank: picked up, left too long, swept up leaving the floor, or flown up when
  *  a rainbow portal opens. */
@@ -634,7 +632,7 @@ interface Computed {
   /** Each companion's share of the party's damage (0–1). */
   shares: number[];
   /** Per companion before the all-damage bonuses. */
-  baseComp: number[];
+  baseComp: Decimal[];
   parts: Parts;
   /** Product of the all-damage bonuses (upgrades, trophies, souls, cards, the Ogre Chieftain). */
   all: Decimal;
@@ -669,12 +667,16 @@ export interface OfflineSummary {
 /** Health of an ordinary monster on a floor (the classic clicker curve). */
 export function floorHp(f: number): Decimal {
   if (f <= TUNE.deepFrom) return new Decimal(10 * (f - 1 + TUNE.hpBase ** (f - 1)));
-  // Past deepFrom each floor's growth creeps up by hpCreep (in natural log) every 100 floors, so walls steepen the
-  // deeper you go and runs settle into steady gains instead of snowballing.
-  const n = f - TUNE.deepFrom;
-  // The wall ramps in to its full height at wallTo.
-  const wall = TUNE.wall ** Math.min(1, Math.max(0, (f - TUNE.wallFrom) / (TUNE.wallTo - TUNE.wallFrom)));
-  return floorHp(TUNE.deepFrom).times(Decimal.pow(TUNE.deepHp, n)).times(Decimal.exp((TUNE.hpCreep * n * n) / 200)).times(wall);
+  // Past deepFrom each floor is deepHp× the last, and that growth rises by hpStep every 500 floors (Clicker Heroes'
+  // ×1.145, then ×1.146 from zone 501, ×1.147 from 1,001…), so runs settle into steady gains instead of snowballing.
+  let logGrowth = 0;
+  for (let from = TUNE.deepFrom + 1; from <= f; ) {
+    const step = Math.floor((from - 1) / 500);
+    const to = Math.min(f, (step + 1) * 500);
+    logGrowth += (to - from + 1) * Math.log(TUNE.deepHp + TUNE.hpStep * step);
+    from = to + 1;
+  }
+  return floorHp(TUNE.deepFrom).times(Decimal.exp(logGrowth));
 }
 
 /** Gold for one ordinary monster's worth of a floor (monsters get a share of it, like their health). */
@@ -684,6 +686,12 @@ export function floorGold(f: number): Decimal {
 }
 
 export const isBossFloor = (f: number) => f % BOSS_EVERY === 0;
+
+/** levelMult in big numbers, for companions levelled past what a JS number holds. */
+const levelMultBig = (level: number) => {
+  const [fours, tens] = levelBonuses(level);
+  return Decimal.pow(LEVEL_BONUS.mult, fours).times(Decimal.pow(LEVEL_BONUS.thousand, tens));
+};
 
 const freshSeed = () => Math.floor(Math.random() * 2 ** 31);
 
@@ -1087,9 +1095,10 @@ export class Game {
     };
     const all = new Decimal(parts.ogre * parts.upgrades * parts.trophies * parts.souls * parts.cards);
     // A companion away hunting deals nothing here.
-    // (A companion that's away hunting, or locked behind a floor not reached this cycle, deals nothing here.)
-    const baseComp = COMPS.map((c, i) => (this.away(i) || !this.compUnlocked(i) ? 0 : c.dps * s.owned[i] * levelMult(s.owned[i]) * tier[i] * (1 + MARK_POWER * s.marks[i])));
-    const perComp = baseComp.map((b) => all.times(b * parts.party));
+    // (A companion that's away hunting deals nothing here.)
+    // (In big numbers: a late companion's damage at a few thousand levels is past what a JS number holds.)
+    const baseComp = COMPS.map((c, i) => (this.away(i) || !this.compUnlocked(i) ? new Decimal(0) : levelMultBig(s.owned[i]).times(c.dps).times(s.owned[i] * tier[i] * (1 + this.markPower() * s.marks[i]))));
+    const perComp = baseComp.map((b) => all.times(b).times(parts.party));
     const dps = perComp.reduce((a, b) => a.plus(b), new Decimal(0));
     const shares = perComp.map((d) => (dps.gt(0) ? d.div(dps).toNumber() : 0));
     const click = all.times(blades).plus(dps.times(parts.clickDps)).times(1 + 0.1 * this.legendLv('fist'));
@@ -1134,7 +1143,7 @@ export class Game {
   compNext(i: number) {
     const c = this.c;
     const n = this.s.owned[i];
-    return c.all.times(COMPS[i].dps * ((n + 1) * levelMult(n + 1) - n * levelMult(n)) * c.parts.tier[i] * (1 + MARK_POWER * this.s.marks[i]) * c.parts.party);
+    return c.all.times(levelMultBig(n + 1).times(n + 1).minus(levelMultBig(n).times(n)).times(COMPS[i].dps)).times(c.parts.tier[i] * (1 + this.markPower() * this.s.marks[i]) * c.parts.party);
   }
 
   clickDamage() {
@@ -1246,10 +1255,9 @@ export class Game {
     return (this.s.owned[i] > 0 && !this.away(i)) || (this.s.inKeep && i === 0 && this.s.owned.every((n) => n === 0));
   }
 
+  /** Everyone can be hired with gold, but for the full game's companions in the demo. */
   compUnlocked(i: number) {
-    if (DEMO && i >= DEMO_COMPANIONS) return false;
-    // Floor gates count this awakening's depth: an awakening locks them again until you're back down there.
-    return this.s.cycleBest >= COMPS[i].floor && this.s.awakens >= (COMPS[i].heart ?? 0);
+    return !DEMO || i < DEMO_COMPANIONS;
   }
 
   // ---------- floors and monsters ----------
@@ -1510,9 +1518,12 @@ export class Game {
     return true;
   }
 
-  /** Souls a champion boss on this floor pays: its own, times the Pit Lord and the pull of every bound soul. */
+  /** Souls a champion boss on this floor pays, as Clicker Heroes' primal bosses do: its own times the Pit Lord, plus
+   *  the pull's 20 × Pit Lord × ((1 + pull)^(floor / 5 − 20) − 1), which compounds with depth. */
   champSouls(floor: number) {
-    return Math.floor(bossSouls(floor) * this.champSoulMult(floor));
+    const pitlord = 1 + 10 * this.boundLv('pitlord') ** 2;
+    const pulled = 20 * pitlord * ((1 + this.pull()) ** Math.max(0, floor / 5 - 20) - 1);
+    return Math.floor(bossSouls(floor) * pitlord + pulled);
   }
 
   goldBossChance() {
@@ -2351,6 +2362,11 @@ export class Game {
     this.events.push({ t: 'mark', comp });
   }
 
+  /** Each Heartmark's damage: MARK_POWER, and the Engraver's 2% a level on top (Clicker Heroes' Argaiv on gilds). */
+  markPower() {
+    return MARK_POWER + 0.02 * this.legendLv('engraver');
+  }
+
   marksTotal() {
     return this.s.marks.reduce((a, b) => a + b, 0);
   }
@@ -2480,9 +2496,9 @@ export class Game {
     return bound ? TUNE.pullFloor + (TUNE.pullCap - TUNE.pullFloor) * (1 - Math.exp(-bound / TUNE.pullScale)) : 0;
   }
 
-  /** Champion souls on this floor: the Pit Lord's ×(1 + level²), and the pull of every bound soul, compounding with depth. */
+  /** How many times its own souls a champion boss on this floor pays, the Pit Lord and the pull counted. */
   champSoulMult(floor: number) {
-    return (1 + 10 * this.boundLv('pitlord') ** 2) * (1 + this.pull()) ** Math.max(0, (floor - TUNE.goldBossFrom) / 5);
+    return this.champSouls(floor) / bossSouls(floor);
   }
 
   /** A Spirit working harder for its Bound: +25% per level. */
@@ -3281,7 +3297,7 @@ export class Game {
   private compGain(i: number, n: number) {
     const c = this.c;
     const lv = this.s.owned[i];
-    return c.all.times(COMPS[i].dps * ((lv + n) * levelMult(lv + n) - lv * levelMult(lv)) * c.parts.tier[i] * (1 + MARK_POWER * this.s.marks[i]) * c.parts.party);
+    return c.all.times(levelMultBig(lv + n).times(lv + n).minus(levelMultBig(lv).times(lv)).times(COMPS[i].dps)).times(c.parts.tier[i] * (1 + this.markPower() * this.s.marks[i]) * c.parts.party);
   }
 
   /**

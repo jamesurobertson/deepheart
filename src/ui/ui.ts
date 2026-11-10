@@ -2,7 +2,7 @@ import { morph } from './morph.ts';
 import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MOD_BY_ID, NEWS, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { AWAKEN_ON, AWAKEN_TEASE, GOLD_SET_BONUS, SET_BONUS, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_POWER, MARK_REROLL, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { AWAKEN_ON, AWAKEN_TEASE, GOLD_SET_BONUS, SET_BONUS, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_REROLL, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
@@ -131,13 +131,20 @@ const WISPS = Array.from({ length: 7 }, (_, k) =>
   `<i style="--x:${10 + ((k * 37) % 80)}%;--d:${(2.4 + ((k * 13) % 22) / 10).toFixed(1)}s;--w:${-((k * 29) % 40) / 10}s;--s:${(0.6 + ((k * 7) % 8) / 10).toFixed(1)}"></i>`).join('');
 
 /** One of the Bound in full: what it boosts now, and the next four levels with their price and what each gives. */
+/** What a Bound boosts, the Spirit it works through underlined (hover it for what that Spirit does). */
+function boundWhat(b: BoundDef) {
+  if (!b.spirit) return esc(b.what);
+  const name = LEGEND_BY_ID.get(b.spirit)!.name;
+  return esc(b.what).replace(esc(name), `<span class="spirit-u" data-tip="spirit:${b.spirit}">${esc(name)}</span>`);
+}
+
+/** A Bound in full, as a Spirit is: its bonus (level 1's, if none bought) big beside what it boosts, then the levels
+ *  ahead, the next one lit. */
 function boundDetail(b: BoundDef, lv: number): string {
-  const rows = Array.from({ length: 4 }, (_, k) => lv + 1 + k)
-    .filter((n) => b.max === undefined || n <= b.max)
-    .map((n) => `<tr><td>Level ${n}</td><td>${boundGlyph(1.2)} ${fmt(boundCost(b, n - 1))}</td><td>${esc(b.value(n))}</td></tr>`).join('');
-  return `<p class="od-what">${esc(b.what)}: <b class="od-now bnd">${lv ? esc(b.value(lv)) : '—'}</b></p>
-    ${rows ? `<table class="od-lv">${rows}</table>` : ''}
-    ${b.max !== undefined ? `<p class="od-max">Max level ${b.max}</p>` : ''}`;
+  const levels = Array.from({ length: lv ? 4 : 5 }, (_, k) => lv + 1 + k).filter((n) => b.max === undefined || n <= b.max);
+  const rows = levels.map((n, k) => `<tr${k ? '' : ' class="next"'}><td>${k ? '' : '▶'}</td><td>Level ${n}</td><td>${boundPrice(boundCost(b, n - 1), 1.2)}</td><td>${esc(b.value(n))}</td></tr>`).join('');
+  return `<p class="od-val"><b>${esc(b.value(Math.max(1, lv)))}</b><span>${boundWhat(b)}</span></p>
+    ${rows ? `<table class="od-lv od-ladder">${rows}</table>` : ''}`;
 }
 
 /** A gold card's dazzle, as champions shed it in the dungeon: a breathing aura, pixel stars twinkling round the card
@@ -186,11 +193,6 @@ const clock = (s: number) => {
 
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
 
-/** What it takes to meet a companion who hasn't joined yet. */
-const meetText = (def: { floor: number; heart?: number }, cycleBest: number) =>
-  DEMO ? 'In the full game'
-    : cycleBest < def.floor ? `Reach floor ${fmt(def.floor)} to meet them` : `Awaken the Heart ${def.heart}× to meet them`;
-
 /** A small rate with up to two decimals (1.15, not 1.1); big ones as usual. */
 const perSec = (n: number) => (n < 100 ? String(Math.round(n * 100) / 100) : fmt(n));
 
@@ -227,6 +229,7 @@ function floorArt(floor: number, box: number) {
 
 /** A bound soul: the soul glyph in the Heart's red. */
 const boundGlyph = (scale = 2) => G.soul(scale).replace('g-soul', 'g-soul g-bound');
+const boundPrice = (n: number, size = 1.5) => `${boundGlyph(size)} ${fmt(n)} bound soul${n === 1 ? '' : 's'}`;
 
 /** A Bound standing on its plinth: the boss's first frame, tinted as the dungeon colors it, drawn once and kept. */
 const bossFigs = new Map<string, string>();
@@ -1369,7 +1372,7 @@ export class Ui {
         this.rowCache[ev.comp] = '';
         if (ev.from !== undefined) this.rowCache[ev.from] = '';
         if (ev.moved) this.toast(`A Heartmark moves to the <b>${esc(COMPS[ev.comp].name)}</b>`, COMPS[ev.comp].sprite);
-        else this.toast(`<b>Heartmark!</b> The ${esc(COMPS[ev.comp].name)} deals +${MARK_POWER * 100}% damage`, COMPS[ev.comp].sprite, 'trophy');
+        else this.toast(`<b>Heartmark!</b> The ${esc(COMPS[ev.comp].name)} deals +${Math.round(g.markPower() * 100)}% damage`, COMPS[ev.comp].sprite, 'trophy');
         break;
     }
   }
@@ -1940,7 +1943,7 @@ export class Ui {
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
       row.querySelector('.gen-name')!.innerHTML = `${name}${marks && !locked && !mystery ? ` <span class="marks" data-tip="mark:${i}">${G.heart(1.5)}${marks}</span>` : ''}${q.n > 1 && !locked && !mystery ? ` <small>×${q.n}</small>` : ''}`;
-      row.querySelector('.gen-cost')!.innerHTML = !DEMO && trip ? `<span class="need trip-tag">Expedition · floor ${fmt(trip.floor)}</span>` : locked ? `<span class="need">${G.lock()} ${meetText(def, g.s.cycleBest)}</span>` : gold(q.cost, can ? 'ok' : 'no');
+      row.querySelector('.gen-cost')!.innerHTML = !DEMO && trip ? `<span class="need trip-tag">Expedition · floor ${fmt(trip.floor)}</span>` : locked ? `<span class="need">${G.lock()} In the full game</span>` : gold(q.cost, can ? 'ok' : 'no');
       row.querySelector('.gen-lv')!.textContent = lv ? `Lv ${lv}` : '';
       row.querySelector('.gen-dps')!.textContent = trip ? '' : lv ? `${fmt(g.compDps(i))} dps` : '';
       // Owned traits and the next one only: the rest show up as you buy your way along. Past the last trait, the next
@@ -2220,8 +2223,8 @@ export class Ui {
               : state === 'raid' ? `<b>A treasure goblin!<small>Walk into it with ${padGlyph('ls', 18)} before it gets away</small></b>`
               : state === 'auto' ? `<b>Auto upgrades<small>Companion upgrades you've bought before buy themselves</small></b>`
               : state === 'autohire' ? `<b>Auto levels<small>Companion levels you've bought before buy themselves</small></b>`
-              : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${MARK_POWER * 100}% damage</small></b>`
-              : (padFamily() ? `<b>Attack the monsters!<small>Tap ${padGlyph('rt', 18)} to attack, hold it to keep attacking</small></b>` : `<b>${this.touch ? 'Tap' : 'Click'} the monsters!<small>Hold to keep ${this.touch ? 'tapping' : 'clicking'}</small></b>`);
+              : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${Math.round(g.markPower() * 100)}% damage</small></b>`
+              : (padFamily() ? `<b>Attack the monsters!<small>Tap ${padGlyph('rt', 18)} to attack, hold it to keep attacking</small></b>` : `<b>${this.touch ? 'Tap' : 'Click'} to attack monsters<small>Hold to keep attacking</small></b>`);
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
   }
@@ -2356,7 +2359,6 @@ export class Ui {
       const i = Number(id);
       const def = COMPS[i];
       if (DEMO && i >= DEMO_COMPANIONS) return '<div class="tt-h"><b>???</b></div><p class="tt-f">More companions join you in the full game.</p>';
-      if (!g.compUnlocked(i)) return `<div class="tt-h"><b>???</b></div><p class="tt-f">Someone waits deeper down. ${meetText(def, g.s.cycleBest)}.</p>`;
       if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">A new companion is on their way. Earn more gold to meet them.</p>`;
       // Away hunting: the trip, not the hire.
       const trip = g.s.expeditions.find((e) => e.comp === i && e.pausedAt === undefined);
@@ -2508,7 +2510,7 @@ export class Ui {
       if (kind === 'mark') {
         const i = Number(id);
         const n = g.s.marks[i];
-        return `<div class="tt-h"><b>${n} Heartmark${n === 1 ? '' : 's'}</b></div><p class="tt-d">The ${esc(COMPS[i].name)} deals +${n * MARK_POWER * 100}% damage.</p>`;
+        return `<div class="tt-h"><b>${n} Heartmark${n === 1 ? '' : 's'}</b></div><p class="tt-d">The ${esc(COMPS[i].name)} deals +${Math.round(n * g.markPower() * 100)}% damage.</p>`;
       }
     }
     if (kind === 'floor') {
@@ -2549,7 +2551,7 @@ export class Ui {
         abyss: DEMO ? `Ascend at floor ${fmt(g.ascendFloor())}.`
           : g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `Ascend at floor ${fmt(g.ascendFloor())}.`,
         ...(DEMO ? {} : {
-          heart: g.canAwaken() ? `Awaken for ${fmt(g.pendingBound())} bound souls` : `Bound souls ${fmt(g.boundFree())}`,
+          heart: g.canAwaken() ? `Awaken for ${fmt(g.pendingBound())} bound souls` : `Awaken at floor ${fmt(TUNE.awakenFloor)}`,
           keep: g.s.inKeep ? `Back to floor ${fmt(g.s.floor)}` : named ? 'The Keep' : '',
         }),
         stats: named ? 'Stats' : '',
@@ -2721,7 +2723,7 @@ export class Ui {
       html = head('Ascend', sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
     } else if (!DEMO && name === 'bound' && this.boundFocus) {
       const b = BOUND.find((x) => x.id === this.boundFocus)!;
-      html = head(esc(boundName(b)), `${boundGlyph()} ${fmt(g.boundFree())} bound souls`) + `<div class="lcards one">${this.boundCard(b)}</div>
+      html = head(esc(boundName(b)), boundPrice(g.boundFree(), 2)) + `<div class="lcards one">${this.boundCard(b)}</div>
         <div class="legend-panel">${boundDetail(b, g.boundLv(b.id))}</div>`;
     } else if (!DEMO && name === 'legend' && this.legendFocus) {
       const d = LEGEND_BY_ID.get(this.legendFocus)!;
@@ -2731,7 +2733,7 @@ export class Ui {
       const out = g.s.expeditions.length;
       html = head('Expeditions', out ? `${out} out` : '') + this.tripsHtml();
     } else if (!DEMO && name === 'heart') {
-      html = head('The Heart', g.s.awakens ? `${boundGlyph()} ${fmt(g.boundFree())} bound souls · ${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}` : '') + this.heartHtml();
+      html = head('The Heart', g.s.awakens ? boundPrice(g.boundFree(), 2) : '') + this.heartHtml();
     } else if (name === 'stats' || name === 'party' || name === 'records' || name === 'ascents') {
       html = head('Stats', '', this.statTabs(name)) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
     } else if (!DEMO && (name === 'dan' || name === 'victor')) {
@@ -2921,11 +2923,11 @@ export class Ui {
       const n = g.s.marks[i];
       if (!n && !g.s.owned[i]) return '';
       const others = total - n > 0;
-      return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${n ? `${G.heart(1.5)} ${n}` : ''}</td><td>${n ? `+${n * MARK_POWER * 100}%` : ''}</td>
+      return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${n ? `${G.heart(1.5)} ${n}` : ''}</td><td>${n ? `+${Math.round(n * g.markPower() * 100)}%` : ''}</td>
         <td>${n ? `<button class="btn small" data-mark-away="${i}" ${free >= MARK_REROLL ? '' : 'disabled'}>Send one away · ${G.soul(1.2)} ${MARK_REROLL}</button>` : ''}</td>
         <td>${others ? `<button class="btn small" data-mark-here="${i}" ${free >= MARK_MOVE ? '' : 'disabled'}>Bring one here · ${G.soul(1.2)} ${MARK_MOVE}</button>` : ''}</td></tr>`;
     }).join('');
-    return `<p class="muted bd-help">The first time you beat each 10th floor past ${100}, a random companion in your party gets a Heartmark: +${MARK_POWER * 100}% damage each, until you awaken. Send one to someone at random, or bring one from someone else to the companion you choose.</p>
+    return `<p class="muted bd-help">The first time you beat each 10th floor past ${100}, a random companion in your party gets a Heartmark: +${Math.round(g.markPower() * 100)}% damage each, until you awaken. Send one to someone at random, or bring one from someone else to the companion you choose.</p>
       <section class="bd wide bd-marks"><table><thead><tr><th>Companion</th><td>Marks</td><td>Damage</td><td></td><td></td></tr></thead>${rows}</table></section>`;
   }
 
@@ -3209,7 +3211,7 @@ export class Ui {
         <table>${live.map(tr).join('')}</table>
         ${idle.length ? `<p class="st-off">Not active: ${idle.map((r) => `<span${r.note ? ` data-tip="note:${esc(r.note)}"` : ''}>${r.label}</span>`).join(' · ')}</p>` : ''}</section>`;
     };
-    const baseSum = b.baseComp.reduce((a, v) => a + v, 0);
+    const baseSum = b.baseComp.reduce((a, v) => a.plus(v), new Decimal(0));
     const buffNames = (k: 'dps' | 'click' | 'gold') => g.s.buffs.filter((u) => u[k] > 1).map((u) => `${u.name} ×${u[k]}`).join(', ');
     const allRows = [
       mul('Trophies', p.trophies, `${g.s.trophies.length} trophies`),
@@ -3349,7 +3351,7 @@ export class Ui {
       return `<div class="heart-bar-box">${bar}</div><div class="bshades">${shades}</div><p class="bshades-note">The Bound await after you awaken</p>`;
     }
     return `<div class="heart-bar-box">${bar}</div>
-      <div class="lc-head"><h3>The Bound</h3><small>${boundGlyph(1.2)} ${fmt(g.boundFree())} to spend</small></div>
+      <div class="lc-head"><h3>The Bound</h3></div>
       <div class="lcards">${BOUND.map((b) => this.boundCard(b)).join('')}</div>`;
   }
 
@@ -3361,22 +3363,14 @@ export class Ui {
     const cost = g.boundPrice(b.id);
     const next = g.boundMaxed(b.id)
       ? `<span class="lc-max" data-tip="bound:${b.id}">Max level</span>`
-      : `<span>Next: ${esc(b.value(lv + 1))}</span><span class="lc-up" data-tip="bound:${b.id}" data-bound="${b.id}"><button class="btn primary" ${g.boundFree() >= cost ? '' : 'disabled'}>Level up · ${boundGlyph(1.5)} ${fmt(cost)}</button></span>`;
+      : `${lv ? `<span>Next: ${esc(b.value(lv + 1))}</span>` : ''}<span class="lc-up" data-tip="bound:${b.id}" data-bound="${b.id}"><button class="btn bound" ${g.boundFree() >= cost ? '' : 'disabled'}>Level up · ${boundPrice(cost)}</button></span>`;
     return `<div class="lcard bcard${lv ? '' : ' unbought'}" data-card="${b.id}">
       <div class="lc-fig"><span class="bsparks">${WISPS}</span><span class="ped-fig">${bossFig(b, 80, 96)}</span><span class="ped-stone"></span></div>
       <div class="lc-nm"><b>${esc(boundName(b))}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
-      <div class="lc-val">${lv ? esc(b.value(lv)) : '—'}</div>
-      <div class="lc-what">${this.boundWhat(b)}</div>
+      <div class="lc-val">${esc(b.value(Math.max(1, lv)))}</div>
+      <div class="lc-what">${boundWhat(b)}</div>
       <div class="lc-next">${next}</div>
     </div>`;
-  }
-
-  /** What a Bound boosts, the Spirit it works through underlined (hover it for what that Spirit does). */
-  private boundWhat(b: BoundDef) {
-    if (DEMO) return '';
-    if (!b.spirit) return esc(b.what);
-    const name = LEGEND_BY_ID.get(b.spirit)!.name;
-    return esc(b.what).replace(esc(name), `<span class="spirit-u" data-tip="spirit:${b.spirit}">${esc(name)}</span>`);
   }
 
   /** Cards picked up and waiting their turn to be shown (they're shown one at a time). */

@@ -59,7 +59,7 @@ const onStairs = (x: number, feet: number) => {
 };
 const STAIR_CELLS = Array.from({ length: STAIRS.steps }, (_, i) => Array.from({ length: STAIRS.wide }, (_, j): [number, number] => [STAIRS.x + i, STAIRS.y + j])).flat();
 /** Doors, set into the wall at the foot of a corridor (where its left side is, and the row its top is on): the Keep's
- *  entrance, and the way up to the Heart, shut until the Heart first stirs (its button shows in the dock). */
+ *  entrance, and the way up to the Heart, shut until your first awakening. */
 const ENTRANCE_DOOR: [number, number] = [20, 25];
 const HEART_DOOR: [number, number] = [5, 14];
 /** While it's shut: the doorway, so no one walks onto the door. */
@@ -256,7 +256,7 @@ export class KeepView {
   private walkable(x: number, y: number) {
     const cx = Math.floor(x), cy = Math.floor(y);
     if (this.cells[cy]?.[cx] !== '.' || this.blocked.has(`${cx},${cy}`)) return false;
-    if (!this.game.s.heartTeased && HEART_DOOR_SHUT.has(`${cx},${cy}`)) return false;
+    if (!this.game.s.awakens && HEART_DOOR_SHUT.has(`${cx},${cy}`)) return false;
     // Not half over a side wall: the hero (and the party in its footsteps) is a tile wide.
     const fx = x - cx;
     if (fx < SIDE_GAP && this.cells[cy][cx - 1] !== '.') return false;
@@ -524,7 +524,8 @@ export class KeepView {
     const offer = this.game.legendOffer().slice(0, SPIRITS.length).map((id, k) => figure(`offer:${id}`, LEGEND_BY_ID.get(id)!.name, SPIRITS[k], 3));
     const mine = this.guards().map(({ d, at }) => ({ ...figure(`legend:${d.id}`, d.name, at, 2), tag: [at[0], at[1] + 1.3] as [number, number] }));
     const bound = this.bound().map(({ b, at }) => ({ ...figure(`bound:${b.id}`, boundName(b), at, 2), tag: [at[0], at[1] + 1.3] as [number, number] }));
-    return [...STATIONS, ...(this.game.tripsOpen() ? [TRIPS] : []), ...offer, ...mine, ...bound];
+    const reachable = this.game.s.awakens ? STATIONS : STATIONS.filter((st) => st.id !== 'heart');
+    return [...reachable, ...(this.game.tripsOpen() ? [TRIPS] : []), ...offer, ...mine, ...bound];
   }
 
   /** Your followers in line behind the hero. The line keeps its order (in the save, between visits): a new hero steps
@@ -778,7 +779,7 @@ export class KeepView {
       }
     }
     this.drawDoor(g, img, atlas, ENTRANCE_DOOR, true);
-    this.drawDoor(g, img, atlas, HEART_DOOR, this.game.s.heartTeased);
+    this.drawDoor(g, img, atlas, HEART_DOOR, this.game.s.awakens > 0);
     // Everything standing, back to front: things, Dan and Victor, then your party (the hero leading).
     const standing: { y: number; draw: () => void }[] = [];
     for (const [name, x, y, how] of THINGS) {
@@ -916,18 +917,26 @@ export class KeepView {
       g.restore();
       g.filter = 'none';
     } });
-    // The Bound, as themselves in their own colors, with red sparks rising round them.
+    // The Bound, with red sparks rising round them: in the Heart's red until you buy a level, as Spirits on offer are
+    // in soul purple, then as themselves in their own colors.
     this.bound().forEach(({ b, at }, k) => {
       const boss = ZONES[b.zone].boss;
       const src = spriteFrames(boss.sprite);
       if (!src) return;
       const frame = (tick + k) % src.frames.length;
       const r = src.frames[frame];
+      const unbought = this.game.boundLv(b.id) === 0;
       standing.push({ y: at[1] + 1, draw: () => {
         shadow(at[0] + 0.5, at[1] + 1, 7);
+        if (unbought) {
+          g.save();
+          g.globalAlpha = 0.86;
+          g.filter = 'grayscale(1) sepia(1) hue-rotate(308deg) saturate(2.6) brightness(1.15) drop-shadow(0 0 3px rgba(255, 90, 126, 0.9))';
+        }
         const tinted = boss.tint !== undefined ? this.tinted(src.img, r, boss.tint) : null;
         if (tinted) standLit(`bound:${b.id}`, tinted, { x: 0, y: 0, w: r.w, h: r.h } as Rect, at[0] + 0.5, at[1] + 1, at[0] > HEART[0]);
         else standLit(`bound:${b.id}`, src.img, r, at[0] + 0.5, at[1] + 1, at[0] > HEART[0]);
+        if (unbought) g.restore();
         for (let w = 0; w < 6; w++) {
           const t = (this.time * 0.3 + w / 6 + k * 0.21) % 1;
           g.fillStyle = w % 3 === 0 ? '#ffb3c4' : '#ff5a7e';

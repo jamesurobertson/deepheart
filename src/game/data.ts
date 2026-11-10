@@ -25,33 +25,22 @@ export interface CompDef {
   dps: number;
   attack: Attack;
   flavor: string;
-  /** Waits on this floor: hired only once your deepest floor ever has reached it. */
-  floor: number;
   big?: boolean;
-  /** Needs this many awakenings of the Heart (the late recruits). */
-  heart?: number;
 }
 
-const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, floor = 0, big = false, heart = 0): CompDef =>
-  ({ id, name, sprite, cost, dps, attack, flavor, floor, big, heart });
+const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, big = false): CompDef =>
+  ({ id, name, sprite, cost, dps, attack, flavor, big });
 
-/** Prices go by place in the list, whoever stands there, spaced as Clicker Heroes spaces its heroes. The first
- *  twenty-three come with gold, each priced against the floor they should arrive on. The first sixteen cost 5 monsters'
- *  gold there: the demo's eight by
- *  floor 30, then one every 8 floors to the Plague Doctor at 94. Then a gap, as after Clicker Heroes' Frostleaf: the
- *  next seven cost 30,000 monsters' gold on floors 125 to 300 (a minute and a half of killing there, weeks of farming
- *  from where the first run levels off), so the first run stops near floor 120 and only souls reach them, about one an
- *  ascent before the awakening. The last nine wait on a floor, each
- *  priced against the gold on its floor, more of it the deeper it waits (150× the floor's gold at 95, rising to 30,000×
- *  from 450 on: about a minute and a half of killing at full speed), since a deeper one meets a stronger party. Their
- *  floors come from the pacing sim (a player who ascends when stuck): two before the awakening, then gaps that widen
- *  from about 8 to 45 played hours.
- *  Once levels pass 200, damage per gold grows about gold^0.82 for
- *  everyone (×1.07 a level against ×4 every 25), so damage is set from price on one smooth curve: from the Shieldmaiden
- *  on, damage ÷ price^0.82 is about 8% better than the one before through the first twenty-three and 12% after, counted
- *  as if each had three ×2 traits. So a new face always hits harder than the last, and one whose traits go to the party,
- *  gold or crits instead ends up weaker on its own. Those with more than three (the Archmage and the late ones) keep the
- *  numbers they were tuned at; the Archmage sits just above the Oathbreaker. */
+/** Prices go by place in the list, whoever stands there, spaced as Clicker Heroes spaces its heroes, and gold is all a
+ *  companion waits on. The first sixteen cost 5 monsters' gold on the floor they should arrive on: the demo's eight by
+ *  floor 30, then one every 8 floors to the Cleric at 94. The seventeenth (GAP_SLOT) costs 3,000 monsters' gold on
+ *  floor 160, as Frostleaf stands before Clicker Heroes' gap: a minute and a half of killing there, weeks of farming
+ *  from where the first run levels off, so the first run stops near floor 120 and only souls reach it. Everyone after
+ *  is priced like the Rangers (Dread Knight on), by priceLate below.
+ *  Once levels pass 200, damage per gold grows about gold^0.82 for everyone (×1.07 a level against ×4 every 25), so the
+ *  first seventeen's damage is set from price on one smooth curve: from the sixth on, damage ÷ price^0.82 is about 8%
+ *  better than the one before, counted as if each had three ×2 traits. So a new face always hits harder than the last,
+ *  and one whose traits go to the party, gold or crits instead ends up weaker on its own. */
 export const COMPS: CompDef[] = [
   // Plain adventurers first; the strange and the enormous come later.
   // The first four are cheap and hit hard, so the party carries the opening and clicking is a bonus.
@@ -59,38 +48,55 @@ export const COMPS: CompDef[] = [
   c('ranger', 'Ranger', 'elf_f', 40, 4, 'arrow', 'Never misses. Well, rarely. Well, sometimes.'),
   c('brawler', 'Dwarf Brawler', 'dwarf_m', 250, 12, 'slash', 'Came for the gold. Stayed for the punching.'),
   c('apprentice', 'Apprentice', 'wizzard_m', 2_000, 50, 'bolt', 'Knows one spell. So far nobody has complained.'),
-  c('gingerbread', 'G Man', 'cr_gingerbread', 12_000, 150, 'slash', 'Ran from the oven. Somehow ended up down here.'),
-  c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 80_000, 1_400, 'slash', 'Her shield has killed more monsters than her sword.'),
-  c('hunter', 'Lizard Hunter', 'lizard_m', 3.2e5, 4_700, 'spear', 'Can smell a monster through three floors of solid stone.'),
-  c('thief', 'Shadow Thief', 'cr_green_thief', 1.3e6, 16_000, 'knife', 'He carries six daggers. Seven would simply be bragging.'),
-  // The demo stops at the Shadow Thief: past him, one silhouette for the full game.
-  ...(DEMO ? [c('corsair', '???', 'cr_pirate_captain', 5e6, 87_000, 'bomb', '')] : [
-    c('corsair', 'Corsair Captain', 'cr_pirate_captain', 2.8e8, 1.4e6, 'bomb', 'Sailed the seven seas. Still confused by stairs.'),
-    c('runesmith', 'Runesmith', 'dwarf_f', 1.3e10, 3.6e7, 'rune', 'Maybe should be in OSRS. But here we are.'),
-    c('woodelf', 'Wood Elf', 'ef_elf_f', 6.4e11, 9.5e8, 'arrow', 'Grew up in the Enchanted Grove. Has opinions about what you did to it.'),
-    c('stormcaller', 'Stormcaller', 'wizzard_f', 3e13, 2.5e10, 'storm', 'Brings her own weather. Down here, of all places.'),
-    c('dancer', 'Blade Dancer', 'elf_m', 1.4e15, 6e11, 'slash', 'Fights like it is a performance. Nobody claps.'),
-    c('bard', 'Wandering Bard', 'rm_rocker', 6.8e16, 1.6e13, 'orb', 'We\'re not sure how he got in here.'),
-    c('venomblade', 'Venomblade', 'lizard_f', 3.2e18, 4.1e14, 'dark', 'Every blade is poisoned. She has a lot.'),
-    c('doctor', 'Plague Doctor', 'doc', 1.5e20, 1e16, 'flask', 'Treats monsters with a strict regimen of dying.'),
-    c('cleric', 'Cleric', 'ef_normalcleric', 7.3e28, 1.5e23, 'light', 'Here to heal the party. Hasn\'t had to yet, so he hits things.'),
-    c('frostimp', 'Frost Imp', 'cr_frost_imp', 1.2e30, 1.7e24, 'ice', 'Came up from the Frozen Vault. Finds the rest of the dungeon too warm.'),
-    c('santa', 'Santa', 'cr_santa', 3.9e31, 3.1e25, 'ice', 'Santa? Is that really you?'),
-    c('paladin', 'Paladin', 'cr_gold_knight', 1.3e33, 5.7e26, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
-    c('hollow', 'Lantern Knight', 'pumpkin_dude', 4.2e34, 1.1e28, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
-    c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 1.4e36, 2.1e29, 'dark', 'Has broken every vow but one. Nobody asks which.'),
-    c('archmage', 'Archmage', 'cr_wizard', 4.6e37, 1.3e30, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
-    c('wraith', 'The Count', 'rm_dracula', 5.5e38, 2.9e31, 'bat', 'We all know who he really is.', 335),
-    c('elfqueen', 'Elf Queen', 'ef_highelf_f', 1.2e41, 1.4e33, 'light', 'Left her court for the deep. Still expects a curtsy.', 370),
-    c('necro', 'Necromancer', 'necromancer', 6.5e76, 1.5e62, 'skull', 'Used to raise these monsters. Now he lowers them.', 950),
-    c('king', 'Exiled King', 'sd_king', 1.3e104, 7.7e84, 'fire', 'Lost his crown, his kingdom and his temper. In that order.', 1400),
-    c('elflord', 'Elf Lord', 'ef_highelf_m', 2.3e125, 2.3e102, 'slash', 'A thousand years of swordsmanship. Still practicing.', 1750),
-    c('magus', 'Old Magus', 'ef_wizard', 5.7e158, 3.1e129, 'storm', 'Was down here before the dungeon. Says it followed him.', 2300),
-    c('angel', 'Fallen Angel', 'angel', 1.2e186, 9.2e151, 'light', 'Fell from somewhere, here to stay.', 2750),
-    c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 2.1e207, 1.1e170, 'slash', 'Answers to "Pebble." Crushes whatever you point at.', 3100, true),
-    c('demon', 'Bound Demon', 'big_demon', 5e240, 3.5e196, 'fire', 'The contract is written in blood. Mostly the monsters\'.', 3650, true),
+  c('shieldmaiden', 'Shieldmaiden', 'ef_elvenknight', 12_000, 150, 'slash', 'Her shield has killed more monsters than her sword.'),
+  c('hunter', 'Lizard Hunter', 'lizard_m', 80_000, 1_400, 'spear', 'Can smell a monster through three floors of solid stone.'),
+  c('thief', 'Shadow Thief', 'cr_green_thief', 3.2e5, 4_700, 'knife', 'He carries six daggers. Seven would simply be bragging.'),
+  c('corsair', 'Corsair Captain', 'cr_pirate_captain', 1.3e6, 16_000, 'bomb', 'Sailed the seven seas. Still confused by stairs.'),
+  // The demo stops at the Corsair Captain: past him, one silhouette for the full game.
+  ...(DEMO ? [c('runesmith', '???', 'dwarf_f', 5e6, 87_000, 'rune', '')] : [
+    c('runesmith', 'Runesmith', 'dwarf_f', 2.8e8, 1.4e6, 'rune', 'Maybe should be in OSRS. But here we are.'),
+    c('woodelf', 'Wood Elf', 'ef_elf_f', 1.3e10, 3.6e7, 'arrow', 'Grew up in the Enchanted Grove. Has opinions about what you did to it.'),
+    c('stormcaller', 'Stormcaller', 'wizzard_f', 6.4e11, 9.5e8, 'storm', 'Brings her own weather. Down here, of all places.'),
+    c('dancer', 'Blade Dancer', 'elf_m', 3e13, 2.5e10, 'slash', 'Fights like it is a performance. Nobody claps.'),
+    c('bard', 'Wandering Bard', 'rm_rocker', 1.4e15, 6e11, 'orb', 'We\'re not sure how he got in here.'),
+    c('venomblade', 'Venomblade', 'lizard_f', 6.8e16, 1.6e13, 'dark', 'Every blade is poisoned. She has a lot.'),
+    c('doctor', 'Plague Doctor', 'doc', 3.2e18, 4.1e14, 'flask', 'Treats monsters with a strict regimen of dying.'),
+    c('cleric', 'Cleric', 'ef_normalcleric', 1.5e20, 1e16, 'light', 'Here to heal the party. Hasn\'t had to yet, so he hits things.'),
+    c('frostimp', 'Frost Imp', 'cr_frost_imp', 7.3e27, 2.3e22, 'ice', 'Came up from the Frozen Vault. Finds the rest of the dungeon too warm.'),
+    c('gingerbread', 'G Man', 'cr_gingerbread', 0, 0, 'slash', 'Ran from the oven. Somehow ended up down here.'),
+    c('santa', 'Santa', 'cr_santa', 0, 0, 'ice', 'Santa? Is that really you?'),
+    c('paladin', 'Paladin', 'cr_gold_knight', 0, 0, 'slash', 'Swore to purge the deep. Has been purging enthusiastically.'),
+    c('hollow', 'Lantern Knight', 'pumpkin_dude', 0, 0, 'fire', 'Nobody knows what is inside the pumpkin. Don\'t be the first to ask.'),
+    c('oathbreaker', 'Oathbreaker', 'cr_purple_knight', 0, 0, 'dark', 'Has broken every vow but one. Nobody asks which.'),
+    c('archmage', 'Archmage', 'cr_wizard', 0, 0, 'orb', 'Older than the dungeon. Insists the dungeon was smaller back then.'),
+    c('wraith', 'The Count', 'rm_dracula', 0, 0, 'bat', 'We all know who he really is.'),
+    c('elfqueen', 'Elf Queen', 'ef_highelf_f', 0, 0, 'light', 'Left her court for the deep. Still expects a curtsy.'),
+    c('necro', 'Necromancer', 'necromancer', 0, 0, 'skull', 'Used to raise these monsters. Now he lowers them.'),
+    c('king', 'Exiled King', 'sd_king', 0, 0, 'fire', 'Lost his crown, his kingdom and his temper. In that order.'),
+    c('elflord', 'Elf Lord', 'ef_highelf_m', 0, 0, 'slash', 'A thousand years of swordsmanship. Still practicing.'),
+    c('magus', 'Old Magus', 'ef_wizard', 0, 0, 'storm', 'Was down here before the dungeon. Says it followed him.'),
+    c('angel', 'Fallen Angel', 'angel', 0, 0, 'light', 'Fell from somewhere, here to stay.'),
+    c('ogre', 'Tamed Oni', 'sm_large_oni_blue', 0, 0, 'slash', 'Answers to "Pebble." Crushes whatever you point at.', true),
+    c('demon', 'Bound Demon', 'big_demon', 0, 0, 'fire', 'The contract is written in blood. Mostly the monsters\'.', true),
   ]),
 ];
+
+/** The seventeenth companion stands in the big gap: everyone after it is priced by priceLate. */
+export const GAP_SLOT = 16;
+
+/** Everyone after the gap is priced as Clicker Heroes' Rangers: each `step`× the one before (Clicker Heroes' 1e15, about
+ *  247 floors of gold), the first `skip` more steps past the gap companion (as Dread Knight is a Ranger nobody buys),
+ *  damage ×step^0.858 with each (Clicker Heroes' ×7.4e12 for ×1e15). The sims call it again to try other steps. */
+export const LATE_PRICING = { step: 1e15, skip: 0 };
+export function priceLate(step = LATE_PRICING.step, skip = LATE_PRICING.skip) {
+  const gap = COMPS[GAP_SLOT];
+  for (let i = GAP_SLOT + 1; i < COMPS.length && gap; i++) {
+    const steps = i - GAP_SLOT + skip;
+    COMPS[i].cost = gap.cost * step ** steps;
+    COMPS[i].dps = gap.dps * step ** (0.858 * steps);
+  }
+}
+priceLate();
 
 /** A companion's place in the roster, by id (so lists below don't break if the order changes). */
 export const compIndex = (id: string) => {
@@ -316,11 +322,16 @@ export const LEVEL_BONUS = { from: 200, every: 25, mult: 4, thousand: 10 };
 export const milestoneMult = (level: number) =>
   level < LEVEL_BONUS.from || (level - LEVEL_BONUS.from) % LEVEL_BONUS.every ? 1 : level % 1000 ? LEVEL_BONUS.mult : LEVEL_BONUS.thousand;
 export const levelMult = (level: number) => {
-  if (level < LEVEL_BONUS.from) return 1;
+  const [fours, tens] = levelBonuses(level);
+  return LEVEL_BONUS.mult ** fours * LEVEL_BONUS.thousand ** tens;
+};
+/** How many of a level's milestones so far are ×4s and how many ×10s (every 1000th level). */
+export function levelBonuses(level: number): [number, number] {
+  if (level < LEVEL_BONUS.from) return [0, 0];
   const steps = Math.floor((level - LEVEL_BONUS.from) / LEVEL_BONUS.every) + 1;
   const thousands = Math.floor(level / 1000);
-  return LEVEL_BONUS.mult ** (steps - thousands) * LEVEL_BONUS.thousand ** thousands;
-};
+  return [steps - thousands, thousands];
+}
 
 /** Each companion level costs this much more than the last. */
 export const COST_GROWTH = 1.07;
@@ -578,7 +589,7 @@ export function modsFor(floor: number): ModId[] {
 // ---------- Legends (spending souls) ----------
 
 export type LegendId =
-  | 'sleeper' | 'fist' | 'breaker' | 'needle' | 'hoard' | 'patient' | 'goblinking' | 'unbroken'
+  | 'sleeper' | 'fist' | 'breaker' | 'needle' | 'hoard' | 'patient' | 'goblinking' | 'unbroken' | 'engraver'
   | 'hourglass' | 'wither' | 'thinning' | 'haggler' | 'restless' | 'soulcaller' | 'lure' | 'collector' | 'ronin'
   | 'lingering' | 'whirl' | 'headsman' | 'magpie' | 'drummer' | 'host'
   | 'hungry';
@@ -636,6 +647,7 @@ export const LEGENDS: LegendDef[] = DEMO ? [] : [
   o({ id: 'fist', name: 'The Fist', kind: 'power', sprite: 'sm_large_oni_red', what: 'Attack and Phantom Blade', value: per(0.1) }),
   o({ id: 'breaker', name: 'The Breaker', kind: 'power', sprite: 'sd_large_knight_elite', what: 'Critical hit damage', value: per(0.15) }),
   o({ id: 'needle', name: 'The Needle', kind: 'utility', sprite: 'sd_executioner', what: 'Critical hit chance', value: share(NEEDLE_CRIT, (n) => `+${pct(n)}`) }),
+  o({ id: 'engraver', name: 'The Engraver', kind: 'power', sprite: 'ef_fatcleric', what: 'Each Heartmark', value: per(0.02) }),
   o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'sd_mountain_king', what: 'All gold', value: per(0.05) }),
   o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'sm_sohei', what: 'Gold while idle', value: per(0.5) }),
   o({ id: 'goblinking', name: 'The Wish', kind: 'power', sprite: 'ef_fairy', what: 'Goblin and vault gold', value: per(0.5) }),
@@ -662,7 +674,7 @@ export const LEGEND_BY_ID = new Map(LEGENDS.map((d) => [d.id, d]));
 // ---------- awakening ----------
 
 /** Awakening first opens at this deepest floor. */
-export const AWAKEN_FLOOR = 400;
+export const AWAKEN_FLOOR = 300;
 /** A boss beaten with this many seconds or fewer left is a clutch kill. */
 export const CLUTCH_SECONDS = 3;
 
