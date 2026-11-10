@@ -1740,3 +1740,15 @@ body.pad-on .modes > span:not(.pad-amount) { display: none; }
 body.phone .pad-bar { display: none; }
 /* (Purple doesn't read on gold: a price on a gold button is drawn in the button's own ink.) */
 .btn.primary .glyph.g-soul { color: currentColor; }
+
+/* ---------- phones: a page instead of the game ---------- */
+body.soon-page #stage, body.soon-page #ui { display: none; }
+.soon {
+  position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  padding: calc(16px + var(--safe-t)) calc(16px + var(--safe-r)) calc(16px + var(--safe-b)) calc(16px + var(--safe-l));
+  background: radial-gradient(ellipse at 50% 60%, rgba(120, 20, 40, 0.35), transparent 65%), #0a0708; text-align: center;
+}
+.soon .mm-logo { font-size: clamp(52px, 15vmin, 96px); }
+.soon-line { margin: 4px 0 0; font: 400 28px/1 'Jersey 10'; letter-spacing: 1px; color: var(--text); text-shadow: var(--shadow); }
+.soon-steam { min-width: 160px; min-height: 48px; font-size: 20px; text-decoration: none; }
+.soon-note { margin: 0; font: 400 12px/1 'Silkscreen'; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); }
