@@ -48,6 +48,7 @@ const RARE_NEWS = 0.15;
 const STAR_WAIT_MS = 1000;
 /** How long your first Heartmark is pointed out. */
 const MARK_TIP_MS = 8000;
+const FALL_BACK_TIP_MS = 30_000;
 /** How long a new skill is pointed out once it unlocks (one you press goes as soon as it's used). */
 const SKILL_TIP_MS = 6000;
 /** How close your hero or the cursor has to come to a coin to pick it up (px). */
@@ -291,6 +292,8 @@ export class Ui {
   /** Which page of Options is open. */
   private setTab: 'sound' | 'display' | 'cursor' | 'game' | 'save' = 'sound';
   private hintState = '';
+  /** A boss has sent the party back a floor this session (the first time, the Auto button is pointed out). */
+  private fellBack = false;
   /** When the current hint appeared (the hero tips time out). */
   private tourAt = 0;
   /** When the pointer was last on a monster, and when switching heroes first became possible: the star tip waits
@@ -1248,7 +1251,10 @@ export class Ui {
       case 'bossFail':
         // The first wall: this is where the game teaches you to descend.
         if (g.s.descents === 0 && ev.floor >= DESCEND_FLOOR && g.canDescend()) this.banner('You can ascend', 'Come back stronger', 'fail');
-        else this.banner('The boss held', 'Your party falls back to grow stronger', 'fail');
+        else {
+          this.banner('The boss held', 'Your party falls back to grow stronger', 'fail');
+          this.fellBack = true;
+        }
         break;
       case 'buyComp':
         this.rowCache[ev.comp] = '';
@@ -2145,6 +2151,8 @@ export class Ui {
     if (g.s.clicks < 6) state = 'click';
     else if (g.s.owned.every((n) => n === 0) && g.s.gold.gte(g.compCost(0))) state = firstRun ? 'hire' : 'nudge';
     else if (newSkill) state = `skill:${newSkill.id}`;
+    // The first time a boss sends you back: Auto is off now, and the party stays put until it's back on.
+    else if (this.fellBack && !g.s.fallBackTipSeen && g.downed <= 0) state = 'fallback';
     // The first champion: pointed out until one is slain.
     else if (g.s.champions === 0 && g.monsters.some((m) => m.champ)) state = 'champ';
     // The first champion boss that pays souls, too: by then you've usually met a champion, but not this.
@@ -2185,6 +2193,11 @@ export class Ui {
       if (shown > SKILL_TIP_MS || (ABILITY_BY_ID.get(id)!.kind === 'button' && g.abilityCooldown(id) > 0)) this.skillSeen(id, true);
     } else if (state === 'rampage') {
       this.pointAt(this.el.abilities.querySelector('[data-ability="rampage"]'));
+    } else if (state === 'fallback') {
+      const rect = this.el.auto.getBoundingClientRect();
+      this.el.hint.style.transform = `translate(${rect.left + rect.width / 2}px, ${rect.bottom + 14}px)`;
+      this.el.hint.style.visibility = 'visible';
+      if (g.s.auto || g.s.floor >= g.s.maxFloor || shown > FALL_BACK_TIP_MS) g.s.fallBackTipSeen = true;
     } else if (state === 'auto') {
       this.pointAt(this.el.autoUpg);
       if (this.hintState === 'auto' && performance.now() - this.tourAt > MARK_TIP_MS) g.s.autoTipSeen = true;
@@ -2206,7 +2219,7 @@ export class Ui {
       if (comp >= 0) padPick(comp);
     }
     const pointing = state.startsWith('skill:') || ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'mark', 'auto', 'autohire'].includes(state);
-    this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ' && !(state === 'raid' && padFamily());
+    this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ' && state !== 'fallback' && !(state === 'raid' && padFamily());
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero' || state === 'raid');
     this.el.shop.classList.toggle('show-stars', state === 'star');
@@ -2221,6 +2234,7 @@ export class Ui {
             : state === 'shop' ? `<b>An upgrade is ready!<small>${padFamily() ? `Press ${padGlyph('x', 18)} to buy it` : this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
               : state === 'champ' ? this.champHint()
               : state === 'raid' ? `<b>A treasure goblin!<small>Walk into it with ${padGlyph('ls', 18)} before it gets away</small></b>`
+              : state === 'fallback' ? `<b>The boss beat you<small>Auto is off: ${padFamily() ? `press ${padCombo(['lt', 'down'], 18)}` : 'turn it back on'} when you're ready to try again</small></b>`
               : state === 'auto' ? `<b>Auto upgrades<small>Companion upgrades you've bought before buy themselves</small></b>`
               : state === 'autohire' ? `<b>Auto levels<small>Companion levels you've bought before buy themselves</small></b>`
               : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${Math.round(g.markPower() * 100)}% damage</small></b>`
@@ -2283,6 +2297,14 @@ export class Ui {
     this.el.hint.classList.toggle('point-down', above);
     if (rect) this.el.hint.style.transform = above ? `translate(${rect.left + rect.width / 2}px, ${rect.top - 6}px)` : `translate(${rect.left - 12}px, ${rect.top + rect.height / 2}px)`;
     this.el.hint.style.visibility = visible ? 'visible' : 'hidden';
+  }
+
+  /** Who unlocks a skill, without naming a companion you've never had. */
+  private unlockedBy(id: AbilityId) {
+    const g = this.game;
+    const comp = ABILITY_BY_ID.get(id)!.comp;
+    const met = comp < Math.max(1, g.s.revealed) || g.s.owned[comp] > 0 || g.s.bestLevel[comp] > 0;
+    return met ? `Unlocked by the ${COMPS[comp].name}` : `Unlocked by a companion you haven't met`;
   }
 
   /** The companion holding the most Heartmarks (where the first one is pointed out). */
@@ -2376,7 +2398,6 @@ export class Ui {
         <ul class="tt-l">
           ${g.s.owned[i] ? `<li>Deals <b>${fmt(g.compDps(i))}</b> damage/sec (${(share * 100).toFixed(1)}% of your party)</li>` : ''}
           <li>Next ${q.n > 1 ? `${q.n} levels` : 'level'}: <b class="up">+${fmt(next)}</b> damage/sec</li>
-          <li>${traitLevels(i).includes(nextMilestone(i, g.s.owned[i])) ? 'Next upgrade' : `×${milestoneMult(nextMilestone(i, g.s.owned[i]))} damage`} at level ${nextMilestone(i, g.s.owned[i])}</li>
         </ul>
         <p class="tt-f">“${esc(def.flavor)}”</p>`;
     }
@@ -2415,11 +2436,12 @@ export class Ui {
       const status = !DEMO && g.away(a.comp)
         ? `The ${comp.name} is on an expedition.`
         : !g.abilityUnlocked(a.id)
-        ? `Unlocked by the ${comp.name}.`
+        ? `${this.unlockedBy(a.id)}.`
         : a.kind === 'passive' ? ''
           : fever ? (next ? `×${fmt(g.feverMult())}. Keep clicking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
             : a.kind === 'charge' && g.s.fervor < 1 ? `${Math.floor(g.s.fervor * 100)}% charged.`
               : cd > 0 ? `Ready again in ${duration(cd)}.` : padFamily() ? `Ready. Press ${this.abilityButtons(a.id)} to use it.` : `Ready. Click to use it${key}.`;
+      if (!g.s.abilitiesFound.includes(a.id)) return `<div class="tt-h"><b>???</b><span class="tt-own">locked</span></div><p class="tt-f">${this.unlockedBy(a.id)}.</p>`;
       const timing = a.kind === 'button' ? `<ul class="tt-l"><li>Lasts ${+g.abilityDuration(a.id).toFixed(1)}s · cooldown ${duration(a.cooldown ?? 0)}</li></ul>` : '';
       return `<div class="tt-h"><b>${esc(a.name)}</b><span class="tt-own">${a.kind === 'passive' ? 'always on' : padFamily() ? this.abilityButtons(a.id) : this.touch ? 'ability' : `key ${abilityKey(a.id)}`}</span></div>
         <p class="tt-d">${esc(g.abilityText(a.id))}</p>${timing}${status ? `<p class="tt-f">${status}</p>` : ''}`;
@@ -3236,10 +3258,10 @@ export class Ui {
       row('During Rampage', x(g.feverMult())),
     ]);
 
-    const critNote = g.abilityUnlocked('crit') ? `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} companions` : ''}` : `Unlocked by the ${COMPS[ABILITY_BY_ID.get('crit')!.comp].name}`;
+    const critNote = g.abilityUnlocked('crit') ? `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} companions` : ''}` : this.unlockedBy('crit');
     const crit = panel('Critical hits', g.abilityUnlocked('crit') ? pc(g.critChance()) : '—', g.abilityUnlocked('crit') ? 'chance' : '', [
       row('Damage', x(g.critMult()), `×${p.critMultBase} base${p.critMultUpg ? ` + ${p.critMultUpg} companions` : ''}`),
-      row('Cleave', g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? `10% base${p.cleaveUpg > 1 ? `, ${x(p.cleaveUpg)} from upgrades` : ''}` : g.abilityUnlocked('cleave') ? 'While the Cleave skill runs' : `Unlocked by the ${COMPS[ABILITY_BY_ID.get('cleave')!.comp].name}`, !g.cleave()),
+      row('Cleave', g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? `10% base${p.cleaveUpg > 1 ? `, ${x(p.cleaveUpg)} from upgrades` : ''}` : g.abilityUnlocked('cleave') ? 'While the Cleave skill runs' : this.unlockedBy('cleave'), !g.cleave()),
     ], critNote);
 
     const goldT = panel('Gold', x(g.goldMult()), '', [
