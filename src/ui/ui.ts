@@ -2398,7 +2398,6 @@ export class Ui {
         <ul class="tt-l">
           ${g.s.owned[i] ? `<li>Deals <b>${fmt(g.compDps(i))}</b> damage/sec (${(share * 100).toFixed(1)}% of your party)</li>` : ''}
           <li>Next ${q.n > 1 ? `${q.n} levels` : 'level'}: <b class="up">+${fmt(next)}</b> damage/sec</li>
-          ${traitLevels(i).includes(nextMilestone(i, g.s.owned[i])) ? '' : `<li>×${milestoneMult(nextMilestone(i, g.s.owned[i]))} damage at level ${nextMilestone(i, g.s.owned[i])}</li>`}
         </ul>
         <p class="tt-f">“${esc(def.flavor)}”</p>`;
     }
