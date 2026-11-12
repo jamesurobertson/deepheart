@@ -7,7 +7,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import type { Atlas, Rect } from './atlas.ts';
 import { BlobShadow, BlobShadows, PixelSprite, blobShadow } from './sprite.ts';
-import { Fx, flameTexture, spellTextures } from './fx.ts';
+import { Fx, RIGHT, flameTexture, spellTextures, type FloorDir } from './fx.ts';
 import { eyeMask } from './eyes.ts';
 import { GradeShader, tiltShift } from './post.ts';
 import { buildStairwell, stairPoint } from './stairwell.ts';
@@ -138,6 +138,8 @@ const HERO_SPEED = 6.5;
 const RAINBOW = [0xff4a4a, 0xff9a3a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0x6a6aff, 0xc46aff];
 /** How close your vault hero has to come to a chest to throw it open (world units). */
 const CHEST_REACH = 1.1;
+/** A kill this close to your hero (world units) counts as theirs: its blood and pieces fly away from them. */
+const HERO_BLOW_REACH = 3;
 /** A loose coin on the vault floor, as big as the painted ones further off. */
 const COIN_SIZE = 1.15;
 
@@ -988,18 +990,18 @@ export class Scene {
   }
 
   /** A monster bursts into its own pixels (dying, or caught on a floor that's just been cleared). Returns where. */
-  private burstApart(v: MonView) {
+  private burstApart(v: MonView, away: FloorDir = RIGHT) {
     v.dead = 0;
     v.body.visible = false;
     const r = v.sprite.rect;
     const origin = v.body.position.clone().add(new THREE.Vector3(v.knock, v.hopY, 0.05));
-    this.fx.shatter(origin, this.atlas.pixels(r, 1), r, v.scale / 16, v.sprite.flip, 1, v.boss ? 1.4 : 1);
+    this.fx.shatter(origin, this.atlas.pixels(r, 1), r, v.scale / 16, v.sprite.flip, away, v.boss ? 1.4 : 1);
     const at = origin.clone().setY(v.height * 0.45);
     this.fx.star(at, 0xffffff, v.boss ? 2.5 : 1.1, 0.18);
     if (this.settings.particles) this.fx.burst(at, '#ffd070', v.boss ? 30 : 5, v.boss ? 6 : 3, 0.06, 12, true);
     if (this.settings.blood) {
-      this.fx.spray(at, v.blood, v.boss ? 30 : 10, 1, v.boss ? 1.5 : 1.1);
-      if (v.blood !== BONE) this.fx.bloodSplat(v.body.position.clone().setX(v.body.position.x + 0.25), v.blood, v.boss ? 2.2 : 1);
+      this.fx.spray(at, v.blood, v.boss ? 30 : 10, away, v.boss ? 1.5 : 1.1);
+      if (v.blood !== BONE) this.fx.bloodSplat(v.body.position.clone().add(new THREE.Vector3(away.x * 0.25, 0, away.z * 0.25)), v.blood, v.boss ? 2.2 : 1);
     }
     return at;
   }
@@ -1382,7 +1384,7 @@ export class Scene {
       this.fx.swipe(at, 0x4a4238, big ? 1.2 : 0.8, Math.PI * (0.6 + Math.random() * 0.5), undefined, fromRight);
       if (v.dead < 0) {
         this.react(v, big ? 0.4 : 0.2);
-        this.bleed(v, at, big ? 4 : 2, false);
+        this.bleed(v, at, big ? 4 : 2, false, this.awayFrom(c.body.position, v));
       }
       return;
     }
@@ -1390,7 +1392,7 @@ export class Scene {
     // (The blow still lands on one that died a moment ago, so a swing is never wasted on thin air.)
     if (v.dead < 0) {
       this.react(v, big ? 0.6 : 0.3);
-      this.bleed(v, at, big ? 8 : 4, !!big);
+      this.bleed(v, at, big ? 8 : 4, !!big, this.awayFrom(c.body.position, v));
     }
     if (big) this.addShake(0.1);
   }
@@ -1605,10 +1607,25 @@ export class Scene {
   }
 
   /** Droplets spraying away from the blow, and sometimes a drip on the floor. */
-  private bleed(v: MonView, at: THREE.Vector3, n: number, heavy: boolean) {
+  private bleed(v: MonView, at: THREE.Vector3, n: number, heavy: boolean, away: FloorDir = RIGHT) {
     if (!this.settings.blood) return;
-    // Thrown away from the party (to the right), landing as little stains.
-    this.fx.spray(at.clone().setX(at.x + 0.2), v.blood, n, 1, heavy ? 1.3 : 1);
+    this.fx.spray(at.clone().add(new THREE.Vector3(away.x * 0.2, 0, away.z * 0.2)), v.blood, n, away, heavy ? 1.3 : 1);
+  }
+
+  /** The way a blow from `from` throws a monster's blood and pieces: straight away from it across the floor. */
+  private awayFrom(from: THREE.Vector3, v: MonView): FloorDir {
+    const x = v.body.position.x - from.x;
+    const z = v.body.position.z - from.z;
+    const distance = Math.hypot(x, z);
+    return distance < 0.05 ? RIGHT : { x: x / distance, z: z / distance };
+  }
+
+  /** Away from your hero while they're beside the monster or attacking it; to the right (away from the party) otherwise. */
+  private awayFromHero(v: MonView, game: Game): FloorDir {
+    const hero = this.party.find((c) => c.comp === game.heroIndex());
+    if (!hero || !hero.body.visible) return RIGHT;
+    const beside = Math.hypot(v.body.position.x - hero.body.position.x, v.body.position.z - hero.body.position.z) <= HERO_BLOW_REACH;
+    return beside || game.heroTarget === v.id ? this.awayFrom(hero.body.position, v) : RIGHT;
   }
 
   /** Visible reaction to being hit: squash, knocked back, a little hop. (No white flash: the cut's white is enough.) */
@@ -2125,7 +2142,7 @@ export class Scene {
           this.fx.light(at, 0xffd070, 25, 0.25, 8);
           this.addShake(0.15);
         }
-        if (parts) this.bleed(v, at, crit ? 10 : 4, crit);
+        if (parts) this.bleed(v, at, crit ? 10 : 4, crit, this.awayFromHero(v, game));
         this.react(v, crit ? 0.8 : 0.45);
         break;
       }
@@ -2133,7 +2150,7 @@ export class Scene {
         const v = this.mons.get(ev.id);
         if (!v || v.dead >= 0) break;
         this.lastKillAt.copy(v.body.position).setY(0);
-        const at = this.burstApart(v);
+        const at = this.burstApart(v, this.awayFromHero(v, game));
         if (ev.champ) {
           this.fx.light(at, 0xffd070, 30, 0.6, 10);
           if (this.settings.particles) this.fx.burst(at, '#ffd070', 26, 5, 0.08, 10, true);
