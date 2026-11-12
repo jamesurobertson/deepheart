@@ -438,6 +438,10 @@ const STAR = (() => {
 })();
 const dummy = new THREE.Object3D();
 
+/** A direction across the floor: x to the right, z toward the camera. */
+export type FloorDir = { x: number; z: number };
+export const RIGHT: FloorDir = { x: 1, z: 0 };
+
 /** Short-lived world effects: chunky pixel bursts, loot beams, lightning. */
 /** The light in a pillar: a bright thin core, soft edges, strongest at the foot and gone by the top. Drawn once. */
 let shaftTex: THREE.CanvasTexture | null = null;
@@ -659,9 +663,9 @@ export class Fx {
 
   /**
    * Blood (or ooze, or bone chips): chunky pixel droplets thrown away from a blow along
-   * `dirX`. They arc down, land, flatten into little stains on the floor and fade later.
+   * `dir` (across the floor). They arc down, land, flatten into little stains on the floor and fade later.
    */
-  spray(at: THREE.Vector3, color: THREE.ColorRepresentation, n: number, dirX = 1, power = 1) {
+  spray(at: THREE.Vector3, color: THREE.ColorRepresentation, n: number, dir: FloorDir = RIGHT, power = 1) {
     while (this.sprays.length >= MAX_SPRAYS) this.sprays.shift();
     n = Math.min(n, SPRAY_MOST);
     const pos = new Float32Array(n * 3);
@@ -673,9 +677,10 @@ export class Fx {
       pos[i * 3] = at.x + (Math.random() - 0.5) * 0.15;
       pos[i * 3 + 1] = at.y + (Math.random() - 0.5) * 0.15;
       pos[i * 3 + 2] = at.z + (Math.random() - 0.5) * 0.15;
-      vel[i * 3] = dirX * (1 + Math.random() * 3) * power + (Math.random() - 0.5) * 1.2;
+      const thrown = (1 + Math.random() * 3) * power;
+      vel[i * 3] = dir.x * thrown + (Math.random() - 0.5) * 1.2;
       vel[i * 3 + 1] = (0.8 + Math.random() * 2.8) * power;
-      vel[i * 3 + 2] = (Math.random() - 0.5) * 2;
+      vel[i * 3 + 2] = dir.z * thrown + (Math.random() - 0.5) * (2 - Math.abs(dir.z) * 0.8);
       // Pixel-sized: one or two sprite pixels across.
       size[i] = (Math.random() < 0.7 ? 1 : 2) / 16 * 1.2;
       // A little tonal variety so it doesn't read as flat paint.
@@ -916,9 +921,9 @@ export class Fx {
 
   /**
    * Burst a sprite into its own pixels: each opaque pixel becomes a little cube that
-   * flies off (biased along `push`), bounces on the floor and fades.
+   * flies off (biased along `push`, across the floor), bounces on the floor and fades.
    */
-  shatter(origin: THREE.Vector3, pixels: { x: number; y: number; color: number }[], frame: { w: number; h: number }, unit: number, flip: boolean, push: number, power = 1) {
+  shatter(origin: THREE.Vector3, pixels: { x: number; y: number; color: number }[], frame: { w: number; h: number }, unit: number, flip: boolean, push: FloorDir = RIGHT, power = 1) {
     if (!pixels.length) return;
     while (this.shards.length >= MAX_SHATTERS) this.dropShard(0);
     const n = pixels.length;
@@ -938,9 +943,10 @@ export class Fx {
       // Fly outward from the sprite's middle, mostly up and away from the blow.
       const ox = lx / frame.w;
       const oy = (ly - frame.h / 2) / frame.h;
-      vel[i * 3] = (ox * 4 + push * (1.5 + Math.random() * 2.5)) * power;
+      const thrown = 1.5 + Math.random() * 2.5;
+      vel[i * 3] = (ox * 4 + push.x * thrown) * power;
       vel[i * 3 + 1] = (2.5 + oy * 3 + Math.random() * 3.5) * power;
-      vel[i * 3 + 2] = (Math.random() - 0.3) * 3 * power;
+      vel[i * 3 + 2] = ((Math.random() - 0.3) * 3 + push.z * thrown) * power;
       spin[i] = (Math.random() - 0.5) * 20;
       mesh.setColorAt(i, c.setHex(p.color).multiplyScalar(0.78));
     });
