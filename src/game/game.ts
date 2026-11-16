@@ -1736,6 +1736,12 @@ export class Game {
     const focus = this.focus();
     const dps = this.dps();
     if (focus && dps.gt(0)) {
+      // The tally dwarfs what the party deals now (its damage fell: a respec, a buff gone): count from here, or the
+      // little it adds each tick rounds away and nobody hurts anything.
+      if (this.dealt.gt(dps.times(1e6))) {
+        this.swungAt = this.swungAt.map((mark) => Decimal.max(mark.minus(this.dealt), dps.times(-(SWING_GAP + SWING_SPREAD + 1))));
+        this.dealt = new Decimal(0);
+      }
       this.dealt = this.dealt.plus(dps.times(dt));
       const hero = this.heroIndex();
       const arrived = this.monsters.filter((m) => m.arrive <= 0);
@@ -2136,6 +2142,9 @@ export class Game {
     s.runActive = 0;
     s.auto = true;
     this.owned.clear();
+    // (The old run's damage tally is far too big for a new party's first blows to add to: they'd round away to nothing.)
+    this.dealt = new Decimal(0);
+    this.swungAt = COMPS.map(() => new Decimal(0));
     this.raid = null;
     this.scheduleRaid();
     s.maxFloor = 1;
