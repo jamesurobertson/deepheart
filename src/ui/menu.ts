@@ -484,8 +484,8 @@ class Stairs {
   /** Your hero, free on the stairs. Each step is a ledge running to the right edge of the screen, which is a wall: walk
    *  along it, jump up through the one above and land on it, drop (↓) through to the one below. The menu's words are ledges
    *  too (the title, the tagline, each line of the list and so on), floating in the dark to the left. Walk off the top of the
-   *  landing (or a menu element) and they fall into the dark, and the next in line takes over (until nobody's left:
-   *  they're back next time the menu opens). A click walks them to where you clicked, hopping up and dropping down
+   *  landing (or a menu element) and they fall into the dark, and the next in line takes over with a hop (the last one left
+   *  comes back at the top instead). A click walks them to where you clicked, hopping up and dropping down
    *  through the steps (and off the DEMO stamp) to the one at that height. */
   private leader(p: (typeof this.party)[number], from: number, landX: number, stepAt: (x: number) => number, stepY: (k: number) => number) {
     if (!p.frames) return [];
@@ -600,10 +600,21 @@ class Stairs {
       for (let i = 0; i < 22; i++) {
         this.embers.push({ x: at + (Math.random() - 0.5) * 10, y: geo.H - 1, vx: (Math.random() - 0.5) * 70, vy: -(70 + Math.random() * 110), life: 0.6 + Math.random() * 0.5, color: colors[Math.floor(Math.random() * colors.length)] });
       }
-      this.party.shift();
+      // The last one left comes back at the top of the line in a puff of their own colours; otherwise the next in line
+      // takes over.
+      if (this.party.length === 1) {
+        const top = { x: from + 8, y: stepY(stepAt(from)) - 8 };
+        for (let i = 0; i < 26; i++) {
+          const angle = (i / 26) * Math.PI * 2;
+          const speed = 45 + Math.random() * 55;
+          this.embers.push({ x: top.x, y: top.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 30, life: 0.35 + Math.random() * 0.3, color: i % 3 ? colors[Math.floor(Math.random() * colors.length)] : '#fff3c4' });
+        }
+      } else this.party.shift();
       this.hero = null;
       this.toX = null;
       this.held.clear();
+      // Whoever you have now hops where they stand.
+      this.jumpAsked = true;
       return [];
     }
     const airborne = h.on === null;
