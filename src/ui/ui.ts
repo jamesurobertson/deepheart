@@ -1638,7 +1638,7 @@ export class Ui {
     const aboutToFly = g.events.reduce((sum, ev) => (ev.t === 'vaultCoin' || ev.t === 'vaultGoblin' || ev.t === 'chest' ? sum.plus(ev.gold) : sum), new Decimal(0));
     const bank = Decimal.max(0, g.s.gold.minus(inFlight).minus(aboutToFly));
     this.shown = bank.lt(this.shown) || bank.minus(this.shown).lt(1) ? bank : this.shown.plus(bank.minus(this.shown).times(Math.min(1, dt * 10)));
-    setText(this.el.bank, fmt(this.shown));
+    setText(this.el.bank, fmt(this.shown.lt(10) ? this.shown.floor() : this.shown));
 
     // Health bars over bosses, and over monsters once they've been hit (none up in the Keep).
     const seen = new Set<number>();
