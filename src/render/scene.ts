@@ -3310,15 +3310,12 @@ export class Scene {
     this.fx.embers(embers, EMBERS, 0.07);
   }
 
-  /** A Rampage on one sprite: eyes burning (plus `flare`) and the red rim, which crackles: each companion's drops out
-   *  for a frame now and then, out of step with the rest. */
+  /** A Rampage on one sprite: eyes burning (plus `flare`) and the red rim, pulsing but never out. */
   private burn(sprite: PixelSprite, key: number, flare = 0) {
     const phase = key * 2.3;
     const flicker = 0.85 + 0.15 * Math.sin(this.time * 23 + phase);
-    const step = Math.floor(this.time * 20);
-    const crackle = !this.settings.calm && (Math.abs(Math.sin((step + key * 13.7) * 12.9898) * 43758.5453) % 1) < 0.22 ? 0 : 1;
     const calm = this.settings.calm ? 0.5 : 1;
-    sprite.rage(this.fever * flicker + flare, this.rageHeat * (0.65 + 0.35 * Math.sin(this.time * 9 + phase)) * calm * crackle);
+    sprite.rage(this.fever * flicker + flare, this.rageHeat * (0.65 + 0.35 * Math.sin(this.time * 9 + phase)) * calm);
   }
 
   /** The held breath lets go: a red flare and ring from the middle of the party, then a burst under each of them. */
