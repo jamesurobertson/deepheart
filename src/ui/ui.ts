@@ -1634,7 +1634,9 @@ export class Ui {
     const now = performance.now();
     if (this.flights.length) this.flights = this.flights.filter((flight) => flight.lands > now);
     const inFlight = this.flights.reduce((sum, flight) => sum.plus(flight.share), new Decimal(0));
-    const bank = Decimal.max(0, g.s.gold.minus(inFlight));
+    // (Nor is gold whose coins take off next frame: the vault's, swept up a moment ago, is banked already.)
+    const aboutToFly = g.events.reduce((sum, ev) => (ev.t === 'vaultCoin' || ev.t === 'vaultGoblin' || ev.t === 'chest' ? sum.plus(ev.gold) : sum), new Decimal(0));
+    const bank = Decimal.max(0, g.s.gold.minus(inFlight).minus(aboutToFly));
     this.shown = bank.lt(this.shown) || bank.minus(this.shown).lt(1) ? bank : this.shown.plus(bank.minus(this.shown).times(Math.min(1, dt * 10)));
     setText(this.el.bank, fmt(this.shown));
 
@@ -2034,7 +2036,12 @@ export class Ui {
     const now = performance.now();
     for (const [id, pile] of this.coinPiles) {
       const k = padFamily() ? PAD_COIN_REACH : 1;
-      if (now >= pile.landsAt && this.scene.sweepCoins(id, collectors, COIN_REACH * k, COIN_MAGNET * k)) this.game.collectGold(id);
+      if (now < pile.landsAt || !this.scene.sweepCoins(id, collectors, COIN_REACH * k, COIN_MAGNET * k)) continue;
+      const banked = this.game.drops.some((drop) => drop.id === id);
+      this.game.collectGold(id);
+      // Its coins take off now, not when the game's event comes round next frame: until then the counter would show
+      // the gold, then take it back.
+      if (banked) this.bankCoins(id, 'hand');
     }
   }
 
