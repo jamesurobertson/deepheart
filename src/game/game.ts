@@ -1187,10 +1187,10 @@ export class Game {
   abilityText(id: AbilityId): string {
     const p = this.c.parts;
     const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
-    if (id === 'crit') return `Clicks and Phantom Blade have a ${pct(Math.min(1, p.critBase + p.critUpg + NEEDLE_CRIT * legendShare(this.legendLv('needle'))))} chance for ×${+((p.critMultBase + p.critMultUpg) * (1 + 0.15 * this.legendLv('breaker'))).toFixed(2)} damage.`;
+    if (id === 'crit') return `Your attacks and Phantom Blade have a ${pct(Math.min(1, p.critBase + p.critUpg + NEEDLE_CRIT * legendShare(this.legendLv('needle'))))} chance for ×${+((p.critMultBase + p.critMultUpg) * (1 + 0.15 * this.legendLv('breaker'))).toFixed(2)} damage.`;
     if (id === 'blade') return `Attacks for you, ${this.c.autoBase === 1 ? 'once' : `${+this.c.autoBase.toFixed(1)} times`} a second.`;
-    if (id === 'cleave') return `Your clicks also hit every other monster for ${pct(CLEAVE_BASE * p.cleaveUpg)} damage.`;
-    if (id === 'rampage') return `Builds as you click. Your party deals ×${+this.feverMult(0).toFixed(1)}–×${+this.feverMult(RAMPAGE_TIERS.length - 1).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
+    if (id === 'cleave') return `Your attacks also hit every other monster for ${pct(CLEAVE_BASE * p.cleaveUpg)} damage.`;
+    if (id === 'rampage') return `Builds as you attack. Your party deals ×${+this.feverMult(0).toFixed(1)}–×${+this.feverMult(RAMPAGE_TIERS.length - 1).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
     return ABILITY_BY_ID.get(id)!.desc;
   }
 

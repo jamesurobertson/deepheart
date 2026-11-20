@@ -477,7 +477,7 @@ function traitEffect(kind: string, comp: number): { effect: Effect; desc: string
   const num = Number(kind.replace(/\D+/g, ''));
   if (kind === 'own') return { effect: { t: 'comp', comp, mult: 2 }, desc: `${COMPS[comp].name} deals ×2 damage.` };
   if (kind === 'party') return { effect: { t: 'party', mult: 1.5 }, desc: 'Every companion deals +50% damage.' };
-  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.01 }, desc: "Clicks and Phantom Blade also deal +1% of your party's damage." };
+  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.01 }, desc: "Your attacks and Phantom Blade also deal +1% of your party's damage." };
   if (kind === 'gold') return { effect: { t: 'gold', pct: 0.5 }, desc: 'Monsters drop +50% gold.' };
   if (kind === 'boss') return { effect: { t: 'boss', pct: 0.25 }, desc: '+25% damage to bosses.' };
   if (kind === 'blade') return { effect: { t: 'auto', add: 1 }, desc: 'Phantom Blade +1/s.' };
@@ -529,10 +529,10 @@ export interface AbilityDef {
  *  Cooldowns are uneven (8, 12, 20, 25 and 30 minutes) so they drift apart: lining them all up costs real waiting. */
 export const ABILITIES: AbilityDef[] = [
   { id: 'blade', name: 'Phantom Blade', desc: 'Attacks for you, once a second.', kind: 'passive', comp: compIndex('squire'), trait: 0 },
-  { id: 'flurry', name: 'Flurry', desc: 'Clicks for you, 10 times a second.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 8 * 60 },
-  { id: 'crit', name: 'Critical Hits', desc: 'Clicks and Phantom Blade have a 3% chance for ×2 damage.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
-  { id: 'rampage', name: 'Rampage', desc: 'Builds as you click. Your party deals ×2–×3 damage for 10s.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
-  { id: 'cleave', name: 'Cleave', desc: 'Your clicks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 12 * 60 },
+  { id: 'flurry', name: 'Flurry', desc: 'Attacks for you, 10 times a second.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 8 * 60 },
+  { id: 'crit', name: 'Critical Hits', desc: 'Your attacks and Phantom Blade have a 3% chance for ×2 damage.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
+  { id: 'rampage', name: 'Rampage', desc: 'Builds as you attack. Your party deals ×2–×3 damage for 10s.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
+  { id: 'cleave', name: 'Cleave', desc: 'Your attacks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 12 * 60 },
   ...(DEMO ? [] : [
     { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 25 * 60 },
     { id: 'drums', name: 'War Drums', desc: '+50% crit chance.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 20 * 60 },
@@ -891,7 +891,7 @@ function buildTrophies(): TrophyDef[] {
     (n) => `Land ${count(n)} critical ${plural(n, 'hit')}.`, 'skill:crit', (n) => ({ t: 'crits', n }));
   tiers('fev', [[1, 'Rampage!'], [100, 'Berserker'], [1000, 'Anger Issues']],
     (n) => `Go on a Rampage ${times(n)}.`, 'flask_big_red', (n) => ({ t: 'fevers', n }));
-  out.push({ id: 'rampage0', name: 'Bloodrush', desc: 'Keep clicking until a Rampage reaches its top tier.', icon: { sprite: 'flask_big_red', tier: 1 }, req: { t: 'rampage', n: 1 } });
+  out.push({ id: 'rampage0', name: 'Bloodrush', desc: 'Keep attacking until a Rampage reaches its top tier.', icon: { sprite: 'flask_big_red', tier: 1 }, req: { t: 'rampage', n: 1 } });
   tiers('raid', [[1, 'Finders Keepers'], [77, 'Red-Handed'], [777, 'Jackpot'], [2777, 'No One Escapes'], [7777, 'Treasure Lord']],
     (n) => `Catch ${n === 1 ? 'a treasure goblin' : `${count(n)} treasure goblins`}.`, 'goblin', (n) => ({ t: 'raids', n }));
   const missed: [number, string, string][] = [

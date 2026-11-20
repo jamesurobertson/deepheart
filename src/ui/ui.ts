@@ -184,7 +184,7 @@ const abilityKey = (id: AbilityId) => KEYED.indexOf(id) + 1;
 /** The same words for a finger: "click" in tooltips (and the game's copy) reads "tap" on a touch screen. */
 const tapWords = (html: string) => html.replace(/\b([Cc])lick(s|ed|ing)?\b/g, (_, c: string, end = '') => `${c === 'C' ? 'T' : 't'}ap${end === 'ed' ? 'ped' : end === 'ing' ? 'ping' : end}`);
 /** A tooltip's mouse words, for a controller: its A button presses what the cursor is on. */
-const padWords = (html: string) => html.replace(/\bClick (to|the)\b/g, (_, w: string) => `Press ${padGlyph('a', 18)} ${w === 'the' ? 'on the' : 'to'}`).replace(/\bclicking\b/g, 'attacking');
+const padWords = (html: string) => html.replace(/\bClick (to|the)\b/g, (_, w: string) => `Press ${padGlyph('a', 18)} ${w === 'the' ? 'on the' : 'to'}`);
 /** The ✦ on a trait square, drawn as that square where a hint names it. */
 const TRAIT_KEY = '<span class="hint-trait">✦</span>';
 const clock = (s: number) => {
@@ -198,16 +198,16 @@ const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${spr
 const perSec = (n: number) => (n < 100 ? String(Math.round(n * 100) / 100) : fmt(n));
 
 function buffText(b: Buff) {
-  if (b.id === 'cleave') return 'clicks hit every monster';
-  if (b.id === 'flurry') return '10 clicks a second';
+  if (b.id === 'cleave') return 'attacks hit every monster';
+  if (b.id === 'flurry') return '10 attacks a second';
   if (b.id === 'drums') return '+50% critical hits';
   if (b.id === 'legion') return 'a blade for every monster';
-  if (b.crit) return 'every click crits';
+  if (b.crit) return 'every attack crits';
   if (b.critMult) return `×${b.critMult} crit damage`;
   if (b.blade && b.blade > 1) return `Phantom Blade ×${b.blade}`;
   if (b.dps > 1 && b.click > 1) return `×${b.dps} damage`;
-  if (b.dps > 1) return `×${b.dps} companion damage`;
-  if (b.click > 1) return `×${b.click} click damage`;
+  if (b.dps > 1) return `×${b.dps} party damage`;
+  if (b.click > 1) return `×${b.click} attack damage`;
   return `×${b.gold} gold`;
 }
 
@@ -355,7 +355,7 @@ export class Ui {
     root.innerHTML = `
       <div class="hud-top">
         <div class="bank" data-tip="idle:patient"><span class="bank-ico">${sprite('coin', 5)}</span><b class="bank-v">0</b></div>
-        <div class="rate"><span class="dps-w" data-tip="idle:sleeper"><b class="dps-v">0</b> <i class="long">damage/sec</i><i class="short">dps</i></span><span class="sep">·</span><span><b class="click-v">1</b> <i class="long">per click</i><i class="short">/click</i></span></div>
+        <div class="rate"><span class="dps-w" data-tip="idle:sleeper"><b class="dps-v">0</b> <i class="long">party damage/sec</i><i class="short">party/s</i></span><span class="sep">·</span><span><b class="click-v">1</b> <i class="long">attack damage</i><i class="short">attack</i></span></div>
         <div class="streak"><i>Streak</i> <b class="streak-v">0</b> <span class="sep">·</span> <b class="streak-b"></b></div>
         <div class="floor pnl">
           <button class="btn icon sm" data-act="floorDown" aria-label="Previous floor">${G.left()}</button>
@@ -1298,7 +1298,7 @@ export class Ui {
         this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 });
         break;
       case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
-      case 'fever': if (ev.on) this.banner(`RAMPAGE ×${fmt(g.feverMult())}!`, `Keep ${this.attacking()} for ×${fmt(g.rampageNext()?.mult ?? g.feverMult())}`, 'rampage'); break;
+      case 'fever': if (ev.on) this.banner(`RAMPAGE ×${fmt(g.feverMult())}!`, `Keep attacking for ×${fmt(g.rampageNext()?.mult ?? g.feverMult())}`, 'rampage'); break;
       case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, 'Full power', `rampage tier${ev.tier}`); break;
       case 'vaultPick': this.showVaultPick(); break;
       case 'vault':
@@ -1735,7 +1735,7 @@ export class Ui {
     if (fever) {
       this.el.feverBar.style.width = `${(fever.t / fever.dur) * 100}%`;
       const next = g.rampageNext();
-      const label = next ? `×${fmt(g.feverMult())} · keep ${this.attacking()}!` : `×${fmt(g.feverMult())}!`;
+      const label = next ? `×${fmt(g.feverMult())} · keep attacking!` : `×${fmt(g.feverMult())}!`;
       if (this.el.feverLabel.textContent !== label) this.el.feverLabel.textContent = label;
     }
 
@@ -2250,10 +2250,6 @@ export class Ui {
     this.el.raid.classList.toggle('first', state === 'raid');
   }
 
-  /** The word for attacking the way you're playing. */
-  private attacking() {
-    return padFamily() ? 'attacking' : this.touch ? 'tapping' : 'clicking';
-  }
 
   /** The controller button(s) that use an ability. */
   private abilityButtons(id: AbilityId) {
@@ -2445,7 +2441,7 @@ export class Ui {
         : !g.abilityUnlocked(a.id)
         ? `${this.unlockedBy(a.id)}.`
         : a.kind === 'passive' ? ''
-          : fever ? (next ? `×${fmt(g.feverMult())}. Keep clicking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
+          : fever ? (next ? `×${fmt(g.feverMult())}. Keep attacking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
             : a.kind === 'charge' && g.s.fervor < 1 ? `${Math.floor(g.s.fervor * 100)}% charged.`
               : cd > 0 ? `Ready again in ${duration(cd)}.` : padFamily() ? `Ready. Press ${this.abilityButtons(a.id)} to use it.` : `Ready. Click to use it${key}.`;
       if (!g.s.abilitiesFound.includes(a.id)) return `<div class="tt-h"><b>???</b><span class="tt-own">locked</span></div><p class="tt-f">${this.unlockedBy(a.id)}.</p>`;
@@ -3256,7 +3252,7 @@ export class Ui {
       mul('Buffs', b.buffDps, buffNames('dps'), 'Rampage, Bloodlust'),
     ]);
 
-    const click = panel('Click damage', fmt(g.clickDamage()), '/click', [
+    const click = panel('Attack damage', fmt(g.clickDamage()), '/attack', [
       row('Base', '1'),
       row('All-damage bonuses', x(b.all), DEMO ? 'trophies and card sets' : 'trophies, card sets and souls'),
       row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion upgrades` : ''}`),
@@ -3314,7 +3310,7 @@ export class Ui {
     const rows: [string, string, boolean?][] = [
       ['Floor', `${fmt(s.floor)} (deepest this descent ${fmt(s.maxFloor)})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
       ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses beaten', fmt(s.bosses)],
-      ['Clicks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rainbow Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
+      ['Attacks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rainbow Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
       ...(DEMO ? [] : [['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)]] as [string, string][]), ['Trophies', `${s.trophies.length} / ${shownTrophies(g).length}`], ['Cards found', fmt(g.cardsFound())],
       ['This descent', duration(s.runTime)], ['Active', duration(s.runActive), true], ['Idle', duration(Math.max(0, s.runTime - s.runActive)), true],
       ['Time played', duration(s.playTime)], ['Active', duration(s.activeTime), true], ['Idle', duration(Math.max(0, s.playTime - s.activeTime)), true],
