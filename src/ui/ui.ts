@@ -88,8 +88,8 @@ const SETTINGS_TAB = { sound: 'ui.settings.tab.sound', display: 'ui.settings.tab
 const KIND_NAME = { power: 'ui.spirit.kind.power', utility: 'ui.spirit.kind.utility', sink: 'ui.spirit.kind.sink' } as const;
 
 type Trader = 'dan' | 'victor';
-/** What Dan and Victor say: one picked at random. */
-const TRADER_LINES: Record<Trader, Record<'hello' | 'short' | 'new' | 'dupe', UiKey[]>> = {
+/** What Dan and Victor say: one picked at random. (They're the full game's: the demo carries none of their words.) */
+const TRADER_LINES = (DEMO ? {} : {
   dan: {
     hello: ['ui.trade.dan.hello1', 'ui.trade.dan.hello2'],
     short: ['ui.trade.dan.short'],
@@ -102,10 +102,10 @@ const TRADER_LINES: Record<Trader, Record<'hello' | 'short' | 'new' | 'dupe', Ui
     new: ['ui.trade.victor.new1', 'ui.trade.victor.new2'],
     dupe: ['ui.trade.victor.dupe1', 'ui.trade.victor.dupe2'],
   },
-};
-const TRADER_NAME = { dan: 'ui.trade.dan', victor: 'ui.trade.victor' } as const;
+}) as Record<Trader, Record<'hello' | 'short' | 'new' | 'dupe', UiKey[]>>;
+const TRADER_NAME = (DEMO ? {} : { dan: 'ui.trade.dan', victor: 'ui.trade.victor' }) as Record<Trader, UiKey>;
 /** A trade saves who it was with by his English name. */
-const TRADED_FROM: Record<string, UiKey | undefined> = { Dan: 'ui.trade.dan', Victor: 'ui.trade.victor' };
+const TRADED_FROM: Record<string, UiKey | undefined> = DEMO ? {} : { Dan: 'ui.trade.dan', Victor: 'ui.trade.victor' };
 const pickLine = (lines: UiKey[]) => t(lines[Math.floor(Math.random() * lines.length)]);
 
 /** What a Spirit boosts, a companion skill it names underlined (hover it for what the skill is and does). */

@@ -6,7 +6,9 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ABILITIES, BOUND, COMPS, LEGENDS, UPGRADES, ZONES, boundName } from '../src/game/data.ts';
+import { pathToFileURL } from 'node:url';
 import { DEMO_COMPANIONS, DEMO_LAST_FLOOR } from '../src/demo.ts';
+import { contentSource, demoContentKeys } from './i18n-source.ts';
 
 const dir = process.argv[2] ?? 'dist-demo';
 const demoZones = ZONES.slice(0, DEMO_LAST_FLOOR / 10);
@@ -23,7 +25,20 @@ const names = [
   ...ABILITIES.filter((a) => a.comp >= DEMO_COMPANIONS).map((a) => a.name),
 ];
 const words = ['Awaken', 'Expedition', 'Spirit', 'Heartmark', 'Heartmarks', 'Awakening', 'Awakenings', 'The Keep', 'Bound', 'bound soul', 'Dan', 'Victor'];
-const forbidden = [...new Set([...names.filter((n) => !allowed.has(n)), ...words])];
+// The full game's names in every translation too: each content name the demo's data doesn't have, as each language says
+// it (unless the same words also name something the demo has).
+const demoKeys = demoContentKeys();
+const fullOnly = [...contentSource().full.keys()].filter((key) => key.endsWith('.name') && !demoKeys.has(key));
+const translated: string[] = [];
+for (const file of existsSync('src/i18n/locales') ? readdirSync('src/i18n/locales').filter((f) => f.endsWith('.ts')) : []) {
+  const { messages } = (await import(pathToFileURL(join('src/i18n/locales', file)).href)).default as { messages: Record<string, unknown> };
+  const inDemo = new Set([...demoKeys].map((key) => messages[key]));
+  for (const key of fullOnly) {
+    const name = messages[key];
+    if (typeof name === 'string' && name.length > 2 && !inDemo.has(name)) translated.push(name);
+  }
+}
+const forbidden = [...new Set([...names.filter((n) => !allowed.has(n)), ...words, ...translated])];
 
 const files = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(d, e.name)) : [join(d, e.name)]));
 const all = files(dir);
