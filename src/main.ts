@@ -19,16 +19,10 @@ import { olderVersion } from './version.ts';
 import { installCrashScreen } from './crash.ts';
 import { installGamepad } from './ui/gamepad.ts';
 import { isPhone, showComingSoon } from './ui/soon.ts';
+import { chooseLanguage } from './i18n/boot.ts';
 
 installCrashScreen();
 installGamepad();
-
-declare global {
-  interface Window {
-    /** Only in the desktop app (see desktop/preload.cjs). */
-    deepheart?: { onUpdate(callback: (update: { version: string }) => void): void; downloadUpdate(): void; log?(text: string): void };
-  }
-}
 
 const params = new URLSearchParams(location.search);
 // ?tune={"costGrowth":1.08} (dev only) overrides pacing knobs for a try, as TUNE='{...}' does for the simulator.
@@ -59,6 +53,8 @@ const SAVE_KEY = 'deepheart-save' + (SLOT ? `:${SLOT}` : '');
 // which wipes the save and reloads) goes straight back in, as do test runs (?slot=, ?state=) and ?menu=0. Closing the
 // tab (or the desktop app) and coming back opens the menu again.
 const IN_GAME = 'deepheart-in-game';
+/** Set across the reload a new language takes, so Options opens again where you left it. */
+const REOPEN = 'deepheart-reopen';
 const inGame = () => {
   try {
     return sessionStorage.getItem(IN_GAME) === '1';
@@ -162,6 +158,14 @@ async function boot() {
       } catch {
         return false;
       }
+    },
+    language: (code) => {
+      save();
+      chooseLanguage(code);
+      try {
+        sessionStorage.setItem(REOPEN, 'language');
+      } catch { /* ignore */ }
+      location.reload();
     },
     mainMenu: () => {
       save();
@@ -441,6 +445,12 @@ async function boot() {
       quit: window.deepheart ? () => window.close() : null,
     });
   } else play();
+  try {
+    if (sessionStorage.getItem(REOPEN) === 'language') {
+      sessionStorage.removeItem(REOPEN);
+      ui.openOptions('game');
+    }
+  } catch { /* ignore */ }
   setInterval(() => {
     const now = Date.now();
     const gap = (now - lastTick) / 1000;

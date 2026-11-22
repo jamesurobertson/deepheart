@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { defineConfig, type Plugin } from 'vite';
 import { demoTrim } from './scripts/demo-trim.ts';
+import { i18nDemo } from './scripts/i18n-demo.ts';
 
 /** The play log on the dev server: the game posts lines to /__log and they're appended to logs/<date>.jsonl. */
 const playLog = (): Plugin => ({
@@ -33,7 +34,7 @@ const demo = process.env.VITE_DEMO === '1';
 export default defineConfig({
   base: './',
   define: { __DEMO__: JSON.stringify(demo) },
-  plugins: [playLog(), ...(demo ? [demoTrim()] : [])],
+  plugins: [playLog(), ...(demo ? [i18nDemo(), demoTrim()] : [])],
   build: {
     rollupOptions: { input: demo ? { main: 'index.html' } : { main: 'index.html', wiki: 'wiki/index.html' } },
   },

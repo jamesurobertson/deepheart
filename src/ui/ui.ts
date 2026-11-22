@@ -12,6 +12,9 @@ import { ABILITY_PAD, hover, keyOf, neighbor, padCombo, padFamily, padGlyph, pad
 import { skillIcon } from './icons.ts';
 import { kokoSvg } from './koko.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
+import { localeCode, PSEUDO, t } from '../i18n/index.ts';
+import { automaticLanguage, chosenLanguage, SHIPPED } from '../i18n/boot.ts';
+import { nativeName } from '../i18n/detect.ts';
 
 export interface UiHooks {
   sound: (name: SfxName, o?: { vol?: number; rate?: number; jitter?: number }) => void;
@@ -22,6 +25,8 @@ export interface UiHooks {
   reset: () => void;
   /** Back to the main menu (the run is saved first). */
   mainMenu: () => void;
+  /** Plays on in another language ('' follows Steam or the system): the run is saved and the page reloads into it. */
+  language: (code: string) => void;
   /** You're in the kid's room (or back out of it): the dungeon waits. `awayCounts` settles the time spent like time
    *  away (not after an awakening, which starts the run over). */
 }
@@ -813,6 +818,11 @@ export class Ui {
       if (setTab) {
         this.setTab = setTab.dataset.settab as typeof this.setTab;
         this.renderModal();
+        return;
+      }
+      const lang = t.closest<HTMLElement>('[data-lang]');
+      if (lang) {
+        if (lang.dataset.lang !== chosenLanguage()) this.hooks.language(lang.dataset.lang!);
         return;
       }
       const open = t.closest<HTMLElement>('[data-open]');
@@ -2793,6 +2803,8 @@ export class Ui {
       html = head('Shortcuts') + `<dl class="keys">${rows.map(([keys, what]) => `<dt>${keys}</dt><dd>${what}</dd>`).join('')}</dl>`;
     } else if (name === 'settings') {
       html = head('Options', '', this.settingsTabs()) + this.settingsHtml();
+    } else if (name === 'language') {
+      html = head(t('system.language')) + this.languageHtml();
     }
     if (soft && (html === this.modalKey || performance.now() < this.modalHold)) return;
     this.modalKey = html;
@@ -3184,7 +3196,8 @@ export class Ui {
           return `<button class="cur ${open ? '' : 'locked'} ${s.cursor === c.id ? 'on' : ''}" data-cursor="${c.id}" data-tip="cur:${c.id}">${spriteFit(c.sprite, 36)}${open ? '' : `<span class="cur-lock">${G.lock()}</span>`}</button>`;
         }).join('')}</div></div>`;
     } else if (this.setTab === 'game') {
-      rows = go('Shortcuts', 'data-open="keys"') + (DEMO ? '' : `<a class="opt opt-go" href="${WIKI_URL}" target="_blank" rel="noopener"><span>Wiki</span><span class="opt-v"><i>▶</i></span></a>`)
+      rows = `<button class="opt opt-go" data-open="language"><span>${t('system.language')}</span><span class="opt-v"><b>${nativeName(localeCode() === PSEUDO ? 'en' : localeCode())}</b><i>▶</i></span></button>`
+        + go('Shortcuts', 'data-open="keys"') + (DEMO ? '' : `<a class="opt opt-go" href="${WIKI_URL}" target="_blank" rel="noopener"><span>Wiki</span><span class="opt-v"><i>▶</i></span></a>`)
         + (document.body.classList.contains('at-menu') ? '' : go('Main menu', 'data-act="mainMenu"'));
     } else {
       rows = go('Copy save code', 'data-act="export"') + go('Load save code', 'data-act="import"')
@@ -3192,6 +3205,20 @@ export class Ui {
         + `<div class="opt-sep"></div>${go(this.resetArmed ? 'Really wipe everything?' : 'Wipe save', 'data-act="reset"', 'danger')}`;
     }
     return `<div class="opts">${rows}</div>`;
+  }
+
+  /** Automatic (Steam's language, else the system's), then every language in itself. */
+  private languageHtml(): string {
+    const chosen = chosenLanguage();
+    const row = (code: string, label: string, value = '') => `<button class="opt opt-lang ${chosen === code ? 'on' : ''}" data-lang="${code}"><span>${label}</span><span class="opt-v">${value ? `<b>${value}</b>` : ''}${chosen === code ? G.check() : ''}</span></button>`;
+    const languages = [...SHIPPED, ...(import.meta.env.DEV ? [PSEUDO] : [])];
+    return `<div class="opts">${row('', t('system.language.auto'), nativeName(automaticLanguage()))}${languages.map((code) => row(code, code === PSEUDO ? 'Pseudo' : nativeName(code))).join('')}</div>`;
+  }
+
+  /** Options, open at one of its pages (after a reload into a new language). */
+  openOptions(tab: typeof this.setTab) {
+    this.setTab = tab;
+    this.openModal('settings');
   }
 
   private statTabs(on: string) {

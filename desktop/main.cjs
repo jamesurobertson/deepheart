@@ -12,6 +12,26 @@ const RELEASES = 'https://api.github.com/repos/jamesurobertson/deepheart/release
 /** How often a running game checks for a newer release (it also checks on launch). */
 const CHECK_EVERY = 6 * 60 * 60 * 1000;
 
+/** The Steam client, when the game was started from Steam (steamworks.js; achievements will go through it too). */
+let steam = null;
+
+/** Steam's game language, an API code such as "schinese" (partner.steamgames.com/doc/store/localization/languages).
+ *  --steam-language=<code> or DEEPHEART_STEAM_LANGUAGE stands in for Steam when testing. */
+function steamLanguage() {
+  const forced = process.argv.find((arg) => arg.startsWith('--steam-language='))?.split('=')[1] ?? process.env.DEEPHEART_STEAM_LANGUAGE;
+  if (forced) return forced;
+  // Steam sets SteamAppId for the games it starts; a steam_appid.txt beside the app does the same in development.
+  const appId = Number(process.env.SteamAppId) || undefined;
+  if (!appId && !fs.existsSync(path.join(process.cwd(), 'steam_appid.txt'))) return null;
+  try {
+    steam = require('steamworks.js').init(appId);
+    return steam.apps.currentGameLanguage() || null;
+  } catch {
+    // Steam isn't running (or the module isn't there): the system's language is used instead.
+    return null;
+  }
+}
+
 const ROOT = app.isPackaged ? path.join(process.resourcesPath, 'game') : path.join(__dirname, '..', 'dist');
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
@@ -83,6 +103,12 @@ async function checkForUpdate(win) {
     // No connection: the next check will try again.
   }
 }
+
+let languages = null;
+ipcMain.on('languages', (e) => {
+  languages ??= { steam: steamLanguage(), os: app.getLocale() || null };
+  e.returnValue = languages;
+});
 
 ipcMain.on('update:download', () => {
   if (update) shell.openExternal(update.url);
