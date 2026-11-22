@@ -1761,3 +1761,14 @@ body.soon-page #stage, body.soon-page #ui { display: none; }
 .soon-line { margin: 4px 0 0; font: 400 28px/1 'Jersey 10'; letter-spacing: 1px; color: var(--text); text-shadow: var(--shadow); }
 .soon-steam { min-width: 160px; min-height: 48px; font-size: 20px; text-decoration: none; }
 .soon-note { margin: 0; font: 400 12px/1 'Silkscreen'; letter-spacing: 1px; text-transform: uppercase; color: var(--faint); }
+
+/* ---------- other languages ---------- */
+/* A word too long for its box (a German compound) breaks rather than spilling out, and running text hyphenates. */
+.modal, .tip, .toast, .mm-panel { overflow-wrap: break-word; }
+.modal p, .tip p, .toast-t, .tt-d { hyphens: auto; }
+/* Korean breaks between words, as it's written; Chinese and Japanese keep closing punctuation off a line's start. */
+:lang(ko) { word-break: keep-all; }
+:lang(zh), :lang(ja) { line-break: strict; }
+/* A Spirit's or a Bound's Level up wraps inside its card instead of running past it. */
+.lc-up { max-width: 100%; }
+.lc-up .btn { max-width: 100%; flex-wrap: wrap; height: auto; padding-block: 4px; text-align: center; }

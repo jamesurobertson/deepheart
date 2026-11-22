@@ -13,7 +13,7 @@
     "timeline": "node scripts/timeline.ts",
     "active": "node scripts/active.ts",
     "achievements": "node scripts/achievements.ts",
-    "i18n:check": "node scripts/i18n-check.ts",
+    "i18n:check": "node scripts/i18n-check.ts && node scripts/i18n-saves.ts",
     "i18n:content": "node scripts/i18n-content.ts",
     "i18n:fonts": "node scripts/i18n-fonts.ts"
   },
