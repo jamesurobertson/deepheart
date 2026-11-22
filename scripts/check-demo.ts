@@ -6,7 +6,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ABILITIES, BOUND, COMPS, LEGENDS, UPGRADES, ZONES, boundName } from '../src/game/data.ts';
-import { pathToFileURL } from 'node:url';
 import { DEMO_COMPANIONS, DEMO_LAST_FLOOR } from '../src/demo.ts';
 import { contentSource, demoContentKeys } from './i18n-source.ts';
 
@@ -25,20 +24,7 @@ const names = [
   ...ABILITIES.filter((a) => a.comp >= DEMO_COMPANIONS).map((a) => a.name),
 ];
 const words = ['Awaken', 'Expedition', 'Spirit', 'Heartmark', 'Heartmarks', 'Awakening', 'Awakenings', 'The Keep', 'Bound', 'bound soul', 'Dan', 'Victor'];
-// The full game's names in every translation too: each content name the demo's data doesn't have, as each language says
-// it (unless the same words also name something the demo has).
-const demoKeys = demoContentKeys();
-const fullOnly = [...contentSource().full.keys()].filter((key) => key.endsWith('.name') && !demoKeys.has(key));
-const translated: string[] = [];
-for (const file of existsSync('src/i18n/locales') ? readdirSync('src/i18n/locales').filter((f) => f.endsWith('.ts')) : []) {
-  const { messages } = (await import(pathToFileURL(join('src/i18n/locales', file)).href)).default as { messages: Record<string, unknown> };
-  const inDemo = new Set([...demoKeys].map((key) => messages[key]));
-  for (const key of fullOnly) {
-    const name = messages[key];
-    if (typeof name === 'string' && name.length > 2 && !inDemo.has(name)) translated.push(name);
-  }
-}
-const forbidden = [...new Set([...names.filter((n) => !allowed.has(n)), ...words, ...translated])];
+const forbidden = [...new Set([...names.filter((n) => !allowed.has(n)), ...words])];
 
 const files = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(d, e.name)) : [join(d, e.name)]));
 const all = files(dir);
@@ -53,11 +39,23 @@ for (const f of text) {
     console.log(`${f}: ${hits.map(([w, n]) => `${w} ×${n}`).join(', ')}`);
   }
 }
+// Every translation is checked by key: no message of the full game's content (a name, a flavor line, a description) may be
+// in the demo in any language. (Its words can't be: other languages reuse them in names the demo does have.)
+const demoKeys = demoContentKeys();
+const fullOnly = [...contentSource().full.keys()].filter((key) => !demoKeys.has(key));
+const code = text.filter((f) => f.endsWith('.js')).map((f) => [f, readFileSync(f, 'utf8')] as const);
+for (const [f, src] of code) {
+  const leaked = fullOnly.filter((key) => src.includes(`${key}\\"`) || src.includes(`"${key}"`));
+  if (leaked.length) {
+    bad += leaked.length;
+    console.log(`${f}: the full game's ${leaked.slice(0, 8).join(', ')}${leaked.length > 8 ? ` (+${leaked.length - 8})` : ''}`);
+  }
+}
 for (const extra of ['wiki', 'assets/music/tomb.mp3', 'assets/music/keep.mp3']) {
   if (existsSync(join(dir, extra))) {
     bad++;
     console.log(`${join(dir, extra)} is in the demo`);
   }
 }
-console.log(bad ? `\n${bad} things from the full game in ${dir}` : `Nothing from the full game in ${dir} (${forbidden.length} names and words checked, ${text.length} files).`);
+console.log(bad ? `\n${bad} things from the full game in ${dir}` : `Nothing from the full game in ${dir} (${forbidden.length} names and words, ${fullOnly.length} content messages in every language checked, ${text.length} files).`);
 process.exit(bad ? 1 : 0);
