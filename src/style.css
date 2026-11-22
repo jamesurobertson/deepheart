@@ -516,9 +516,10 @@ body.ui-hidden .abilities { right: 0; }
 .ico.pair { display: flex; align-items: flex-end; }
 .ico.pair > .px + .px { margin-left: -6px; }
 
-.modes { display: flex; align-items: center; gap: 4px; padding: 8px 12px; border-bottom: 2px solid #2d2224; }
-.modes > span { font: 400 12px/1 'Silkscreen'; color: var(--faint); margin-right: auto; text-transform: uppercase; white-space: nowrap; }
-.mode { min-width: 52px; min-height: 30px; font-size: 15px; }
+.modes { display: flex; align-items: center; gap: 3px; padding: 8px 12px; border-bottom: 2px solid #2d2224; }
+.modes > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 400 12px/1 'Silkscreen'; color: var(--faint); margin-right: auto; text-transform: uppercase; white-space: nowrap; }
+/* A long word ("Siguiente") widens its button; the label before them gives way instead. */
+.mode { flex-shrink: 0; min-width: 40px; min-height: 30px; padding-inline: 2px; font-size: 15px; }
 .mode.on { color: var(--gold-hi); }
 
 .gens { flex: 1; overflow-y: auto; padding: 6px 4px 16px 8px; }

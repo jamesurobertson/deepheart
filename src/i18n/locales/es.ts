@@ -109,7 +109,7 @@ export default {
     'ui.shop.autoLevels': 'Niveles',
     'ui.shop.autoUpgrades': 'Mejoras',
     'ui.shop.hire': 'Contratar',
-    'ui.shop.next': 'Siguiente',
+    'ui.shop.next': 'Sig.',
     'ui.shop.max': 'Máx.',
 
     'ui.toast.saveCopied': 'Partida copiada al portapapeles',
