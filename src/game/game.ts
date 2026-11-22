@@ -1,5 +1,6 @@
 import { DEMO, DEMO_COMPANIONS, DEMO_FIRST_CARD, DEMO_LAST_FLOOR } from '../demo.ts';
 import { GAME_VERSION } from '../version.ts';
+import { t } from '../i18n/index.ts';
 import Decimal from 'break_infinity.js';
 import {
   CARD_BY_ID, COST_GROWTH, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, BOUND, BOUND_BY_ID, boundCost, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, featuredFor, modsFor, pickMonster,
@@ -211,9 +212,25 @@ export const TUNE = { bossHp: 20, bossHpFrom: 8, bossRamp: 40, bossTrait: 1, hpB
  *  a rainbow portal opens. */
 export type BankedBy = 'hand' | 'time' | 'all' | 'sweep';
 
+/** A buff's name in the player's language, from its id. */
+export function buffName(buff: Buff): string {
+  switch (buff.id) {
+    case 'bloodlust': return t('game.buff.bloodlust');
+    case 'heartstorm': return t('game.buff.heartstorm');
+    case 'soulstorm': return t('game.buff.soulstorm');
+    case 'deadeye': return t('game.buff.deadeye');
+    case 'brutal': return t('game.buff.brutal');
+    case 'horde': return t('game.buff.horde');
+    case 'vault': return t('game.buff.vault');
+    case 'fever': return t('game.buff.fever');
+    default: return ABILITY_BY_ID.get(buff.id as AbilityId)?.name ?? buff.name ?? '';
+  }
+}
+
 export interface Buff {
   id: RaidReward | 'fever' | AbilityId;
-  name: string;
+  /** Saves from before the game was translated carry the English name; it's never shown (see buffName). */
+  name?: string;
   t: number;
   dur: number;
   /** Companion damage multiplier. */
@@ -993,7 +1010,7 @@ export class Game {
     if (id === 'rampage') return this.unleashRampage();
     if (!a || a.kind !== 'button' || !this.abilityUnlocked(id) || this.abilityCooldown(id) > 0) return false;
     const dur = this.abilityDuration(id);
-    const buff: Buff = { id, name: a.name, t: dur, dur, dps: 1, click: 1, gold: 1 };
+    const buff: Buff = { id, t: dur, dur, dps: 1, click: 1, gold: 1 };
     if (id === 'treasure') buff.gold = 3;
     this.addBuff(buff);
     this.s.cooldowns[id] = (a.cooldown ?? 0) * (1 - 0.75 * legendShare(this.legendLv('restless')));
@@ -1386,7 +1403,7 @@ export class Game {
       return { id: this.seq++, x: -6 + Math.random() * (VAULT_LENGTH - 12), z: -2.5 + Math.random() * 5, rainbow, gold: chest.times(rainbow ? VAULT_RAINBOW_GOBLIN_CHESTS : VAULT_GOBLIN_CHESTS), caught: false };
     });
     this.vault = { chests: this.makeChests(VAULT_CHESTS, Math.random() < 0.5 ? 3 : 2), coins, goblins, hero, gold: new Decimal(0) };
-    this.addBuff({ id: 'vault', name: 'Rainbow Vault', t: Infinity, dur: Infinity, dps: 1, click: 1, gold: 1 });
+    this.addBuff({ id: 'vault', t: Infinity, dur: Infinity, dps: 1, click: 1, gold: 1 });
     this.vaultOn = true;
     this.events.push({ t: 'vault', on: true, gold: new Decimal(0) });
   }
@@ -1905,7 +1922,7 @@ export class Game {
     this.rampageClicks = 0;
     const dur = this.rampageDuration();
     this.s.fevers++;
-    this.addBuff({ id: 'fever', name: 'Rampage', t: dur, dur, dps: this.feverMult(0), click: 1, gold: 1 });
+    this.addBuff({ id: 'fever', t: dur, dur, dps: this.feverMult(0), click: 1, gold: 1 });
     this.events.push({ t: 'fever', on: true });
   }
 
@@ -2050,14 +2067,14 @@ export class Game {
   }
 
   private rewardBuff(reward: RaidReward, effect: number): Buff {
-    const b = (id: Buff['id'], name: string, t: number, dps: number, click: number, gold: number): Buff => ({ id, name, t: t * effect, dur: t * effect, dps, click, gold });
+    const b = (id: Buff['id'], t: number, dps: number, click: number, gold: number): Buff => ({ id, t: t * effect, dur: t * effect, dps, click, gold });
     switch (reward) {
-      case 'bloodlust': return b('bloodlust', 'Bloodlust', 7, 7, 1, 1);
-      case 'heartstorm': return b('heartstorm', 'Frenzy', 7, 1, 77, 1);
-      case 'soulstorm': return b('soulstorm', 'Soul Storm', 6, 666, 666, 1);
-      case 'deadeye': return { ...b('deadeye', 'Deadeye', 10, 1, 1, 1), crit: 1 };
-      case 'brutal': return { ...b('brutal', 'Brutality', 10, 1, 1, 1), critMult: 3 };
-      default: return b('horde', 'Gold Rush', 30, 1, 1, 7);
+      case 'bloodlust': return b('bloodlust', 7, 7, 1, 1);
+      case 'heartstorm': return b('heartstorm', 7, 1, 77, 1);
+      case 'soulstorm': return b('soulstorm', 6, 666, 666, 1);
+      case 'deadeye': return { ...b('deadeye', 10, 1, 1, 1), crit: 1 };
+      case 'brutal': return { ...b('brutal', 10, 1, 1, 1), critMult: 3 };
+      default: return b('horde', 30, 1, 1, 7);
     }
   }
 

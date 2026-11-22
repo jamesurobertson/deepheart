@@ -2,7 +2,7 @@ import { morph } from './morph.ts';
 import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MOD_BY_ID, NEWS, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
-import { AWAKEN_ON, AWAKEN_TEASE, GOLD_SET_BONUS, SET_BONUS, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_REROLL, TRIP_HOURS, TUNE, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
+import { AWAKEN_ON, AWAKEN_TEASE, GOLD_SET_BONUS, SET_BONUS, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_REROLL, TRIP_HOURS, TUNE, buffName, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
 import type { Drop, Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
@@ -1917,7 +1917,7 @@ export class Ui {
         chip = document.createElement('div');
         chip.className = `buff ${b.id}`;
         chip.dataset.buff = b.id;
-        chip.innerHTML = `<span class="buff-ico">${ability ? skillIcon(ability.id, 22) : b.id === 'deadeye' ? skillIcon('crit', 22, '', 'red') : spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(b.name)}</b><small></small></span><em class="buff-bar"></em>`;
+        chip.innerHTML = `<span class="buff-ico">${ability ? skillIcon(ability.id, 22) : b.id === 'deadeye' ? skillIcon('crit', 22, '', 'red') : spriteFit(ico, 24)}</span><span class="buff-t"><b>${esc(buffName(b))}</b><small></small></span><em class="buff-bar"></em>`;
         box.appendChild(chip);
       }
       // Phones only have room for the countdown; the icon says which buff it is.
@@ -3264,7 +3264,7 @@ export class Ui {
         ${idle.length ? `<p class="st-off">Not active: ${idle.map((r) => `<span${r.note ? ` data-tip="note:${esc(r.note)}"` : ''}>${r.label}</span>`).join(' · ')}</p>` : ''}</section>`;
     };
     const baseSum = b.baseComp.reduce((a, v) => a.plus(v), new Decimal(0));
-    const buffNames = (k: 'dps' | 'click' | 'gold') => g.s.buffs.filter((u) => u[k] > 1).map((u) => `${u.name} ×${u[k]}`).join(', ');
+    const buffNames = (k: 'dps' | 'click' | 'gold') => g.s.buffs.filter((u) => u[k] > 1).map((u) => `${buffName(u)} ×${u[k]}`).join(', ');
     const allRows = [
       mul('Trophies', p.trophies, `${g.s.trophies.length} trophies`),
       mul('Card sets', p.cards, `${g.setsDone(false)} sets · ${g.setsDone(true)} gold sets`, 'Every card of a zone in one color'),
