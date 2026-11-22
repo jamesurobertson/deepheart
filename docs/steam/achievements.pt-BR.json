@@ -1,0 +1,704 @@
+[
+  {
+    "api": "FLOOR_10",
+    "name": "Escada Abaixo",
+    "desc": "Limpe o andar 10.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_50",
+    "name": "A Longa Descida",
+    "desc": "Limpe o andar 50.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_100",
+    "name": "O Subsolo",
+    "desc": "Limpe o andar 100.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_400",
+    "name": "O Fundo?",
+    "desc": "Limpe o andar 400.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_500",
+    "name": "Não Há Fundo",
+    "desc": "Limpe o andar 500.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_750",
+    "name": "A Geologia Desiste",
+    "desc": "Limpe o andar 750.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1000",
+    "name": "Mil Abaixo",
+    "desc": "Limpe o andar 1.000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1500",
+    "name": "Sem Sinal",
+    "desc": "Limpe o andar 1.500.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_2000",
+    "name": "Duas Mil Braças",
+    "desc": "Limpe o andar 2.000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_3000",
+    "name": "Raiz do Mundo",
+    "desc": "Limpe o andar 3.000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_5000",
+    "name": "Onde o Coração Bate",
+    "desc": "Limpe o andar 5.000.",
+    "hidden": false
+  },
+  {
+    "api": "LAP0",
+    "name": "Corrupção",
+    "desc": "Chegue ao andar 81, onde as zonas voltam corrompidas.",
+    "hidden": false
+  },
+  {
+    "api": "LAP1",
+    "name": "O Abismo Olha de Volta",
+    "desc": "Chegue ao andar 161, onde as zonas voltam abissais.",
+    "hidden": false
+  },
+  {
+    "api": "LAP2",
+    "name": "Vazio por Dentro",
+    "desc": "Chegue ao andar 241, onde as zonas voltam vazias.",
+    "hidden": false
+  },
+  {
+    "api": "LAP3",
+    "name": "Eternidade",
+    "desc": "Chegue ao andar 321, onde as zonas voltam eternas.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E9",
+    "name": "Cofrinho",
+    "desc": "Junte 1 bilhão de ouro no total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E24",
+    "name": "Cofre-Forte",
+    "desc": "Junte 1 septilhão de ouro no total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E40",
+    "name": "Tesouraria",
+    "desc": "Junte 10 duodecilhões de ouro no total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E60",
+    "name": "Tesouro de Dragão",
+    "desc": "Junte 1 novendecilhão de ouro no total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E90",
+    "name": "Resgate de um Reino",
+    "desc": "Junte 1e90 de ouro no total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E120",
+    "name": "Mar de Ouro",
+    "desc": "Junte 1e120 de ouro no total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E160",
+    "name": "Além da Conta",
+    "desc": "Junte 1e160 de ouro no total.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E6",
+    "name": "Lutador",
+    "desc": "Alcance 1 milhão de dano por segundo.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E24",
+    "name": "Senhor da Guerra",
+    "desc": "Alcance 1 septilhão de dano por segundo.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E40",
+    "name": "Cataclismo",
+    "desc": "Alcance 10 duodecilhões de dano por segundo.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E60",
+    "name": "Apocalipse",
+    "desc": "Alcance 1 novendecilhão de dano por segundo.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E80",
+    "name": "Quebra-Mundos",
+    "desc": "Alcance 1e80 de dano por segundo.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E100",
+    "name": "Googol",
+    "desc": "Alcance um googol de dano por segundo.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E150",
+    "name": "Morte Térmica",
+    "desc": "Alcance 1e150 de dano por segundo.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E200",
+    "name": "Big Bang",
+    "desc": "Alcance 1e200 de dano por segundo.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_1000",
+    "name": "Matador",
+    "desc": "Abata 1.000 monstros.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_100000",
+    "name": "Massacre",
+    "desc": "Abata 100.000 monstros.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E6",
+    "name": "Evento de Extinção",
+    "desc": "Abata 1.000.000 monstros.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E7",
+    "name": "O Ceifador",
+    "desc": "Abata 10.000.000 monstros.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E8",
+    "name": "Nada Fica Vivo",
+    "desc": "Abata 100.000.000 monstros.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_10",
+    "name": "Mata-Reis",
+    "desc": "Derrote 10 chefes.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_100",
+    "name": "Matador de Tiranos",
+    "desc": "Derrote 100 chefes.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_1000",
+    "name": "Maratona de Chefes",
+    "desc": "Derrote 1.000 chefes.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_5000",
+    "name": "Regicida em Série",
+    "desc": "Derrote 5.000 chefes.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_25000",
+    "name": "Trono de Ossos",
+    "desc": "Derrote 25.000 chefes.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1",
+    "name": "Mata-Campeões",
+    "desc": "Abata um campeão.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_100",
+    "name": "Colecionador de Coroas",
+    "desc": "Abata 100 campeões.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1000",
+    "name": "Campeão dos Campeões",
+    "desc": "Abata 1.000 campeões.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_10000",
+    "name": "Incontestável",
+    "desc": "Abata 10.000 campeões.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_1",
+    "name": "Por um Fio",
+    "desc": "Derrote um chefe com 3 segundos ou menos no relógio.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_20",
+    "name": "Nervos de Aço",
+    "desc": "Derrote 20 chefes com 3 segundos ou menos no relógio.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_100",
+    "name": "Precisava Disso?",
+    "desc": "Derrote 100 chefes com 3 segundos ou menos no relógio.",
+    "hidden": false
+  },
+  {
+    "api": "HIRE_ALL",
+    "name": "Grupo Completo",
+    "desc": "Contrate todos os 32 companheiros.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_1000",
+    "name": "Lendário",
+    "desc": "Leve um companheiro ao nível 1.000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_2500",
+    "name": "Mítico",
+    "desc": "Leve um companheiro ao nível 2.500.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_5000",
+    "name": "Imortal",
+    "desc": "Leve um companheiro ao nível 5.000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_10000",
+    "name": "Upado Demais",
+    "desc": "Leve um companheiro ao nível 10.000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_500",
+    "name": "Companhia Leal",
+    "desc": "Leve todos os companheiros ao nível 500.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_1000",
+    "name": "Companhia Lendária",
+    "desc": "Leve todos os companheiros ao nível 1.000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_2500",
+    "name": "Companhia Mítica",
+    "desc": "Leve todos os companheiros ao nível 2.500.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100",
+    "name": "Toc Toc",
+    "desc": "Ataque 100 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_10000",
+    "name": "Clicador",
+    "desc": "Ataque 10.000 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100000",
+    "name": "Ainda Clicando",
+    "desc": "Ataque 100.000 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_E6",
+    "name": "Tendinite",
+    "desc": "Ataque 1.000.000 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_1",
+    "name": "Crítico!",
+    "desc": "Consiga 1 acerto crítico.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_10000",
+    "name": "Olho Afiado",
+    "desc": "Consiga 10.000 acertos críticos.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_100000",
+    "name": "Cirurgião",
+    "desc": "Consiga 100.000 acertos críticos.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_E6",
+    "name": "Estado Crítico",
+    "desc": "Consiga 1.000.000 acertos críticos.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1",
+    "name": "Fúria!",
+    "desc": "Entre em Fúria uma vez.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_100",
+    "name": "Berserker",
+    "desc": "Entre em Fúria 100 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1000",
+    "name": "Problemas com a Raiva",
+    "desc": "Entre em Fúria 1.000 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "RAMPAGE0",
+    "name": "Sangue Quente",
+    "desc": "Continue atacando até uma Fúria chegar ao nível máximo.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_1",
+    "name": "Achado Não É Roubado",
+    "desc": "Capture um goblin do tesouro.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_77",
+    "name": "Com a Mão na Massa",
+    "desc": "Capture 77 goblins do tesouro.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_777",
+    "name": "Sorte Grande",
+    "desc": "Capture 777 goblins do tesouro.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_2777",
+    "name": "Ninguém Escapa",
+    "desc": "Capture 2.777 goblins do tesouro.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_7777",
+    "name": "Senhor dos Tesouros",
+    "desc": "Capture 7.777 goblins do tesouro.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1",
+    "name": "Mão Furada",
+    "desc": "Deixe um goblin do tesouro fugir.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_100",
+    "name": "Pestinhas Escorregadios",
+    "desc": "Deixe 100 goblins do tesouro fugirem.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1000",
+    "name": "Cúmplice dos Goblins",
+    "desc": "Deixe 1.000 goblins do tesouro fugirem. Eles estão contando para os amigos.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_5000",
+    "name": "Filantropo dos Goblins",
+    "desc": "Deixe 5.000 goblins do tesouro fugirem. Você está bancando a aposentadoria deles.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_20000",
+    "name": "Patrocinador Oficial dos Goblins",
+    "desc": "Deixe 20.000 goblins do tesouro fugirem. Deram o seu nome a um túnel.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_50000",
+    "name": "Os Goblins Agradecem",
+    "desc": "Deixe 50.000 goblins do tesouro fugirem. Tem uma estátua sua na Cidade dos Goblins.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_1",
+    "name": "Arco-Íris Duplo",
+    "desc": "Capture um goblin arco-íris.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_50",
+    "name": "Caçando Arco-Íris",
+    "desc": "Capture 50 goblins arco-íris.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_500",
+    "name": "O Fim do Arco-Íris",
+    "desc": "Capture 500 goblins arco-íris.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_1",
+    "name": "Além do Arco-Íris",
+    "desc": "Abra o Cofre Arco-Íris.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_25",
+    "name": "Saqueador de Cofres",
+    "desc": "Abra o Cofre Arco-Íris 25 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_250",
+    "name": "Banqueiro Goblin",
+    "desc": "Abra o Cofre Arco-Íris 250 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_1",
+    "name": "Tomando Ar",
+    "desc": "Ascenda uma vez.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_10",
+    "name": "Passagem de Volta",
+    "desc": "Ascenda 10 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_50",
+    "name": "Bate e Volta",
+    "desc": "Ascenda 50 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_250",
+    "name": "Sempre de Volta pra Baixo",
+    "desc": "Ascenda 250 vezes.",
+    "hidden": false
+  },
+  {
+    "api": "AWK_1",
+    "name": "Ele Acorda",
+    "desc": "Desperte o Coração uma vez.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_5",
+    "name": "Batimento",
+    "desc": "Desperte o Coração 5 vezes.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_25",
+    "name": "Só Mais Cinco Minutos",
+    "desc": "Desperte o Coração 25 vezes.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_100",
+    "name": "Marca-Passo",
+    "desc": "Desperte o Coração 100 vezes.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_ALL",
+    "name": "Todos os Oito",
+    "desc": "Desperte todos os Acorrentados.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_50",
+    "name": "Dívida de Almas",
+    "desc": "Ganhe 50 almas acorrentadas no total.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_250",
+    "name": "Quitado",
+    "desc": "Ganhe 250 almas acorrentadas no total.",
+    "hidden": true
+  },
+  {
+    "api": "TRIP_1",
+    "name": "Fui Caçar",
+    "desc": "Envie um companheiro em uma expedição.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_25",
+    "name": "Espólios",
+    "desc": "Encontre 25 cartas em expedições.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_250",
+    "name": "Cartões-Postais",
+    "desc": "Encontre 250 cartas em expedições.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_10000",
+    "name": "Dedetização",
+    "desc": "Derrote 10.000 monstros em expedições.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_E6",
+    "name": "Músculos de Aluguel",
+    "desc": "Derrote 1.000.000 monstros em expedições.",
+    "hidden": false
+  },
+  {
+    "api": "PET_1",
+    "name": "Boa Gatinha",
+    "desc": "Faça carinho na Koko.",
+    "hidden": false
+  },
+  {
+    "api": "PET_10",
+    "name": "Pessoa de Gatos",
+    "desc": "Faça carinho na Koko 10 vezes.",
+    "hidden": true
+  },
+  {
+    "api": "PET_100",
+    "name": "O Xodó Dela",
+    "desc": "Faça carinho na Koko 100 vezes.",
+    "hidden": true
+  },
+  {
+    "api": "PET_1000",
+    "name": "O Humano da Koko",
+    "desc": "Faça carinho na Koko 1.000 vezes.",
+    "hidden": true
+  },
+  {
+    "api": "SET_1",
+    "name": "Conjunto Completo",
+    "desc": "Complete um conjunto de cartas.",
+    "hidden": false
+  },
+  {
+    "api": "SET_5",
+    "name": "Colecionador de Conjuntos",
+    "desc": "Complete 5 conjuntos de cartas.",
+    "hidden": false
+  },
+  {
+    "api": "SET_10",
+    "name": "Coleção Completa",
+    "desc": "Complete 10 conjuntos de cartas.",
+    "hidden": false
+  },
+  {
+    "api": "GSET_1",
+    "name": "Conjunto Dourado",
+    "desc": "Complete um conjunto dourado.",
+    "hidden": false
+  },
+  {
+    "api": "GSET_5",
+    "name": "Banhado a Ouro",
+    "desc": "Complete 5 conjuntos dourados.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_1",
+    "name": "Portador de Cartas",
+    "desc": "Encontre uma carta de monstro.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_25",
+    "name": "Carta na Manga",
+    "desc": "Encontre 25 cartas de monstro diferentes.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_ALL",
+    "name": "Bestiário",
+    "desc": "Encontre todas as cartas de monstro.",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_250",
+    "name": "Manual dos Monstros",
+    "desc": "Colete 250 cartas.",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_ALL",
+    "name": "Até o Último Monstro",
+    "desc": "Colete todas as cartas.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_1",
+    "name": "Folheado a Ouro",
+    "desc": "Encontre uma carta dourada.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_25",
+    "name": "Padrão-Ouro",
+    "desc": "Encontre 25 cartas douradas diferentes.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_ALL",
+    "name": "Baralho de Midas",
+    "desc": "Encontre todas as cartas douradas.",
+    "hidden": false
+  }
+]

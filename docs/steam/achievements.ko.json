@@ -1,0 +1,704 @@
+[
+  {
+    "api": "FLOOR_10",
+    "name": "계단 아래로",
+    "desc": "10층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_50",
+    "name": "기나긴 하강",
+    "desc": "50층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_100",
+    "name": "그 아래",
+    "desc": "100층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_400",
+    "name": "바닥인가?",
+    "desc": "400층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_500",
+    "name": "바닥은 없다",
+    "desc": "500층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_750",
+    "name": "지질학 포기",
+    "desc": "750층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1000",
+    "name": "지하 천 층",
+    "desc": "1,000층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1500",
+    "name": "통화권 이탈",
+    "desc": "1,500층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_2000",
+    "name": "이천 길 아래",
+    "desc": "2,000층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_3000",
+    "name": "세계의 뿌리",
+    "desc": "3,000층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_5000",
+    "name": "심장이 뛰는 곳",
+    "desc": "5,000층 클리어.",
+    "hidden": false
+  },
+  {
+    "api": "LAP0",
+    "name": "타락",
+    "desc": "81층 도달: 구역이 타락하여 돌아오는 곳.",
+    "hidden": false
+  },
+  {
+    "api": "LAP1",
+    "name": "심연도 너를 들여다본다",
+    "desc": "161층 도달: 구역이 심연에 물들어 돌아오는 곳.",
+    "hidden": false
+  },
+  {
+    "api": "LAP2",
+    "name": "속이 텅 빈",
+    "desc": "241층 도달: 구역이 공허해져 돌아오는 곳.",
+    "hidden": false
+  },
+  {
+    "api": "LAP3",
+    "name": "영원",
+    "desc": "321층 도달: 구역이 영원을 입고 돌아오는 곳.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E9",
+    "name": "동전 지갑",
+    "desc": "누적 골드 10억 획득.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E24",
+    "name": "돈궤",
+    "desc": "누적 골드 1자 획득.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E40",
+    "name": "국고",
+    "desc": "누적 골드 1정 획득.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E60",
+    "name": "용의 보물",
+    "desc": "누적 골드 1e60 획득.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E90",
+    "name": "왕국의 몸값",
+    "desc": "누적 골드 1e90 획득.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E120",
+    "name": "황금의 바다",
+    "desc": "누적 골드 1e120 획득.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E160",
+    "name": "셀 수 없음",
+    "desc": "누적 골드 1e160 획득.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E6",
+    "name": "투사",
+    "desc": "초당 피해 100만 달성.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E24",
+    "name": "군벌",
+    "desc": "초당 피해 1자 달성.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E40",
+    "name": "대격변",
+    "desc": "초당 피해 1정 달성.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E60",
+    "name": "종말",
+    "desc": "초당 피해 1e60 달성.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E80",
+    "name": "세계 파괴자",
+    "desc": "초당 피해 1e80 달성.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E100",
+    "name": "구골",
+    "desc": "초당 피해 구골 달성.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E150",
+    "name": "열죽음",
+    "desc": "초당 피해 1e150 달성.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E200",
+    "name": "빅뱅",
+    "desc": "초당 피해 1e200 달성.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_1000",
+    "name": "슬레이어",
+    "desc": "몬스터 1,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_100000",
+    "name": "대학살",
+    "desc": "몬스터 100,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E6",
+    "name": "대멸종",
+    "desc": "몬스터 1,000,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E7",
+    "name": "사신",
+    "desc": "몬스터 10,000,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E8",
+    "name": "살아남은 자 없음",
+    "desc": "몬스터 100,000,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_10",
+    "name": "왕 사냥꾼",
+    "desc": "보스 10마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_100",
+    "name": "폭군 처단자",
+    "desc": "보스 100마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_1000",
+    "name": "보스 러시",
+    "desc": "보스 1,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_5000",
+    "name": "연쇄 시해범",
+    "desc": "보스 5,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_25000",
+    "name": "뼈의 왕좌",
+    "desc": "보스 25,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1",
+    "name": "챔피언 사냥꾼",
+    "desc": "챔피언 1마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_100",
+    "name": "왕관 수집가",
+    "desc": "챔피언 100마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1000",
+    "name": "챔피언 중의 챔피언",
+    "desc": "챔피언 1,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_10000",
+    "name": "이견 없음",
+    "desc": "챔피언 10,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_1",
+    "name": "간발의 차",
+    "desc": "남은 시간 3초 이하로 보스 1마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_20",
+    "name": "강철 멘탈",
+    "desc": "남은 시간 3초 이하로 보스 20마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_100",
+    "name": "꼭 그래야 했어?",
+    "desc": "남은 시간 3초 이하로 보스 100마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "HIRE_ALL",
+    "name": "파티 완성",
+    "desc": "동료 32명 전원 고용.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_1000",
+    "name": "전설",
+    "desc": "동료 한 명을 레벨 1,000까지.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_2500",
+    "name": "신화",
+    "desc": "동료 한 명을 레벨 2,500까지.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_5000",
+    "name": "불멸",
+    "desc": "동료 한 명을 레벨 5,000까지.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_10000",
+    "name": "레벨 과잉",
+    "desc": "동료 한 명을 레벨 10,000까지.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_500",
+    "name": "충직한 동료들",
+    "desc": "모든 동료를 레벨 500까지.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_1000",
+    "name": "전설의 동료들",
+    "desc": "모든 동료를 레벨 1,000까지.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_2500",
+    "name": "신화의 동료들",
+    "desc": "모든 동료를 레벨 2,500까지.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100",
+    "name": "톡톡",
+    "desc": "100회 공격.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_10000",
+    "name": "클릭쟁이",
+    "desc": "10,000회 공격.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100000",
+    "name": "아직도 클릭 중",
+    "desc": "100,000회 공격.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_E6",
+    "name": "손목 터널 증후군",
+    "desc": "1,000,000회 공격.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_1",
+    "name": "치명타!",
+    "desc": "치명타 1회 적중.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_10000",
+    "name": "날카로운 눈",
+    "desc": "치명타 10,000회 적중.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_100000",
+    "name": "외과의",
+    "desc": "치명타 100,000회 적중.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_E6",
+    "name": "상태가 치명적",
+    "desc": "치명타 1,000,000회 적중.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1",
+    "name": "폭주!",
+    "desc": "폭주 1회 발동.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_100",
+    "name": "광전사",
+    "desc": "폭주 100회 발동.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1000",
+    "name": "분노 조절 실패",
+    "desc": "폭주 1,000회 발동.",
+    "hidden": false
+  },
+  {
+    "api": "RAMPAGE0",
+    "name": "피가 끓는다",
+    "desc": "폭주가 최고 단계에 이를 때까지 계속 공격하기.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_1",
+    "name": "먼저 줍는 사람이 임자",
+    "desc": "보물 고블린 1마리 잡기.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_77",
+    "name": "현행범",
+    "desc": "보물 고블린 77마리 잡기.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_777",
+    "name": "잭팟",
+    "desc": "보물 고블린 777마리 잡기.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_2777",
+    "name": "아무도 못 도망쳐",
+    "desc": "보물 고블린 2,777마리 잡기.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_7777",
+    "name": "보물 군주",
+    "desc": "보물 고블린 7,777마리 잡기.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1",
+    "name": "헛손질",
+    "desc": "보물 고블린 1마리 놓치기.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_100",
+    "name": "미꾸라지 같은 녀석들",
+    "desc": "보물 고블린 100마리 놓치기.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1000",
+    "name": "고블린 방조범",
+    "desc": "보물 고블린 1,000마리 놓치기. 친구들한테 소문내는 중이다.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_5000",
+    "name": "고블린 자선가",
+    "desc": "보물 고블린 5,000마리 놓치기. 그들의 노후 자금을 대 주는 중이다.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_20000",
+    "name": "고블린 공식 후원자",
+    "desc": "보물 고블린 20,000마리 놓치기. 고블린들이 터널에 은인의 이름을 붙였다.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_50000",
+    "name": "고블린 일동 감사드립니다",
+    "desc": "보물 고블린 50,000마리 놓치기. 고블린 마을에 은인의 동상이 섰다.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_1",
+    "name": "쌍무지개",
+    "desc": "무지개 고블린 1마리 잡기.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_50",
+    "name": "무지개를 좇아서",
+    "desc": "무지개 고블린 50마리 잡기.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_500",
+    "name": "무지개 끝",
+    "desc": "무지개 고블린 500마리 잡기.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_1",
+    "name": "무지개 너머",
+    "desc": "무지개 금고 1회 열기.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_25",
+    "name": "금고 털이",
+    "desc": "무지개 금고 25회 열기.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_250",
+    "name": "고블린 은행원",
+    "desc": "무지개 금고 250회 열기.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_1",
+    "name": "숨 좀 쉬자",
+    "desc": "1회 승천.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_10",
+    "name": "왕복표",
+    "desc": "10회 승천.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_50",
+    "name": "통근자",
+    "desc": "50회 승천.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_250",
+    "name": "결국 다시 아래로",
+    "desc": "250회 승천.",
+    "hidden": false
+  },
+  {
+    "api": "AWK_1",
+    "name": "깨어난다",
+    "desc": "심장 1회 각성.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_5",
+    "name": "심장 박동",
+    "desc": "심장 5회 각성.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_25",
+    "name": "5분만 더",
+    "desc": "심장 25회 각성.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_100",
+    "name": "심박 조율기",
+    "desc": "심장 100회 각성.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_ALL",
+    "name": "여덟 전부",
+    "desc": "속박된 자들을 모두 깨우기.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_50",
+    "name": "영혼 빚",
+    "desc": "누적 속박된 영혼 50 획득.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_250",
+    "name": "완납",
+    "desc": "누적 속박된 영혼 250 획득.",
+    "hidden": true
+  },
+  {
+    "api": "TRIP_1",
+    "name": "사냥 나감",
+    "desc": "동료를 원정에 보내기.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_25",
+    "name": "노획물",
+    "desc": "원정에서 카드 25장 발견.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_250",
+    "name": "그림엽서",
+    "desc": "원정에서 카드 250장 발견.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_10000",
+    "name": "해충 방제",
+    "desc": "원정에서 몬스터 10,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_E6",
+    "name": "고용된 주먹",
+    "desc": "원정에서 몬스터 1,000,000마리 처치.",
+    "hidden": false
+  },
+  {
+    "api": "PET_1",
+    "name": "착한 고양이",
+    "desc": "코코 쓰다듬기.",
+    "hidden": false
+  },
+  {
+    "api": "PET_10",
+    "name": "고양이파",
+    "desc": "코코 10번 쓰다듬기.",
+    "hidden": true
+  },
+  {
+    "api": "PET_100",
+    "name": "코코의 1순위",
+    "desc": "코코 100번 쓰다듬기.",
+    "hidden": true
+  },
+  {
+    "api": "PET_1000",
+    "name": "코코의 집사",
+    "desc": "코코 1,000번 쓰다듬기.",
+    "hidden": true
+  },
+  {
+    "api": "SET_1",
+    "name": "풀세트",
+    "desc": "카드 세트 1개 완성.",
+    "hidden": false
+  },
+  {
+    "api": "SET_5",
+    "name": "세트 수집가",
+    "desc": "카드 세트 5개 완성.",
+    "hidden": false
+  },
+  {
+    "api": "SET_10",
+    "name": "완전 수집",
+    "desc": "카드 세트 10개 완성.",
+    "hidden": false
+  },
+  {
+    "api": "GSET_1",
+    "name": "황금 세트",
+    "desc": "황금 카드 세트 1개 완성.",
+    "hidden": false
+  },
+  {
+    "api": "GSET_5",
+    "name": "금테 두른",
+    "desc": "황금 카드 세트 5개 완성.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_1",
+    "name": "카드 소지자",
+    "desc": "몬스터 카드 발견.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_25",
+    "name": "타짜",
+    "desc": "서로 다른 몬스터 카드 25장 발견.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_ALL",
+    "name": "몬스터 도감",
+    "desc": "모든 몬스터 카드 발견.",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_250",
+    "name": "몬스터 매뉴얼",
+    "desc": "카드 250장 수집.",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_ALL",
+    "name": "마지막 한 마리까지",
+    "desc": "모든 카드 수집.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_1",
+    "name": "금박",
+    "desc": "황금 카드 발견.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_25",
+    "name": "금본위제",
+    "desc": "서로 다른 황금 카드 25장 발견.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_ALL",
+    "name": "미다스의 덱",
+    "desc": "모든 황금 카드 발견.",
+    "hidden": false
+  }
+]

@@ -1,0 +1,704 @@
+[
+  {
+    "api": "FLOOR_10",
+    "name": "Die Treppe hinab",
+    "desc": "Schaffe Ebene 10.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_50",
+    "name": "Der lange Abstieg",
+    "desc": "Schaffe Ebene 50.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_100",
+    "name": "Das Darunter",
+    "desc": "Schaffe Ebene 100.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_400",
+    "name": "Der Grund?",
+    "desc": "Schaffe Ebene 400.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_500",
+    "name": "Es gibt keinen Grund",
+    "desc": "Schaffe Ebene 500.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_750",
+    "name": "Die Geologie gibt auf",
+    "desc": "Schaffe Ebene 750.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1000",
+    "name": "Tausend tief",
+    "desc": "Schaffe Ebene 1.000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1500",
+    "name": "Kein Netz",
+    "desc": "Schaffe Ebene 1.500.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_2000",
+    "name": "Zweitausend Klafter",
+    "desc": "Schaffe Ebene 2.000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_3000",
+    "name": "Wurzel der Welt",
+    "desc": "Schaffe Ebene 3.000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_5000",
+    "name": "Wo das Herz schlägt",
+    "desc": "Schaffe Ebene 5.000.",
+    "hidden": false
+  },
+  {
+    "api": "LAP0",
+    "name": "Verderbnis",
+    "desc": "Erreiche Ebene 81, wo die Zonen verderbt zurückkehren.",
+    "hidden": false
+  },
+  {
+    "api": "LAP1",
+    "name": "Der Abgrund blickt zurück",
+    "desc": "Erreiche Ebene 161, wo die Zonen abgründig zurückkehren.",
+    "hidden": false
+  },
+  {
+    "api": "LAP2",
+    "name": "Ausgehöhlt",
+    "desc": "Erreiche Ebene 241, wo die Zonen ausgehöhlt zurückkehren.",
+    "hidden": false
+  },
+  {
+    "api": "LAP3",
+    "name": "Ewigkeit",
+    "desc": "Erreiche Ebene 321, wo die Zonen ewig zurückkehren.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E9",
+    "name": "Geldbeutel",
+    "desc": "Sammle insgesamt 1 Milliarde Gold.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E24",
+    "name": "Geldkassette",
+    "desc": "Sammle insgesamt 1 Quadrillion Gold.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E40",
+    "name": "Schatzkammer",
+    "desc": "Sammle insgesamt 10 Sextilliarden Gold.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E60",
+    "name": "Drachenhort",
+    "desc": "Sammle insgesamt 1 Dezillion Gold.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E90",
+    "name": "Lösegeld eines Königreichs",
+    "desc": "Sammle insgesamt 1e90 Gold.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E120",
+    "name": "Goldmeer",
+    "desc": "Sammle insgesamt 1e120 Gold.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E160",
+    "name": "Unzählbar",
+    "desc": "Sammle insgesamt 1e160 Gold.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E6",
+    "name": "Kämpfer",
+    "desc": "Erreiche 1 Million Schaden pro Sekunde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E24",
+    "name": "Kriegsherr",
+    "desc": "Erreiche 1 Quadrillion Schaden pro Sekunde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E40",
+    "name": "Kataklysmus",
+    "desc": "Erreiche 10 Sextilliarden Schaden pro Sekunde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E60",
+    "name": "Apokalypse",
+    "desc": "Erreiche 1 Dezillion Schaden pro Sekunde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E80",
+    "name": "Weltenbrecher",
+    "desc": "Erreiche 1e80 Schaden pro Sekunde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E100",
+    "name": "Googol",
+    "desc": "Erreiche ein Googol Schaden pro Sekunde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E150",
+    "name": "Wärmetod",
+    "desc": "Erreiche 1e150 Schaden pro Sekunde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E200",
+    "name": "Urknall",
+    "desc": "Erreiche 1e200 Schaden pro Sekunde.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_1000",
+    "name": "Schlächter",
+    "desc": "Erledige 1.000 Monster.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_100000",
+    "name": "Massaker",
+    "desc": "Erledige 100.000 Monster.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E6",
+    "name": "Massenaussterben",
+    "desc": "Erledige 1.000.000 Monster.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E7",
+    "name": "Der Sensenmann",
+    "desc": "Erledige 10.000.000 Monster.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E8",
+    "name": "Nichts lebt mehr",
+    "desc": "Erledige 100.000.000 Monster.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_10",
+    "name": "Königsschreck",
+    "desc": "Besiege 10 Bosse.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_100",
+    "name": "Tyrannentöter",
+    "desc": "Besiege 100 Bosse.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_1000",
+    "name": "Chefsache",
+    "desc": "Besiege 1.000 Bosse.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_5000",
+    "name": "Serienkönigsmörder",
+    "desc": "Besiege 5.000 Bosse.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_25000",
+    "name": "Knochenthron",
+    "desc": "Besiege 25.000 Bosse.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1",
+    "name": "Championtöter",
+    "desc": "Erlege einen Champion.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_100",
+    "name": "Kronensammler",
+    "desc": "Erlege 100 Champions.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1000",
+    "name": "Champion der Champions",
+    "desc": "Erlege 1.000 Champions.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_10000",
+    "name": "Unangefochten",
+    "desc": "Erlege 10.000 Champions.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_1",
+    "name": "Um Haaresbreite",
+    "desc": "Besiege einen Boss mit höchstens 3 Sekunden auf der Uhr.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_20",
+    "name": "Nerven aus Stahl",
+    "desc": "Besiege 20 Bosse mit höchstens 3 Sekunden auf der Uhr.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_100",
+    "name": "Musste das sein?",
+    "desc": "Besiege 100 Bosse mit höchstens 3 Sekunden auf der Uhr.",
+    "hidden": false
+  },
+  {
+    "api": "HIRE_ALL",
+    "name": "Volle Gruppe",
+    "desc": "Heuere alle 32 Gefährten an.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_1000",
+    "name": "Legendär",
+    "desc": "Bring einen Gefährten auf Stufe 1.000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_2500",
+    "name": "Mythisch",
+    "desc": "Bring einen Gefährten auf Stufe 2.500.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_5000",
+    "name": "Unsterblich",
+    "desc": "Bring einen Gefährten auf Stufe 5.000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_10000",
+    "name": "Überlevelt",
+    "desc": "Bring einen Gefährten auf Stufe 10.000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_500",
+    "name": "Treue Truppe",
+    "desc": "Bring jeden Gefährten auf Stufe 500.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_1000",
+    "name": "Legendäre Truppe",
+    "desc": "Bring jeden Gefährten auf Stufe 1.000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_2500",
+    "name": "Mythische Truppe",
+    "desc": "Bring jeden Gefährten auf Stufe 2.500.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100",
+    "name": "Tipp Tipp",
+    "desc": "Greif 100-mal an.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_10000",
+    "name": "Klicker",
+    "desc": "Greif 10.000-mal an.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100000",
+    "name": "Klickt immer noch",
+    "desc": "Greif 100.000-mal an.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_E6",
+    "name": "Mausarm",
+    "desc": "Greif 1.000.000-mal an.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_1",
+    "name": "Kritisch!",
+    "desc": "Lande 1 kritischen Treffer.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_10000",
+    "name": "Scharfes Auge",
+    "desc": "Lande 10.000 kritische Treffer.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_100000",
+    "name": "Chirurg",
+    "desc": "Lande 100.000 kritische Treffer.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_E6",
+    "name": "Kritischer Zustand",
+    "desc": "Lande 1.000.000 kritische Treffer.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1",
+    "name": "Raserei!",
+    "desc": "Gerate einmal in Raserei.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_100",
+    "name": "Berserker",
+    "desc": "Gerate 100-mal in Raserei.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1000",
+    "name": "Aggressionsproblem",
+    "desc": "Gerate 1.000-mal in Raserei.",
+    "hidden": false
+  },
+  {
+    "api": "RAMPAGE0",
+    "name": "Blutrausch",
+    "desc": "Greif weiter an, bis eine Raserei ihre höchste Stufe erreicht.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_1",
+    "name": "Finderlohn",
+    "desc": "Fang einen Schatzgoblin.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_77",
+    "name": "Auf frischer Tat",
+    "desc": "Fang 77 Schatzgoblins.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_777",
+    "name": "Jackpot",
+    "desc": "Fang 777 Schatzgoblins.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_2777",
+    "name": "Keiner entkommt",
+    "desc": "Fang 2.777 Schatzgoblins.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_7777",
+    "name": "Schatzfürst",
+    "desc": "Fang 7.777 Schatzgoblins.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1",
+    "name": "Butterfinger",
+    "desc": "Lass einen Schatzgoblin entkommen.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_100",
+    "name": "Glitschige kleine Kerle",
+    "desc": "Lass 100 Schatzgoblins entkommen.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1000",
+    "name": "Goblinförderer",
+    "desc": "Lass 1.000 Schatzgoblins entkommen. Sie erzählen es ihren Freunden.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_5000",
+    "name": "Goblin-Philanthrop",
+    "desc": "Lass 5.000 Schatzgoblins entkommen. Du finanzierst ihre Rente.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_20000",
+    "name": "Offizieller Goblin-Sponsor",
+    "desc": "Lass 20.000 Schatzgoblins entkommen. Sie haben einen Tunnel nach dir benannt.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_50000",
+    "name": "Die Goblins danken dir",
+    "desc": "Lass 50.000 Schatzgoblins entkommen. In Goblinhausen steht eine Statue von dir.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_1",
+    "name": "Doppelter Regenbogen",
+    "desc": "Fang einen Regenbogengoblin.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_50",
+    "name": "Regenbogenjagd",
+    "desc": "Fang 50 Regenbogengoblins.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_500",
+    "name": "Ende des Regenbogens",
+    "desc": "Fang 500 Regenbogengoblins.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_1",
+    "name": "Über dem Regenbogen",
+    "desc": "Öffne den Regenbogentresor.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_25",
+    "name": "Tresorknacker",
+    "desc": "Öffne den Regenbogentresor 25-mal.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_250",
+    "name": "Goblinbankier",
+    "desc": "Öffne den Regenbogentresor 250-mal.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_1",
+    "name": "Luft holen",
+    "desc": "Steig einmal auf.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_10",
+    "name": "Rückfahrkarte",
+    "desc": "Steig 10-mal auf.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_50",
+    "name": "Pendler",
+    "desc": "Steig 50-mal auf.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_250",
+    "name": "Immer wieder runter",
+    "desc": "Steig 250-mal auf.",
+    "hidden": false
+  },
+  {
+    "api": "AWK_1",
+    "name": "Es erwacht",
+    "desc": "Erwecke das Herz einmal.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_5",
+    "name": "Herzschlag",
+    "desc": "Erwecke das Herz 5-mal.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_25",
+    "name": "Schlummertaste",
+    "desc": "Erwecke das Herz 25-mal.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_100",
+    "name": "Herzschrittmacher",
+    "desc": "Erwecke das Herz 100-mal.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_ALL",
+    "name": "Alle acht",
+    "desc": "Wecke jeden der Gebundenen.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_50",
+    "name": "Seelenschuld",
+    "desc": "Verdiene insgesamt 50 gebundene Seelen.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_250",
+    "name": "Restlos beglichen",
+    "desc": "Verdiene insgesamt 250 gebundene Seelen.",
+    "hidden": true
+  },
+  {
+    "api": "TRIP_1",
+    "name": "Auf der Jagd",
+    "desc": "Schick einen Gefährten auf Expedition.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_25",
+    "name": "Ausbeute",
+    "desc": "Finde 25 Karten auf Expeditionen.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_250",
+    "name": "Postkarten",
+    "desc": "Finde 250 Karten auf Expeditionen.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_10000",
+    "name": "Kammerjäger",
+    "desc": "Besiege 10.000 Monster auf Expeditionen.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_E6",
+    "name": "Angeheuerte Muskeln",
+    "desc": "Besiege 1.000.000 Monster auf Expeditionen.",
+    "hidden": false
+  },
+  {
+    "api": "PET_1",
+    "name": "Brave Mieze",
+    "desc": "Streichle Koko.",
+    "hidden": false
+  },
+  {
+    "api": "PET_10",
+    "name": "Katzenmensch",
+    "desc": "Streichle Koko 10-mal.",
+    "hidden": true
+  },
+  {
+    "api": "PET_100",
+    "name": "Ihr Liebling",
+    "desc": "Streichle Koko 100-mal.",
+    "hidden": true
+  },
+  {
+    "api": "PET_1000",
+    "name": "Kokos Mensch",
+    "desc": "Streichle Koko 1.000-mal.",
+    "hidden": true
+  },
+  {
+    "api": "SET_1",
+    "name": "Komplettes Set",
+    "desc": "Vervollständige ein Kartenset.",
+    "hidden": false
+  },
+  {
+    "api": "SET_5",
+    "name": "Setsammler",
+    "desc": "Vervollständige 5 Kartensets.",
+    "hidden": false
+  },
+  {
+    "api": "SET_10",
+    "name": "Vollständige Sammlung",
+    "desc": "Vervollständige 10 Kartensets.",
+    "hidden": false
+  },
+  {
+    "api": "GSET_1",
+    "name": "Goldset",
+    "desc": "Vervollständige ein Goldset.",
+    "hidden": false
+  },
+  {
+    "api": "GSET_5",
+    "name": "Goldrand",
+    "desc": "Vervollständige 5 Goldsets.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_1",
+    "name": "Kartenträger",
+    "desc": "Finde eine Monsterkarte.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_25",
+    "name": "Kartenhai",
+    "desc": "Finde 25 verschiedene Monsterkarten.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_ALL",
+    "name": "Bestiarium",
+    "desc": "Finde jede Monsterkarte.",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_250",
+    "name": "Monsterhandbuch",
+    "desc": "Sammle 250 Karten.",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_ALL",
+    "name": "Bis zum letzten Monster",
+    "desc": "Sammle jede Karte.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_1",
+    "name": "Vergoldet",
+    "desc": "Finde eine Goldkarte.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_25",
+    "name": "Goldstandard",
+    "desc": "Finde 25 verschiedene Goldkarten.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_ALL",
+    "name": "Midas-Deck",
+    "desc": "Finde jede Goldkarte.",
+    "hidden": false
+  }
+]

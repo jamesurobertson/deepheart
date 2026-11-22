@@ -1,0 +1,704 @@
+[
+  {
+    "api": "FLOOR_10",
+    "name": "下楼梯",
+    "desc": "通关第10层。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_50",
+    "name": "漫漫下行路",
+    "desc": "通关第50层。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_100",
+    "name": "地下深处",
+    "desc": "通关第100层。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_400",
+    "name": "到底了？",
+    "desc": "通关第400层。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_500",
+    "name": "深不见底",
+    "desc": "通关第500层。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_750",
+    "name": "地质学放弃了",
+    "desc": "通关第750层。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1000",
+    "name": "下潜一千",
+    "desc": "通关第1,000层。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1500",
+    "name": "没信号",
+    "desc": "通关第1,500层。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_2000",
+    "name": "两千寻",
+    "desc": "通关第2,000层。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_3000",
+    "name": "世界之根",
+    "desc": "通关第3,000层。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_5000",
+    "name": "心跳之处",
+    "desc": "通关第5,000层。",
+    "hidden": false
+  },
+  {
+    "api": "LAP0",
+    "name": "腐化",
+    "desc": "抵达第81层，区域在此重临，皆已腐化。",
+    "hidden": false
+  },
+  {
+    "api": "LAP1",
+    "name": "深渊也在凝视你",
+    "desc": "抵达第161层，区域在此重临，皆已堕入深渊。",
+    "hidden": false
+  },
+  {
+    "api": "LAP2",
+    "name": "被掏空了",
+    "desc": "抵达第241层，区域在此重临，皆已化为虚空。",
+    "hidden": false
+  },
+  {
+    "api": "LAP3",
+    "name": "永恒",
+    "desc": "抵达第321层，区域在此重临，皆已归于永恒。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E9",
+    "name": "钱袋",
+    "desc": "累计获得10亿金币。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E24",
+    "name": "保险箱",
+    "desc": "累计获得1e24金币。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E40",
+    "name": "国库",
+    "desc": "累计获得1e40金币。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E60",
+    "name": "巨龙宝藏",
+    "desc": "累计获得1e60金币。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E90",
+    "name": "富可敌国",
+    "desc": "累计获得1e90金币。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E120",
+    "name": "金海",
+    "desc": "累计获得1e120金币。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E160",
+    "name": "数不过来",
+    "desc": "累计获得1e160金币。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E6",
+    "name": "战士",
+    "desc": "达到每秒100万伤害。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E24",
+    "name": "军阀",
+    "desc": "达到每秒1e24伤害。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E40",
+    "name": "浩劫",
+    "desc": "达到每秒1e40伤害。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E60",
+    "name": "天启",
+    "desc": "达到每秒1e60伤害。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E80",
+    "name": "碎界者",
+    "desc": "达到每秒1e80伤害。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E100",
+    "name": "古戈尔",
+    "desc": "达到每秒一古戈尔伤害。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E150",
+    "name": "热寂",
+    "desc": "达到每秒1e150伤害。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E200",
+    "name": "大爆炸",
+    "desc": "达到每秒1e200伤害。",
+    "hidden": false
+  },
+  {
+    "api": "KILL_1000",
+    "name": "屠戮者",
+    "desc": "击杀1,000只怪物。",
+    "hidden": false
+  },
+  {
+    "api": "KILL_100000",
+    "name": "大屠杀",
+    "desc": "击杀100,000只怪物。",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E6",
+    "name": "物种灭绝",
+    "desc": "击杀1,000,000只怪物。",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E7",
+    "name": "死神",
+    "desc": "击杀10,000,000只怪物。",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E8",
+    "name": "寸草不生",
+    "desc": "击杀100,000,000只怪物。",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_10",
+    "name": "弑王者",
+    "desc": "击败10个首领。",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_100",
+    "name": "暴君杀手",
+    "desc": "击败100个首领。",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_1000",
+    "name": "首领车轮战",
+    "desc": "击败1,000个首领。",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_5000",
+    "name": "连环弑君",
+    "desc": "击败5,000个首领。",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_25000",
+    "name": "白骨王座",
+    "desc": "击败25,000个首领。",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1",
+    "name": "精英杀手",
+    "desc": "击杀1只精英。",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_100",
+    "name": "王冠收藏家",
+    "desc": "击杀100只精英。",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1000",
+    "name": "精英中的精英",
+    "desc": "击杀1,000只精英。",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_10000",
+    "name": "无可争议",
+    "desc": "击杀10,000只精英。",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_1",
+    "name": "千钧一发",
+    "desc": "在计时剩余3秒或更少时击败1个首领。",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_20",
+    "name": "钢铁神经",
+    "desc": "在计时剩余3秒或更少时击败20个首领。",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_100",
+    "name": "有必要这么悬吗？",
+    "desc": "在计时剩余3秒或更少时击败100个首领。",
+    "hidden": false
+  },
+  {
+    "api": "HIRE_ALL",
+    "name": "满员",
+    "desc": "雇佣全部32名同伴。",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_1000",
+    "name": "传说",
+    "desc": "让一名同伴达到1,000级。",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_2500",
+    "name": "神话",
+    "desc": "让一名同伴达到2,500级。",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_5000",
+    "name": "不朽",
+    "desc": "让一名同伴达到5,000级。",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_10000",
+    "name": "等级溢出",
+    "desc": "让一名同伴达到10,000级。",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_500",
+    "name": "忠诚之师",
+    "desc": "让每位同伴都达到500级。",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_1000",
+    "name": "传说之师",
+    "desc": "让每位同伴都达到1,000级。",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_2500",
+    "name": "神话之师",
+    "desc": "让每位同伴都达到2,500级。",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100",
+    "name": "点点点",
+    "desc": "攻击100次。",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_10000",
+    "name": "点击狂",
+    "desc": "攻击10,000次。",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100000",
+    "name": "还在点",
+    "desc": "攻击100,000次。",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_E6",
+    "name": "腱鞘炎",
+    "desc": "攻击1,000,000次。",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_1",
+    "name": "暴击！",
+    "desc": "打出1次暴击。",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_10000",
+    "name": "火眼金睛",
+    "desc": "打出10,000次暴击。",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_100000",
+    "name": "外科医生",
+    "desc": "打出100,000次暴击。",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_E6",
+    "name": "病危通知",
+    "desc": "打出1,000,000次暴击。",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1",
+    "name": "狂暴！",
+    "desc": "进入狂暴1次。",
+    "hidden": false
+  },
+  {
+    "api": "FEV_100",
+    "name": "狂战士",
+    "desc": "进入狂暴100次。",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1000",
+    "name": "需要情绪管理",
+    "desc": "进入狂暴1,000次。",
+    "hidden": false
+  },
+  {
+    "api": "RAMPAGE0",
+    "name": "热血上头",
+    "desc": "持续攻击，直到狂暴达到最高档。",
+    "hidden": false
+  },
+  {
+    "api": "RAID_1",
+    "name": "谁捡归谁",
+    "desc": "抓住1只宝藏哥布林。",
+    "hidden": false
+  },
+  {
+    "api": "RAID_77",
+    "name": "人赃并获",
+    "desc": "抓住77只宝藏哥布林。",
+    "hidden": false
+  },
+  {
+    "api": "RAID_777",
+    "name": "中大奖",
+    "desc": "抓住777只宝藏哥布林。",
+    "hidden": false
+  },
+  {
+    "api": "RAID_2777",
+    "name": "一个都别想跑",
+    "desc": "抓住2,777只宝藏哥布林。",
+    "hidden": false
+  },
+  {
+    "api": "RAID_7777",
+    "name": "宝藏之主",
+    "desc": "抓住7,777只宝藏哥布林。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1",
+    "name": "手滑",
+    "desc": "让1只宝藏哥布林跑掉。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_100",
+    "name": "滑溜的小家伙",
+    "desc": "让100只宝藏哥布林跑掉。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1000",
+    "name": "哥布林帮凶",
+    "desc": "让1,000只宝藏哥布林跑掉。它们在跟朋友们宣传你。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_5000",
+    "name": "哥布林慈善家",
+    "desc": "让5,000只宝藏哥布林跑掉。你在资助它们的退休生活。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_20000",
+    "name": "哥布林官方赞助商",
+    "desc": "让20,000只宝藏哥布林跑掉。它们用你的名字命名了一条隧道。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_50000",
+    "name": "哥布林感谢你",
+    "desc": "让50,000只宝藏哥布林跑掉。哥布林镇上立了你的雕像。",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_1",
+    "name": "双彩虹",
+    "desc": "抓住1只彩虹哥布林。",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_50",
+    "name": "追逐彩虹",
+    "desc": "抓住50只彩虹哥布林。",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_500",
+    "name": "彩虹尽头",
+    "desc": "抓住500只彩虹哥布林。",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_1",
+    "name": "彩虹之上",
+    "desc": "打开彩虹宝库1次。",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_25",
+    "name": "宝库掠夺者",
+    "desc": "打开彩虹宝库25次。",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_250",
+    "name": "哥布林银行家",
+    "desc": "打开彩虹宝库250次。",
+    "hidden": false
+  },
+  {
+    "api": "DESC_1",
+    "name": "上来透口气",
+    "desc": "飞升1次。",
+    "hidden": false
+  },
+  {
+    "api": "DESC_10",
+    "name": "往返票",
+    "desc": "飞升10次。",
+    "hidden": false
+  },
+  {
+    "api": "DESC_50",
+    "name": "通勤族",
+    "desc": "飞升50次。",
+    "hidden": false
+  },
+  {
+    "api": "DESC_250",
+    "name": "迟早还得下去",
+    "desc": "飞升250次。",
+    "hidden": false
+  },
+  {
+    "api": "AWK_1",
+    "name": "它醒了",
+    "desc": "唤醒心脏1次。",
+    "hidden": true
+  },
+  {
+    "api": "AWK_5",
+    "name": "心跳",
+    "desc": "唤醒心脏5次。",
+    "hidden": true
+  },
+  {
+    "api": "AWK_25",
+    "name": "再睡五分钟",
+    "desc": "唤醒心脏25次。",
+    "hidden": true
+  },
+  {
+    "api": "AWK_100",
+    "name": "心脏起搏器",
+    "desc": "唤醒心脏100次。",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_ALL",
+    "name": "八个全齐",
+    "desc": "唤醒每一个被缚者。",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_50",
+    "name": "灵魂债",
+    "desc": "累计获得50缚魂。",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_250",
+    "name": "两清了",
+    "desc": "累计获得250缚魂。",
+    "hidden": true
+  },
+  {
+    "api": "TRIP_1",
+    "name": "打猎去了",
+    "desc": "派一名同伴去远征。",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_25",
+    "name": "战利品",
+    "desc": "在远征中找到25张卡牌。",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_250",
+    "name": "明信片",
+    "desc": "在远征中找到250张卡牌。",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_10000",
+    "name": "害虫防治",
+    "desc": "在远征中击败10,000只怪物。",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_E6",
+    "name": "雇来的打手",
+    "desc": "在远征中击败1,000,000只怪物。",
+    "hidden": false
+  },
+  {
+    "api": "PET_1",
+    "name": "乖猫猫",
+    "desc": "摸摸可可。",
+    "hidden": false
+  },
+  {
+    "api": "PET_10",
+    "name": "猫奴",
+    "desc": "摸摸可可10次。",
+    "hidden": true
+  },
+  {
+    "api": "PET_100",
+    "name": "她的最爱",
+    "desc": "摸摸可可100次。",
+    "hidden": true
+  },
+  {
+    "api": "PET_1000",
+    "name": "可可的铲屎官",
+    "desc": "摸摸可可1,000次。",
+    "hidden": true
+  },
+  {
+    "api": "SET_1",
+    "name": "集齐一套",
+    "desc": "完成1个卡牌套组。",
+    "hidden": false
+  },
+  {
+    "api": "SET_5",
+    "name": "套组收藏家",
+    "desc": "完成5个卡牌套组。",
+    "hidden": false
+  },
+  {
+    "api": "SET_10",
+    "name": "全套收藏",
+    "desc": "完成10个卡牌套组。",
+    "hidden": false
+  },
+  {
+    "api": "GSET_1",
+    "name": "金卡套组",
+    "desc": "完成1个金卡套组。",
+    "hidden": false
+  },
+  {
+    "api": "GSET_5",
+    "name": "金边",
+    "desc": "完成5个金卡套组。",
+    "hidden": false
+  },
+  {
+    "api": "CARD_1",
+    "name": "持卡人",
+    "desc": "找到一张怪物卡。",
+    "hidden": false
+  },
+  {
+    "api": "CARD_25",
+    "name": "牌桌老千",
+    "desc": "找到25张不同的怪物卡。",
+    "hidden": false
+  },
+  {
+    "api": "CARD_ALL",
+    "name": "怪物图鉴",
+    "desc": "找到每一张怪物卡。",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_250",
+    "name": "怪物手册",
+    "desc": "收集250张卡牌。",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_ALL",
+    "name": "一只不落",
+    "desc": "收集每一张卡牌。",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_1",
+    "name": "镀金",
+    "desc": "找到一张金卡。",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_25",
+    "name": "金本位",
+    "desc": "找到25张不同的金卡。",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_ALL",
+    "name": "点石成金",
+    "desc": "找到每一张金卡。",
+    "hidden": false
+  }
+]

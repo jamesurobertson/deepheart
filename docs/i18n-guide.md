@@ -45,6 +45,12 @@ const c = (id: string, name: string, …) => ({ id, name: tc(`comp.${id}.name`, 
 - IDs come from the English source, never from a `tc()` result. `cardId()` takes the English name.
 - Text that `data.ts` assembles in code (trait descriptions, "The Abyssal Lich") is a template in `src/i18n/en/data.ts` and goes through `t()`.
 
+## Adding a language
+
+1. Add `src/i18n/locales/<code>.ts` (copy an existing one; `satisfies LocaleFile` lists every key it still lacks). Set `meta.steam` to Steam's API code, and add the code to `STEAM_LANGUAGES` / `NATIVE_NAMES` in `src/i18n/detect.ts` if it isn't there.
+2. New script? Latin and Cyrillic are covered. Another CJK language needs a `FontPack` and an entry in `scripts/i18n-fonts.ts`; anything else needs its own pixel font.
+3. `npm run i18n:fonts && npm run i18n:check`, then look at it with `?lang=<code>`.
+
 ## Numbers
 
 `fmt`, `fmtLong`, `pct` and `duration` (src/game/format.ts) are in the player's language already. Use `int(n)` (src/i18n) instead of `n.toLocaleString('en-US')`, and `decimal(n, digits)` / `fixed(n, digits)` instead of `toFixed` for anything shown.
@@ -52,5 +58,7 @@ const c = (id: string, name: string, …) => ({ id, name: tc(`comp.${id}.name`, 
 ## Checks
 
 - `npm run typecheck`: a translation missing a key or having an extra one doesn't compile.
-- `npm run i18n:check`: unused or unknown keys, stale `en/content.ts`, placeholders, plurals and tags that differ from English, English left in the UI files (`--strings` lists them), characters a language's font can't draw.
+- `npm run i18n:check`: unused or unknown keys, stale `en/content.ts`, placeholders, plurals and tags that differ from English, English left in the UI files (`--strings` lists them), characters a language's font can't draw. Then every language plays the same seeded run and round-trips an old save, and the saves must be byte-identical.
+- `npm run i18n:content` after changing text in `data.ts`; `npm run i18n:fonts` after changing a CJK translation, adding a sign the pixel fonts lack, or changing font sizes in the stylesheets (the CJK size rules are generated from them).
+- `npm run build:demo` runs `check-demo`, which fails if any full-game content message (in any language) reaches the demo.
 - `?lang=pseudo` (or Options → Game → Language → Pseudo in dev): every translated string is accented, ~35% longer and bracketed. Plain English on screen is a string that was missed. A cut-off bracket is an overflow.

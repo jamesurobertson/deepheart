@@ -1,0 +1,704 @@
+[
+  {
+    "api": "FLOOR_10",
+    "name": "階段を下りて",
+    "desc": "10階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_50",
+    "name": "長い下り坂",
+    "desc": "50階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_100",
+    "name": "地下の地下",
+    "desc": "100階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_400",
+    "name": "底？",
+    "desc": "400階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_500",
+    "name": "底などない",
+    "desc": "500階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_750",
+    "name": "地質学、お手上げ",
+    "desc": "750階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1000",
+    "name": "地下千階",
+    "desc": "1,000階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1500",
+    "name": "圏外",
+    "desc": "1,500階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_2000",
+    "name": "二千尋の底",
+    "desc": "2,000階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_3000",
+    "name": "世界の根",
+    "desc": "3,000階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_5000",
+    "name": "心臓の鼓動する場所",
+    "desc": "5,000階をクリアする。",
+    "hidden": false
+  },
+  {
+    "api": "LAP0",
+    "name": "穢れ",
+    "desc": "81階に到達する。そこからエリアが穢れて還ってくる。",
+    "hidden": false
+  },
+  {
+    "api": "LAP1",
+    "name": "深淵もまた、こちらを覗く",
+    "desc": "161階に到達する。そこからエリアが深淵に染まって還ってくる。",
+    "hidden": false
+  },
+  {
+    "api": "LAP2",
+    "name": "心まで虚ろ",
+    "desc": "241階に到達する。そこからエリアが虚ろになって還ってくる。",
+    "hidden": false
+  },
+  {
+    "api": "LAP3",
+    "name": "永劫",
+    "desc": "321階に到達する。そこからエリアが永劫をまとって還ってくる。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E9",
+    "name": "小銭入れ",
+    "desc": "累計10億ゴールドを集める。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E24",
+    "name": "金庫",
+    "desc": "累計1e24ゴールドを集める。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E40",
+    "name": "国庫",
+    "desc": "累計1e40ゴールドを集める。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E60",
+    "name": "竜の財宝",
+    "desc": "累計1e60ゴールドを集める。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E90",
+    "name": "王国の身代金",
+    "desc": "累計1e90ゴールドを集める。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E120",
+    "name": "黄金の海",
+    "desc": "累計1e120ゴールドを集める。",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E160",
+    "name": "数えきれない",
+    "desc": "累計1e160ゴールドを集める。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E6",
+    "name": "ファイター",
+    "desc": "秒間ダメージ100万に到達する。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E24",
+    "name": "覇王",
+    "desc": "秒間ダメージ1e24に到達する。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E40",
+    "name": "大災厄",
+    "desc": "秒間ダメージ1e40に到達する。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E60",
+    "name": "黙示録",
+    "desc": "秒間ダメージ1e60に到達する。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E80",
+    "name": "世界を砕く者",
+    "desc": "秒間ダメージ1e80に到達する。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E100",
+    "name": "グーゴル",
+    "desc": "秒間ダメージ1グーゴルに到達する。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E150",
+    "name": "熱的死",
+    "desc": "秒間ダメージ1e150に到達する。",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E200",
+    "name": "ビッグバン",
+    "desc": "秒間ダメージ1e200に到達する。",
+    "hidden": false
+  },
+  {
+    "api": "KILL_1000",
+    "name": "スレイヤー",
+    "desc": "モンスターを1,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "KILL_100000",
+    "name": "大虐殺",
+    "desc": "モンスターを100,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E6",
+    "name": "大量絶滅",
+    "desc": "モンスターを1,000,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E7",
+    "name": "死神",
+    "desc": "モンスターを10,000,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E8",
+    "name": "生存者なし",
+    "desc": "モンスターを100,000,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_10",
+    "name": "王殺し",
+    "desc": "ボスを10体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_100",
+    "name": "暴君討ち",
+    "desc": "ボスを100体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_1000",
+    "name": "ボスラッシュ",
+    "desc": "ボスを1,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_5000",
+    "name": "連続王殺し事件",
+    "desc": "ボスを5,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_25000",
+    "name": "骨の玉座",
+    "desc": "ボスを25,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1",
+    "name": "チャンピオンスレイヤー",
+    "desc": "チャンピオンを1体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_100",
+    "name": "王冠コレクター",
+    "desc": "チャンピオンを100体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1000",
+    "name": "王者の中の王者",
+    "desc": "チャンピオンを1,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_10000",
+    "name": "文句なし",
+    "desc": "チャンピオンを10,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_1",
+    "name": "間一髪",
+    "desc": "残り3秒以下でボスを1体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_20",
+    "name": "鋼の神経",
+    "desc": "残り3秒以下でボスを20体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_100",
+    "name": "そこまでする必要あった？",
+    "desc": "残り3秒以下でボスを100体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "HIRE_ALL",
+    "name": "フルパーティー",
+    "desc": "仲間32人を全員雇う。",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_1000",
+    "name": "伝説級",
+    "desc": "仲間をレベル1,000にする。",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_2500",
+    "name": "神話級",
+    "desc": "仲間をレベル2,500にする。",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_5000",
+    "name": "不死身",
+    "desc": "仲間をレベル5,000にする。",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_10000",
+    "name": "レベル上げすぎ",
+    "desc": "仲間をレベル10,000にする。",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_500",
+    "name": "忠実な一行",
+    "desc": "全仲間をレベル500にする。",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_1000",
+    "name": "伝説の一行",
+    "desc": "全仲間をレベル1,000にする。",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_2500",
+    "name": "神話の一行",
+    "desc": "全仲間をレベル2,500にする。",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100",
+    "name": "ポチポチ",
+    "desc": "100回攻撃する。",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_10000",
+    "name": "クリッカー",
+    "desc": "10,000回攻撃する。",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100000",
+    "name": "まだクリック中",
+    "desc": "100,000回攻撃する。",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_E6",
+    "name": "腱鞘炎",
+    "desc": "1,000,000回攻撃する。",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_1",
+    "name": "クリティカル！",
+    "desc": "クリティカルを1回出す。",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_10000",
+    "name": "鋭い目",
+    "desc": "クリティカルを10,000回出す。",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_100000",
+    "name": "外科医",
+    "desc": "クリティカルを100,000回出す。",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_E6",
+    "name": "危篤状態",
+    "desc": "クリティカルを1,000,000回出す。",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1",
+    "name": "暴走！",
+    "desc": "1回暴走する。",
+    "hidden": false
+  },
+  {
+    "api": "FEV_100",
+    "name": "バーサーカー",
+    "desc": "100回暴走する。",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1000",
+    "name": "キレやすい",
+    "desc": "1,000回暴走する。",
+    "hidden": false
+  },
+  {
+    "api": "RAMPAGE0",
+    "name": "血が騒ぐ",
+    "desc": "暴走が最終段階に達するまで攻撃を続ける。",
+    "hidden": false
+  },
+  {
+    "api": "RAID_1",
+    "name": "拾った者勝ち",
+    "desc": "トレジャーゴブリンを1体捕まえる。",
+    "hidden": false
+  },
+  {
+    "api": "RAID_77",
+    "name": "現行犯",
+    "desc": "トレジャーゴブリンを77体捕まえる。",
+    "hidden": false
+  },
+  {
+    "api": "RAID_777",
+    "name": "大当たり",
+    "desc": "トレジャーゴブリンを777体捕まえる。",
+    "hidden": false
+  },
+  {
+    "api": "RAID_2777",
+    "name": "逃がさない",
+    "desc": "トレジャーゴブリンを2,777体捕まえる。",
+    "hidden": false
+  },
+  {
+    "api": "RAID_7777",
+    "name": "お宝の王",
+    "desc": "トレジャーゴブリンを7,777体捕まえる。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1",
+    "name": "うっかり",
+    "desc": "トレジャーゴブリンを1体逃がす。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_100",
+    "name": "すばしっこい奴ら",
+    "desc": "トレジャーゴブリンを100体逃がす。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1000",
+    "name": "ゴブリンの甘やかし係",
+    "desc": "トレジャーゴブリンを1,000体逃がす。仲間に言いふらしている。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_5000",
+    "name": "ゴブリン慈善家",
+    "desc": "トレジャーゴブリンを5,000体逃がす。ゴブリンの老後資金はこちら持ち。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_20000",
+    "name": "ゴブリン公式スポンサー",
+    "desc": "トレジャーゴブリンを20,000体逃がす。名前を冠したトンネルができた。",
+    "hidden": false
+  },
+  {
+    "api": "MISS_50000",
+    "name": "ゴブリン一同より感謝を込めて",
+    "desc": "トレジャーゴブリンを50,000体逃がす。ゴブリンの町に銅像が建った。",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_1",
+    "name": "ダブルレインボー",
+    "desc": "虹色ゴブリンを1体捕まえる。",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_50",
+    "name": "虹を追って",
+    "desc": "虹色ゴブリンを50体捕まえる。",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_500",
+    "name": "虹のふもと",
+    "desc": "虹色ゴブリンを500体捕まえる。",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_1",
+    "name": "虹の彼方に",
+    "desc": "虹の宝物庫を1回開ける。",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_25",
+    "name": "宝物庫荒らし",
+    "desc": "虹の宝物庫を25回開ける。",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_250",
+    "name": "ゴブリン銀行員",
+    "desc": "虹の宝物庫を250回開ける。",
+    "hidden": false
+  },
+  {
+    "api": "DESC_1",
+    "name": "息つぎ",
+    "desc": "1回転生する。",
+    "hidden": false
+  },
+  {
+    "api": "DESC_10",
+    "name": "往復切符",
+    "desc": "10回転生する。",
+    "hidden": false
+  },
+  {
+    "api": "DESC_50",
+    "name": "通勤者",
+    "desc": "50回転生する。",
+    "hidden": false
+  },
+  {
+    "api": "DESC_250",
+    "name": "また下へ",
+    "desc": "250回転生する。",
+    "hidden": false
+  },
+  {
+    "api": "AWK_1",
+    "name": "目覚め",
+    "desc": "心臓を1回覚醒させる。",
+    "hidden": true
+  },
+  {
+    "api": "AWK_5",
+    "name": "鼓動",
+    "desc": "心臓を5回覚醒させる。",
+    "hidden": true
+  },
+  {
+    "api": "AWK_25",
+    "name": "あと5分",
+    "desc": "心臓を25回覚醒させる。",
+    "hidden": true
+  },
+  {
+    "api": "AWK_100",
+    "name": "ペースメーカー",
+    "desc": "心臓を100回覚醒させる。",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_ALL",
+    "name": "八体そろい踏み",
+    "desc": "縛られし者を全員目覚めさせる。",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_50",
+    "name": "魂のローン",
+    "desc": "束縛の魂を累計50個得る。",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_250",
+    "name": "完済",
+    "desc": "束縛の魂を累計250個得る。",
+    "hidden": true
+  },
+  {
+    "api": "TRIP_1",
+    "name": "狩りに出ています",
+    "desc": "仲間を遠征に送る。",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_25",
+    "name": "戦利品",
+    "desc": "遠征でカードを25枚見つける。",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_250",
+    "name": "旅先からの便り",
+    "desc": "遠征でカードを250枚見つける。",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_10000",
+    "name": "害虫駆除",
+    "desc": "遠征でモンスターを10,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_E6",
+    "name": "雇われ用心棒",
+    "desc": "遠征でモンスターを1,000,000体倒す。",
+    "hidden": false
+  },
+  {
+    "api": "PET_1",
+    "name": "いい子",
+    "desc": "ココをなでる。",
+    "hidden": false
+  },
+  {
+    "api": "PET_10",
+    "name": "猫派",
+    "desc": "ココを10回なでる。",
+    "hidden": true
+  },
+  {
+    "api": "PET_100",
+    "name": "お気に入り",
+    "desc": "ココを100回なでる。",
+    "hidden": true
+  },
+  {
+    "api": "PET_1000",
+    "name": "ココの下僕",
+    "desc": "ココを1,000回なでる。",
+    "hidden": true
+  },
+  {
+    "api": "SET_1",
+    "name": "フルセット",
+    "desc": "カードセットを1個完成させる。",
+    "hidden": false
+  },
+  {
+    "api": "SET_5",
+    "name": "セット収集家",
+    "desc": "カードセットを5個完成させる。",
+    "hidden": false
+  },
+  {
+    "api": "SET_10",
+    "name": "コンプリート",
+    "desc": "カードセットを10個完成させる。",
+    "hidden": false
+  },
+  {
+    "api": "GSET_1",
+    "name": "金のセット",
+    "desc": "金カードセットを1個完成させる。",
+    "hidden": false
+  },
+  {
+    "api": "GSET_5",
+    "name": "金縁",
+    "desc": "金カードセットを5個完成させる。",
+    "hidden": false
+  },
+  {
+    "api": "CARD_1",
+    "name": "カードホルダー",
+    "desc": "モンスターカードを見つける。",
+    "hidden": false
+  },
+  {
+    "api": "CARD_25",
+    "name": "カード通",
+    "desc": "異なるモンスターカードを25枚見つける。",
+    "hidden": false
+  },
+  {
+    "api": "CARD_ALL",
+    "name": "モンスター図鑑",
+    "desc": "モンスターカードをすべて見つける。",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_250",
+    "name": "モンスター大全",
+    "desc": "カードを250枚集める。",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_ALL",
+    "name": "最後の一体まで",
+    "desc": "カードをすべて集める。",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_1",
+    "name": "金ぴか",
+    "desc": "金カードを見つける。",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_25",
+    "name": "金本位制",
+    "desc": "異なる金カードを25枚見つける。",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_ALL",
+    "name": "ミダス王のデッキ",
+    "desc": "金カードをすべて見つける。",
+    "hidden": false
+  }
+]

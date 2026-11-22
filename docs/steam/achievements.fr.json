@@ -1,0 +1,704 @@
+[
+  {
+    "api": "FLOOR_10",
+    "name": "Au bas des marches",
+    "desc": "Terminez l'étage 10.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_50",
+    "name": "La longue descente",
+    "desc": "Terminez l'étage 50.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_100",
+    "name": "Les Dessous",
+    "desc": "Terminez l'étage 100.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_400",
+    "name": "Le fond ?",
+    "desc": "Terminez l'étage 400.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_500",
+    "name": "Il n'y a pas de fond",
+    "desc": "Terminez l'étage 500.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_750",
+    "name": "La géologie abandonne",
+    "desc": "Terminez l'étage 750.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1000",
+    "name": "Mille sous terre",
+    "desc": "Terminez l'étage 1 000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1500",
+    "name": "Plus de réseau",
+    "desc": "Terminez l'étage 1 500.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_2000",
+    "name": "Deux mille brasses",
+    "desc": "Terminez l'étage 2 000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_3000",
+    "name": "Racine du monde",
+    "desc": "Terminez l'étage 3 000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_5000",
+    "name": "Là où bat le Cœur",
+    "desc": "Terminez l'étage 5 000.",
+    "hidden": false
+  },
+  {
+    "api": "LAP0",
+    "name": "Corruption",
+    "desc": "Atteignez l'étage 81, où les zones reviennent corrompues.",
+    "hidden": false
+  },
+  {
+    "api": "LAP1",
+    "name": "Les Abysses vous regardent",
+    "desc": "Atteignez l'étage 161, où les zones reviennent abyssales.",
+    "hidden": false
+  },
+  {
+    "api": "LAP2",
+    "name": "Ça sonne creux",
+    "desc": "Atteignez l'étage 241, où les zones reviennent creuses.",
+    "hidden": false
+  },
+  {
+    "api": "LAP3",
+    "name": "Éternité",
+    "desc": "Atteignez l'étage 321, où les zones reviennent éternelles.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E9",
+    "name": "Bourse",
+    "desc": "Amassez 1 milliard d'or au total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E24",
+    "name": "Coffre-fort",
+    "desc": "Amassez 1 quadrillion d'or au total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E40",
+    "name": "Trésor public",
+    "desc": "Amassez 10 sextilliards d'or au total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E60",
+    "name": "Trésor de dragon",
+    "desc": "Amassez 1 décillion d'or au total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E90",
+    "name": "Rançon d'un royaume",
+    "desc": "Amassez 1e90 d'or au total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E120",
+    "name": "Mer d'or",
+    "desc": "Amassez 1e120 d'or au total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E160",
+    "name": "Incalculable",
+    "desc": "Amassez 1e160 d'or au total.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E6",
+    "name": "Combattant",
+    "desc": "Atteignez 1 million de dégâts par seconde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E24",
+    "name": "Seigneur de guerre",
+    "desc": "Atteignez 1 quadrillion de dégâts par seconde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E40",
+    "name": "Cataclysme",
+    "desc": "Atteignez 10 sextilliards de dégâts par seconde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E60",
+    "name": "Apocalypse",
+    "desc": "Atteignez 1 décillion de dégâts par seconde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E80",
+    "name": "Briseur de mondes",
+    "desc": "Atteignez 1e80 de dégâts par seconde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E100",
+    "name": "Gogol",
+    "desc": "Atteignez un gogol de dégâts par seconde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E150",
+    "name": "Mort thermique",
+    "desc": "Atteignez 1e150 de dégâts par seconde.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E200",
+    "name": "Big Bang",
+    "desc": "Atteignez 1e200 de dégâts par seconde.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_1000",
+    "name": "Tueur",
+    "desc": "Tuez 1 000 monstres.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_100000",
+    "name": "Massacre",
+    "desc": "Tuez 100 000 monstres.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E6",
+    "name": "Extinction de masse",
+    "desc": "Tuez 1 000 000 monstres.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E7",
+    "name": "La Faucheuse",
+    "desc": "Tuez 10 000 000 monstres.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E8",
+    "name": "Plus âme qui vive",
+    "desc": "Tuez 100 000 000 monstres.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_10",
+    "name": "Tueur de rois",
+    "desc": "Vainquez 10 boss.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_100",
+    "name": "Tyrannicide",
+    "desc": "Vainquez 100 boss.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_1000",
+    "name": "Boss rush",
+    "desc": "Vainquez 1 000 boss.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_5000",
+    "name": "Régicide en série",
+    "desc": "Vainquez 5 000 boss.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_25000",
+    "name": "Trône d'os",
+    "desc": "Vainquez 25 000 boss.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1",
+    "name": "Tueur de champions",
+    "desc": "Tuez un champion.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_100",
+    "name": "Collectionneur de couronnes",
+    "desc": "Tuez 100 champions.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1000",
+    "name": "Champion des champions",
+    "desc": "Tuez 1 000 champions.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_10000",
+    "name": "Incontesté",
+    "desc": "Tuez 10 000 champions.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_1",
+    "name": "À un cheveu",
+    "desc": "Battez un boss avec 3 secondes ou moins au chrono.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_20",
+    "name": "Nerfs d'acier",
+    "desc": "Battez 20 boss avec 3 secondes ou moins au chrono.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_100",
+    "name": "Était-ce bien nécessaire ?",
+    "desc": "Battez 100 boss avec 3 secondes ou moins au chrono.",
+    "hidden": false
+  },
+  {
+    "api": "HIRE_ALL",
+    "name": "Groupe au complet",
+    "desc": "Recrutez les 32 compagnons.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_1000",
+    "name": "Légendaire",
+    "desc": "Faites monter un compagnon au niveau 1 000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_2500",
+    "name": "Mythique",
+    "desc": "Faites monter un compagnon au niveau 2 500.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_5000",
+    "name": "Immortel",
+    "desc": "Faites monter un compagnon au niveau 5 000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_10000",
+    "name": "Surentraîné",
+    "desc": "Faites monter un compagnon au niveau 10 000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_500",
+    "name": "Compagnie fidèle",
+    "desc": "Faites monter tous les compagnons au niveau 500.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_1000",
+    "name": "Compagnie légendaire",
+    "desc": "Faites monter tous les compagnons au niveau 1 000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_2500",
+    "name": "Compagnie mythique",
+    "desc": "Faites monter tous les compagnons au niveau 2 500.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100",
+    "name": "Tap tap",
+    "desc": "Attaquez 100 fois.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_10000",
+    "name": "Cliqueur",
+    "desc": "Attaquez 10 000 fois.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100000",
+    "name": "Clique encore",
+    "desc": "Attaquez 100 000 fois.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_E6",
+    "name": "Canal carpien",
+    "desc": "Attaquez 1 000 000 fois.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_1",
+    "name": "Critique !",
+    "desc": "Portez 1 coup critique.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_10000",
+    "name": "Œil aiguisé",
+    "desc": "Portez 10 000 coups critiques.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_100000",
+    "name": "Chirurgien",
+    "desc": "Portez 100 000 coups critiques.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_E6",
+    "name": "État critique",
+    "desc": "Portez 1 000 000 coups critiques.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1",
+    "name": "Carnage !",
+    "desc": "Déclenchez un carnage.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_100",
+    "name": "Berserker",
+    "desc": "Déclenchez un carnage 100 fois.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1000",
+    "name": "Gestion de la colère",
+    "desc": "Déclenchez un carnage 1 000 fois.",
+    "hidden": false
+  },
+  {
+    "api": "RAMPAGE0",
+    "name": "Coup de sang",
+    "desc": "Continuez d'attaquer jusqu'à ce qu'un Carnage atteigne son palier max.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_1",
+    "name": "Qui trouve garde",
+    "desc": "Attrapez un gobelin aux trésors.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_77",
+    "name": "La main dans le sac",
+    "desc": "Attrapez 77 gobelins aux trésors.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_777",
+    "name": "Jackpot",
+    "desc": "Attrapez 777 gobelins aux trésors.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_2777",
+    "name": "Personne n'échappe",
+    "desc": "Attrapez 2 777 gobelins aux trésors.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_7777",
+    "name": "Seigneur du trésor",
+    "desc": "Attrapez 7 777 gobelins aux trésors.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1",
+    "name": "Mains de beurre",
+    "desc": "Laissez filer un gobelin aux trésors.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_100",
+    "name": "Insaisissables",
+    "desc": "Laissez filer 100 gobelins aux trésors.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1000",
+    "name": "Complice des gobelins",
+    "desc": "Laissez filer 1 000 gobelins aux trésors. Ils en parlent à leurs amis.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_5000",
+    "name": "Philanthrope gobelin",
+    "desc": "Laissez filer 5 000 gobelins aux trésors. Vous financez leur retraite.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_20000",
+    "name": "Sponsor officiel des gobelins",
+    "desc": "Laissez filer 20 000 gobelins aux trésors. Ils ont donné votre nom à un tunnel.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_50000",
+    "name": "Les gobelins vous remercient",
+    "desc": "Laissez filer 50 000 gobelins aux trésors. Il y a une statue de vous à Gobelinville.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_1",
+    "name": "Double arc-en-ciel",
+    "desc": "Attrapez un gobelin arc-en-ciel.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_50",
+    "name": "Chasseur d'arcs-en-ciel",
+    "desc": "Attrapez 50 gobelins arc-en-ciel.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_500",
+    "name": "Au bout de l'arc-en-ciel",
+    "desc": "Attrapez 500 gobelins arc-en-ciel.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_1",
+    "name": "Par-delà l'arc-en-ciel",
+    "desc": "Ouvrez le Caveau arc-en-ciel.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_25",
+    "name": "Pilleur de caveaux",
+    "desc": "Ouvrez le Caveau arc-en-ciel 25 fois.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_250",
+    "name": "Banquier gobelin",
+    "desc": "Ouvrez le Caveau arc-en-ciel 250 fois.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_1",
+    "name": "Bol d'air",
+    "desc": "Faites une ascension.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_10",
+    "name": "Billet retour",
+    "desc": "Faites 10 ascensions.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_50",
+    "name": "Navetteur",
+    "desc": "Faites 50 ascensions.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_250",
+    "name": "Toujours redescendre",
+    "desc": "Faites 250 ascensions.",
+    "hidden": false
+  },
+  {
+    "api": "AWK_1",
+    "name": "Il s'éveille",
+    "desc": "Éveillez le Cœur une fois.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_5",
+    "name": "Battement de cœur",
+    "desc": "Éveillez le Cœur 5 fois.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_25",
+    "name": "Encore cinq minutes",
+    "desc": "Éveillez le Cœur 25 fois.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_100",
+    "name": "Pacemaker",
+    "desc": "Éveillez le Cœur 100 fois.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_ALL",
+    "name": "Les huit",
+    "desc": "Éveillez chacun des Liés.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_50",
+    "name": "Dette d'âmes",
+    "desc": "Gagnez 50 âmes liées au total.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_250",
+    "name": "Dette soldée",
+    "desc": "Gagnez 250 âmes liées au total.",
+    "hidden": true
+  },
+  {
+    "api": "TRIP_1",
+    "name": "Parti chasser",
+    "desc": "Envoyez un compagnon en expédition.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_25",
+    "name": "Butin de guerre",
+    "desc": "Trouvez 25 cartes en expédition.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_250",
+    "name": "Cartes postales",
+    "desc": "Trouvez 250 cartes en expédition.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_10000",
+    "name": "Dératisation",
+    "desc": "Vainquez 10 000 monstres en expédition.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_E6",
+    "name": "Gros bras à louer",
+    "desc": "Vainquez 1 000 000 monstres en expédition.",
+    "hidden": false
+  },
+  {
+    "api": "PET_1",
+    "name": "Gentil minou",
+    "desc": "Caressez Koko.",
+    "hidden": false
+  },
+  {
+    "api": "PET_10",
+    "name": "Ami des chats",
+    "desc": "Caressez Koko 10 fois.",
+    "hidden": true
+  },
+  {
+    "api": "PET_100",
+    "name": "Chouchou",
+    "desc": "Caressez Koko 100 fois.",
+    "hidden": true
+  },
+  {
+    "api": "PET_1000",
+    "name": "L'humain de Koko",
+    "desc": "Caressez Koko 1 000 fois.",
+    "hidden": true
+  },
+  {
+    "api": "SET_1",
+    "name": "Série complète",
+    "desc": "Complétez une série de cartes.",
+    "hidden": false
+  },
+  {
+    "api": "SET_5",
+    "name": "Collectionneur de séries",
+    "desc": "Complétez 5 séries de cartes.",
+    "hidden": false
+  },
+  {
+    "api": "SET_10",
+    "name": "Collection complète",
+    "desc": "Complétez 10 séries de cartes.",
+    "hidden": false
+  },
+  {
+    "api": "GSET_1",
+    "name": "Série dorée",
+    "desc": "Complétez une série de cartes dorées.",
+    "hidden": false
+  },
+  {
+    "api": "GSET_5",
+    "name": "Doré sur tranche",
+    "desc": "Complétez 5 séries de cartes dorées.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_1",
+    "name": "Porte-cartes",
+    "desc": "Trouvez une carte de monstre.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_25",
+    "name": "As des cartes",
+    "desc": "Trouvez 25 cartes de monstre différentes.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_ALL",
+    "name": "Bestiaire",
+    "desc": "Trouvez toutes les cartes de monstre.",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_250",
+    "name": "Manuel des monstres",
+    "desc": "Collectionnez 250 cartes.",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_ALL",
+    "name": "Jusqu'au dernier monstre",
+    "desc": "Collectionnez toutes les cartes.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_1",
+    "name": "Plaqué or",
+    "desc": "Trouvez une carte dorée.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_25",
+    "name": "Étalon-or",
+    "desc": "Trouvez 25 cartes dorées différentes.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_ALL",
+    "name": "Le jeu de Midas",
+    "desc": "Trouvez toutes les cartes dorées.",
+    "hidden": false
+  }
+]

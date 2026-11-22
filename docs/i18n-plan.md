@@ -38,7 +38,7 @@ Adding a language means adding `locales/<code>.ts` and listing it in `locales.ts
 
 ### Saves
 
-Saves hold only IDs, as now. Active buffs carry a `name` from before this change: it stays in the save so old saves load, but the UI shows buffs by `id`. The language choice is stored in `localStorage['deepheart-language']`, **not inside the save**. That means switching language leaves save data byte-identical, a New Game or an imported save code keeps your language, and the wiki can read it. It sits on the Options screen with the other settings. Switching saves the run and reloads straight back into the same Options page (under a second, nothing lost). That's simpler and safer than re-rendering every cached view in place.
+Saves hold only IDs, as now. `npm run i18n:check` proves it: in every language, the seeded pacing bot plays the same run and an old English save does a round trip, and all the saves must be byte-identical (timestamps aside). Active buffs carry a `name` from before this change: it stays in the save so old saves load, but the UI shows buffs by `id`. The language choice is stored in `localStorage['deepheart-language']`, **not inside the save**. That means switching language leaves save data byte-identical, a New Game or an imported save code keeps your language, and the wiki can read it. It sits on the Options screen with the other settings. Switching saves the run and reloads straight back into the same Options page (under a second, nothing lost). That's simpler and safer than re-rendering every cached view in place.
 
 ### Numbers
 
@@ -79,12 +79,15 @@ The pixel fonts stay. For other scripts, extra `@font-face` rules are added **un
 | Script | Languages | Font | License |
 |---|---|---|---|
 | Latin + Latin-Ext | en de fr es es-419 pt-BR | Jersey 10, Silkscreen (latin + latin-ext subsets from `@fontsource`) | OFL 1.1 |
-| Cyrillic | ru | Jersey 10 and Silkscreen have no Cyrillic. Picked by side-by-side render from: Fusion Pixel (its Cyrillic from Ark Pixel), Pixelify Sans, Tiny5 | OFL 1.1 |
-| CJK | zh-CN ja ko | Fusion Pixel 12px proportional, the zh_hans / ja / ko builds (regional glyph forms) | OFL 1.1 |
+| Cyrillic | ru | **Tiny5** (`@fontsource/tiny5`), for all three families. Picked by side-by-side render: Fusion Pixel's Cyrillic is too thin beside Jersey, and Pixelify Sans has no Cyrillic О or П | OFL 1.1 |
+| CJK | zh-CN ja ko | **Fusion Pixel 12px proportional** 2026.11.10, the zh_hans / ja / ko builds (regional glyph forms; built from Ark Pixel, Cubic 11 and Galmuri, all OFL) | OFL 1.1 |
+| Signs and picker names | all | The same Fusion Pixel, cut to ², →, and 简体中文 / 日本語 / 한국어 for the language picker (`extras.woff2`, 1 kB) | OFL 1.1 |
 
-- CJK fonts are **subset to the characters our translations use**: `npm run i18n:fonts`, using fonttools. Each file is then tens of kB, not 3–5 MB. A sidecar list of covered characters lets `i18n:check` fail on tofu.
-- Each script's faces load only when that language is active (a lazily imported CSS chunk). So English players and the demo download nothing extra.
-- Crispness: Fusion Pixel draws on a 12 px grid. Its `size-adjust` is picked so the game's most common text sizes land on whole pixels. Then we check by screenshot at 1× and 2×.
+- CJK fonts are **subset to the characters our translations use**: `npm run i18n:fonts` (pure Node: `subset-font`, no Python). zh-CN is 42 kB, ja 35 kB, ko 14 kB, against 0.7 MB for each full font. A sidecar list of covered characters lets `i18n:check` fail on tofu. The script downloads the Fusion Pixel release once into `node_modules/.cache`.
+- The CJK packs load only when that language is active (a lazily imported CSS chunk). The Cyrillic and extras faces are declared for everyone, but a browser only downloads a `unicode-range` face when a character in its range is on screen. So English players and the demo download nothing extra.
+- **Weights must match @fontsource's.** Chrome only searches a family's faces of the matching weight for a missing character. So the added faces declare `400` for Jersey 10 and `400`/`700` for Silkscreen, like @fontsource, not a range. Get this wrong and the text silently falls back to a system serif.
+- **Crispness:** Fusion Pixel draws on a 12 px grid, and the game sets text at every size from 9 to 68 px. `scripts/cjk-sizes.ts` reads both stylesheets and, for each rule that sets a font size, puts a CJK-only face with exactly the `size-adjust` that gives a whole multiple of 12 px in front of that rule's fonts. Latin sizes and layout don't change, and every ideograph lands on whole pixels (checked in the browser for every CJK text element). At a fractional scale with the game's `-webkit-font-smoothing: none`, strokes simply vanished.
+- ≈ is in no pixel font. It comes from the system font, as it always has in English.
 - Layout: German and Russian run about 30% longer, and CJK has no spaces. Fixes go in CSS: `overflow-wrap: anywhere` / `word-break` for CJK (`:lang(ja)` etc.), and wrapping or shrinking where labels are fixed-width. Everything found with the pseudo-locale.
 
 ## Steam
