@@ -1,62 +1,79 @@
 import { DESCEND_FLOOR, FLOOR_KILLS } from '../../game/game.ts';
 import { fmt } from '../../game/format.ts';
+import { numberWords, t } from '../../i18n/index.ts';
 import { h2, link, table, toc } from '../kit.ts';
 import type { Page } from '../pages.ts';
 
-const basicsBody = () => `<p class="lede">Deepheart is an idle dungeon crawler. Your companions fight on their own; you hire more, level them up, and push deeper.</p>
-  ${toc('basics', ['The loop', 'Your first run', 'After floor 100', 'Where to look next'])}
-  ${h2('The loop')}
+const BASICS = {
+  loop: ['the-loop', t('wiki.basics.h.loop')],
+  first: ['your-first-run', t('wiki.basics.h.first')],
+  after: ['after-floor-100', t('wiki.basics.h.after')],
+  next: ['where-to-look-next', t('wiki.basics.h.next')],
+} as const;
+
+const basicsBody = () => `<p class="lede">${t('wiki.basics.lede')}</p>
+  ${toc('basics', [BASICS.loop, BASICS.first, BASICS.after, BASICS.next])}
+  ${h2(BASICS.loop)}
   <ol>
-    <li>Monsters drop gold when they die.</li>
-    <li>Spend gold on companions and their upgrades.</li>
-    <li>Your party kills faster, so you clear floors faster and go deeper.</li>
-    <li>At floor ${DESCEND_FLOOR}, ascend for souls, which make every run after stronger.</li>
+    <li>${t('wiki.basics.loop.gold')}</li>
+    <li>${t('wiki.basics.loop.spend')}</li>
+    <li>${t('wiki.basics.loop.deeper')}</li>
+    <li>${t('wiki.basics.loop.ascend', { floor: DESCEND_FLOOR })}</li>
   </ol>
-  ${h2('Your first run')}
-  <p>Each floor needs ${FLOOR_KILLS} kills. Every fifth floor is a boss with a 30-second timer; if it beats you, you drop back a floor to farm. Click or hold to attack, and catch treasure goblins when they run by.</p>
-  <p>Companions open upgrades at levels 10, 25, 50, 75 and up. Some upgrades unlock abilities like the Phantom Blade, Flurry and Rampage.</p>
-  ${h2('After floor 100')}
-  <p>You can ascend from floor ${DESCEND_FLOOR}. Ascending starts a new run with souls: each soul you keep is +10% damage, or spend them on ${link('spirits', 'Spirits')}. Deeper bosses can be champions that drop more souls, and zone bosses past floor 100 hand out ${link('heartmarks', 'Heartmarks')}.</p>
-  ${h2('Where to look next')}
-  <p>${link('companions', 'Companions')} · ${link('floors', 'Floors and zones')} · ${link('bosses', 'Bosses')} · ${link('souls', 'Souls and ascending')} · ${link('spirits', 'Spirits')} · ${link('calculator', 'Calculator')}</p>`;
+  ${h2(BASICS.first)}
+  <p>${t('wiki.basics.first', { count: FLOOR_KILLS })}</p>
+  <p>${t('wiki.basics.first.upgrades')}</p>
+  ${h2(BASICS.after)}
+  <p>${t('wiki.basics.after', { floor: DESCEND_FLOOR, spirits: link('spirits', t('wiki.basics.after.spirits')), heartmarks: link('heartmarks', t('wiki.basics.after.heartmarks')) })}</p>
+  ${h2(BASICS.next)}
+  <p>${link('companions', t('wiki.page.companions'))} · ${link('floors', t('wiki.page.floors'))} · ${link('bosses', t('wiki.page.bosses'))} · ${link('souls', t('wiki.page.souls'))} · ${link('spirits', t('wiki.page.spirits'))} · ${link('calculator', t('wiki.page.calculator'))}</p>`;
 
-const awayBody = () => `<p class="lede">Close the game and your party keeps farming. Come back to gold and kills.</p>
-  ${h2('What happens while you\'re away')}
+const AWAY = {
+  happens: ['what-happens-while-you-re-away', t('wiki.away.h.happens')],
+  doesnt: ['what-doesn-t', t('wiki.away.h.doesnt')],
+  long: ['how-long-counts', t('wiki.away.h.long')],
+} as const;
+
+const awayBody = () => `<p class="lede">${t('wiki.away.lede')}</p>
+  ${h2(AWAY.happens)}
   <ul>
-    <li>Your party farms the floor you left on (the floor before it, if you left on a boss), at its full damage per second.</li>
-    <li>Gold comes in at the floor's rate, with your gold bonuses. ${link('spirit-sleeper', 'The Sleeper')} and ${link('spirit-patient', 'the Patient')} always count, because time away is idle.</li>
-    <li>Kills count toward the floor you're on. If you reach its quota the next floor opens, but you stay where you are.</li>
-    <li>Cards drop as they would from those kills (plain cards only).</li>
-    <li>Ability cooldowns and buffs count down.</li>
+    <li>${t('wiki.away.farm')}</li>
+    <li>${t('wiki.away.gold', { sleeper: link('spirit-sleeper', t('wiki.away.gold.sleeper')), patient: link('spirit-patient', t('wiki.away.gold.patient')) })}</li>
+    <li>${t('wiki.away.kills')}</li>
+    <li>${t('wiki.away.cards')}</li>
+    <li>${t('wiki.away.cooldowns')}</li>
   </ul>
-  ${h2('What doesn\'t')}
-  <p>No bosses, treasure goblins, champions, Rampage, abilities, Heartmarks or souls. Buffs run out without working.</p>
-  ${h2('How long counts')}
-  <p>There's no limit and nothing is cut: a week away pays a week. A hidden browser tab counts as away too.</p>`;
+  ${h2(AWAY.doesnt)}
+  <p>${t('wiki.away.doesnt')}</p>
+  ${h2(AWAY.long)}
+  <p>${t('wiki.away.long')}</p>`;
 
-const settingsBody = () => `<p class="lede">Everything in Options.</p>
-  ${table(['Setting', 'What it does'], [
-    ['Sound, music, volume', 'Sound effects and music, each with its own volume'],
-    ['Particles', 'Hit sparks and other particles'],
-    ['Reduce flashing', 'Companion attacks without bright flashes, light bursts or screen shake'],
-    ['Screen shake', 'Shake on big hits'],
-    ['Damage numbers', 'Numbers over monsters (crits still show when off)'],
-    ['Blood', 'Blood on hits'],
-    ['Zone intros', 'The title card when you enter a new zone'],
-    ['Numbers', 'Short (1.23M) or scientific (1.23e6)'],
-    ['Cursor', `A cursor skin, unlocked by ${link('trophies', 'trophies', 'Cursors')}`],
-    ['Export / import', 'Copy your save as text, or load one'],
+const settingsBody = () => `<p class="lede">${t('wiki.settings.lede')}</p>
+  ${table([t('wiki.settings.setting'), t('wiki.settings.does')], [
+    [t('wiki.settings.sound'), t('wiki.settings.sound.does')],
+    [t('wiki.settings.particles'), t('wiki.settings.particles.does')],
+    [t('wiki.settings.flashing'), t('wiki.settings.flashing.does')],
+    [t('wiki.settings.shake'), t('wiki.settings.shake.does')],
+    [t('wiki.settings.damage'), t('wiki.settings.damage.does')],
+    [t('wiki.settings.blood'), t('wiki.settings.blood.does')],
+    [t('wiki.settings.intros'), t('wiki.settings.intros.does')],
+    [t('wiki.settings.numbers'), t('wiki.settings.numbers.does')],
+    [t('wiki.settings.cursor'), t('wiki.settings.cursor.does', { trophies: link('trophies', t('wiki.settings.cursor.trophies'), 'cursors') })],
+    [t('wiki.settings.export'), t('wiki.settings.export.does')],
   ])}`;
 
-const SUFFIX = ['K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc', 'UDc', 'DDc', 'TDc', 'QaDc', 'QiDc', 'SxDc', 'SpDc', 'OcDc', 'NoDc', 'Vg'];
-const WORD = ['thousand', 'million', 'billion', 'trillion', 'quadrillion', 'quintillion', 'sextillion', 'septillion', 'octillion', 'nonillion', 'decillion', 'undecillion', 'duodecillion', 'tredecillion', 'quattuordecillion', 'quindecillion', 'sexdecillion', 'septendecillion', 'octodecillion', 'novemdecillion', 'vigintillion'];
+/** The suffixes and their names in the player's language, from K (10³) up to the last named one. */
+const suffixRows = () => {
+  const { short, long } = numberWords();
+  return short.slice(1, long.length).map((suffix, k) => [`<b>${suffix}</b>`, long[k + 1], `10<sup>${(k + 1) * 3}</sup>`, fmt(1.23 * 10 ** ((k + 1) * 3))]);
+};
 
-const numbersBody = () => `<p class="lede">Big numbers are shortened with a suffix. Past the last one, they switch to scientific notation (1.23e99).</p>
-  ${table(['Suffix', 'Name', 'Value', 'Example'], SUFFIX.map((s, k) => [`<b>${s}</b>`, WORD[k], `10<sup>${(k + 1) * 3}</sup>`, fmt(1.23 * 10 ** ((k + 1) * 3))]))}`;
+const numbersBody = () => `<p class="lede">${t('wiki.numbers.lede')}</p>
+  ${table([t('wiki.numbers.suffix'), t('wiki.numbers.name'), t('wiki.numbers.value'), t('wiki.numbers.example')], suffixRows())}`;
 
 export const OTHER_PAGES: Page[] = [
-  { id: 'basics', group: 'Start here', title: 'How to play', summary: 'The loop, your first run and what opens after floor 100.', body: basicsBody },
-  { id: 'away', group: 'Other', title: 'Time away', summary: 'What your party does while the game is closed.', body: awayBody },
-  { id: 'settings', group: 'Other', title: 'Settings', summary: 'Every option.', body: settingsBody },
-  { id: 'numbers', group: 'Other', title: 'Number suffixes', summary: 'K, M, B, T, Qa, Qi and the rest.', body: numbersBody },
+  { id: 'basics', group: 'start', title: t('wiki.page.basics'), summary: t('wiki.page.basics.summary'), body: basicsBody },
+  { id: 'away', group: 'other', title: t('wiki.page.away'), summary: t('wiki.page.away.summary'), body: awayBody },
+  { id: 'settings', group: 'other', title: t('wiki.page.settings'), summary: t('wiki.page.settings.summary'), body: settingsBody },
+  { id: 'numbers', group: 'other', title: t('wiki.page.numbers'), summary: t('wiki.page.numbers.summary'), body: numbersBody },
 ];

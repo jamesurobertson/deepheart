@@ -1,5 +1,5 @@
 import { morph } from './morph.ts';
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MOD_BY_ID, NEWS, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, cardId, corruptionOf, lapOf, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MOD_BY_ID, NEWS, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, corruptionOf, lapOf, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { AWAKEN_ON, AWAKEN_TEASE, GOLD_SET_BONUS, SET_BONUS, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_REROLL, TRIP_HOURS, TUNE, buffName, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
@@ -12,7 +12,7 @@ import { ABILITY_PAD, hover, keyOf, neighbor, padCombo, padFamily, padGlyph, pad
 import { skillIcon } from './icons.ts';
 import { kokoSvg } from './koko.ts';
 import { DEMO, DEMO_COMPANIONS, STEAM_URL, WIKI_URL } from '../demo.ts';
-import { localeCode, PSEUDO, t } from '../i18n/index.ts';
+import { decimal, fixed, int, list, localeCode, percent, PSEUDO, t, type Params, type UiKey } from '../i18n/index.ts';
 import { automaticLanguage, chosenLanguage, SHIPPED } from '../i18n/boot.ts';
 import { nativeName } from '../i18n/detect.ts';
 
@@ -32,7 +32,7 @@ export interface UiHooks {
 }
 
 const TIER_COLORS = ['#b8a58a', '#7ddb6a', '#5fa8ff', '#c77dff', '#f2c14e', '#ff8a3d', '#ec5a4f', '#ff5ac8', '#9cf0ff', '#ffffff', '#ffe08a'];
-const REWARD_TEXT: Record<string, string> = { plunder: 'Treasure!', bloodlust: 'Bloodlust!', heartstorm: 'Frenzy!', horde: 'Gold Rush!', deadeye: 'Deadeye!', brutal: 'Brutality!', soulstorm: 'Soul Storm!', vault: 'Rainbow Vault!', rainbow: 'Rainbow Haul!' };
+const REWARD_TEXT = { plunder: 'ui.reward.plunder', bloodlust: 'ui.reward.bloodlust', heartstorm: 'ui.reward.heartstorm', horde: 'ui.reward.horde', deadeye: 'ui.reward.deadeye', brutal: 'ui.reward.brutal', soulstorm: 'ui.reward.soulstorm', vault: 'ui.reward.vault', rainbow: 'ui.reward.rainbow' } as const;
 /** Writes text only when it changed: rewriting the same text still costs the page a relayout. */
 const setText = (el: Element, text: string) => {
   if (el.textContent !== text) el.textContent = text;
@@ -83,31 +83,36 @@ function cardFace(card: (typeof CARDS)[number], state: 'locked' | 'got', gilded 
 /** The trophies on show: hidden ones only once earned. */
 const shownTrophies = (g: Game) => TROPHIES.filter((t) => !t.hidden || g.hasTrophy(t.id));
 
-const KIND_NAME = { power: 'Power', utility: 'Utility', sink: 'Sink' } as const;
+const CARD_KIND = { monster: 'ui.tip.card.kind.monster', mid: 'ui.tip.card.kind.boss', boss: 'ui.tip.card.kind.boss', goblin: 'ui.tip.card.kind.goblin' } as const;
+const SETTINGS_TAB = { sound: 'ui.settings.tab.sound', display: 'ui.settings.tab.display', cursor: 'ui.settings.tab.cursor', game: 'ui.settings.tab.game', save: 'ui.settings.tab.save' } as const;
+const KIND_NAME = { power: 'ui.spirit.kind.power', utility: 'ui.spirit.kind.utility', sink: 'ui.spirit.kind.sink' } as const;
 
 type Trader = 'dan' | 'victor';
 /** What Dan and Victor say: one picked at random. */
-const TRADER_LINES: Record<Trader, Record<'hello' | 'short' | 'new' | 'dupe', string[]>> = {
+const TRADER_LINES: Record<Trader, Record<'hello' | 'short' | 'new' | 'dupe', UiKey[]>> = {
   dan: {
-    hello: ['Got any doubles?', 'Swap you?'],
-    short: ['Come back with five cards.'],
-    new: ["That one's new for you!", 'Nice, a new one.'],
-    dupe: ['Ah, you had that one.', 'A double. Sorry!'],
+    hello: ['ui.trade.dan.hello1', 'ui.trade.dan.hello2'],
+    short: ['ui.trade.dan.short'],
+    new: ['ui.trade.dan.new1', 'ui.trade.dan.new2'],
+    dupe: ['ui.trade.dan.dupe1', 'ui.trade.dan.dupe2'],
   },
   victor: {
-    hello: ["Gold isn't cheap.", 'Ten. Not nine.'],
-    short: ['Come back with ten.'],
-    new: ["Don't get used to it.", 'Shiny, right?'],
-    dupe: ['No refunds.', 'You had that one. Not my problem.'],
+    hello: ['ui.trade.victor.hello1', 'ui.trade.victor.hello2'],
+    short: ['ui.trade.victor.short'],
+    new: ['ui.trade.victor.new1', 'ui.trade.victor.new2'],
+    dupe: ['ui.trade.victor.dupe1', 'ui.trade.victor.dupe2'],
   },
 };
-const pickLine = (lines: string[]) => lines[Math.floor(Math.random() * lines.length)];
+const TRADER_NAME = { dan: 'ui.trade.dan', victor: 'ui.trade.victor' } as const;
+/** A trade saves who it was with by his English name. */
+const TRADED_FROM: Record<string, UiKey | undefined> = { Dan: 'ui.trade.dan', Victor: 'ui.trade.victor' };
+const pickLine = (lines: UiKey[]) => t(lines[Math.floor(Math.random() * lines.length)]);
 
 /** What a Spirit boosts, a companion skill it names underlined (hover it for what the skill is and does). */
 function skillText(what: string) {
   let out = esc(what);
   for (const a of ABILITIES) {
-    const phrase = a.id === 'crit' ? 'Critical hit' : a.name;
+    const phrase = a.id === 'crit' ? t('ui.spirit.critPhrase') : a.name;
     if (out.includes(phrase)) out = out.replace(phrase, `<span class="skill-u" data-tip="skill:${a.id}">${phrase}</span>`);
   }
   return out;
@@ -126,7 +131,7 @@ const legendValue = (d: LegendDef, lv: number) => `<p class="od-val"><b>${esc(d.
  *  the next on a Spirit you have). */
 function legendDetail(d: LegendDef, lv: number) {
   const levels = Array.from({ length: lv ? 4 : 5 }, (_, k) => lv + 1 + k).filter((n) => !d.maxLv || n <= d.maxLv);
-  const rows = levels.map((n, k) => `<tr${k ? '' : ' class="next"'}><td>${k ? '' : '▶'}</td><td>Level ${n}</td><td>${n > 1 ? soulPrice(legendCost(d, n - 1), 1.2) : ''}</td><td>${esc(d.value(n))}</td></tr>`).join('');
+  const rows = levels.map((n, k) => `<tr${k ? '' : ' class="next"'}><td>${k ? '' : '▶'}</td><td>${t('ui.level', { level: n })}</td><td>${n > 1 ? soulPrice(legendCost(d, n - 1), 1.2) : ''}</td><td>${esc(d.value(n))}</td></tr>`).join('');
   return `${legendValue(d, lv)}
     ${rows ? `<table class="od-lv od-ladder">${rows}</table>` : ''}
     ${!d.term && d.note ? `<p class="od-note">${esc(d.note)}</p>` : ''}`;
@@ -148,7 +153,7 @@ function boundWhat(b: BoundDef) {
  *  ahead, the next one lit. */
 function boundDetail(b: BoundDef, lv: number): string {
   const levels = Array.from({ length: lv ? 4 : 5 }, (_, k) => lv + 1 + k).filter((n) => b.max === undefined || n <= b.max);
-  const rows = levels.map((n, k) => `<tr${k ? '' : ' class="next"'}><td>${k ? '' : '▶'}</td><td>Level ${n}</td><td>${boundPrice(boundCost(b, n - 1), 1.2)}</td><td>${esc(b.value(n))}</td></tr>`).join('');
+  const rows = levels.map((n, k) => `<tr${k ? '' : ' class="next"'}><td>${k ? '' : '▶'}</td><td>${t('ui.level', { level: n })}</td><td>${boundPrice(boundCost(b, n - 1), 1.2)}</td><td>${esc(b.value(n))}</td></tr>`).join('');
   return `<p class="od-val"><b>${esc(b.value(Math.max(1, lv)))}</b><span>${boundWhat(b)}</span></p>
     ${rows ? `<table class="od-lv od-ladder">${rows}</table>` : ''}`;
 }
@@ -179,19 +184,15 @@ const MOUSE_GLYPH = '<svg class="k-mouse" viewBox="0 0 9 12" width="18" height="
 /** What this many kept souls add to all damage, as a percentage ("+300%"). */
 const soulPct = (n: number) => `+${fmt(n * TUNE.soulPower * 100)}%`;
 /** A price in souls, the word spelled out: a new player may not know the icon yet. */
-const soulPrice = (n: number, size = 1.5) => `${G.soul(size)} ${fmt(n)} soul${n === 1 ? '' : 's'}`;
+const soulPrice = (n: number, size = 1.5) => t('ui.price.souls', { count: n, icon: G.soul(size), amount: fmt(n) });
 
 /** The skills you press, in column order: their number keys (passive abilities don't get one). */
 const KEYED = ABILITIES.filter((a) => a.kind !== 'passive').map((a) => a.id);
 const abilityKey = (id: AbilityId) => KEYED.indexOf(id) + 1;
 
-/** "4:05" for a cooldown. */
-/** The same words for a finger: "click" in tooltips (and the game's copy) reads "tap" on a touch screen. */
-const tapWords = (html: string) => html.replace(/\b([Cc])lick(s|ed|ing)?\b/g, (_, c: string, end = '') => `${c === 'C' ? 'T' : 't'}ap${end === 'ed' ? 'ped' : end === 'ing' ? 'ping' : end}`);
-/** A tooltip's mouse words, for a controller: its A button presses what the cursor is on. */
-const padWords = (html: string) => html.replace(/\bClick (to|the)\b/g, (_, w: string) => `Press ${padGlyph('a', 18)} ${w === 'the' ? 'on the' : 'to'}`);
 /** The ✦ on a trait square, drawn as that square where a hint names it. */
 const TRAIT_KEY = '<span class="hint-trait">✦</span>';
+/** "4:05" for a cooldown. */
 const clock = (s: number) => {
   const whole = Math.ceil(s);
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
@@ -200,20 +201,20 @@ const clock = (s: number) => {
 const gold = (n: number | Decimal, cls = '') => `<span class="gold ${cls}">${sprite('coin', 2)}${fmt(n)}</span>`;
 
 /** A small rate with up to two decimals (1.15, not 1.1); big ones as usual. */
-const perSec = (n: number) => (n < 100 ? String(Math.round(n * 100) / 100) : fmt(n));
+const perSec = (n: number) => (n < 100 ? decimal(n, 2) : fmt(n));
 
 function buffText(b: Buff) {
-  if (b.id === 'cleave') return 'attacks hit every monster';
-  if (b.id === 'flurry') return '10 attacks a second';
-  if (b.id === 'drums') return '+50% critical hits';
-  if (b.id === 'legion') return 'a blade for every monster';
-  if (b.crit) return 'every attack crits';
-  if (b.critMult) return `×${b.critMult} crit damage`;
-  if (b.blade && b.blade > 1) return `Phantom Blade ×${b.blade}`;
-  if (b.dps > 1 && b.click > 1) return `×${b.dps} damage`;
-  if (b.dps > 1) return `×${b.dps} party damage`;
-  if (b.click > 1) return `×${b.click} attack damage`;
-  return `×${b.gold} gold`;
+  if (b.id === 'cleave') return t('ui.buff.cleave');
+  if (b.id === 'flurry') return t('ui.buff.flurry');
+  if (b.id === 'drums') return t('ui.buff.drums');
+  if (b.id === 'legion') return t('ui.buff.legion');
+  if (b.crit) return t('ui.buff.crit');
+  if (b.critMult) return t('ui.buff.critMult', { mult: decimal(b.critMult, 2) });
+  if (b.blade && b.blade > 1) return t('ui.buff.blade', { blades: decimal(b.blade, 2) });
+  if (b.dps > 1 && b.click > 1) return t('ui.buff.damage', { mult: decimal(b.dps, 2) });
+  if (b.dps > 1) return t('ui.buff.party', { mult: decimal(b.dps, 2) });
+  if (b.click > 1) return t('ui.buff.attack', { mult: decimal(b.click, 2) });
+  return t('ui.buff.gold', { mult: decimal(b.gold, 2) });
 }
 
 const MAP_ROOMS = 5;
@@ -229,13 +230,13 @@ const CROWN = pixelIcon(['#..#..#', '##.#.##', '#######', '#######']);
 /** The face of a floor on the map (its boss, or the monster it's known for), tinted as it looks on that lap. */
 function floorArt(floor: number, box: number) {
   const def = floor % 5 === 0 ? bossFor(floor) : featuredFor(floor);
-  const card = CARD_BY_ID.get(cardId(def.name));
+  const card = CARD_BY_ID.get(def.id);
   return card ? cardArt(card, box, 'mon', lapOf(floor)) : charFit(def.sprite, box, box, 'mon');
 }
 
 /** A bound soul: the soul glyph in the Heart's red. */
 const boundGlyph = (scale = 2) => G.soul(scale).replace('g-soul', 'g-soul g-bound');
-const boundPrice = (n: number, size = 1.5) => `${boundGlyph(size)} ${fmt(n)} bound soul${n === 1 ? '' : 's'}`;
+const boundPrice = (n: number, size = 1.5) => t('ui.price.bound', { count: n, icon: boundGlyph(size), amount: fmt(n) });
 
 /** A Bound standing on its plinth: the boss's first frame, tinted as the dungeon colors it, drawn once and kept. */
 const bossFigs = new Map<string, string>();
@@ -360,50 +361,50 @@ export class Ui {
     root.innerHTML = `
       <div class="hud-top">
         <div class="bank" data-tip="idle:patient"><span class="bank-ico">${sprite('coin', 5)}</span><b class="bank-v">0</b></div>
-        <div class="rate"><span class="dps-w" data-tip="idle:sleeper"><b class="dps-v">0</b> <i class="long">party damage/sec</i><i class="short">party/s</i></span><span class="sep">·</span><span><b class="click-v">1</b> <i class="long">attack damage</i><i class="short">attack</i></span></div>
-        <div class="streak"><i>Streak</i> <b class="streak-v">0</b> <span class="sep">·</span> <b class="streak-b"></b></div>
+        <div class="rate"><span class="dps-w" data-tip="idle:sleeper"><b class="dps-v">0</b> <i class="long">${t('ui.hud.partyDps')}</i><i class="short">${t('ui.hud.partyDpsShort')}</i></span><span class="sep">·</span><span><b class="click-v">1</b> <i class="long">${t('ui.hud.attack')}</i><i class="short">${t('ui.hud.attackShort')}</i></span></div>
+        <div class="streak"><i>${t('ui.hud.streak')}</i> <b class="streak-v">0</b> <span class="sep">·</span> <b class="streak-b"></b></div>
         <div class="floor pnl">
-          <button class="btn icon sm" data-act="floorDown" aria-label="Previous floor">${G.left()}</button>
+          <button class="btn icon sm" data-act="floorDown" aria-label="${t('ui.floor.previous')}">${G.left()}</button>
           <div class="floor-mid">
-            <div class="floor-name" data-tip="floor"><b class="floor-n">Floor 1</b><span class="floor-sub"></span></div>
+            <div class="floor-name" data-tip="floor"><b class="floor-n">${t('ui.floor', { floor: fmt(1) })}</b><span class="floor-sub"></span></div>
             <div class="floor-map"></div>
             <div class="floor-bar"><i></i><span></span></div>
           </div>
-          <button class="btn icon sm" data-act="floorUp" aria-label="Next floor">${G.right()}</button>
-          <button class="btn small auto" data-act="auto" data-tip="auto">Auto</button>
+          <button class="btn icon sm" data-act="floorUp" aria-label="${t('ui.floor.next')}">${G.right()}</button>
+          <button class="btn small auto" data-act="auto" data-tip="auto">${t('ui.floor.auto')}</button>
         </div>
         <div class="fever on" hidden><i></i><span></span><b class="fever-face">${skillIcon('rampage', 33)}</b></div>
         <div class="buffs"></div>
       </div>
-      <div class="zone-map pnl"><button class="btn icon sm" data-act="zonePrev" aria-label="Earlier floors">${G.left()}</button><div class="floor-map"></div><button class="btn icon sm" data-act="zoneNext" aria-label="Later floors">${G.right()}</button></div>
+      <div class="zone-map pnl"><button class="btn icon sm" data-act="zonePrev" aria-label="${t('ui.map.earlier')}">${G.left()}</button><div class="floor-map"></div><button class="btn icon sm" data-act="zoneNext" aria-label="${t('ui.map.later')}">${G.right()}</button></div>
       <div class="bars"></div>
       <div class="hint" hidden></div>
-      <button class="btn vault-leave" data-act="leaveVault" hidden>Leave the vault</button>
-      <div class="vault-pick" hidden><b>A rainbow portal has appeared!</b><span>Choose a companion to send in</span><div class="vp-faces"></div></div>
+      <button class="btn vault-leave" data-act="leaveVault" hidden>${t('ui.vault.leave')}</button>
+      <div class="vault-pick" hidden><b>${t('ui.vault.portal')}</b><span>${t('ui.vault.pick')}</span><div class="vp-faces"></div></div>
       <div class="hero-mark" hidden>▼</div>
       <div class="raid-mark" hidden><b>!</b></div>
-      <div class="exit-mark" hidden><i>▲</i><b>Way out</b></div>
+      <div class="exit-mark" hidden><i>▲</i><b>${t('ui.vault.wayOut')}</b></div>
       <div class="keep-labels"></div>
       <div class="letterbox" aria-hidden="true"></div>
       <div class="banner" hidden><b></b><span></span></div>
       <div class="ticker"><span></span></div>
-      <button class="ui-back" data-act="showUi" hidden><kbd>H</kbd><span>Show interface</span></button>
+      <button class="ui-back" data-act="showUi" hidden><kbd>H</kbd><span>${t('ui.hud.showUi')}</span></button>
       <nav class="dock">
-        <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy(3)}<span>Collection</span><em class="badge new" hidden></em></button>
-        <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>Ascend</span><em class="badge" hidden></em></button>
-        <button class="btn dock-b dock-heart" data-open="heart" data-tip="dock:heart" hidden>${G.heart(3)}<span>The Heart</span><em class="badge bound" hidden></em></button>
+        <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy(3)}<span>${t('ui.dock.collection')}</span><em class="badge new" hidden></em></button>
+        <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>${t('ui.dock.ascend')}</span><em class="badge" hidden></em></button>
+        <button class="btn dock-b dock-heart" data-open="heart" data-tip="dock:heart" hidden>${G.heart(3)}<span>${t('ui.dock.heart')}</span><em class="badge bound" hidden></em></button>
         <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden></button>
-        <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>Stats</span></button>
-        <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu(3)}<span>Options</span></button>
+        <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>${t('ui.dock.stats')}</span></button>
+        <button class="btn dock-b" data-open="settings" data-tip="dock:settings">${G.menu(3)}<span>${t('ui.dock.options')}</span></button>
         <button class="btn icon mute" data-act="mute" data-tip="dock:mute" hidden></button>
       </nav>
-      <nav class="abilities" aria-label="Abilities"></nav>
+      <nav class="abilities" aria-label="${t('ui.abilities')}"></nav>
       <div class="drops"></div>
       <aside class="shop">
-        <header class="shop-head"><h2>Your Party</h2><span class="shop-autos"><span class="auto-lbl" hidden>Auto</span><button class="btn small auto-upg auto-hire" data-act="autoHire" data-tip="shop:hire" hidden>Levels</button><button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden>Upgrades</button></span><span class="sheet-grip" aria-hidden="true"></span></header>
+        <header class="shop-head"><h2>${t('ui.shop.title')}</h2><span class="shop-autos"><span class="auto-lbl" hidden>${t('ui.shop.auto')}</span><button class="btn small auto-upg auto-hire" data-act="autoHire" data-tip="shop:hire" hidden>${t('ui.shop.autoLevels')}</button><button class="btn small auto-upg" data-act="autoUpg" data-tip="shop:auto" hidden>${t('ui.shop.autoUpgrades')}</button></span><span class="sheet-grip" aria-hidden="true"></span></header>
         <div class="modes">
-          <span>Hire</span>
-          <button class="btn mode" data-mode="1">×1</button><button class="btn mode" data-mode="10">×10</button><button class="btn mode" data-mode="25">×25</button><button class="btn mode" data-mode="100">×100</button><button class="btn mode" data-mode="next" data-tip="shop:next">Next</button><button class="btn mode" data-mode="-1">Max</button>
+          <span>${t('ui.shop.hire')}</span>
+          <button class="btn mode" data-mode="1">×1</button><button class="btn mode" data-mode="10">×10</button><button class="btn mode" data-mode="25">×25</button><button class="btn mode" data-mode="100">×100</button><button class="btn mode" data-mode="next" data-tip="shop:next">${t('ui.shop.next')}</button><button class="btn mode" data-mode="-1">${t('ui.shop.max')}</button>
         </div>
         <div class="gens"></div>
       </aside>
@@ -1038,12 +1039,12 @@ export class Ui {
         const ta = this.el.modal.querySelector('textarea') as HTMLTextAreaElement;
         ta.value = this.hooks.exportSave();
         ta.select();
-        navigator.clipboard?.writeText(ta.value).then(() => this.toast('Save copied to clipboard', 'check'), () => {});
+        navigator.clipboard?.writeText(ta.value).then(() => this.toast(t('ui.toast.saveCopied'), 'check'), () => {});
         break;
       }
       case 'import': {
         const ta = this.el.modal.querySelector('textarea') as HTMLTextAreaElement;
-        if (!this.hooks.importSave(ta.value.trim())) this.toast('That save code did not work', 'close');
+        if (!this.hooks.importSave(ta.value.trim())) this.toast(t('ui.toast.saveBad'), 'close');
         break;
       }
       case 'mainMenu':
@@ -1197,7 +1198,7 @@ export class Ui {
         // (A splitting boss's body and first half pay nothing: the gold comes with the last half.)
         if (!s || ev.gold.lte(0)) break;
         this.pop(s.x, s.y + s.h * 0.5, `+${fmt(ev.gold)}`, ev.boss || ev.champ ? 'p-gold p-big' : 'p-gold');
-        if (ev.champ) this.pop(s.x, s.y - 10, 'CHAMPION!', 'p-champ');
+        if (ev.champ) this.pop(s.x, s.y - 10, t('ui.pop.champion'), 'p-champ');
         break;
       }
       case 'drop': this.dropCoins(ev.id, ev.from, ev.big, ev.gold); break;
@@ -1205,14 +1206,14 @@ export class Ui {
       case 'ability': {
         const a = ABILITY_BY_ID.get(ev.id)!;
         if (ev.unlocked) {
-          this.toast(`<b>Ability unlocked: ${esc(a.name)}</b><small>${esc(g.abilityText(a.id))}</small>`, 'flask_big_yellow', 'trophy');
+          this.toast(`<b>${t('ui.toast.abilityUnlocked', { name: esc(a.name) })}</b><small>${esc(g.abilityText(a.id))}</small>`, 'flask_big_yellow', 'trophy');
           this.hooks.sound('levelup', { vol: 0.6 });
         } else this.hooks.sound('awaken', { vol: 0.5 });
         break;
       }
       case 'sweep': {
         const at = this.scene.fieldScreen();
-        this.pop(at.x, at.y, `Swept! +${fmt(ev.gold)}`, 'p-gold p-sweep');
+        this.pop(at.x, at.y, t('ui.pop.swept', { gold: fmt(ev.gold) }), 'p-gold p-sweep');
         this.coinFly(at.x, at.y + 20, 4, ev.gold);
         break;
       }
@@ -1220,7 +1221,7 @@ export class Ui {
         // A cleared floor: say so in the middle of the field, and give the floor bar a gold flash as it ticks over.
         if (ev.cleared) {
           const mid = this.scene.fieldScreen();
-          this.pop(mid.x, mid.y, `Floor ${fmt(ev.floor - 1)} cleared!`, 'p-floor');
+          this.pop(mid.x, mid.y, t('ui.pop.floorCleared', { floor: fmt(ev.floor - 1) }), 'p-floor');
           this.el.floorBox.classList.remove('advance');
           void this.el.floorBox.offsetWidth;
           this.el.floorBox.classList.add('advance');
@@ -1236,11 +1237,13 @@ export class Ui {
           this.bossAnnounced.add(ev.floor);
           const boss = g.monsters.find((m) => m.boss);
           const mods = g.bossMods(ev.floor).map((id) => MOD_BY_ID.get(id)!.name);
-          const time = `Kill it in ${Math.round(g.bossTimeMax)} seconds`;
-          const souls = boss?.champ && ev.floor >= TUNE.goldBossFrom ? ` · ${g.champSouls(ev.floor)} souls` : '';
-          this.banner(`${souls ? 'Champion boss' : 'Boss'}: ${boss?.def.name ?? 'Guardian'}`, (mods.length ? `${mods.join(' · ')} — ${time.toLowerCase()}` : time) + souls, 'boss');
+          const seconds = Math.round(g.bossTimeMax);
+          const time = mods.length ? t('ui.banner.bossModsTime', { mods: mods.join(' · '), count: seconds }) : t('ui.banner.bossTime', { count: seconds });
+          const souls = boss?.champ && ev.floor >= TUNE.goldBossFrom ? g.champSouls(ev.floor) : 0;
+          const bossName = boss?.def.name ?? t('ui.banner.guardian');
+          this.banner(souls ? t('ui.banner.champBoss', { name: bossName }) : t('ui.banner.boss', { name: bossName }), souls ? `${time} · ${t('ui.souls', { count: souls })}` : time, 'boss');
         } else if (ev.boss && ev.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.boss && m.champ)) {
-          this.banner('Champion boss!', `Beat it for ${g.champSouls(ev.floor)} soul${g.champSouls(ev.floor) === 1 ? '' : 's'}`, 'boss');
+          this.banner(t('ui.banner.champBossHere'), t('ui.banner.beatFor', { count: g.champSouls(ev.floor) }), 'boss');
         }
         break;
       case 'bossWin':
@@ -1253,16 +1256,16 @@ export class Ui {
             document.body.classList.add('cinema');
             setTimeout(() => document.body.classList.remove('cinema'), 2150);
           }
-          this.banner('CLUTCH!', `${left.toFixed(1)}s to spare · +${fmt(gold)} gold${ev.souls ? ` · +${ev.souls} souls` : ''}`, 'clutch');
+          this.banner(t('ui.banner.clutch'), [t('ui.banner.toSpare', { seconds: fixed(left, 1) }), t('ui.plusGold', { gold: fmt(gold) }), ev.souls ? t('ui.plusSouls', { count: ev.souls }) : ''].filter(Boolean).join(' · '), 'clutch');
         }
-        else if (ev.first) this.banner('Victory!', `Floor ${fmt(ev.floor)} conquered${ev.souls ? ` · +${ev.souls} soul${ev.souls === 1 ? '' : 's'}` : ''}`, 'win');
-        else if (ev.souls) this.banner('Champion boss down!', `+${ev.souls} soul${ev.souls === 1 ? '' : 's'}`, 'win');
+        else if (ev.first) this.banner(t('ui.banner.victory'), `${t('ui.banner.conquered', { floor: fmt(ev.floor) })}${ev.souls ? ` · ${t('ui.plusSouls', { count: ev.souls })}` : ''}`, 'win');
+        else if (ev.souls) this.banner(t('ui.banner.champBossDown'), t('ui.plusSouls', { count: ev.souls }), 'win');
         break;
       case 'bossFail':
         // The first wall: this is where the game teaches you to descend.
-        if (g.s.descents === 0 && ev.floor >= DESCEND_FLOOR && g.canDescend()) this.banner('You can ascend', 'Come back stronger', 'fail');
+        if (g.s.descents === 0 && ev.floor >= DESCEND_FLOOR && g.canDescend()) this.banner(t('ui.banner.canAscend'), t('ui.banner.comeBack'), 'fail');
         else {
-          this.banner('The boss held', 'Your party falls back to grow stronger', 'fail');
+          this.banner(t('ui.banner.bossHeld'), t('ui.banner.fallBack'), 'fail');
           this.fellBack = true;
         }
         break;
@@ -1270,7 +1273,7 @@ export class Ui {
         this.rowCache[ev.comp] = '';
         this.bump(this.rows[ev.comp]);
         break;
-      case 'reveal': this.toast(`New companion for hire: <b>${COMPS[ev.comp].name}</b>`, COMPS[ev.comp].sprite); break;
+      case 'reveal': this.toast(t('ui.toast.newCompanion', { name: COMPS[ev.comp].name }), COMPS[ev.comp].sprite); break;
       case 'trophy': {
         // A card trophy waits for its card: the card is collected when you've seen it, not when it drops.
         const req = TROPHIES.find((x) => x.id === ev.id)!.req.t;
@@ -1284,15 +1287,15 @@ export class Ui {
       }
       case 'raidCatch': {
         if (ev.reward === 'vault') break;
-        const title = REWARD_TEXT[ev.reward];
-        const line = ev.reward === 'plunder' || ev.reward === 'rainbow' ? `+${fmt(ev.amount ?? 0)} gold` : ev.buff ? `${buffText(ev.buff)} for ${Math.round(ev.buff.dur)}s` : '';
+        const title = t(REWARD_TEXT[ev.reward]);
+        const line = ev.reward === 'plunder' || ev.reward === 'rainbow' ? t('ui.plusGold', { gold: fmt(ev.amount ?? 0) }) : ev.buff ? t('ui.banner.buffFor', { buff: buffText(ev.buff), seconds: Math.round(ev.buff.dur) }) : '';
         this.banner(title, line, ev.reward === 'rainbow' ? 'loot rainbow' : 'loot');
         break;
       }
       case 'spawn': {
         const m = g.monster(ev.id);
         if (m?.boss && m.champ && !m.half && !g.s.inKeep) {
-          this.banner('CHAMPION BOSS!', `${m.def.name} · tougher, richer, and it might drop a gold card`, 'loot');
+          this.banner(t('ui.banner.champBossLoud'), `${m.def.name} · ${t('ui.banner.champBossSub')}`, 'loot');
           this.hooks.sound('drop4', { vol: 0.6 });
         }
         break;
@@ -1307,19 +1310,19 @@ export class Ui {
         this.cardsComing++;
         this.hooks.sound(ev.gold ? 'cardgold' : 'card', { vol: 0.9 });
         break;
-      case 'raidEscape': this.toast('The treasure goblin got away…', 'goblin'); break;
-      case 'fever': if (ev.on) this.banner(`RAMPAGE ×${fmt(g.feverMult())}!`, `Keep attacking for ×${fmt(g.rampageNext()?.mult ?? g.feverMult())}`, 'rampage'); break;
-      case 'rampage': this.banner(`RAMPAGE ×${fmt(ev.click)}!`, 'Full power', `rampage tier${ev.tier}`); break;
+      case 'raidEscape': this.toast(t('ui.toast.goblinEscaped'), 'goblin'); break;
+      case 'fever': if (ev.on) this.banner(t('ui.banner.rampage', { mult: fmt(g.feverMult()) }), t('ui.banner.keepAttacking', { mult: fmt(g.rampageNext()?.mult ?? g.feverMult()) }), 'rampage'); break;
+      case 'rampage': this.banner(t('ui.banner.rampage', { mult: fmt(ev.click) }), t('ui.banner.fullPower'), `rampage tier${ev.tier}`); break;
       case 'vaultPick': this.showVaultPick(); break;
       case 'vault':
         this.closeVaultPick();
         this.el.vaultLeave.hidden = !ev.on;
         // The floor's tracker means nothing in the vault.
         document.body.classList.toggle('in-vault', ev.on);
-        if (ev.on) this.banner('RAINBOW VAULT!', 'Open every chest!', 'loot rainbow');
-        else this.toast(`You leave the vault. Haul: <b>+${fmt(ev.gold)} gold</b>`, 'chest_full_open', 'trophy');
+        if (ev.on) this.banner(t('ui.banner.vault'), t('ui.banner.vaultSub'), 'loot rainbow');
+        else this.toast(t('ui.toast.vaultHaul', { gold: fmt(ev.gold) }), 'chest_full_open', 'trophy');
         break;
-      case 'vaultAll': this.banner('EVERY CHEST!', `+${fmt(ev.gold)} gold bonus`, 'loot rainbow'); break;
+      case 'vaultAll': this.banner(t('ui.banner.everyChest'), t('ui.banner.goldBonus', { gold: fmt(ev.gold) }), 'loot rainbow'); break;
       case 'chest': this.chestOpened(ev.id, ev.gold, ev.rainbow); break;
       case 'vaultGoblin': {
         const at = this.scene.goblinScreen(ev.id);
@@ -1352,7 +1355,7 @@ export class Ui {
       }
       case 'split': {
         const s = this.scene.screenOf(ev.into[0]) ?? this.scene.screenOf(ev.id);
-        if (s) this.pop(s.x, s.y + s.h * 0.2, 'Split!', 'p-mod');
+        if (s) this.pop(s.x, s.y + s.h * 0.2, t('ui.pop.split'), 'p-mod');
         break;
       }
       default:
@@ -1377,18 +1380,18 @@ export class Ui {
       }
       case 'hunterHere':
         this.rowCache[ev.comp] = '';
-        if (ev.on) this.toast(`<b>${esc(COMPS[ev.comp].name)}</b> fights with you on floor ${fmt(g.s.floor)}`, COMPS[ev.comp].sprite);
+        if (ev.on) this.toast(t('ui.toast.hunterHere', { name: esc(COMPS[ev.comp].name), floor: fmt(g.s.floor) }), COMPS[ev.comp].sprite);
         break;
-      case 'tripsOpen': this.toast('<b>Expeditions</b> are open: the ladder in the Keep', COMPS[ev.comp].sprite, 'trophy'); break;
-      case 'setStart': this.toast(`Card sets: <b>floor ${fmt(ev.floor)}</b> · +${fmt(ev.gold)} gold`, 'imp', 'trophy'); break;
-      case 'autoHireOpen': this.toast('<b>Auto levels</b> is open: the toggle above your party', 'knight_m', 'trophy'); break;
-      case 'tripReady': this.toast(`<b>${esc(COMPS[ev.comp].name)}</b> can go on expeditions`, COMPS[ev.comp].sprite); break;
-      case 'legend': if (ev.summoned) this.toast(`<b>${esc(LEGEND_BY_ID.get(ev.id)!.name)}</b> joins you`, LEGEND_BY_ID.get(ev.id)!.sprite); break;
+      case 'tripsOpen': this.toast(t('ui.toast.tripsOpen'), COMPS[ev.comp].sprite, 'trophy'); break;
+      case 'setStart': this.toast(t('ui.toast.setStart', { floor: fmt(ev.floor), gold: fmt(ev.gold) }), 'imp', 'trophy'); break;
+      case 'autoHireOpen': this.toast(t('ui.toast.autoHireOpen'), 'knight_m', 'trophy'); break;
+      case 'tripReady': this.toast(t('ui.toast.tripReady', { name: esc(COMPS[ev.comp].name) }), COMPS[ev.comp].sprite); break;
+      case 'legend': if (ev.summoned) this.toast(t('ui.toast.spiritJoins', { name: esc(LEGEND_BY_ID.get(ev.id)!.name) }), LEGEND_BY_ID.get(ev.id)!.sprite); break;
       case 'mark':
         this.rowCache[ev.comp] = '';
         if (ev.from !== undefined) this.rowCache[ev.from] = '';
-        if (ev.moved) this.toast(`A Heartmark moves to the <b>${esc(COMPS[ev.comp].name)}</b>`, COMPS[ev.comp].sprite);
-        else this.toast(`<b>Heartmark!</b> The ${esc(COMPS[ev.comp].name)} deals +${Math.round(g.markPower() * 100)}% damage`, COMPS[ev.comp].sprite, 'trophy');
+        if (ev.moved) this.toast(t('ui.toast.markMoved', { name: esc(COMPS[ev.comp].name) }), COMPS[ev.comp].sprite);
+        else this.toast(t('ui.toast.mark', { name: esc(COMPS[ev.comp].name), percent: Math.round(g.markPower() * 100) }), COMPS[ev.comp].sprite, 'trophy');
         break;
     }
   }
@@ -1405,8 +1408,9 @@ export class Ui {
     const z = zoneOf(floor);
     const lap = lapOf(floor);
     // The first zone of a new lap says what's changed.
-    const sub = lap && z % 8 === 0 ? `Everything returns ${corruptionOf(lap).name.toLowerCase()} · floors ${z * 10 + 1}–${z * 10 + 10}` : `Floors ${z * 10 + 1}–${z * 10 + 10}`;
-    this.banner(zoneName(floor), sub, `zone lap${Math.min(lap, 4)}`);
+    const floors = { from: z * 10 + 1, to: z * 10 + 10 };
+    const sub = lap && z % 8 === 0 ? t('ui.banner.zoneLap', { corruption: corruptionOf(lap).state, ...floors }) : t('ui.banner.zone', floors);
+    this.banner(zoneName(floor), sub, `zone lap${Math.min(lap, 4)}`); // i18n-ignore (class names)
   }
 
   /** The party has come down the stairs into a new zone. */
@@ -1662,7 +1666,7 @@ export class Ui {
         bar = document.createElement('div');
         bar.className = `hp ${m.boss ? 'boss' : ''}`;
         const souls = m.boss && m.champ && g.s.floor >= TUNE.goldBossFrom && g.s.goldBosses[g.s.floor] ? g.champSouls(g.s.floor) : 0;
-        const chips = (souls ? `<em class="mod soul-chip" style="--mc:var(--soul)">${G.soul(1)} ${souls} soul${souls === 1 ? '' : 's'}</em>` : '') + modChips(m.mods);
+        const chips = (souls ? `<em class="mod soul-chip" style="--mc:var(--soul)">${G.soul(1)} ${t('ui.souls', { count: souls })}</em>` : '') + modChips(m.mods);
         bar.innerHTML = `<i></i>${chips ? `<span class="hp-mods">${chips}</span>` : ''}`;
         this.el.bars.appendChild(bar);
         this.bars.set(m.id, bar);
@@ -1730,7 +1734,7 @@ export class Ui {
     this.el.streak.classList.toggle('on', unbroken > 0 && g.streak > 1);
     if (unbroken > 0 && g.streak > 1) {
       setText(this.el.streakV, fmt(g.streak));
-      setText(this.el.streakB, `+${+(0.01 * unbroken * g.streak).toFixed(1)}%`);
+      setText(this.el.streakB, `+${decimal(0.01 * unbroken * g.streak, 1)}%`);
     }
     // Spirit colors on the numbers the Sleeper and the Patient are raising right now.
     const idle = g.idle();
@@ -1745,7 +1749,7 @@ export class Ui {
     if (fever) {
       this.el.feverBar.style.width = `${(fever.t / fever.dur) * 100}%`;
       const next = g.rampageNext();
-      const label = next ? `×${fmt(g.feverMult())} · keep attacking!` : `×${fmt(g.feverMult())}!`;
+      const label = next ? t('ui.fever.keepAttacking', { mult: fmt(g.feverMult()) }) : `×${fmt(g.feverMult())}!`;
       if (this.el.feverLabel.textContent !== label) this.el.feverLabel.textContent = label;
     }
 
@@ -1768,7 +1772,7 @@ export class Ui {
 
     if (g.canAwaken() && !this.toldAwaken) {
       this.toldAwaken = true;
-      if (g.s.awakens === 0) this.toast('<b>The Heart stirs</b>', 'ui_heart_full', 'trophy');
+      if (g.s.awakens === 0) this.toast(t('ui.toast.heartStirs'), 'ui_heart_full', 'trophy');
     }
     // The Heart's button shows up AWAKEN_TEASE floors before it can first wake (its panel shows the way to it); its badge
     // is what an awakening would pay now.
@@ -1776,7 +1780,7 @@ export class Ui {
     this.el.heartBtn.hidden = !AWAKEN_ON || !teased;
     if (AWAKEN_ON && teased && !g.s.heartTeased) {
       g.s.heartTeased = true;
-      if (!g.s.awakens) this.toast(`<b>Something beats below</b> Floor ${fmt(TUNE.awakenFloor)}`, 'ui_heart_full', 'trophy');
+      if (!g.s.awakens) this.toast(t('ui.toast.heartTease', { floor: fmt(TUNE.awakenFloor) }), 'ui_heart_full', 'trophy');
     }
     const bound = g.canAwaken() ? g.pendingBound() : 0;
     this.el.heartBadge.hidden = bound < 1;
@@ -1785,7 +1789,7 @@ export class Ui {
     // The Keep opens with your first ascent; from then on it's a button away (and the way back down, while you're there).
     this.el.keepBtn.hidden = !g.legendsOpen() || g.inVault() || !!g.raid;
     // Up in the Keep it's the way back down: the dungeon's stairs tile instead of the Keep's door.
-    const keepText = DEMO ? '' : g.s.inKeep ? 'The Dungeon' : 'The Keep';
+    const keepText = DEMO ? '' : g.s.inKeep ? t('ui.dungeon') : t('ui.keep');
     if (this.keepBtnText !== keepText) {
       this.keepBtnText = keepText;
       this.el.keepBtn.innerHTML = `${g.s.inKeep ? sprite('floor_stairs', 2) : keepDoor()}<span>${keepText}</span>`;
@@ -1826,17 +1830,17 @@ export class Ui {
     const key = `${s.floor}|${s.maxFloor}|${s.auto}|${boss}|${page}|${owned}`;
     if (key !== this.floorKey) {
       this.floorKey = key;
-      setText(this.el.floorN, `Floor ${fmt(s.floor)}`);
+      setText(this.el.floorN, t('ui.floor', { floor: fmt(s.floor) }));
       const mods = boss ? g.bossMods() : [];
       // Two tags fit; the rest show as a count (hover for them all).
-      if (mods.length) this.el.floorSub.innerHTML = `Boss <span class="chips">${modChips(mods.slice(0, mods.length > 2 ? 1 : 2))}${mods.length > 2 ? `<em class="mod more" style="--mc:var(--dim)">+${mods.length - 1}</em>` : ''}</span>`;
-      else setText(this.el.floorSub, boss ? 'Boss' : zoneName(s.floor).replace(/^The /, ''));
+      if (mods.length) this.el.floorSub.innerHTML = `${t('ui.floor.boss')} <span class="chips">${modChips(mods.slice(0, mods.length > 2 ? 1 : 2))}${mods.length > 2 ? `<em class="mod more" style="--mc:var(--dim)">+${mods.length - 1}</em>` : ''}</span>`; // i18n-ignore (class names)
+      else setText(this.el.floorSub, boss ? t('ui.floor.boss') : zoneName(s.floor).replace(/^The /, ''));
       this.fitFloorSub();
       this.el.floorBox.classList.toggle('is-boss', boss);
       (this.el.down as HTMLButtonElement).disabled = s.floor <= 1;
       (this.el.up as HTMLButtonElement).disabled = s.floor >= s.maxFloor;
       this.el.auto.classList.toggle('on', s.auto);
-      setText(this.el.auto, s.auto ? 'Auto: on' : 'Auto: off');
+      setText(this.el.auto, s.auto ? t('ui.floor.autoOn') : t('ui.floor.autoOff'));
       // Five rooms on a winding corridor, each page ending on a boss. Drawn twice: an island in the corner on wide
       // screens, inside the floor box on narrow ones (CSS picks).
       const first = page * MAP_ROOMS + 1;
@@ -1873,30 +1877,30 @@ export class Ui {
       // A clutch kill: the clock stops where the boss fell, for the slow motion to show it.
       const { left, max } = this.clutchHold;
       this.el.floorBar.style.width = `${max ? (left / max) * 100 : 0}%`;
-      setText(this.el.floorBarT, `${left.toFixed(1)}s`);
+      setText(this.el.floorBarT, t('ui.seconds', { seconds: fixed(left, 1) }));
       this.el.floorBox.classList.add('urgent');
     } else if (boss && g.inVault()) {
       // The boss steps aside for the vault; its clock is frozen.
       this.el.floorBar.style.width = `${g.bossTimeMax ? (Math.max(0, g.bossTime) / g.bossTimeMax) * 100 : 100}%`;
-      setText(this.el.floorBarT, 'Boss waits');
+      setText(this.el.floorBarT, t('ui.floor.bossWaits'));
       this.el.floorBox.classList.remove('urgent');
     } else if (boss && !g.monsters.some((m) => m.boss)) {
       // Farming a boss floor: the next one is on its way up.
       this.el.floorBar.style.width = '0%';
-      setText(this.el.floorBarT, 'Next boss coming…');
+      setText(this.el.floorBarT, t('ui.floor.nextBoss'));
       this.el.floorBox.classList.remove('urgent');
     } else if (boss) {
       // The bar is the clock: it drains steadily. (The boss's health is the bar over its head.)
       const left = Math.max(0, g.bossTime);
       this.el.floorBar.style.width = `${(left / g.bossTimeMax) * 100}%`;
-      setText(this.el.floorBarT, `${left.toFixed(1)}s`);
+      setText(this.el.floorBarT, t('ui.seconds', { seconds: fixed(left, 1) }));
       this.el.floorBox.classList.toggle('urgent', g.bossTime < 8);
     } else {
       const need = g.killsNeeded();
       const cleared = s.floor < s.maxFloor || s.floorKills >= need;
       const k = cleared ? need : s.floorKills;
       this.el.floorBar.style.width = `${(k / need) * 100}%`;
-      setText(this.el.floorBarT, cleared ? 'Cleared' : `${k} / ${need}`);
+      setText(this.el.floorBarT, cleared ? t('ui.floor.cleared') : `${k} / ${need}`);
       this.el.floorBox.classList.remove('urgent');
     }
   }
@@ -1922,8 +1926,8 @@ export class Ui {
       }
       // Phones only have room for the countdown; the icon says which buff it is.
       const vault = b.id === 'vault' ? this.game.vault : null;
-      const what = vault ? `${vault.chests.filter((c) => c.open).length}/${vault.chests.length} chests` : buffText(b);
-      const time = Number.isFinite(b.t) ? `${Math.ceil(b.t)}s` : '';
+      const what = vault ? t('ui.buff.chests', { open: vault.chests.filter((c) => c.open).length, total: vault.chests.length }) : buffText(b);
+      const time = Number.isFinite(b.t) ? t('ui.seconds', { seconds: Math.ceil(b.t) }) : '';
       const text = document.body.classList.contains('phone') ? time || what : [what, time].filter(Boolean).join(' · ');
       const small = chip.querySelector('small')!;
       if (small.textContent !== text) small.textContent = text;
@@ -1961,9 +1965,9 @@ export class Ui {
       this.rowCache[i] = key;
       const name = locked || mystery ? '???' : def.name;
       row.querySelector('.gen-name')!.innerHTML = `${name}${marks && !locked && !mystery ? ` <span class="marks" data-tip="mark:${i}">${G.heart(1.5)}${marks}</span>` : ''}${q.n > 1 && !locked && !mystery ? ` <small>×${q.n}</small>` : ''}`;
-      row.querySelector('.gen-cost')!.innerHTML = !DEMO && trip ? `<span class="need trip-tag">Expedition · floor ${fmt(trip.floor)}</span>` : locked ? `<span class="need">${G.lock()} In the full game</span>` : gold(q.cost, can ? 'ok' : 'no');
-      row.querySelector('.gen-lv')!.textContent = lv ? `Lv ${lv}` : '';
-      row.querySelector('.gen-dps')!.textContent = trip ? '' : lv ? `${fmt(g.compDps(i))} dps` : '';
+      row.querySelector('.gen-cost')!.innerHTML = !DEMO && trip ? `<span class="need trip-tag">${t('ui.party.tripTag', { floor: fmt(trip.floor) })}</span>` : locked ? `<span class="need">${G.lock()} ${t('ui.party.fullGame')}</span>` : gold(q.cost, can ? 'ok' : 'no');
+      row.querySelector('.gen-lv')!.textContent = lv ? t('ui.party.lv', { level: lv }) : '';
+      row.querySelector('.gen-dps')!.textContent = trip ? '' : lv ? t('ui.party.dps', { dps: fmt(g.compDps(i)) }) : '';
       // Owned traits and the next one only: the rest show up as you buy your way along. Past the last trait, the next
       // automatic level bonus.
       const shown = traits.findIndex((st) => st !== 'got');
@@ -2016,8 +2020,8 @@ export class Ui {
       }
       const fill = buff && state === 'active' ? 1 - buff.t / buff.dur : state === 'cooling' ? cd / (a.cooldown ?? 1) : state === 'charging' ? g.s.fervor : 0;
       slot.style.setProperty('--cd', `${fill * 100}%`);
-      const time = buff && state === 'active' ? `${Math.ceil(buff.t)}s` : state === 'cooling' ? clock(cd) : state === 'charging' ? `${Math.floor(g.s.fervor * 100)}%`
-        : state === 'passive' && id === 'blade' ? `${perSec(g.autoRate())}/s` : '';
+      const time = buff && state === 'active' ? t('ui.seconds', { seconds: Math.ceil(buff.t) }) : state === 'cooling' ? clock(cd) : state === 'charging' ? `${Math.floor(g.s.fervor * 100)}%`
+        : state === 'passive' && id === 'blade' ? t('ui.perSecond', { rate: perSec(g.autoRate()) }) : '';
       const label = slot.querySelector('.ab-time')!;
       if (label.textContent !== time) label.textContent = time;
     }
@@ -2093,7 +2097,7 @@ export class Ui {
     this.pickAt = now;
     // (The chest's own sound plays from the game event; this is the coins, climbing as you chain chests.)
     this.hooks.sound('coins', { vol: 0.3, rate: 1 + this.pickCombo * 0.05 });
-    if (rainbow) this.banner('RAINBOW CHEST!', `+${fmt(gold)} gold`, 'loot rainbow');
+    if (rainbow) this.banner(t('ui.banner.rainbowChest'), t('ui.plusGold', { gold: fmt(gold) }), 'loot rainbow');
     if (!at) {
       this.coinFly(this.field.w / 2, this.field.h / 2, rainbow ? 30 : 8, gold);
       return;
@@ -2240,26 +2244,32 @@ export class Ui {
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero' || state === 'raid');
     this.el.shop.classList.toggle('show-stars', state === 'star');
+    const hint = (title: string, sub = '') => `<b>${title}${sub ? `<small>${sub}</small>` : ''}</b>`;
     this.el.hint.innerHTML = state === 'hero'
-      ? `<b>This is your hero!<small>The one with the gold ring · ${this.touch ? 'hold a finger down to lead them' : padFamily() ? `walk them with ${padGlyph('ls', 18)}` : 'they follow your mouse'}</small></b>`
-      : state === 'star' ? `<b>Try making the ${esc(COMPS[this.starPick()]?.name ?? 'next one')} your hero<small>${padFamily() ? `Press ${padGlyph('r3', 18)} to switch` : `Click their ${G.star()} to switch`}</small></b>`
-        : state === 'hire' ? `<b>Hire the ${esc(COMPS[0].name)}!<small>${padFamily() ? `Press ${padGlyph('a', 18)} to hire them` : 'Companions fight for you, even while you\'re away'}</small></b>`
-          : state === 'level' ? `<b>${padFamily() ? `Press ${padGlyph('a', 20)} to level up` : `Keep ${this.touch ? 'tapping' : 'clicking'} to level up`}<small>At level 10 the ${esc(COMPS[0].name)} gets an upgrade</small></b>`
+      ? hint(t('ui.hint.hero'), this.touch ? t('ui.hint.heroTouch') : padFamily() ? t('ui.hint.heroPad', { stick: padGlyph('ls', 18) }) : t('ui.hint.heroMouse'))
+      : state === 'star' ? hint(t('ui.hint.star', { name: esc(COMPS[this.starPick()]?.name ?? t('ui.hint.nextOne')) }), padFamily() ? t('ui.hint.starPad', { button: padGlyph('r3', 18) }) : t('ui.hint.starClick', { star: G.star() }))
+        : state === 'hire' ? hint(t('ui.hint.hire', { name: esc(COMPS[0].name) }), padFamily() ? t('ui.hint.hirePad', { button: padGlyph('a', 18) }) : t('ui.hint.hireSub'))
+          : state === 'level' ? hint(this.byInput('ui.hint.levelPad', 'ui.hint.levelTouch', 'ui.hint.levelClick', { button: padGlyph('a', 20) }), t('ui.hint.levelSub', { name: esc(COMPS[0].name) }))
             : state.startsWith('skill:') ? this.skillHint(state.slice(6) as AbilityId)
-            : state === 'rampage' ? `<b>Rampage is ready!<small>${padFamily() ? `Press ${this.abilityButtons('rampage')}` : this.touch ? 'Tap it' : `Click it or press ${abilityKey('rampage')}`} to unleash it</small></b>`
-            : state === 'upgrade' ? `<b>Your first upgrade!<small>${this.firstUpgradeHint(upgradeRow)}</small></b>`
-            : state === 'shop' ? `<b>An upgrade is ready!<small>${padFamily() ? `Press ${padGlyph('x', 18)} to buy it` : this.touch ? 'Tap it to buy it' : 'Click it to buy it'}</small></b>`
+            : state === 'rampage' ? hint(t('ui.hint.rampage'), this.byInput('ui.hint.rampagePad', 'ui.hint.rampageTouch', 'ui.hint.rampageClick', { button: this.abilityButtons('rampage'), key: abilityKey('rampage') }))
+            : state === 'upgrade' ? hint(t('ui.hint.upgrade'), this.firstUpgradeHint(upgradeRow))
+            : state === 'shop' ? hint(t('ui.hint.shop'), this.byInput('ui.hint.shopPad', 'ui.hint.shopTouch', 'ui.hint.shopClick', { button: padGlyph('x', 18) }))
               : state === 'champ' ? this.champHint()
-              : state === 'raid' ? `<b>A treasure goblin!<small>Walk into it with ${padGlyph('ls', 18)} before it gets away</small></b>`
-              : state === 'fallback' ? `<b>The boss beat you<small>Auto is off: ${padFamily() ? `press ${padCombo(['lt', 'down'], 18)}` : 'turn it back on'} when you're ready to try again</small></b>`
-              : state === 'auto' ? `<b>Auto upgrades<small>Companion upgrades you've bought before buy themselves</small></b>`
-              : state === 'autohire' ? `<b>Auto levels<small>Companion levels you've bought before buy themselves</small></b>`
-              : !DEMO && state === 'mark' ? `<b>A Heartmark!<small>The ${esc(COMPS[this.markRow()].name)} deals +${Math.round(g.markPower() * 100)}% damage</small></b>`
-              : (padFamily() ? `<b>Attack the monsters!<small>Tap ${padGlyph('rt', 18)} to attack, hold it to keep attacking</small></b>` : `<b>${this.touch ? 'Tap' : 'Click'} to attack monsters<small>Hold to keep attacking</small></b>`);
+              : state === 'raid' ? hint(t('ui.hint.raid'), t('ui.hint.raidSub', { stick: padGlyph('ls', 18) }))
+              : state === 'fallback' ? hint(t('ui.hint.fallback'), padFamily() ? t('ui.hint.fallbackPad', { buttons: padCombo(['lt', 'down'], 18) }) : t('ui.hint.fallbackMouse'))
+              : state === 'auto' ? hint(t('ui.hint.auto'), t('ui.hint.autoSub'))
+              : state === 'autohire' ? hint(t('ui.hint.autoHire'), t('ui.hint.autoHireSub'))
+              : !DEMO && state === 'mark' ? hint(t('ui.hint.mark'), t('ui.hint.markSub', { name: esc(COMPS[this.markRow()].name), percent: Math.round(g.markPower() * 100) }))
+              : (padFamily() ? hint(t('ui.hint.attackPad'), t('ui.hint.attackPadSub', { trigger: padGlyph('rt', 18) })) : hint(t(this.touch ? 'ui.hint.attackTouch' : 'ui.hint.attackClick'), t('ui.hint.attackSub')));
     this.rows.forEach((row, i) => row.classList.toggle('nudge', (i === 0 && ['hire', 'nudge', 'level'].includes(state)) || (state === 'upgrade' && i === upgradeRow)));
     this.el.raid.classList.toggle('first', state === 'raid');
   }
 
+
+  /** The words for how you play: a controller's, a touch screen's or a mouse's. */
+  private byInput(pad: UiKey, touch: UiKey, mouse: UiKey, params?: Params) {
+    return t(padFamily() ? pad : this.touch ? touch : mouse, params);
+  }
 
   /** The controller button(s) that use an ability. */
   private abilityButtons(id: AbilityId) {
@@ -2269,8 +2279,8 @@ export class Ui {
   /** A skill just unlocked: its name, and how to use it (or that it's always on). */
   private skillHint(id: AbilityId) {
     const a = ABILITY_BY_ID.get(id)!;
-    const how = a.kind === 'button' ? `<small>${padFamily() ? `Press ${this.abilityButtons(id)}` : this.touch ? 'Tap it' : `Click it or press ${abilityKey(id)}`} to use it</small>` : a.kind === 'passive' ? '<small>Always on</small>' : '';
-    return `<b>${esc(a.name)} unlocked!${how}</b>`;
+    const how = a.kind === 'button' ? this.byInput('ui.hint.skillPad', 'ui.hint.skillTouch', 'ui.hint.skillClick', { button: this.abilityButtons(id), key: abilityKey(id) }) : a.kind === 'passive' ? t('ui.alwaysOn') : '';
+    return `<b>${t('ui.hint.skill', { name: esc(a.name) })}${how ? `<small>${how}</small>` : ''}</b>`;
   }
 
   /** Whether a skill's unlock has been pointed out (or, with `mark`, note that it has). */
@@ -2288,16 +2298,12 @@ export class Ui {
   private firstUpgradeHint(row: number) {
     const id = `m${row}_0`;
     const skill = ABILITY_BY_UPGRADE.get(id);
-    if (padFamily()) {
-      const x = padGlyph('x', 18);
-      if (skill) return `Press ${x} to unlock the ${esc(skill.name)}`;
-      const u = UPG_BY_ID.get(id);
-      return u?.effect.t === 'comp' ? `Press ${x} to double ${esc(COMPS[row].name)}'s damage` : `Press ${x}: ${esc(u?.desc ?? '')}`;
-    }
-    const press = this.touch ? 'Tap' : 'Click';
-    if (skill) return `${press} the ${TRAIT_KEY} to unlock the ${esc(skill.name)}`;
+    const button = padGlyph('x', 18);
+    if (skill) return this.byInput('ui.hint.upgradeSkillPad', 'ui.hint.upgradeSkillTouch', 'ui.hint.upgradeSkillClick', { button, trait: TRAIT_KEY, skill: esc(skill.name) });
     const u = UPG_BY_ID.get(id);
-    return u?.effect.t === 'comp' ? `${press} the <span class="hint-trait">×2</span> to double ${esc(COMPS[row].name)}'s damage` : `${press} the ${TRAIT_KEY}: ${esc(u?.desc ?? '')}`;
+    return u?.effect.t === 'comp'
+      ? this.byInput('ui.hint.upgradeDoublePad', 'ui.hint.upgradeDoubleTouch', 'ui.hint.upgradeDoubleClick', { button, trait: '<span class="hint-trait">×2</span>', name: esc(COMPS[row].name) })
+      : this.byInput('ui.hint.upgradeOtherPad', 'ui.hint.upgradeOtherTouch', 'ui.hint.upgradeOtherClick', { button, trait: TRAIT_KEY, desc: esc(u?.desc ?? '') });
   }
 
   /** Moves the hint's arrow onto something in the party panel: beside it when there's room to its left (the panel on the
@@ -2312,12 +2318,13 @@ export class Ui {
     this.el.hint.style.visibility = visible ? 'visible' : 'hidden';
   }
 
-  /** Who unlocks a skill, without naming a companion you've never had. */
-  private unlockedBy(id: AbilityId) {
+  /** Who unlocks a skill, without naming a companion you've never had (`sentence`: with its full stop). */
+  private unlockedBy(id: AbilityId, sentence = false) {
     const g = this.game;
     const comp = ABILITY_BY_ID.get(id)!.comp;
     const met = comp < Math.max(1, g.s.revealed) || g.s.owned[comp] > 0 || g.s.bestLevel[comp] > 0;
-    return met ? `Unlocked by the ${COMPS[comp].name}` : `Unlocked by a companion you haven't met`;
+    if (!met) return t(sentence ? 'ui.unlockedBy.strangerSentence' : 'ui.unlockedBy.stranger');
+    return t(sentence ? 'ui.unlockedBy.sentence' : 'ui.unlockedBy', { name: COMPS[comp].name });
   }
 
   /** The companion holding the most Heartmarks (where the first one is pointed out). */
@@ -2332,9 +2339,9 @@ export class Ui {
     const champ = g.monsters.find((m) => m.champ && m.boss) ?? g.monsters.find((m) => m.champ);
     if (champ?.boss && g.s.floor >= TUNE.goldBossFrom) {
       const n = g.champSouls(g.s.floor);
-      return `<b>A champion boss!<small>Beat it for ${n} soul${n === 1 ? '' : 's'}. It might drop a gold card.</small></b>`;
+      return `<b>${t('ui.hint.champBoss')}<small>${t('ui.hint.champBossSouls', { count: n })}</small></b>`;
     }
-    return champ?.boss ? '<b>A champion boss!<small>Tougher, and it might drop a gold card</small></b>' : '<b>A champion!<small>Tougher, and it might drop a gold card</small></b>';
+    return `<b>${t(champ?.boss ? 'ui.hint.champBoss' : 'ui.hint.champ')}<small>${t('ui.hint.champSub')}</small></b>`;
   }
 
   /** Who the star tip suggests trying as your hero: the first companion you have who isn't your hero already. */
@@ -2366,7 +2373,7 @@ export class Ui {
       if (!a) return this.hideTip();
       this.tipAnchor = a;
     }
-    const html = padFamily() ? padWords(this.tipHtml(this.tipKey)) : this.touch ? tapWords(this.tipHtml(this.tipKey)) : this.tipHtml(this.tipKey);
+    const html = this.tipHtml(this.tipKey);
     if (!html) return this.hideTip();
     const tip = this.el.tip;
     if (tip.innerHTML !== html) tip.innerHTML = html;
@@ -2393,75 +2400,74 @@ export class Ui {
     if (kind === 'comp') {
       const i = Number(id);
       const def = COMPS[i];
-      if (DEMO && i >= DEMO_COMPANIONS) return '<div class="tt-h"><b>???</b></div><p class="tt-f">More companions join you in the full game.</p>';
-      if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">A new companion is on their way. Earn more gold to meet them.</p>`;
+      if (DEMO && i >= DEMO_COMPANIONS) return `<div class="tt-h"><b>???</b></div><p class="tt-f">${t('ui.tip.comp.demo')}</p>`;
+      if (i === g.s.revealed && g.s.owned[i] === 0 && i > 0) return `<div class="tt-h"><b>???</b></div><p class="tt-f">${t('ui.tip.comp.mystery')}</p>`;
       // Away hunting: the trip, not the hire.
       const trip = g.s.expeditions.find((e) => e.comp === i && e.pausedAt === undefined);
       if (!DEMO && trip) {
-        return `<div class="tt-h">${charFit(def.sprite, 30)}<b>${def.name}</b><span class="tt-own">expedition</span></div>
-          <dl class="tt-trip"><div><dt>Floor</dt><dd>${trip.floor}</dd></div><div><dt>Kills</dt><dd>${fmt(g.tripKills(trip))}</dd></div>
-          <div><dt>Cards found</dt><dd>${fmt(trip.found?.length ?? 0)}</dd></div>
-          <div><dt>Back in</dt><dd>${duration(Math.max(0, TRIP_HOURS * 3600 - g.tripSeconds(trip)))}</dd></div></dl>`;
+        return `<div class="tt-h">${charFit(def.sprite, 30)}<b>${def.name}</b><span class="tt-own">${t('ui.tip.comp.trip')}</span></div>
+          <dl class="tt-trip"><div><dt>${t('ui.tip.comp.tripFloor')}</dt><dd>${trip.floor}</dd></div><div><dt>${t('ui.tip.comp.tripKills')}</dt><dd>${fmt(g.tripKills(trip))}</dd></div>
+          <div><dt>${t('ui.tip.comp.tripCards')}</dt><dd>${fmt(trip.found?.length ?? 0)}</dd></div>
+          <div><dt>${t('ui.tip.comp.tripBack')}</dt><dd>${duration(Math.max(0, TRIP_HOURS * 3600 - g.tripSeconds(trip)))}</dd></div></dl>`;
       }
       const q = g.compQuote(i);
       const next = g.compNext(i).times(q.n);
       const share = g.baseDps().gt(0) ? g.compDps(i).div(g.baseDps()).toNumber() : 0;
-      return `<div class="tt-h">${charFit(def.sprite, 30)}<b>${def.name}</b><span class="tt-own">level ${g.s.owned[i]}</span></div>
-        <div class="tt-cost">${gold(q.cost, g.s.gold.gte(q.cost) ? 'ok' : 'no')}${q.n > 1 ? ` for ${q.n} levels` : ''}</div>
+      return `<div class="tt-h">${charFit(def.sprite, 30)}<b>${def.name}</b><span class="tt-own">${t('ui.tip.level', { level: g.s.owned[i] })}</span></div>
+        <div class="tt-cost">${gold(q.cost, g.s.gold.gte(q.cost) ? 'ok' : 'no')}${q.n > 1 ? ` ${t('ui.tip.comp.forLevels', { count: q.n })}` : ''}</div>
         <ul class="tt-l">
-          ${g.s.owned[i] ? `<li>Deals <b>${fmt(g.compDps(i))}</b> damage/sec (${(share * 100).toFixed(1)}% of your party)</li>` : ''}
-          <li>Next ${q.n > 1 ? `${q.n} levels` : 'level'}: <b class="up">+${fmt(next)}</b> damage/sec</li>
+          ${g.s.owned[i] ? `<li>${t('ui.tip.comp.deals', { dps: fmt(g.compDps(i)), share: fixed(share * 100, 1) })}</li>` : ''}
+          <li>${t('ui.tip.comp.next', { count: q.n, gain: `<b class="up">+${fmt(next)}</b>` })}</li>
         </ul>
-        <p class="tt-f">“${esc(def.flavor)}”</p>`;
+        <p class="tt-f">${t('ui.quote', { text: esc(def.flavor) })}</p>`;
     }
     if (kind === 'shop') {
-      if (id === 'next') return `<p class="tt-d">Hire up to each companion's next milestone, where a damage upgrade unlocks.</p>`;
+      if (id === 'next') return `<p class="tt-d">${t('ui.tip.shop.next')}</p>`;
       // (The state on a line of its own, so the tip is the same size on and off.)
       const on = id === 'hire' ? g.s.settings.autoHire : g.s.settings.autoUpg;
-      const text = id === 'hire' ? 'Buys companion levels back up to what you\'ve bought before.' : 'Buys companion upgrades you\'ve bought before.';
-      return `<p class="tt-d">${text}</p><p class="tt-d tt-state ${on ? 'on' : ''}">${on ? 'On' : 'Off'}</p>`;
+      const text = id === 'hire' ? t('ui.tip.shop.hire') : t('ui.tip.shop.auto');
+      return `<p class="tt-d">${text}</p><p class="tt-d tt-state ${on ? 'on' : ''}">${on ? t('ui.on') : t('ui.off')}</p>`;
     }
     if (kind === 'lvl') {
       const i = Number(id);
       const lv = g.s.owned[i];
       const now = levelMult(lv);
-      return `<div class="tt-h"><b>Level bonus</b><span class="tt-own">automatic</span></div>
-        <p class="tt-d">${esc(COMPS[i].name)} deals ×${milestoneMult(nextMilestone(i, lv))} damage at level ${nextMilestone(i, lv)}, and again every ${LEVEL_BONUS.every} levels (×${LEVEL_BONUS.thousand} at every 1,000th).</p>
-        ${now > 1 ? `<p class="tt-gain">Now ×${fmt(now)} from levels.</p>` : ''}`;
+      return `<div class="tt-h"><b>${t('ui.tip.lvl.title')}</b><span class="tt-own">${t('ui.tip.lvl.kind')}</span></div>
+        <p class="tt-d">${t('ui.tip.lvl.desc', { name: esc(COMPS[i].name), mult: decimal(milestoneMult(nextMilestone(i, lv)), 2), level: nextMilestone(i, lv), every: LEVEL_BONUS.every, thousand: decimal(LEVEL_BONUS.thousand, 2) })}</p>
+        ${now > 1 ? `<p class="tt-gain">${t('ui.tip.lvl.now', { mult: fmt(now) })}</p>` : ''}`;
     }
     if (kind === 'upg') {
       const u = UPG_BY_ID.get(id);
       if (!u) return '';
       const cost = g.upgCost(u);
-      const forSkill = u.needs ? `${ABILITY_BY_ID.get(u.needs)!.name} upgrade` : 'upgrade';
+      const forSkill = u.needs ? t('ui.tip.upg.skill', { skill: ABILITY_BY_ID.get(u.needs)!.name }) : t('ui.tip.upg.kind');
       return `<div class="tt-h">${icon(u.icon, 32, false)}<b>${esc(u.name)}</b><span class="tt-own">${forSkill}</span></div>
         <div class="tt-cost">${gold(cost, g.s.gold.gte(cost) ? 'ok' : 'no')}</div>
-        ${ABILITY_BY_UPGRADE.has(u.id) ? `<p class="tt-gain">Unlocks ${esc(ABILITY_BY_UPGRADE.get(u.id)!.name)}</p>` : ''}
+        ${ABILITY_BY_UPGRADE.has(u.id) ? `<p class="tt-gain">${t('ui.tip.upg.unlocks', { skill: esc(ABILITY_BY_UPGRADE.get(u.id)!.name) })}</p>` : ''}
         <p class="tt-d">${esc(u.desc)}</p>${this.upgPreview(u)}${u.flavor ? `<p class="tt-flavor">${esc(u.flavor)}</p>` : ''}`;
     }
     if (kind === 'ab') {
       const a = ABILITY_BY_ID.get(id as AbilityId)!;
       const comp = COMPS[a.comp];
       const cd = g.abilityCooldown(a.id);
-      const key = this.touch || padFamily() ? '' : ` (or press ${abilityKey(a.id)})`;
       const fever = a.id === 'rampage' ? g.s.buffs.find((b) => b.id === 'fever') : undefined;
       const next = fever ? g.rampageNext() : null;
       const status = !DEMO && g.away(a.comp)
-        ? `The ${comp.name} is on an expedition.`
+        ? t('ui.tip.ab.away', { name: comp.name })
         : !g.abilityUnlocked(a.id)
-        ? `${this.unlockedBy(a.id)}.`
+        ? this.unlockedBy(a.id, true)
         : a.kind === 'passive' ? ''
-          : fever ? (next ? `×${fmt(g.feverMult())}. Keep attacking for ×${fmt(next.mult)}.` : `×${fmt(g.feverMult())}. Full power.`)
-            : a.kind === 'charge' && g.s.fervor < 1 ? `${Math.floor(g.s.fervor * 100)}% charged.`
-              : cd > 0 ? `Ready again in ${duration(cd)}.` : padFamily() ? `Ready. Press ${this.abilityButtons(a.id)} to use it.` : `Ready. Click to use it${key}.`;
-      if (!g.s.abilitiesFound.includes(a.id)) return `<div class="tt-h"><b>???</b><span class="tt-own">locked</span></div><p class="tt-f">${this.unlockedBy(a.id)}.</p>`;
-      const timing = a.kind === 'button' ? `<ul class="tt-l"><li>Lasts ${+g.abilityDuration(a.id).toFixed(1)}s · cooldown ${duration(a.cooldown ?? 0)}</li></ul>` : '';
-      return `<div class="tt-h"><b>${esc(a.name)}</b><span class="tt-own">${a.kind === 'passive' ? 'always on' : padFamily() ? this.abilityButtons(a.id) : this.touch ? 'ability' : `key ${abilityKey(a.id)}`}</span></div>
+          : fever ? (next ? t('ui.tip.ab.rampageNext', { mult: fmt(g.feverMult()), next: fmt(next.mult) }) : t('ui.tip.ab.rampageFull', { mult: fmt(g.feverMult()) }))
+            : a.kind === 'charge' && g.s.fervor < 1 ? t('ui.tip.ab.charged', { percent: Math.floor(g.s.fervor * 100) })
+              : cd > 0 ? t('ui.tip.ab.cooling', { time: duration(cd) }) : this.byInput('ui.tip.ab.readyPad', 'ui.tip.ab.readyTouch', 'ui.tip.ab.readyClick', { button: this.abilityButtons(a.id), key: abilityKey(a.id) });
+      if (!g.s.abilitiesFound.includes(a.id)) return `<div class="tt-h"><b>???</b><span class="tt-own">${t('ui.tip.locked')}</span></div><p class="tt-f">${this.unlockedBy(a.id, true)}</p>`;
+      const timing = a.kind === 'button' ? `<ul class="tt-l"><li>${t('ui.tip.ab.timing', { seconds: decimal(g.abilityDuration(a.id), 1), cooldown: duration(a.cooldown ?? 0) })}</li></ul>` : '';
+      return `<div class="tt-h"><b>${esc(a.name)}</b><span class="tt-own">${a.kind === 'passive' ? t('ui.tip.ab.alwaysOn') : padFamily() ? this.abilityButtons(a.id) : this.touch ? t('ui.tip.ab.ability') : t('ui.tip.ab.key', { key: abilityKey(a.id) })}</span></div>
         <p class="tt-d">${esc(g.abilityText(a.id))}</p>${timing}${status ? `<p class="tt-f">${status}</p>` : ''}`;
     }
     if (kind === 'tro') {
-      const t = TROPHIES.find((x) => x.id === id)!;
-      return `<div class="tt-h">${icon(t.icon, 32, false)}<b>${esc(t.name)}</b><span class="tt-own">${g.hasTrophy(id) ? 'unlocked' : 'locked'}</span></div><p class="tt-d">${esc(t.desc)}</p>`;
+      const trophy = TROPHIES.find((x) => x.id === id)!;
+      return `<div class="tt-h">${icon(trophy.icon, 32, false)}<b>${esc(trophy.name)}</b><span class="tt-own">${g.hasTrophy(id) ? t('ui.tip.unlocked') : t('ui.tip.locked')}</span></div><p class="tt-d">${esc(trophy.desc)}</p>`;
     }
     if (kind === 'card') {
       const c = CARD_BY_ID.get(id)!;
@@ -2475,46 +2481,45 @@ export class Ui {
       const lap = inPanel ? view : c.laps.includes(onLap) ? onLap : c.laps[0];
       const goldView = inPanel && this.cardGold;
       const places = c.where[lap].filter((w) => w.floor <= g.s.bestFloor);
-      const lines = places.map((w) => `<li>${esc(w.zone)} · ${w.boss ? `floor ${fmt(w.from)} boss` : `floors ${w.from}–${w.to}`}</li>`).join('');
+      const lines = places.map((w) => `<li>${esc(w.zone)} · ${w.boss ? t('ui.tip.card.bossFloor', { floor: fmt(w.from) }) : t('ui.tip.card.floors', { from: w.from, to: w.to })}</li>`).join('');
       const common = places.flatMap((w) => w.common);
-      const commonLine = common.length ? `<p class="tt-d">Most common on floor${common.length > 1 ? 's' : ''} ${common.length > 1 ? `${common.slice(0, -1).join(', ')} and ${common.at(-1)}` : common[0]}</p>` : '';
+      const commonLine = common.length ? `<p class="tt-d">${t('ui.tip.card.common', { count: common.length, floors: list(common.map((floor) => int(floor))) })}</p>` : '';
       // Until you've killed one, only where to find it: not its name.
       if (!n && !g.cardMet(id)) return `<div class="tt-h"><b>???</b></div><ul class="tt-l">${lines}</ul>`;
-      const what = { monster: 'monster card', mid: 'boss card', boss: 'boss card', goblin: 'goblin card' }[c.kind];
+      const what = t(CARD_KIND[c.kind]);
       const own = g.s.cards[id];
       const here = inPanel ? ((goldView ? own?.gold : own?.n)?.[view] ?? 0) : n;
       const gilt = inPanel ? goldView : gilded;
-      const head = `<div class="tt-h"><b style="color:${gilt && here ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${goldView ? 'Gold ' : ''}${esc(cardName(c.name, inPanel ? view : 0))} Card</b><span class="tt-own">${here ? `×${here}` : what}</span></div>`;
-      const unit = c.kind === 'goblin' ? 'catch' : 'kill';
+      const head = `<div class="tt-h"><b style="color:${gilt && here ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${t(goldView ? 'ui.tip.card.goldName' : 'ui.card.name', { name: esc(cardName(c.name, inPanel ? view : 0)) })}</b><span class="tt-own">${here ? `×${here}` : what}</span></div>`;
       // When the copy you're looking at was first found: the kill it dropped on, or where it came from.
-      const found = (at?: number, via?: string) => (at ? `Found on ${unit} #${fmt(at)}` : via ? this.viaLine(via) : '');
+      const found = (at?: number, via?: string) => (at ? t(c.kind === 'goblin' ? 'ui.card.foundCatch' : 'ui.card.foundKill', { n: fmt(at) }) : via ? this.viaLine(via) : '');
       const first = goldView ? found(own?.goldAt, own?.goldVia) : here && (!inPanel || view === 0) ? found(own?.at, own?.via) : '';
       const caught = id === 'rainbow-goblin' ? g.s.rainbows : g.s.raids - g.s.rainbows;
-      const tally = c.kind === 'goblin' ? `Caught ${fmt(caught)}`
-        : goldView ? `Champions slain ${fmt(g.champsSlainOn(id, view))}`
-          : `Slain ${fmt(inPanel ? g.slainOn(id, view) : g.s.slain[id] ?? 0)}`;
-      return `${head}<ul class="tt-l">${lines}</ul>${commonLine}${goldView ? '<p class="tt-d">Drops from champions</p>' : ''}${first ? `<p class="tt-got">${first}</p>` : ''}<p class="tt-f">${tally}</p>`;
+      const tally = c.kind === 'goblin' ? t('ui.tip.card.caught', { n: fmt(caught) })
+        : goldView ? t('ui.tip.card.champsSlain', { n: fmt(g.champsSlainOn(id, view)) })
+          : t('ui.tip.card.slain', { n: fmt(inPanel ? g.slainOn(id, view) : g.s.slain[id] ?? 0) });
+      return `${head}<ul class="tt-l">${lines}</ul>${commonLine}${goldView ? `<p class="tt-d">${t('ui.tip.card.fromChampions')}</p>` : ''}${first ? `<p class="tt-got">${first}</p>` : ''}<p class="tt-f">${tally}</p>`;
     }
     if (kind === 'note') return `<p class="tt-d">${esc(key.slice(5))}</p>`;
     if (!DEMO) {
       if (kind === 'bound') {
         const b = BOUND.find((x) => x.id === id)!;
         const lv = g.boundLv(b.id);
-        return `<div class="tt-h">${bossFig(b, 30, 36)}<b>${esc(boundName(b))}</b><span class="tt-own">${lv ? `level ${lv}` : 'Bound'}</span></div>${boundDetail(b, lv)}`;
+        return `<div class="tt-h">${bossFig(b, 30, 36)}<b>${esc(boundName(b))}</b><span class="tt-own">${lv ? t('ui.tip.level', { level: lv }) : t('ui.tip.bound')}</span></div>${boundDetail(b, lv)}`;
       }
       if (kind === 'skill') {
         const a = ABILITY_BY_ID.get(id as AbilityId)!;
         const comp = COMPS[a.comp];
         const lasts = a.id === 'rampage' ? g.rampageDuration() : g.abilityDuration(a.id);
-        const timing = a.kind === 'button' ? `Lasts ${duration(lasts)} · every ${duration(a.cooldown ?? 0)}` : a.kind === 'charge' ? `Lasts ${duration(lasts)}` : 'Always on';
-        return `<div class="tt-h">${skillIcon(a.id, 30)}<b>${esc(a.name)}</b><span class="tt-own">skill</span></div>
+        const timing = a.kind === 'button' ? t('ui.tip.skill.timing', { time: duration(lasts), cooldown: duration(a.cooldown ?? 0) }) : a.kind === 'charge' ? t('ui.tip.skill.lasts', { time: duration(lasts) }) : t('ui.alwaysOn');
+        return `<div class="tt-h">${skillIcon(a.id, 30)}<b>${esc(a.name)}</b><span class="tt-own">${t('ui.tip.skill.kind')}</span></div>
           <p class="tt-d">${esc(a.desc)}</p>
-          <p class="tt-f">${esc(comp.name)} · level ${traitLevels(a.comp)[a.trait]}<br>${timing}</p>`;
+          <p class="tt-f">${esc(comp.name)} · ${t('ui.tip.level', { level: traitLevels(a.comp)[a.trait] })}<br>${timing}</p>`;
       }
       if (kind === 'idle') {
         const d = LEGEND_BY_ID.get(id as LegendId)!;
         const lv = g.legendLv(d.id);
-        return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">Spirit · level ${lv}</span></div><p class="tt-d">${esc(d.what)}: ${esc(d.value(lv))}</p>`;
+        return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${t('ui.tip.spirit.level', { level: lv })}</span></div><p class="tt-d">${t('ui.tip.idle.value', { what: esc(d.what), value: esc(d.value(lv)) })}</p>`;
       }
       if (kind === 'spirit') {
         const d = LEGEND_BY_ID.get(id as LegendId)!;
@@ -2528,70 +2533,70 @@ export class Ui {
           const share = legendShare(shown);
           const v = d.id === 'wither' ? `−${Math.round(Math.min(0.9, 0.5 * share * boost) * 100)}%`
             : d.id === 'soulcaller' ? `${Math.round((0.25 + 0.75 * Math.min(1, share * boost)) * 100)}%`
-            : d.id === 'hourglass' ? `+${+(30 * share * boost).toFixed(1)}s`
+            : d.id === 'hourglass' ? `+${t('ui.seconds', { seconds: decimal(30 * share * boost, 1) })}`
             : d.id === 'lure' ? `+${Math.round(200 * share * boost)}%`
-            : `−${Math.min(10 + L, shown)} kills, up to −${10 + L}`;
+            : t('ui.tip.spirit.kills', { kills: Math.min(10 + L, shown), max: 10 + L });
           return `<tr${L === blv ? ' class="on"' : ''}><td>${esc(boundName(b))} ${L}</td><td>${v}</td></tr>`;
         }).join('');
-        return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? `Spirit · level ${lv}` : 'Spirit · not summoned'}</span></div>
-          <p class="od-what">${esc(d.what)} at level ${shown}</p>
+        return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? t('ui.tip.spirit.level', { level: lv }) : t('ui.tip.spirit.notSummoned')}</span></div>
+          <p class="od-what">${t('ui.tip.spirit.atLevel', { what: esc(d.what), level: shown })}</p>
           <table class="od-lv sp-lv">${rows}</table>`;
       }
       if (kind === 'legend') {
         const d = LEGEND_BY_ID.get(id as LegendId)!;
         const lv = g.legendLv(d.id);
-        return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? `level ${lv}` : KIND_NAME[d.kind]}</span></div>${legendDetail(d, lv)}`;
+        return `<div class="tt-h">${charFit(d.sprite, 30)}<b>${esc(d.name)}</b><span class="tt-own">${lv ? t('ui.tip.level', { level: lv }) : t(KIND_NAME[d.kind])}</span></div>${legendDetail(d, lv)}`;
       }
       if (kind === 'mark') {
         const i = Number(id);
         const n = g.s.marks[i];
-        return `<div class="tt-h"><b>${n} Heartmark${n === 1 ? '' : 's'}</b></div><p class="tt-d">The ${esc(COMPS[i].name)} deals +${Math.round(n * g.markPower() * 100)}% damage.</p>`;
+        return `<div class="tt-h"><b>${t('ui.tip.mark.count', { count: n })}</b></div><p class="tt-d">${t('ui.tip.mark.desc', { name: esc(COMPS[i].name), percent: Math.round(n * g.markPower() * 100) })}</p>`;
       }
     }
     if (kind === 'floor') {
       const mods = g.bossFloor() ? g.bossMods() : [];
       const champ = g.bossFloor() && g.s.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.boss && m.champ) ? g.champSouls(g.s.floor) : 0;
-      const souls = champ ? `<li><em class="mod soul-chip" style="--mc:var(--soul)">${G.soul(1)} ${champ} soul${champ === 1 ? '' : 's'}</em> Champion boss</li>` : '';
-      if (souls) return `<div class="tt-h"><b>Floor ${fmt(g.s.floor)} boss</b></div><ul class="tt-l">${souls}${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
-      if (!mods.length) return `<div class="tt-h"><b>Floor ${fmt(g.s.floor)}</b><span class="tt-own">${esc(zoneName(g.s.floor))}</span></div><p class="tt-d">${g.bossFloor() ? `Beat the boss before the clock runs out.` : `Kill ${g.killsNeeded()} monsters to clear the floor.`}</p>${g.s.floor < 30 ? '<p class="tt-f">From floor 30, bosses start showing up with modifiers.</p>' : ''}<p class="tt-f">Click the floor number to jump to a floor.</p>`;
-      return `<div class="tt-h"><b>Floor ${fmt(g.s.floor)} boss</b></div><ul class="tt-l">${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
+      const souls = champ ? `<li><em class="mod soul-chip" style="--mc:var(--soul)">${G.soul(1)} ${t('ui.souls', { count: champ })}</em> ${t('ui.tip.floor.champBoss')}</li>` : '';
+      if (souls) return `<div class="tt-h"><b>${t('ui.tip.floor.boss', { floor: fmt(g.s.floor) })}</b></div><ul class="tt-l">${souls}${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
+      if (!mods.length) return `<div class="tt-h"><b>${t('ui.floor', { floor: fmt(g.s.floor) })}</b><span class="tt-own">${esc(zoneName(g.s.floor))}</span></div><p class="tt-d">${g.bossFloor() ? t('ui.tip.floor.beatBoss') : t('ui.tip.floor.kill', { count: g.killsNeeded() })}</p>${g.s.floor < 30 ? `<p class="tt-f">${t('ui.tip.floor.mods')}</p>` : ''}<p class="tt-f">${this.byInput('ui.tip.floor.jumpPad', 'ui.tip.floor.jumpTouch', 'ui.tip.floor.jumpClick', { button: padGlyph('a', 18) })}</p>`;
+      return `<div class="tt-h"><b>${t('ui.tip.floor.boss', { floor: fmt(g.s.floor) })}</b></div><ul class="tt-l">${mods.map((m) => `<li>${modChips([m])} ${esc(MOD_BY_ID.get(m)!.desc)}</li>`).join('')}</ul>`;
     }
     if (kind === 'cur') {
       const c = CURSORS.find((x) => x.id === id)!;
       const tro = c.trophy ? TROPHIES.find((x) => x.id === c.trophy) : undefined;
-      const how = tro ? `${this.cursorOpen(c.id) ? 'Unlocked by' : 'Unlock with'} the trophy <b>${esc(tro.name)}</b>: ${esc(tro.desc)}` : 'Always available.';
-      return `<div class="tt-h"><b>${esc(c.name)}</b><span class="tt-own">${this.cursorOpen(c.id) ? (this.game.s.settings.cursor === c.id ? 'equipped' : 'cursor') : 'locked'}</span></div><p class="tt-d">${how}</p>${this.game.s.settings.cursor === c.id ? '<p class="tt-f">Tap again to go back to your best bought blade.</p>' : ''}`;
+      const how = tro ? t(this.cursorOpen(c.id) ? 'ui.tip.cur.unlockedBy' : 'ui.tip.cur.unlockWith', { name: esc(tro.name), desc: esc(tro.desc) }) : t('ui.tip.cur.always');
+      return `<div class="tt-h"><b>${esc(c.name)}</b><span class="tt-own">${this.cursorOpen(c.id) ? (this.game.s.settings.cursor === c.id ? t('ui.tip.cur.equipped') : t('ui.tip.cur.kind')) : t('ui.tip.locked')}</span></div><p class="tt-d">${how}</p>${this.game.s.settings.cursor === c.id ? `<p class="tt-f">${t('ui.tip.cur.takeOff')}</p>` : ''}`;
     }
     if (kind === 'hero') {
       const i = Number(id);
       const now = g.heroIndex() === i;
       return now
-        ? `<div class="tt-h"><b>The ${esc(COMPS[i].name)} is your hero</b></div><p class="tt-d">${padFamily() ? `Press ${padGlyph('r3', 18)} again` : `Click the ${G.star()} again`} to have no hero.</p>`
-        : `<div class="tt-h"><b>Make the ${esc(COMPS[i].name)} your hero</b></div>`;
+        ? `<div class="tt-h"><b>${t('ui.tip.hero.is', { name: esc(COMPS[i].name) })}</b></div><p class="tt-d">${this.byInput('ui.tip.hero.offPad', 'ui.tip.hero.offTouch', 'ui.tip.hero.offClick', { button: padGlyph('r3', 18), star: G.star() })}</p>`
+        : `<div class="tt-h"><b>${t('ui.tip.hero.make', { name: esc(COMPS[i].name) })}</b></div>`;
     }
     if (kind === 'fm') {
       const f = Number(id);
       const reached = f <= g.s.maxFloor;
-      const what = f % 10 === 0 ? 'Zone boss' : f % 5 === 0 ? 'Boss' : zoneName(f).replace(/^The /, '');
+      const what = f % 10 === 0 ? t('ui.tip.fm.zoneBoss') : f % 5 === 0 ? t('ui.floor.boss') : zoneName(f).replace(/^The /, '');
       const face = f % 5 === 0 ? bossFor(f) : featuredFor(f);
-      const where = f === g.s.floor ? 'You are here' : reached ? 'Click to go there' : 'Not reached yet';
-      return `<div class="tt-h">${reached ? floorArt(f, 30) : ''}<b>Floor ${fmt(f)}</b><span class="tt-own">${what}</span></div><p class="tt-d">${reached ? esc(face.name) : '???'}</p><p class="tt-f">${where}</p>`;
+      const where = f === g.s.floor ? t('ui.tip.fm.here') : reached ? this.byInput('ui.tip.fm.goPad', 'ui.tip.fm.goTouch', 'ui.tip.fm.goClick', { button: padGlyph('a', 18) }) : t('ui.tip.fm.notReached');
+      return `<div class="tt-h">${reached ? floorArt(f, 30) : ''}<b>${t('ui.floor', { floor: fmt(f) })}</b><span class="tt-own">${what}</span></div><p class="tt-d">${reached ? esc(face.name) : '???'}</p><p class="tt-f">${where}</p>`;
     }
-    if (kind === 'auto') return `<div class="tt-h"><b>Auto-advance</b></div><p class="tt-d">${g.s.auto ? 'On: you move to the next floor as soon as one is cleared.' : 'Off: you stay on this floor and farm it.'}</p>`;
+    if (kind === 'auto') return `<div class="tt-h"><b>${t('ui.tip.auto')}</b></div><p class="tt-d">${g.s.auto ? t('ui.tip.auto.on') : t('ui.tip.auto.off')}</p>`;
     if (kind === 'dock') {
       // (A tip that only says the button's name is for small screens, where the dock shows icons without labels.)
       const named = document.body.classList.contains('compact');
       const text: Record<string, string> = {
-        trophies: `Trophies ${g.s.trophies.length}/${shownTrophies(g).length}. Cards ${g.cardVersions()}/${g.cardVersionsTotal()}.`,
-        abyss: DEMO ? `Ascend at floor ${fmt(g.ascendFloor())}.`
-          : g.canDescend() ? `Ascend now for ${fmt(g.pendingSouls())} souls: ${soulPct(g.pendingSouls())} damage.` : g.descendOpen() ? 'Level companions and beat champion bosses for souls.' : `Ascend at floor ${fmt(g.ascendFloor())}.`,
+        trophies: t('ui.tip.dock.trophies', { trophies: g.s.trophies.length, trophiesTotal: shownTrophies(g).length, cards: g.cardVersions(), cardsTotal: g.cardVersionsTotal() }),
+        abyss: DEMO ? t('ui.tip.dock.ascendAt', { floor: fmt(g.ascendFloor()) })
+          : g.canDescend() ? t('ui.tip.dock.ascendNow', { count: g.pendingSouls(), souls: fmt(g.pendingSouls()), percent: soulPct(g.pendingSouls()) }) : g.descendOpen() ? t('ui.tip.dock.earnSouls') : t('ui.tip.dock.ascendAt', { floor: fmt(g.ascendFloor()) }),
         ...(DEMO ? {} : {
-          heart: g.canAwaken() ? `Awaken for ${fmt(g.pendingBound())} bound souls` : `Awaken at floor ${fmt(TUNE.awakenFloor)}`,
-          keep: g.s.inKeep ? `Back to floor ${fmt(g.s.floor)}` : named ? 'The Keep' : '',
+          heart: g.canAwaken() ? t('ui.tip.dock.awakenFor', { count: g.pendingBound(), bound: fmt(g.pendingBound()) }) : t('ui.tip.dock.awakenAt', { floor: fmt(TUNE.awakenFloor) }),
+          keep: g.s.inKeep ? t('ui.tip.dock.backTo', { floor: fmt(g.s.floor) }) : named ? t('ui.keep') : '',
         }),
-        stats: named ? 'Stats' : '',
-        settings: named ? 'Options' : '',
-        mute: g.s.settings.muted ? 'Unmute' : 'Mute',
+        stats: named ? t('ui.dock.stats') : '',
+        settings: named ? t('ui.dock.options') : '',
+        mute: g.s.settings.muted ? t('ui.tip.dock.unmute') : t('ui.tip.dock.mute'),
       };
       return text[id] ? `<p class="tt-d">${text[id]}</p>` : '';
     }
@@ -2604,7 +2609,7 @@ export class Ui {
     let gain = new Decimal(0);
     if (e.t === 'global') gain = g.baseDps().times(e.pct);
     if (gain.lte(0)) return '';
-    return `<p class="tt-gain">≈ +${fmt(gain)} damage/sec</p>`;
+    return `<p class="tt-gain">${t('ui.tip.upg.gain', { dps: fmt(gain) })}</p>`;
   }
 
   // ---------- news ----------
@@ -2649,7 +2654,7 @@ export class Ui {
   /** The souls you have, and the damage they give. */
   private soulsSub() {
     const free = this.game.soulsFree();
-    return `${soulPrice(free, 2)} · ${soulPct(free)} damage`;
+    return `${soulPrice(free, 2)} · ${t('ui.damageBonus', { percent: soulPct(free) })}`;
   }
 
   /** Tab keeps to the open window, wrapping at either end; from outside it, it lands on the first thing past the ✕. */
@@ -2739,23 +2744,23 @@ export class Ui {
     if (!name) return;
     const g = this.game;
     // The title (and any tabs under it) stays put while the window scrolls.
-    const head = (title: string, sub = '', tabs = '') => `<div class="m-top"><header class="m-head"><h2>${title}</h2>${sub ? `<span>${sub}</span>` : ''}<button class="btn icon" data-act="close" aria-label="Close">${G.close()}</button></header>${tabs}</div>`;
+    const head = (title: string, sub = '', tabs = '') => `<div class="m-top"><header class="m-head"><h2>${title}</h2>${sub ? `<span>${sub}</span>` : ''}<button class="btn icon" data-act="close" aria-label="${t('ui.close')}">${G.close()}</button></header>${tabs}</div>`;
     let html = '';
     if (name === 'trophies') {
       const n = g.s.trophies.length;
       const shown = shownTrophies(g);
-      html = head('Trophies', `${n} / ${shown.length} · +${n}% damage`, this.troTabs('trophies')) + `<div class="tro-grid">${shown.map((t) => `<span class="tro ${g.hasTrophy(t.id) ? 'got' : ''}" data-tip="tro:${t.id}">${icon(t.icon, 28)}</span>`).join('')}</div>`;
+      html = head(t('ui.trophies.title'), `${n} / ${shown.length} · ${t('ui.trophies.bonus', { percent: n })}`, this.troTabs('trophies')) + `<div class="tro-grid">${shown.map((t) => `<span class="tro ${g.hasTrophy(t.id) ? 'got' : ''}" data-tip="tro:${t.id}">${icon(t.icon, 28)}</span>`).join('')}</div>`;
     } else if (name === 'cards') {
-      html = head('Cards', '', this.troTabs('cards')) + this.cardsHtml();
+      html = head(t('ui.cards.title'), '', this.troTabs('cards')) + this.cardsHtml();
 
     } else if (DEMO && name === 'abyss') {
-      html = head('Ascend') + this.ascendHtml();
+      html = head(t('ui.ascend.title')) + this.ascendHtml();
     } else if (!DEMO && name === 'spirits') {
       // (From the Keep's summoning circle: the Spirits alone. Ascend, from the dock, has them along with the way up.)
-      html = head('Spirits', this.soulsSub()) + this.legendsHtml();
+      html = head(t('ui.spirits.title'), this.soulsSub()) + this.legendsHtml();
     } else if (!DEMO && (name === 'abyss' || name === 'marks')) {
       const sub = g.s.descents ? this.soulsSub() : '';
-      html = head('Ascend', sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
+      html = head(t('ui.ascend.title'), sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
     } else if (!DEMO && name === 'bound' && this.boundFocus) {
       const b = BOUND.find((x) => x.id === this.boundFocus)!;
       html = head(esc(boundName(b)), boundPrice(g.boundFree(), 2)) + `<div class="lcards one">${this.boundCard(b)}</div>
@@ -2766,43 +2771,43 @@ export class Ui {
         <div class="legend-panel">${legendDetail(d, g.legendLv(d.id))}</div>`;
     } else if (!DEMO && name === 'trips') {
       const out = g.s.expeditions.length;
-      html = head('Expeditions', out ? `${out} out` : '') + this.tripsHtml();
+      html = head(t('ui.trips.title'), out ? t('ui.trips.out', { count: out }) : '') + this.tripsHtml();
     } else if (!DEMO && name === 'heart') {
-      html = head('The Heart', g.s.awakens ? boundPrice(g.boundFree(), 2) : '') + this.heartHtml();
+      html = head(t('ui.heart.title'), g.s.awakens ? boundPrice(g.boundFree(), 2) : '') + this.heartHtml();
     } else if (name === 'stats' || name === 'party' || name === 'records' || name === 'ascents') {
-      html = head('Stats', '', this.statTabs(name)) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
+      html = head(t('ui.stats.title'), '', this.statTabs(name)) + (name === 'stats' ? this.bonusHtml() : name === 'party' ? this.partyHtml() : name === 'ascents' ? this.ascentsHtml() : this.recordsHtml());
     } else if (!DEMO && (name === 'dan' || name === 'victor')) {
       const who = name as Trader;
-      html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${who === 'dan' ? 'Dan' : 'Victor'}`, who === 'dan' ? `Trade ${DAN_GIVES} cards for a random card` : `Trade ${VICTOR_GIVES} cards for 1 gold card`) + this.tradeHtml(who);
+      html = head(`${charFit(who === 'dan' ? 'ef_elf_m' : 'victor', 26)} ${t(TRADER_NAME[who])}`, who === 'dan' ? t('ui.trade.danOffer', { count: DAN_GIVES }) : t('ui.trade.victorOffer', { count: VICTOR_GIVES })) + this.tradeHtml(who);
     } else if (name === 'keys') {
       const cap = (...keys: string[]) => keys.map((k) => `<kbd>${k}</kbd>`).join('');
       const pad = (...keys: string[]) => keys.map((k) => padGlyph(k, 26)).join('');
       const rows: [string, string][] = padFamily() ? [
-        [pad('ls'), 'Move your hero'],
-        [pad('rt'), 'Attack'],
-        [pad('up', 'down'), 'Pick a companion'],
-        [pad('a'), 'Level them'],
-        [pad('x'), 'Buy their next upgrade'],
-        [pad('r3'), 'Make them your hero'],
-        [pad('left', 'right'), 'Buy amount'],
+        [pad('ls'), t('ui.keys.moveHero')],
+        [pad('rt'), t('ui.keys.attack')],
+        [pad('up', 'down'), t('ui.keys.pick')],
+        [pad('a'), t('ui.keys.level')],
+        [pad('x'), t('ui.keys.upgrade')],
+        [pad('r3'), t('ui.keys.hero')],
+        [pad('left', 'right'), t('ui.keys.amount')],
         ...ABILITIES.filter((a) => ABILITY_PAD[a.id]).map((a): [string, string] => [pad(...ABILITY_PAD[a.id]), esc(a.name)]),
-        [pad('lt', 'left', 'right'), 'Floor down, floor up'],
-        [pad('lt', 'down'), 'Auto'],
-        [pad('menu'), 'Options'],
-        [pad('view'), 'Browse the screen'],
-        [pad('b'), 'Back'],
+        [pad('lt', 'left', 'right'), t('ui.keys.floors')],
+        [pad('lt', 'down'), t('ui.keys.auto')],
+        [pad('menu'), t('ui.keys.options')],
+        [pad('view'), t('ui.keys.browse')],
+        [pad('b'), t('ui.keys.back')],
       ] : [
-        [cap('W', 'A', 'S', 'D'), 'Move'],
-        [`${MOUSE_GLYPH}${cap('Space')}`, 'Attack'],
-        [`${cap('1')}–${cap(String(KEYED.length))}`, 'Abilities'],
-        ...(DEMO || !(g.legendsOpen() || g.s.inKeep) ? [] : [[cap('E'), 'Interact'] as [string, string]]),
-        [cap('H'), 'Hide interface'],
-        [cap('Esc'), 'Close'],
-        [cap('?'), 'Shortcuts'],
+        [cap('W', 'A', 'S', 'D'), t('ui.keys.move')],
+        [`${MOUSE_GLYPH}${cap('Space')}`, t('ui.keys.attack')],
+        [`${cap('1')}–${cap(String(KEYED.length))}`, t('ui.keys.abilities')],
+        ...(DEMO || !(g.legendsOpen() || g.s.inKeep) ? [] : [[cap('E'), t('ui.keys.interact')] as [string, string]]),
+        [cap('H'), t('ui.keys.hide')],
+        [cap('Esc'), t('ui.keys.close')],
+        [cap('?'), t('ui.keys.title')],
       ];
-      html = head('Shortcuts') + `<dl class="keys">${rows.map(([keys, what]) => `<dt>${keys}</dt><dd>${what}</dd>`).join('')}</dl>`;
+      html = head(t('ui.keys.title')) + `<dl class="keys">${rows.map(([keys, what]) => `<dt>${keys}</dt><dd>${what}</dd>`).join('')}</dl>`;
     } else if (name === 'settings') {
-      html = head('Options', '', this.settingsTabs()) + this.settingsHtml();
+      html = head(t('ui.settings.title'), '', this.settingsTabs()) + this.settingsHtml();
     } else if (name === 'language') {
       html = head(t('system.language')) + this.languageHtml();
     }
@@ -2821,15 +2826,15 @@ export class Ui {
   /** The Ascend strip atop the window: what an ascent pays now, and either the floors left to go or the Ascend button. */
   private ascendHtml(): string {
     const g = this.game;
-    const locked = `<div class="as-go locked"><span class="as-floor">Floor ${fmt(g.s.maxFloor)} / ${g.ascendFloor()}</span>
+    const locked = `<div class="as-go locked"><span class="as-floor">${t('ui.ascend.floor', { floor: fmt(g.s.maxFloor), target: g.ascendFloor() })}</span>
         <div class="bar"><i style="width:${Math.min(100, (g.s.maxFloor / g.ascendFloor()) * 100)}%"></i></div></div>`;
     // The demo shows there's a way up, and nothing past it.
     if (DEMO) return `<div class="ascend">${locked}</div>`;
     const pending = g.pendingSouls();
-    const pay = `<div class="as-gain">${G.soul(3.6)}<b>+${fmt(pending)}</b><span>soul${pending === 1 ? '' : 's'} · ${soulPct(pending)} damage</span></div>`;
+    const pay = `<div class="as-gain">${G.soul(3.6)}<b>+${fmt(pending)}</b><span>${t('ui.ascend.pay', { count: pending, percent: soulPct(pending) })}</span></div>`;
     // (The first run shows how far there is to go; later ones, nothing until you can ascend.)
     if (!g.descendOpen()) return g.s.descents ? '' : `<div class="ascend">${locked}</div>`;
-    const go = `<button class="btn primary${g.s.descents ? '' : ' big'}" data-act="descend" ${g.canDescend() ? '' : 'disabled'}>Ascend</button>`;
+    const go = `<button class="btn primary${g.s.descents ? '' : ' big'}" data-act="descend" ${g.canDescend() ? '' : 'disabled'}>${t('ui.ascend.go')}</button>`;
     return `<div class="ascend">${pay}<div class="as-go">${go}</div></div>`;
   }
 
@@ -2847,7 +2852,7 @@ export class Ui {
         const fig = stirring ? charFit(spiritForm(d.sprite), 84, 92) : silhouette(d.sprite, 84, '#0b0710');
         return `<div class="pedestal shade${stirring ? ' stirring' : ''}"><span class="spirit">${WISPS}</span><span class="ped-fig">${fig}</span><span class="ped-stone"></span></div>`;
       }).join('');
-      return `<div class="legend-await"><div class="pedestals">${peds}</div><p>Spirits await after you ascend</p></div>`;
+      return `<div class="legend-await"><div class="pedestals">${peds}</div><p>${t('ui.spirits.await')}</p></div>`;
     }
     const free = g.soulsFree();
     const price = g.summonPrice();
@@ -2859,22 +2864,22 @@ export class Ui {
       return `<button class="pedestal ${on ? 'on' : 'ghost'}" data-pick="${id}"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(on ? d.sprite : spiritForm(d.sprite), 72, 96)}</span><span class="ped-stone"></span><b>${esc(d.name)}</b></button>`;
     }).join('');
     // Along the bottom of the window, once a respec would give something back.
-    const respec = g.respecBack() > 0 ? `<div class="legend-foot"><button class="btn small" data-act="respec">Respec · ${G.soul(1.2)} +${fmt(g.respecBack())} soul${g.respecBack() === 1 ? '' : 's'}</button></div>` : '';
+    const respec = g.respecBack() > 0 ? `<div class="legend-foot"><button class="btn small" data-act="respec">${t('ui.spirits.respec', { count: g.respecBack(), icon: G.soul(1.2), amount: fmt(g.respecBack()) })}</button></div>` : '';
     // Both uses of a soul, side by side: neither is the right one.
-    const why = `<div class="legend-why"><span><small>Keep</small>${G.soul(1.5)} souls for <em>${soulPct(1)} damage</em> each</span><i>or</i><span><small>Spend</small>${G.soul(1.5)} souls on Spirits</span></div>`;
+    const why = `<div class="legend-why"><span><small>${t('ui.spirits.keep')}</small>${t('ui.spirits.keepWhat', { icon: G.soul(1.5), percent: soulPct(1) })}</span><i>${t('ui.spirits.or')}</i><span><small>${t('ui.spirits.spend')}</small>${t('ui.spirits.spendWhat', { icon: G.soul(1.5) })}</span></div>`;
     const summon = pick
       ? `${why}<div class="pedestals">${pedestals}</div>
-        ${LEGENDS.length - g.legendsOwned() > OFFER_SIZE ? `<div class="legend-reroll"><button class="btn soul" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>${G.reroll()} Reroll Spirits · ${g.rerollPrice() ? soulPrice(g.rerollPrice()) : 'Free'}</button></div>` : ''}
+        ${LEGENDS.length - g.legendsOwned() > OFFER_SIZE ? `<div class="legend-reroll"><button class="btn soul" data-act="reroll" ${free >= g.rerollPrice() ? '' : 'disabled'}>${G.reroll()} ${t('ui.spirits.reroll', { price: g.rerollPrice() ? soulPrice(g.rerollPrice()) : t('ui.spirits.free') })}</button></div>` : ''}
         <div class="legend-panel pick">
-          <div class="tt-h"><b>${esc(pick.name)}</b><span class="tt-own">${KIND_NAME[pick.kind]}</span></div>
+          <div class="tt-h"><b>${esc(pick.name)}</b><span class="tt-own">${t(KIND_NAME[pick.kind])}</span></div>
           ${legendDetail(pick, 0)}
-          <div class="set-row"><button class="btn soul" data-act="summon" ${free >= price ? '' : 'disabled'}>Summon · ${soulPrice(price)}</button></div>
+          <div class="set-row"><button class="btn soul" data-act="summon" ${free >= price ? '' : 'disabled'}>${t('ui.spirits.summon', { price: soulPrice(price) })}</button></div>
         </div>`
-      : '<p class="muted">Every Spirit has joined you.</p>';
+      : `<p class="muted">${t('ui.spirits.allJoined')}</p>`;
     const owned = LEGENDS.filter((d) => g.legendLv(d.id) > 0);
     const cards = owned.map((d) => this.legendCard(d)).join('');
     return `${summon}
-      ${owned.length ? `<div class="lc-head"><h3>Your Spirits</h3><small>${owned.length}</small></div><div class="lcards">${cards}</div>` : ''}
+      ${owned.length ? `<div class="lc-head"><h3>${t('ui.spirits.yours')}</h3><small>${owned.length}</small></div><div class="lcards">${cards}</div>` : ''}
       ${respec}`;
   }
 
@@ -2904,11 +2909,11 @@ export class Ui {
     const lv = g.legendLv(d.id);
     const cost = g.legendLevelCost(d.id);
     const next = g.legendMaxed(d.id)
-      ? `<span class="lc-max" data-tip="legend:${d.id}">Max level</span>`
-      : `<span>Next: ${esc(d.value(lv + 1))}</span><span class="lc-up" data-tip="legend:${d.id}" data-legend="${d.id}"><button class="btn soul" ${g.soulsFree() >= cost ? '' : 'disabled'}>Level up · ${soulPrice(cost)}</button></span>`;
+      ? `<span class="lc-max" data-tip="legend:${d.id}">${t('ui.lcard.max')}</span>`
+      : `<span>${t('ui.lcard.next', { value: esc(d.value(lv + 1)) })}</span><span class="lc-up" data-tip="legend:${d.id}" data-legend="${d.id}"><button class="btn soul" ${g.soulsFree() >= cost ? '' : 'disabled'}>${t('ui.lcard.levelUp', { price: soulPrice(cost) })}</button></span>`;
     return `<div class="lcard" data-card="${d.id}">
       <div class="lc-fig"><span class="spirit">${WISPS}</span><span class="ped-fig">${charFit(d.sprite, 88, 96)}</span><span class="ped-stone"></span></div>
-      <div class="lc-nm"><b>${esc(d.name)}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
+      <div class="lc-nm"><b>${esc(d.name)}</b><span class="lc-lv">${t('ui.lcard.level')}<span>${lv}</span></span></div>
       <div class="lc-val">${esc(d.value(lv))}</div>
       <div class="lc-what">${legendWhat(d)}</div>
       <div class="lc-next">${next}</div>
@@ -2961,11 +2966,11 @@ export class Ui {
       if (!n && !g.s.owned[i]) return '';
       const others = total - n > 0;
       return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${n ? `${G.heart(1.5)} ${n}` : ''}</td><td>${n ? `+${Math.round(n * g.markPower() * 100)}%` : ''}</td>
-        <td>${n ? `<button class="btn small" data-mark-away="${i}" ${free >= MARK_REROLL ? '' : 'disabled'}>Send one away · ${G.soul(1.2)} ${MARK_REROLL}</button>` : ''}</td>
-        <td>${others ? `<button class="btn small" data-mark-here="${i}" ${free >= MARK_MOVE ? '' : 'disabled'}>Bring one here · ${G.soul(1.2)} ${MARK_MOVE}</button>` : ''}</td></tr>`;
+        <td>${n ? `<button class="btn small" data-mark-away="${i}" ${free >= MARK_REROLL ? '' : 'disabled'}>${t('ui.marks.away', { icon: G.soul(1.2), cost: MARK_REROLL })}</button>` : ''}</td>
+        <td>${others ? `<button class="btn small" data-mark-here="${i}" ${free >= MARK_MOVE ? '' : 'disabled'}>${t('ui.marks.here', { icon: G.soul(1.2), cost: MARK_MOVE })}</button>` : ''}</td></tr>`;
     }).join('');
-    return `<p class="muted bd-help">The first time you beat each 10th floor past ${100}, a random companion in your party gets a Heartmark: +${Math.round(g.markPower() * 100)}% damage each, until you awaken. Send one to someone at random, or bring one from someone else to the companion you choose.</p>
-      <section class="bd wide bd-marks"><table><thead><tr><th>Companion</th><td>Marks</td><td>Damage</td><td></td><td></td></tr></thead>${rows}</table></section>`;
+    return `<p class="muted bd-help">${t('ui.marks.help', { floor: 100, percent: Math.round(g.markPower() * 100) })}</p>
+      <section class="bd wide bd-marks"><table><thead><tr><th>${t('ui.table.companion')}</th><td>${t('ui.table.marks')}</td><td>${t('ui.marks.damage')}</td><td></td><td></td></tr></thead>${rows}</table></section>`;
   }
 
   /** The Legend picked on the summon pedestals. */
@@ -2973,7 +2978,7 @@ export class Ui {
 
   private troTabs(on: 'trophies' | 'cards') {
     const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
-    return `<nav class="tabs">${tab('trophies', `${G.trophy()} Trophies`)}${tab('cards', `Cards${on !== 'cards' && this.newCardsShown.size ? `<em class="badge new">+${this.newCardsShown.size}</em>` : ''}`)}</nav>`;
+    return `<nav class="tabs">${tab('trophies', `${G.trophy()} ${t('ui.trophies.title')}`)}${tab('cards', `${t('ui.cards.title')}${on !== 'cards' && this.newCardsShown.size ? `<em class="badge new">+${this.newCardsShown.size}</em>` : ''}`)}</nav>`;
   }
 
   /** Trading with Dan or Victor: the spares you've put down, the card you got last, and what he just said. */
@@ -3020,7 +3025,7 @@ export class Ui {
   private tradeHtml(who: Trader): string {
     if (DEMO) return '';
     const need = this.tradeNeed(who);
-    const name = who === 'dan' ? 'Dan' : 'Victor';
+    const name = t(TRADER_NAME[who]);
     const { side, got, line } = this.trade;
     const face = (id: string, attrs: string, extra = '', last = false) => {
       const c = CARD_BY_ID.get(id)!;
@@ -3029,36 +3034,35 @@ export class Ui {
     const g = this.game;
     // A put-down card that's your last copy keeps its tag on the table.
     const isLast = (id: string, k: number) => side.slice(0, k + 1).filter((x) => x === id).length === g.plainCards(id);
-    const slots = Array.from({ length: need }, (_, k) => (side[k] ? face(side[k], `data-take="${side[k]}"`, isLast(side[k], k) ? '<i class="tr-last">Last</i>' : '', isLast(side[k], k)) : '<span class="tr-slot"></span>')).join('');
-    const pct = (v: number) => `${Math.round(v * 100)}%`;
+    const slots = Array.from({ length: need }, (_, k) => (side[k] ? face(side[k], `data-take="${side[k]}"`, isLast(side[k], k) ? `<i class="tr-last">${t('ui.trade.last')}</i>` : '', isLast(side[k], k)) : '<span class="tr-slot"></span>')).join('');
     const odds = this.tradeOdds(who);
     const setName = (zone: number) => ZONES[zone].name.replace(/^The /, '');
     const his = got
       ? `<div class="tr-got${this.trade.reveal ? ' reveal' : ''}${got.gold ? ' gold' : ''}" style="--rc:${got.gold ? CARD_FRAME.gold : CARD_FRAME[CARD_BY_ID.get(got.id)!.kind]}">
           ${this.trade.reveal ? '<i class="tr-rays"></i>' : ''}${got.gold ? GOLD_DAZZLE : ''}
           <div class="tr-flip"><div class="tr-fback">${G.heart(3)}</div><div class="tr-ffront">${cardFace(CARD_BY_ID.get(got.id)!, 'got', got.gold, 56, got.lap)}</div></div>
-          ${got.first ? '<em class="tr-new">New</em>' : ''}</div>`
+          ${got.first ? `<em class="tr-new">${t('ui.cards.new')}</em>` : ''}</div>`
       : `<div class="tr-back">${G.heart(3)}</div>`;
     const from = got ? '' : who === 'victor'
-      ? '<p class="tr-from">Any gold card</p>'
-      : odds.split.length ? `<ul class="tr-from">${odds.split.map(({ zone, share }) => `<li><b>${pct(share)}</b> ${esc(setName(zone))}</li>`).join('')}</ul>` : '<p class="tr-from">From the sets you give</p>';
-    const fresh = got || (who === 'dan' && !odds.split.length) ? '' : `<p class="tr-odds">${odds.fresh ? `${pct(odds.fresh)} chance it's new` : 'You have them all'}</p>`;
+      ? `<p class="tr-from">${t('ui.trade.anyGold')}</p>`
+      : odds.split.length ? `<ul class="tr-from">${odds.split.map(({ zone, share }) => `<li><b>${percent(share)}</b> ${esc(setName(zone))}</li>`).join('')}</ul>` : `<p class="tr-from">${t('ui.trade.fromSets')}</p>`;
+    const fresh = got || (who === 'dan' && !odds.split.length) ? '' : `<p class="tr-odds">${odds.fresh ? t('ui.trade.chanceNew', { percent: percent(odds.fresh) }) : t('ui.trade.haveAll')}</p>`;
     const hand = this.tradeHand();
     const full = side.length >= need;
     // Your last copy of a card can go too, marked so it's never given away by accident.
     const cards = hand.length
-      ? hand.map((h) => face(h.c.id, `data-put="${h.c.id}"${full ? ' disabled' : ''}`, h.n === 1 ? '<i class="tr-last">Last</i>' : `<i class="tr-n">×${h.n}</i>`, h.n === 1)).join('')
-      : '<p class="muted">No cards.</p>';
+      ? hand.map((h) => face(h.c.id, `data-put="${h.c.id}"${full ? ' disabled' : ''}`, h.n === 1 ? `<i class="tr-last">${t('ui.trade.last')}</i>` : `<i class="tr-n">×${h.n}</i>`, h.n === 1)).join('')
+      : `<p class="muted">${t('ui.trade.noCards')}</p>`;
     const buttons = got
-      ? '<button class="btn" data-act="tradeAgain">Trade again</button><button class="btn primary" data-act="close">Done</button>'
-      : `<button class="btn" data-act="${side.length ? 'tradeClear' : 'tradeAuto'}">${side.length ? 'Clear' : 'Auto-fill'}</button><button class="btn primary" data-act="tradeGo" ${full ? '' : 'disabled'}>Trade</button>`;
+      ? `<button class="btn" data-act="tradeAgain">${t('ui.trade.again')}</button><button class="btn primary" data-act="close">${t('ui.trade.done')}</button>`
+      : `<button class="btn" data-act="${side.length ? 'tradeClear' : 'tradeAuto'}">${side.length ? t('ui.trade.clear') : t('ui.trade.autoFill')}</button><button class="btn primary" data-act="tradeGo" ${full ? '' : 'disabled'}>${t('ui.trade.go')}</button>`;
     return `<p class="tr-say">${esc(line)}</p>
       <div class="tr-table">
-        <div class="tr-side"><h3>Yours <span class="muted">${side.length} / ${need}</span></h3><div class="tr-slots">${slots}</div></div>
+        <div class="tr-side"><h3>${t('ui.trade.yours')} <span class="muted">${side.length} / ${need}</span></h3><div class="tr-slots">${slots}</div></div>
         <span class="tr-swap">⇄</span>
-        <div class="tr-side his"><h3>${name}'s</h3>${his}${from}${fresh}</div>
+        <div class="tr-side his"><h3>${t('ui.trade.his', { name })}</h3>${his}${from}${fresh}</div>
       </div>
-      <h3>Your cards</h3>
+      <h3>${t('ui.trade.yourCards')}</h3>
       <div class="tr-hand">${cards}</div>
       <div class="set-row tr-foot">${buttons}</div>`;
   }
@@ -3130,7 +3134,7 @@ export class Ui {
     const lap = lapOf(floor);
     const hereLap = Math.min(lap, CORRUPTION.length - 1) === view;
     const hereZone = zoneOf(floor) % ZONES.length;
-    const hereCards = new Set(hereLap ? (isBossFloor(floor) ? [bossFor(floor)] : bandFor(floor)).map((d) => cardId(d.name)) : []);
+    const hereCards = new Set(hereLap ? (isBossFloor(floor) ? [bossFor(floor)] : bandFor(floor)).map((d) => d.id) : []);
     const face = (c: (typeof CARDS)[number]) => {
       const got = owned(c);
       const isNew = got && this.newCardsShown.has(`${c.id}:${view}:${gold ? 1 : 0}`);
@@ -3140,10 +3144,10 @@ export class Ui {
       const cards = all.filter((c) => inView(c));
       if (!cards.length) return '';
       const got = cards.filter((c) => owned(c)).length;
-      const marker = here && hereLap ? ` <em class="here-mark">▸ Floor ${fmt(floor)}</em>` : '';
+      const marker = here && hereLap ? ` <em class="here-mark">▸ ${t('ui.floor', { floor: fmt(floor) })}</em>` : '';
       // A finished set says what it's worth instead of its count.
       const done = zone >= 0 && g.setDone(zone, view, gold);
-      const count = done ? `<span class="set-done">Set +${Math.round((gold ? GOLD_SET_BONUS : SET_BONUS) * 100)}% damage</span>` : `<span class="muted">${got} / ${cards.length}</span>`;
+      const count = done ? `<span class="set-done">${t('ui.cards.setDone', { percent: Math.round((gold ? GOLD_SET_BONUS : SET_BONUS) * 100) })}</span>` : `<span class="muted">${got} / ${cards.length}</span>`;
       return `<h3${here && hereLap ? ' class="here-zone"' : ''}><span>${esc(title)}${marker}</span> ${count}</h3><div class="card-grid">${cards.map(face).join('')}</div>`;
     };
     const tally = (l: number) => {
@@ -3157,52 +3161,52 @@ export class Ui {
       const c = corruptionOf(l);
       const color = `#${(l ? c.tint : 0xc9b8a0).toString(16).padStart(6, '0')}`;
       const here = l === Math.min(lap, CORRUPTION.length - 1);
-      return `<button class="sub${l === view ? ' on' : ''}${here ? ' here' : ''}" data-card-lap="${l}">${here ? '<em class="sub-here"></em>' : ''}<span class="sub-dot" style="--lc:${color}"></span>${l ? c.name : 'Plain'} <i>${tally(l)}</i>${l === view ? '' : newTag(newIn(l, gold))}</button>`;
+      return `<button class="sub${l === view ? ' on' : ''}${here ? ' here' : ''}" data-card-lap="${l}">${here ? '<em class="sub-here"></em>' : ''}<span class="sub-dot" style="--lc:${color}"></span>${l ? c.name : t('ui.cards.plain')} <i>${tally(l)}</i>${l === view ? '' : newTag(newIn(l, gold))}</button>`;
     };
     const bar = `<nav class="subbar">${Array.from({ length: lapsReached + 1 }, (_, l) => lapTab(l)).join('')}
-      <span class="sub-toggle"><button class="sub ${gold ? '' : 'on'}" data-card-gold="0">Normal${gold ? newTag(newIn(view, false)) : ''}</button><button class="sub gold-tab ${gold ? 'on' : ''}" data-card-gold="1">★ Gold${gold ? '' : newTag(newIn(view, true))}</button></span></nav>`;
-    const more = CARDS.some((c) => !seen(c)) ? '<p class="cards-more">More cards wait deeper down.</p>' : '';
+      <span class="sub-toggle"><button class="sub ${gold ? '' : 'on'}" data-card-gold="0">${t('ui.cards.normal')}${gold ? newTag(newIn(view, false)) : ''}</button><button class="sub gold-tab ${gold ? 'on' : ''}" data-card-gold="1">★ ${t('ui.cards.gold')}${gold ? '' : newTag(newIn(view, true))}</button></span></nav>`;
+    const more = CARDS.some((c) => !seen(c)) ? `<p class="cards-more">${t('ui.cards.more')}</p>` : '';
     return bar + ZONES.map((z, i) => section(z.name, CARDS.filter((c) => c.zone === i), i === hereZone, i)).join('')
-      + section('Treasure goblins', CARDS.filter((c) => c.zone < 0)) + more;
+      + section(t('ui.cards.goblins'), CARDS.filter((c) => c.zone < 0)) + more;
   }
 
   /** Options' pages (the cursor's only for a mouse: a controller has none). */
   private settingsTabs() {
-    const tabs: [typeof this.setTab, string][] = [['sound', 'Sound'], ['display', 'Display'], ...(padFamily() ? [] : [['cursor', 'Cursor'] as [typeof this.setTab, string]]), ['game', 'Game'], ['save', 'Save']];
-    if (!tabs.some(([id]) => id === this.setTab)) this.setTab = 'sound';
-    return `<nav class="tabs">${tabs.map(([id, label]) => `<button class="tab ${this.setTab === id ? 'on' : ''}" data-settab="${id}">${label}</button>`).join('')}</nav>`;
+    const tabs = (['sound', 'display', ...(padFamily() ? [] : ['cursor' as const]), 'game', 'save'] as const);
+    if (!tabs.some((id) => id === this.setTab)) this.setTab = 'sound';
+    return `<nav class="tabs">${tabs.map((id) => `<button class="tab ${this.setTab === id ? 'on' : ''}" data-settab="${id}">${t(SETTINGS_TAB[id])}</button>`).join('')}</nav>`;
   }
 
   /** One setting a row: its name, and its value with arrows either side (click the row, or ◀ ▶ on a controller). */
   private settingsHtml(): string {
     const s = this.game.s.settings;
     const pick = (act: string, label: string, value: string, cls = '') => `<button class="opt ${cls}" data-act="${act}"><span>${label}</span><span class="opt-v"><i>◀</i><b>${value}</b><i>▶</i></span></button>`;
-    const onOff = (act: string, on: boolean, label: string) => pick(act, label, on ? 'On' : 'Off', on ? '' : 'off');
+    const onOff = (act: string, on: boolean, label: string) => pick(act, label, on ? t('ui.on') : t('ui.off'), on ? '' : 'off');
     const volume = (key: 'sfxVol' | 'musicVol', label: string) => {
       const v = Math.round(s[key] * 100);
       return `<label class="opt opt-vol" tabindex="0"><span>${label}</span><span class="opt-v"><input type="range" min="0" max="100" step="5" value="${v}" data-set="${key}" tabindex="-1"><b>${v}%</b></span></label>`;
     };
     const go = (label: string, attrs: string, cls = '') => `<button class="opt opt-go ${cls}" ${attrs}><span>${label}</span><span class="opt-v"><i>▶</i></span></button>`;
     let rows = '';
-    if (this.setTab === 'sound') rows = onOff('sound', !s.muted, 'Sound') + onOff('music', s.music, 'Music') + volume('sfxVol', 'Effects volume') + volume('musicVol', 'Music volume');
+    if (this.setTab === 'sound') rows = onOff('sound', !s.muted, t('ui.settings.sound')) + onOff('music', s.music, t('ui.settings.music')) + volume('sfxVol', t('ui.settings.sfxVol')) + volume('musicVol', t('ui.settings.musicVol'));
     else if (this.setTab === 'display') {
-      rows = onOff('particles', s.particles, 'Particles') + onOff('calm', s.calm, 'Reduce flashing') + onOff('shake', s.shake, 'Screen shake')
-        + onOff('numbers', s.numbers, 'Damage numbers') + onOff('blood', s.blood, 'Blood') + onOff('cinematics', s.cinematics, 'Zone intros')
-        + pick('notation', 'Numbers', s.notation === 'short' ? '1.23M' : '1.23e6');
+      rows = onOff('particles', s.particles, t('ui.settings.particles')) + onOff('calm', s.calm, t('ui.settings.calm')) + onOff('shake', s.shake, t('ui.settings.shake'))
+        + onOff('numbers', s.numbers, t('ui.settings.numbers')) + onOff('blood', s.blood, t('ui.settings.blood')) + onOff('cinematics', s.cinematics, t('ui.settings.cinematics'))
+        + pick('notation', t('ui.settings.notation'), s.notation === 'short' ? '1.23M' : '1.23e6');
     } else if (this.setTab === 'cursor') {
-      return `<div class="set"><h3>Cursor <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
+      return `<div class="set"><h3>${t('ui.settings.cursor')} <span class="muted">${CURSORS.filter((c) => this.cursorOpen(c.id)).length} / ${CURSORS.length}</span></h3>
         <div class="cursors">${CURSORS.map((c) => {
           const open = this.cursorOpen(c.id);
           return `<button class="cur ${open ? '' : 'locked'} ${s.cursor === c.id ? 'on' : ''}" data-cursor="${c.id}" data-tip="cur:${c.id}">${spriteFit(c.sprite, 36)}${open ? '' : `<span class="cur-lock">${G.lock()}</span>`}</button>`;
         }).join('')}</div></div>`;
     } else if (this.setTab === 'game') {
       rows = `<button class="opt opt-go" data-open="language"><span>${t('system.language')}</span><span class="opt-v"><b>${nativeName(localeCode() === PSEUDO ? 'en' : localeCode())}</b><i>▶</i></span></button>`
-        + go('Shortcuts', 'data-open="keys"') + (DEMO ? '' : `<a class="opt opt-go" href="${WIKI_URL}" target="_blank" rel="noopener"><span>Wiki</span><span class="opt-v"><i>▶</i></span></a>`)
-        + (document.body.classList.contains('at-menu') ? '' : go('Main menu', 'data-act="mainMenu"'));
+        + go(t('ui.keys.title'), 'data-open="keys"') + (DEMO ? '' : `<a class="opt opt-go" href="${WIKI_URL}" target="_blank" rel="noopener"><span>${t('ui.settings.wiki')}</span><span class="opt-v"><i>▶</i></span></a>`)
+        + (document.body.classList.contains('at-menu') ? '' : go(t('ui.mainMenu'), 'data-act="mainMenu"'));
     } else {
-      rows = go('Copy save code', 'data-act="export"') + go('Load save code', 'data-act="import"')
-        + '<textarea spellcheck="false" placeholder="Paste a save code here to load it"></textarea>'
-        + `<div class="opt-sep"></div>${go(this.resetArmed ? 'Really wipe everything?' : 'Wipe save', 'data-act="reset"', 'danger')}`;
+      rows = go(t('ui.settings.export'), 'data-act="export"') + go(t('ui.settings.import'), 'data-act="import"')
+        + `<textarea spellcheck="false" placeholder="${t('ui.settings.paste')}"></textarea>`
+        + `<div class="opt-sep"></div>${go(this.resetArmed ? t('ui.settings.wipeSure') : t('ui.settings.wipe'), 'data-act="reset"', 'danger')}`;
     }
     return `<div class="opts">${rows}</div>`;
   }
@@ -3223,7 +3227,7 @@ export class Ui {
 
   private statTabs(on: string) {
     const tab = (id: string, label: string) => `<button class="tab ${on === id ? 'on' : ''}" data-open="${id}">${label}</button>`;
-    return `<nav class="tabs">${tab('stats', 'Bonuses')}${tab('party', 'Companions')}${tab('records', 'Records')}${DEMO ? '' : tab('ascents', 'Ascents')}</nav>`;
+    return `<nav class="tabs">${tab('stats', t('ui.stats.tab.bonuses'))}${tab('party', t('ui.stats.tab.party'))}${tab('records', t('ui.stats.tab.records'))}${DEMO ? '' : tab('ascents', t('ui.stats.tab.ascents'))}</nav>`;
   }
 
   /** This run, then every ascent so far: its run time, the deepest floor reached and the souls it paid. */
@@ -3234,10 +3238,10 @@ export class Ui {
     const clock = (t: number) => [Math.floor(t / 3600), Math.floor((t % 3600) / 60), Math.floor(t % 60)].map((n, i) => (i ? String(n).padStart(2, '0') : String(n))).join(':');
     let ascent = 0;
     const rows = list.map((a) => a.awakening
-      ? `<tr class="asc-awaken"><th>Awakening ${a.awakening}</th><td>${clock(a.time)}</td><td>${fmt(a.floor)}</td><td>${boundGlyph(1.2)} ${fmt(a.bound ?? 0)}</td></tr>`
+      ? `<tr class="asc-awaken"><th>${t('ui.awakening', { n: a.awakening })}</th><td>${clock(a.time)}</td><td>${fmt(a.floor)}</td><td>${boundGlyph(1.2)} ${fmt(a.bound ?? 0)}</td></tr>`
       : `<tr><th>${++ascent}</th><td>${clock(a.time)}</td><td>${fmt(a.floor)}</td><td>${G.soul(1.2)} ${fmt(a.souls)}</td></tr>`).reverse().join('');
-    const now = `<tr class="asc-now"><th>${ascent + 1} <small>Now</small></th><td>${clock(g.s.runTime)}</td><td>${fmt(g.s.maxFloor)}</td><td>${G.soul(1.2)} ${fmt(g.pendingSouls())}</td></tr>`;
-    return `<section class="bd wide bd-ascents"><table><thead><tr><th>Ascent</th><td>Time</td><td>Deepest floor</td><td>Souls</td></tr></thead>${now}${rows}</table></section>`;
+    const now = `<tr class="asc-now"><th>${ascent + 1} <small>${t('ui.ascents.now')}</small></th><td>${clock(g.s.runTime)}</td><td>${fmt(g.s.maxFloor)}</td><td>${G.soul(1.2)} ${fmt(g.pendingSouls())}</td></tr>`;
+    return `<section class="bd wide bd-ascents"><table><thead><tr><th>${t('ui.ascents.ascent')}</th><td>${t('ui.ascents.time')}</td><td>${t('ui.ascents.deepest')}</td><td>${t('ui.ascents.souls')}</td></tr></thead>${now}${rows}</table></section>`;
   }
 
   /** Where every number comes from: each multiplier on its own line, then the total. */
@@ -3245,8 +3249,8 @@ export class Ui {
     const g = this.game;
     const b = g.breakdown();
     const p = b.parts;
-    const x = (v: number | Decimal) => (new Decimal(v).gte(1000) ? `×${fmt(v)}` : `×${Math.round(new Decimal(v).toNumber() * 100) / 100}`);
-    const pc = (v: number) => `${Math.round(v * 1000) / 10}%`;
+    const x = (v: number | Decimal) => (new Decimal(v).gte(1000) ? `×${fmt(v)}` : `×${decimal(new Decimal(v).toNumber(), 2)}`);
+    const pc = (v: number) => percent(v, 1, 0);
     // A row is a label and a value; how it's made up shows on hover. Sources doing nothing yet (×1, or locked) gather
     // in one faint line under their panel.
     type Row = { label: string; value: string; note?: string; off?: boolean };
@@ -3261,57 +3265,57 @@ export class Ui {
       const tr = (r: Row) => `<tr${r.note ? ` data-tip="note:${esc(r.note)}"` : ''}><th>${r.label}</th><td>${r.value}</td></tr>`;
       return `<section class="st"><header><h3>${title}</h3><b${bigNote ? ` data-tip="note:${esc(bigNote)}"` : ''}>${big}${unit ? `<small>${unit}</small>` : ''}</b></header>
         <table>${live.map(tr).join('')}</table>
-        ${idle.length ? `<p class="st-off">Not active: ${idle.map((r) => `<span${r.note ? ` data-tip="note:${esc(r.note)}"` : ''}>${r.label}</span>`).join(' · ')}</p>` : ''}</section>`;
+        ${idle.length ? `<p class="st-off">${t('ui.stats.notActive', { list: idle.map((r) => `<span${r.note ? ` data-tip="note:${esc(r.note)}"` : ''}>${r.label}</span>`).join(' · ') })}</p>` : ''}</section>`;
     };
     const baseSum = b.baseComp.reduce((a, v) => a.plus(v), new Decimal(0));
     const buffNames = (k: 'dps' | 'click' | 'gold') => g.s.buffs.filter((u) => u[k] > 1).map((u) => `${buffName(u)} ×${u[k]}`).join(', ');
     const allRows = [
-      mul('Trophies', p.trophies, `${g.s.trophies.length} trophies`),
-      mul('Card sets', p.cards, `${g.setsDone(false)} sets · ${g.setsDone(true)} gold sets`, 'Every card of a zone in one color'),
-      ...(DEMO ? [] : [mul('Souls', p.souls, `${fmt(g.soulsFree())} kept, ${soulPct(1)} each${g.legendLv('hungry') ? ` + the Hungry Dark ${g.legendLv('hungry')}` : ''}`, 'Ascend to earn souls')]),
-      ...(!DEMO && g.s.awakens ? [mul('Ogre Chieftain', p.ogre, `level ${g.boundLv('ogre')}`, 'Bound in the Heart')] : []),
+      mul(t('ui.stats.trophies'), p.trophies, t('ui.stats.trophiesNote', { count: g.s.trophies.length })),
+      mul(t('ui.stats.sets'), p.cards, `${t('ui.stats.setsNote', { count: g.setsDone(false) })} · ${t('ui.stats.goldSetsNote', { count: g.setsDone(true) })}`, t('ui.stats.setsHow')),
+      ...(DEMO ? [] : [mul(t('ui.stats.souls'), p.souls, g.legendLv('hungry') ? t('ui.stats.soulsNoteHungry', { souls: fmt(g.soulsFree()), percent: soulPct(1), level: g.legendLv('hungry') }) : t('ui.stats.soulsNote', { souls: fmt(g.soulsFree()), percent: soulPct(1) }), t('ui.stats.soulsHow'))]),
+      ...(!DEMO && g.s.awakens ? [mul(boundName(BOUND.find((x) => x.id === 'ogre')!), p.ogre, t('ui.tip.level', { level: g.boundLv('ogre') }), t('ui.stats.ogreHow'))] : []),
     ];
 
-    const dps = panel('Party damage', fmt(g.dps()), '/sec', [
-      row('Companions', fmt(baseSum), DEMO ? 'levels × upgrades' : 'levels × upgrades × Heartmarks'),
+    const dps = panel(t('ui.stats.partyDamage'), fmt(g.dps()), t('ui.stats.perSec'), [
+      row(t('ui.stats.companions'), fmt(baseSum), DEMO ? t('ui.stats.companionsNoteDemo') : t('ui.stats.companionsNote')),
       ...allRows,
-      mul('Party upgrades', p.party, 'companion upgrades that lift everyone', 'Some companion upgrades lift everyone'),
-      mul('Buffs', b.buffDps, buffNames('dps'), 'Rampage, Bloodlust'),
+      mul(t('ui.stats.partyUpgrades'), p.party, t('ui.stats.partyUpgradesNote'), t('ui.stats.partyUpgradesHow')),
+      mul(t('ui.stats.buffs'), b.buffDps, buffNames('dps'), [t('game.buff.fever'), t('game.buff.bloodlust')].join(', ')),
     ]);
 
-    const click = panel('Attack damage', fmt(g.clickDamage()), '/attack', [
-      row('Base', '1'),
-      row('All-damage bonuses', x(b.all), DEMO ? 'trophies and card sets' : 'trophies, card sets and souls'),
-      row('Share of party damage', `+${fmt(g.baseDps().times(p.clickDps))}`, `${pc(p.clickDps)} of party damage: 5% base${p.clickDpsUpg ? ` + ${pc(p.clickDpsUpg)} companion upgrades` : ''}`),
-      ...(DEMO ? [] : [mul('The Fist', 1 + 0.1 * g.legendLv('fist'), `level ${g.legendLv('fist')}`, 'A Spirit')]),
-      mul('Buffs', b.buffClick, buffNames('click'), 'Frenzy'),
-      row('During Rampage', x(g.feverMult())),
+    const click = panel(t('ui.stats.attackDamage'), fmt(g.clickDamage()), t('ui.stats.perAttack'), [
+      row(t('ui.stats.base'), '1'),
+      row(t('ui.stats.allDamage'), x(b.all), DEMO ? t('ui.stats.allDamageNoteDemo') : t('ui.stats.allDamageNote')),
+      row(t('ui.stats.share'), `+${fmt(g.baseDps().times(p.clickDps))}`, p.clickDpsUpg ? t('ui.stats.shareNoteUpg', { percent: pc(p.clickDps), upg: pc(p.clickDpsUpg) }) : t('ui.stats.shareNote', { percent: pc(p.clickDps) })),
+      ...(DEMO ? [] : [mul(LEGEND_BY_ID.get('fist')!.name, 1 + 0.1 * g.legendLv('fist'), t('ui.tip.level', { level: g.legendLv('fist') }), t('ui.stats.aSpirit'))]),
+      mul(t('ui.stats.buffs'), b.buffClick, buffNames('click'), t('game.buff.heartstorm')),
+      row(t('ui.stats.duringRampage'), x(g.feverMult())),
     ]);
 
-    const critNote = g.abilityUnlocked('crit') ? `${pc(p.critBase)} base${p.critUpg ? ` + ${pc(p.critUpg)} companions` : ''}` : this.unlockedBy('crit');
-    const crit = panel('Critical hits', g.abilityUnlocked('crit') ? pc(g.critChance()) : '—', g.abilityUnlocked('crit') ? 'chance' : '', [
-      row('Damage', x(g.critMult()), `×${p.critMultBase} base${p.critMultUpg ? ` + ${p.critMultUpg} companions` : ''}`),
-      row('Cleave', g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? `10% base${p.cleaveUpg > 1 ? `, ${x(p.cleaveUpg)} from upgrades` : ''}` : g.abilityUnlocked('cleave') ? 'While the Cleave skill runs' : this.unlockedBy('cleave'), !g.cleave()),
+    const critNote = g.abilityUnlocked('crit') ? (p.critUpg ? t('ui.stats.critNoteUpg', { base: pc(p.critBase), upg: pc(p.critUpg) }) : t('ui.stats.critNote', { base: pc(p.critBase) })) : this.unlockedBy('crit');
+    const crit = panel(t('ui.stats.crits'), g.abilityUnlocked('crit') ? pc(g.critChance()) : '—', g.abilityUnlocked('crit') ? t('ui.stats.chance') : '', [
+      row(t('ui.stats.critDamage'), x(g.critMult()), p.critMultUpg ? t('ui.stats.critMultNoteUpg', { base: decimal(p.critMultBase, 2), upg: decimal(p.critMultUpg, 2) }) : t('ui.stats.critMultNote', { base: decimal(p.critMultBase, 2) })),
+      row(t('ui.stats.cleave'), g.cleave() ? pc(g.cleave()) : '—', g.cleave() ? (p.cleaveUpg > 1 ? t('ui.stats.cleaveNoteUpg', { mult: x(p.cleaveUpg) }) : t('ui.stats.cleaveNote')) : g.abilityUnlocked('cleave') ? t('ui.stats.cleaveSkill') : this.unlockedBy('cleave'), !g.cleave()),
     ], critNote);
 
-    const goldT = panel('Gold', x(g.goldMult()), '', [
-      mul('Companion upgrades', p.goldUpg, 'gold upgrades', 'Some companion upgrades add gold'),
-      ...(DEMO ? [] : [mul('The Hoard', 1 + 0.05 * g.legendLv('hoard'), `level ${g.legendLv('hoard')}`, 'A Spirit')]),
-      mul('Buffs', b.buffGold, buffNames('gold'), 'Gold Rush'),
+    const goldT = panel(t('ui.stats.gold'), x(g.goldMult()), '', [
+      mul(t('ui.stats.goldUpgrades'), p.goldUpg, t('ui.stats.goldUpgradesNote'), t('ui.stats.goldUpgradesHow')),
+      ...(DEMO ? [] : [mul(LEGEND_BY_ID.get('hoard')!.name, 1 + 0.05 * g.legendLv('hoard'), t('ui.tip.level', { level: g.legendLv('hoard') }), t('ui.stats.aSpirit'))]),
+      mul(t('ui.stats.buffs'), b.buffGold, buffNames('gold'), t('game.buff.horde')),
     ]);
 
     const baseTime = 30;
-    const boss = panel('Bosses', `${baseTime + Math.round(g.bossTimeBonus())}s`, 'timer', [
-      mul('Damage to bosses', p.boss, 'companion upgrades', 'Some companion upgrades hit bosses harder'),
-      row('Armored blocks', pc(g.armor()), 'of companion damage'),
-      row('Regenerating heals', `${pc(g.regen())}/s`, 'of its health'),
-      row('Modifier strength', pc(g.modBite()), 'how hard Armored and Regenerating bite'),
+    const boss = panel(t('ui.stats.bosses'), t('ui.seconds', { seconds: baseTime + Math.round(g.bossTimeBonus()) }), t('ui.stats.timer'), [
+      mul(t('ui.stats.bossDamage'), p.boss, t('ui.stats.bossDamageNote'), t('ui.stats.bossDamageHow')),
+      row(t('ui.stats.armored'), pc(g.armor()), t('ui.stats.armoredNote')),
+      row(t('ui.stats.regen'), t('ui.perSecond', { rate: pc(g.regen()) }), t('ui.stats.regenNote')),
+      row(t('ui.stats.modStrength'), pc(g.modBite()), t('ui.stats.modStrengthNote')),
     ]);
 
-    const souls = DEMO ? '' : panel('Souls', fmt(g.s.souls), '', [
-      row('Unspent', fmt(g.soulsFree())),
-      row('An ascent now pays', fmt(g.pendingSouls()), `${fmt(Math.floor(g.runLevels() / TUNE.levelsPerSoul))} from levels, ${fmt(g.s.bossSouls)} from champion bosses`),
-      ...(!DEMO && g.s.awakens ? [mul('Champion souls', g.champSoulMult(g.s.maxFloor), `on floor ${fmt(g.s.maxFloor)}`), row('Bound souls', fmt(g.s.boundEarned), `${g.s.awakens} awakening${g.s.awakens === 1 ? '' : 's'}`)] : []),
+    const souls = DEMO ? '' : panel(t('ui.stats.souls'), fmt(g.s.souls), '', [
+      row(t('ui.stats.unspent'), fmt(g.soulsFree())),
+      row(t('ui.stats.ascentPays'), fmt(g.pendingSouls()), t('ui.stats.ascentPaysNote', { levels: fmt(Math.floor(g.runLevels() / TUNE.levelsPerSoul)), bosses: fmt(g.s.bossSouls) })),
+      ...(!DEMO && g.s.awakens ? [mul(t('ui.stats.champSouls'), g.champSoulMult(g.s.maxFloor), t('ui.stats.onFloor', { floor: fmt(g.s.maxFloor) })), row(t('ui.stats.boundSouls'), fmt(g.s.boundEarned), t('ui.stats.awakenings', { count: g.s.awakens }))] : []),
     ]);
     return `<div class="st-grid">${dps}${click}${crit}${goldT}${boss}${souls}</div>`;
   }
@@ -3321,28 +3325,28 @@ export class Ui {
     const b = g.breakdown();
     const p = b.parts;
     const total = g.baseDps();
-    const x = (v: number | Decimal) => (new Decimal(v).gte(1000) ? `×${fmt(v)}` : `×${Math.round(new Decimal(v).toNumber() * 100) / 100}`);
+    const x = (v: number | Decimal) => (new Decimal(v).gte(1000) ? `×${fmt(v)}` : `×${decimal(new Decimal(v).toNumber(), 2)}`);
     const rows = COMPS.map((c, i) => {
       const lv = g.s.owned[i];
       if (!lv) return '';
-      return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(levelMult(lv))}</td><td>${x(p.tier[i])}</td>${DEMO ? '' : `<td>${g.s.marks[i] ? `${G.heart(1.2)} ${g.s.marks[i]}` : ''}</td>`}<td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? g.compDps(i).div(total).times(100).toNumber().toFixed(1) : 0}%</td></tr>`;
+      return `<tr><th><span class="bd-comp">${charFit(c.sprite, 22)}${esc(c.name)}</span></th><td>${lv}</td><td>${fmt(c.dps)}</td><td>${x(levelMult(lv))}</td><td>${x(p.tier[i])}</td>${DEMO ? '' : `<td>${g.s.marks[i] ? `${G.heart(1.2)} ${g.s.marks[i]}` : ''}</td>`}<td>${fmt(g.compDps(i))}</td><td>${total.gt(0) ? fixed(g.compDps(i).div(total).times(100).toNumber(), 1) : 0}%</td></tr>`;
     }).join('');
-    return `<p class="muted bd-help">Each companion: level × base damage × milestones × traits${DEMO ? '' : ' × Heartmarks'}, then every all-damage bonus (${x(b.all.times(p.party))} right now) on top.</p>
-      <section class="bd wide"><table><thead><tr><th>Companion</th><td>Level</td><td>Base</td><td>Milestones</td><td>Upgrades</td>${DEMO ? '' : '<td>Marks</td>'}<td>Damage/sec</td><td>Share</td></tr></thead>${rows || '<tr><th>Nobody hired yet.</th></tr>'}</table></section>`;
+    return `<p class="muted bd-help">${t(DEMO ? 'ui.party.help' : 'ui.party.helpMarks', { mult: x(b.all.times(p.party)) })}</p>
+      <section class="bd wide"><table><thead><tr><th>${t('ui.table.companion')}</th><td>${t('ui.party.level')}</td><td>${t('ui.party.base')}</td><td>${t('ui.party.milestones')}</td><td>${t('ui.party.upgrades')}</td>${DEMO ? '' : `<td>${t('ui.table.marks')}</td>`}<td>${t('ui.party.damage')}</td><td>${t('ui.party.share')}</td></tr></thead>${rows || `<tr><th>${t('ui.party.nobody')}</th></tr>`}</table></section>`;
   }
 
   private recordsHtml(): string {
     const g = this.game;
     const s = g.s;
-    const rows: [string, string, boolean?][] = [
-      ['Floor', `${fmt(s.floor)} (deepest this descent ${fmt(s.maxFloor)})`], ['Deepest floor cleared', fmt(s.bestCleared)], ['Kills per second', g.killRate.toFixed(1)],
-      ['Gold this descent', fmt(s.runGold)], ['Gold all time', fmt(s.totalGold)], ['Monsters killed', fmt(s.kills)], ['Bosses beaten', fmt(s.bosses)],
-      ['Attacks', fmt(s.clicks)], ['Critical hits', fmt(s.crits)], ['Treasure goblins', fmt(s.raids)], ['Rainbow Vaults', fmt(s.vaults)], ['Rampages', fmt(s.fevers)], ['Clutch kills', fmt(s.clutches)], ['Champions slain', fmt(s.champions)],
-      ...(DEMO ? [] : [['Ascents', fmt(s.descents)], ['Awakenings', fmt(s.awakens)]] as [string, string][]), ['Trophies', `${s.trophies.length} / ${shownTrophies(g).length}`], ['Cards found', fmt(g.cardsFound())],
-      ['This descent', duration(s.runTime)], ['Active', duration(s.runActive), true], ['Idle', duration(Math.max(0, s.runTime - s.runActive)), true],
-      ['Time played', duration(s.playTime)], ['Active', duration(s.activeTime), true], ['Idle', duration(Math.max(0, s.playTime - s.activeTime)), true],
+    const rows: [UiKey, string, boolean?][] = [
+      ['ui.records.floor', t('ui.records.floorValue', { floor: fmt(s.floor), deepest: fmt(s.maxFloor) })], ['ui.records.bestCleared', fmt(s.bestCleared)], ['ui.records.killRate', fixed(g.killRate, 1)],
+      ['ui.records.runGold', fmt(s.runGold)], ['ui.records.totalGold', fmt(s.totalGold)], ['ui.records.kills', fmt(s.kills)], ['ui.records.bosses', fmt(s.bosses)],
+      ['ui.records.attacks', fmt(s.clicks)], ['ui.records.crits', fmt(s.crits)], ['ui.records.goblins', fmt(s.raids)], ['ui.records.vaults', fmt(s.vaults)], ['ui.records.rampages', fmt(s.fevers)], ['ui.records.clutches', fmt(s.clutches)], ['ui.records.champions', fmt(s.champions)],
+      ...(DEMO ? [] : [['ui.records.ascents', fmt(s.descents)], ['ui.records.awakenings', fmt(s.awakens)]] as [UiKey, string][]), ['ui.records.trophies', `${s.trophies.length} / ${shownTrophies(g).length}`], ['ui.records.cards', fmt(g.cardsFound())],
+      ['ui.records.runTime', duration(s.runTime)], ['ui.records.active', duration(s.runActive), true], ['ui.records.idle', duration(Math.max(0, s.runTime - s.runActive)), true],
+      ['ui.records.playTime', duration(s.playTime)], ['ui.records.active', duration(s.activeTime), true], ['ui.records.idle', duration(Math.max(0, s.playTime - s.activeTime)), true],
     ];
-    return `<dl class="stats">${rows.map(([k, v, sub]) => `<div${sub ? ' class="sub"' : ''}><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
+    return `<dl class="stats">${rows.map(([label, v, sub]) => `<div${sub ? ' class="sub"' : ''}><dt>${t(label)}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
   }
 
   private tabs(on: 'abyss' | 'marks') {
@@ -3350,8 +3354,8 @@ export class Ui {
     const g = this.game;
     if (!g.marksTotal()) return '';
     return `<nav class="tabs">
-      <button class="tab ${on === 'abyss' ? 'on' : ''}" data-open="abyss">Spirits</button>
-      ${g.marksTotal() ? `<button class="tab ${on === 'marks' ? 'on' : ''}" data-open="marks">${G.heart()} Heartmarks ${g.marksTotal()}</button>` : ''}
+      <button class="tab ${on === 'abyss' ? 'on' : ''}" data-open="abyss">${t('ui.spirits.title')}</button>
+      ${g.marksTotal() ? `<button class="tab ${on === 'marks' ? 'on' : ''}" data-open="marks">${G.heart()} ${t('ui.marks.tab', { n: g.marksTotal() })}</button>` : ''}
     </nav>`;
   }
 
@@ -3361,26 +3365,26 @@ export class Ui {
   private tripsHtml(): string {
     if (DEMO) return '';
     const g = this.game;
-    const rate = (r: number) => (r >= 10 ? fmt(Math.round(r)) : r.toFixed(r >= 1 ? 1 : 2));
+    const rate = (r: number) => (r >= 10 ? fmt(Math.round(r)) : fixed(r, r >= 1 ? 1 : 2));
     const rows = COMPS.map((c, i) => {
       const trip = g.s.expeditions.find((e) => e.comp === i);
       if (trip) {
         const left = TRIP_HOURS * 3600 - g.tripSeconds(trip);
-        const time = trip.pausedAt !== undefined ? 'With you' : `${duration(Math.max(0, left))} left`;
+        const time = trip.pausedAt !== undefined ? t('ui.trips.withYou') : t('ui.trips.left', { time: duration(Math.max(0, left)) });
         return `<div class="trip away" data-hunter="${i}"><span class="trip-ico">${charFit(c.sprite, 34)}</span>
-          <span class="trip-mid"><b>${esc(c.name)}</b><small class="trip-stats"><span>Floor ${fmt(trip.floor)}</span><span>${fmt(g.tripKills(trip))} kills</span><span>${fmt(trip.found?.length ?? 0)} cards</span><span>${time}</span></small></span>
-          <button class="btn small" data-act="tripHome">Call home</button></div>`;
+          <span class="trip-mid"><b>${esc(c.name)}</b><small class="trip-stats"><span>${t('ui.floor', { floor: fmt(trip.floor) })}</span><span>${t('ui.trips.kills', { count: g.tripKills(trip), n: fmt(g.tripKills(trip)) })}</span><span>${t('ui.trips.cards', { count: trip.found?.length ?? 0, n: fmt(trip.found?.length ?? 0) })}</span><span>${time}</span></small></span>
+          <button class="btn small" data-act="tripHome">${t('ui.trips.callHome')}</button></div>`;
       }
       if (g.s.owned[i] < EXPEDITION_LEVEL) return '';
       const floor = Math.min(g.s.bestFloor, this.tripPick[i] ?? g.tripFloor(i));
       const dps = g.compDps(i);
       return `<div class="trip" data-hunter="${i}"><span class="trip-ico">${charFit(c.sprite, 34)}</span>
-        <span class="trip-mid"><b>${esc(c.name)} <small>Lv ${g.s.owned[i]}</small></b>
-        <small>${rate(g.tripRate(floor, dps))} kills/s</small></span>
-        <label class="trip-floor">Floor <input type="number" id="trip-floor-${i}" min="1" max="${g.s.bestFloor}" value="${floor}" data-trip="${i}"></label>
-        <button class="btn small primary" data-act="tripGo">Send</button></div>`;
+        <span class="trip-mid"><b>${esc(c.name)} <small>${t('ui.party.lv', { level: g.s.owned[i] })}</small></b>
+        <small>${t('ui.trips.rate', { rate: rate(g.tripRate(floor, dps)) })}</small></span>
+        <label class="trip-floor">${t('ui.trips.floor')} <input type="number" id="trip-floor-${i}" min="1" max="${g.s.bestFloor}" value="${floor}" data-trip="${i}"></label>
+        <button class="btn small primary" data-act="tripGo">${t('ui.trips.send')}</button></div>`;
     }).join('');
-    return `<div class="trips">${rows || `<p class="muted">Companions at level ${EXPEDITION_LEVEL} can go</p>`}</div>`;
+    return `<div class="trips">${rows || `<p class="muted">${t('ui.trips.none', { level: EXPEDITION_LEVEL })}</p>`}</div>`;
   }
 
   private heartHtml(): string {
@@ -3389,21 +3393,21 @@ export class Ui {
     const cycle = g.cycleSouls();
     let bar: string;
     if (g.canAwaken()) {
-      bar = `<button class="btn primary big" data-act="awaken">Awaken for ${boundGlyph()} ${fmt(g.pendingBound())}</button>`;
+      bar = `<button class="btn primary big" data-act="awaken">${t('ui.heart.awakenFor', { icon: boundGlyph(), bound: fmt(g.pendingBound()) })}</button>`;
     } else if (Math.max(g.s.cycleBest, g.s.maxFloor) < TUNE.awakenFloor) {
       const best = Math.max(g.s.cycleBest, g.s.maxFloor);
-      bar = `<p>Deepest floor <b>${fmt(best)} / ${fmt(TUNE.awakenFloor)}</b></p><div class="bar heart-bar"><i style="width:${Math.min(100, (best / TUNE.awakenFloor) * 100)}%"></i></div>`;
+      bar = `<p>${t('ui.heart.deepest', { floor: fmt(best), target: fmt(TUNE.awakenFloor) })}</p><div class="bar heart-bar"><i style="width:${Math.min(100, (best / TUNE.awakenFloor) * 100)}%"></i></div>`;
     } else {
       const at = g.nextBoundAt();
-      bar = `<p>Souls this cycle <b>${fmt(cycle)} / ${fmt(at)}</b></p><div class="bar heart-bar"><i style="width:${Math.min(100, (Math.log10(Math.max(1, cycle)) / Math.log10(at)) * 100)}%"></i></div>`;
+      bar = `<p>${t('ui.heart.cycle', { souls: fmt(cycle), target: fmt(at) })}</p><div class="bar heart-bar"><i style="width:${Math.min(100, (Math.log10(Math.max(1, cycle)) / Math.log10(at)) * 100)}%"></i></div>`;
     }
     // Before the first awakening the Bound wait as shadows, as the Spirits do before the first ascent.
     if (!g.s.awakens) {
       const shades = BOUND.map((b) => `<span class="bshade">${silhouette(ZONES[b.zone].boss.sprite, 56, '#0b0710')}</span>`).join('');
-      return `<div class="heart-bar-box">${bar}</div><div class="bshades">${shades}</div><p class="bshades-note">The Bound await after you awaken</p>`;
+      return `<div class="heart-bar-box">${bar}</div><div class="bshades">${shades}</div><p class="bshades-note">${t('ui.heart.await')}</p>`;
     }
     return `<div class="heart-bar-box">${bar}</div>
-      <div class="lc-head"><h3>The Bound</h3></div>
+      <div class="lc-head"><h3>${t('ui.heart.bound')}</h3></div>
       <div class="lcards">${BOUND.map((b) => this.boundCard(b)).join('')}</div>`;
   }
 
@@ -3414,11 +3418,11 @@ export class Ui {
     const lv = g.boundLv(b.id);
     const cost = g.boundPrice(b.id);
     const next = g.boundMaxed(b.id)
-      ? `<span class="lc-max" data-tip="bound:${b.id}">Max level</span>`
-      : `${lv ? `<span>Next: ${esc(b.value(lv + 1))}</span>` : ''}<span class="lc-up" data-tip="bound:${b.id}" data-bound="${b.id}"><button class="btn bound" ${g.boundFree() >= cost ? '' : 'disabled'}>Level up · ${boundPrice(cost)}</button></span>`;
+      ? `<span class="lc-max" data-tip="bound:${b.id}">${t('ui.lcard.max')}</span>`
+      : `${lv ? `<span>${t('ui.lcard.next', { value: esc(b.value(lv + 1)) })}</span>` : ''}<span class="lc-up" data-tip="bound:${b.id}" data-bound="${b.id}"><button class="btn bound" ${g.boundFree() >= cost ? '' : 'disabled'}>${t('ui.lcard.levelUp', { price: boundPrice(cost) })}</button></span>`;
     return `<div class="lcard bcard${lv ? '' : ' unbought'}" data-card="${b.id}">
       <div class="lc-fig"><span class="bsparks">${WISPS}</span><span class="ped-fig">${bossFig(b, 80, 96)}</span><span class="ped-stone"></span></div>
-      <div class="lc-nm"><b>${esc(boundName(b))}</b><span class="lc-lv">Level<span>${lv}</span></span></div>
+      <div class="lc-nm"><b>${esc(boundName(b))}</b><span class="lc-lv">${t('ui.lcard.level')}<span>${lv}</span></span></div>
       <div class="lc-val">${esc(b.value(Math.max(1, lv)))}</div>
       <div class="lc-what">${boundWhat(b)}</div>
       <div class="lc-next">${next}</div>
@@ -3433,11 +3437,11 @@ export class Ui {
   private heldTimer = 0;
 
   private trophyToast(id: string) {
-    const t = TROPHIES.find((x) => x.id === id)!;
+    const trophy = TROPHIES.find((x) => x.id === id)!;
     this.hooks.sound('drop2', { vol: 0.55 });
-    this.toast(`Trophy: <b>${esc(t.name)}</b><small>${esc(t.desc)} +1% damage</small>`, t.icon.sprite, 'trophy');
+    this.toast(t('ui.toast.trophy', { name: esc(trophy.name), desc: esc(trophy.desc) }), trophy.icon.sprite, 'trophy');
     const cur = CURSORS.find((c) => c.trophy === id);
-    if (cur) this.toast(`New cursor: <b>${esc(cur.name)}</b><small>Pick it in Options</small>`, cur.sprite, 'trophy');
+    if (cur) this.toast(t('ui.toast.cursor', { name: esc(cur.name) }), cur.sprite, 'trophy');
   }
 
   private releaseTrophies() {
@@ -3470,11 +3474,11 @@ export class Ui {
     const to = dock.getBoundingClientRect();
     el.style.setProperty('--tx', `${to.left + to.width / 2 - mid.x}px`);
     el.style.setProperty('--ty', `${to.top + to.height / 2 - mid.y}px`);
-    const head = ev.gold ? (ev.newColor ? 'New gold card!' : 'Gold card!') : ev.newColor ? 'New card!' : 'Card';
-    const line = ev.first ? `<em>Found on ${d.kind === 'goblin' ? 'catch' : 'kill'} #${fmt(ev.kill)}</em>` : '';
+    const head = t(ev.gold ? (ev.newColor ? 'ui.reveal.newGold' : 'ui.reveal.gold') : ev.newColor ? 'ui.reveal.new' : 'ui.reveal.card');
+    const line = ev.first ? `<em>${t(d.kind === 'goblin' ? 'ui.card.foundCatch' : 'ui.card.foundKill', { n: fmt(ev.kill) })}</em>` : '';
     el.innerHTML = `<i class="cr-rays"></i>
       <div class="cr-card">${ev.gold ? GOLD_DAZZLE : ''}<div class="cr-flip"><div class="cr-back">${G.heart(7)}<b class="cr-logo">DEEPHEART</b></div><div class="cr-front">${cardFace(d, 'got', ev.gold, 96, ev.lap)}</div></div></div>
-      <div class="cr-text"><small>${head}</small><b>${esc(cardName(d.name, ev.lap))} Card${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${padFamily() ? `Press ${padGlyph('a', 18)}` : this.touch ? 'Tap' : 'Click'} to collect</span></div>`;
+      <div class="cr-text"><small>${head}</small><b>${t('ui.card.name', { name: esc(cardName(d.name, ev.lap)) })}${(ev.copies ?? 1) > 1 ? ` ×${ev.copies}` : ''}</b>${line}<span class="cr-tap">${this.byInput('ui.reveal.collectPad', 'ui.reveal.collectTouch', 'ui.reveal.collectClick', { button: padGlyph('a', 18) })}</span></div>`;
     this.el.banner.parentElement!.appendChild(el);
     // The sound lands with the flip.
     setTimeout(() => this.hooks.sound(ev.gold || d.kind !== 'monster' ? 'drop4' : 'drop3', { vol: 0.8 }), 380);
@@ -3519,23 +3523,23 @@ export class Ui {
       return `<span class="aw-face">${first ? silhouette(ZONES[b.zone].boss.sprite, 40, '#0b0710') : bossFig(b, 40, 48)}${lv ? `<i>${lv}</i>` : ''}</span>`;
     }).join('');
     const row = (k: string, v: string) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
-    this.el.modal.innerHTML = `<header class="m-head"><h2>Awaken the Heart</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
+    this.el.modal.innerHTML = `<header class="m-head"><h2>${t('ui.awaken.title')}</h2><button class="btn icon" data-act="close"">${G.close()}</button></header>
       <div class="confirm aw-confirm">
         <div class="aw-cols">
-          <section class="aw-gain"><h4>Gain</h4>
+          <section class="aw-gain"><h4>${t('ui.awaken.gain')}</h4>
             <div class="aw-big">${boundGlyph(3)}<b>${fmt(gain)}</b></div>
-            <small>bound souls${first ? '' : ` · ${fmt(g.s.boundEarned + gain)} in all`}</small>
-            <h5>${first ? 'The Bound wake' : 'The Bound'}</h5>
+            <small>${first ? t('ui.awaken.boundSouls') : t('ui.awaken.boundSoulsAll', { total: fmt(g.s.boundEarned + gain) })}</small>
+            <h5>${first ? t('ui.awaken.boundWake') : t('ui.heart.bound')}</h5>
             <div class="aw-faces${first ? ' shade' : ''}">${faces}</div>
           </section>
-          <section class="aw-lose"><h4>Lose</h4>
-            <dl class="stats">${row(`${G.soul(1.5)} Souls`, fmt(g.cycleSouls()))}${row('Spirits', fmt(g.legendsOwned()))}${row(`${G.heart(1.5)} Heartmarks`, fmt(g.marksTotal()))}${row('This run', `floor ${fmt(g.s.maxFloor)}`)}</dl>
+          <section class="aw-lose"><h4>${t('ui.awaken.lose')}</h4>
+            <dl class="stats">${row(`${G.soul(1.5)} ${t('ui.awaken.souls')}`, fmt(g.cycleSouls()))}${row(t('ui.spirits.title'), fmt(g.legendsOwned()))}${row(`${G.heart(1.5)} ${t('ui.awaken.marks')}`, fmt(g.marksTotal()))}${row(t('ui.awaken.run'), t('ui.floorLower', { floor: fmt(g.s.maxFloor) }))}</dl>
           </section>
         </div>
-        <p class="aw-kept">Kept: cards, trophies, companions</p>
-        ${away ? `<p class="aw-away">On expeditions: ${away}</p>` : ''}
-        ${!first && g.boundSpent() ? `<label class="set-check"><input type="checkbox" id="awaken-respec" checked> Respec the Bound</label>` : ''}
-        <div class="set-row"><button class="btn" data-act="heartBack">Not yet</button>${away ? '<button class="btn primary big" data-act="recallAll">Call everyone home</button>' : '<button class="btn primary big" data-act="awakenGo">Awaken</button>'}</div>
+        <p class="aw-kept">${t('ui.awaken.kept')}</p>
+        ${away ? `<p class="aw-away">${t('ui.confirm.away', { count: away })}</p>` : ''}
+        ${!first && g.boundSpent() ? `<label class="set-check"><input type="checkbox" id="awaken-respec" checked> ${t('ui.awaken.respec')}</label>` : ''}
+        <div class="set-row"><button class="btn" data-act="heartBack">${t('ui.confirm.notYet')}</button>${away ? `<button class="btn primary big" data-act="recallAll">${t('ui.confirm.recall')}</button>` : `<button class="btn primary big" data-act="awakenGo">${t('ui.awaken.go')}</button>`}</div>
       </div>`;
   }
 
@@ -3561,7 +3565,7 @@ export class Ui {
     if (!g.canAwaken() || this.descending) return;
     const first = !g.s.awakens;
     const gain = g.pendingBound();
-    const title = first ? 'The Heart awakens' : `Awakening ${g.s.awakens + 1}`;
+    const title = first ? t('ui.awaken.first') : t('ui.awakening', { n: g.s.awakens + 1 });
     this.descending = true;
     this.cutscene = true;
     this.modal = null;
@@ -3589,8 +3593,8 @@ export class Ui {
     el.className = `awk${first ? ' first' : ''}`;
     el.innerHTML = `<div class="awk-embers">${embers}</div><div class="awk-souls">${souls}</div><div class="awk-sparks">${sparks}</div><div class="awk-ring">${ring}</div>
       <div class="awk-heart">${G.heart(18)}<i class="awk-wave"></i></div><div class="awk-flash"></div>
-      <div class="awk-text"><b>${esc(title)}</b><span class="awk-gain">${boundGlyph(3)}<em>0</em><small>bound souls</small></span></div>
-      <span class="awk-tap">${padFamily() ? `Press ${padGlyph('a', 18)}` : this.touch ? 'Tap' : 'Click'} to continue</span>`;
+      <div class="awk-text"><b>${esc(title)}</b><span class="awk-gain">${boundGlyph(3)}<em>0</em><small>${t('ui.awaken.boundSouls')}</small></span></div>
+      <span class="awk-tap">${this.byInput('ui.awaken.continuePad', 'ui.awaken.continueTouch', 'ui.awaken.continueClick', { button: padGlyph('a', 18) })}</span>`;
     this.root.appendChild(el);
     const timers: number[] = [];
     const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
@@ -3677,7 +3681,7 @@ export class Ui {
     if (label.hidden) return;
     const input = document.createElement('input');
     Object.assign(input, { type: 'number', inputMode: 'numeric', min: '1', max: String(g.s.maxFloor), value: String(g.s.floor), className: 'floor-jump' });
-    input.setAttribute('aria-label', `Go to floor (1 to ${g.s.maxFloor})`);
+    input.setAttribute('aria-label', t('ui.floor.jump', { max: g.s.maxFloor }));
     label.hidden = true;
     label.after(input);
     this.hideTip();
@@ -3705,7 +3709,9 @@ export class Ui {
   }
 
   private viaLine(via: string) {
-    return via.startsWith(giftVia('')) ? `A gift from ${via.slice(giftVia('').length)}` : `Traded from ${via}`;
+    if (via.startsWith(giftVia(''))) return t('ui.card.gift', { name: via.slice(giftVia('').length) });
+    const trader = TRADED_FROM[via];
+    return t('ui.card.traded', { name: trader ? t(trader) : via });
   }
 
 
@@ -3718,12 +3724,12 @@ export class Ui {
     this.modal = 'respec';
     this.modalKey = 'respec';
     this.el.modal.className = 'modal pnl m-confirm';
-    this.el.modal.innerHTML = `<header class="m-head"><h2>Respec?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
+    this.el.modal.innerHTML = `<header class="m-head"><h2>${t('ui.respec.title')}</h2><button class="btn icon" data-act="close"">${G.close()}</button></header>
       <div class="confirm">
-        <p class="respec-back">${G.soul(3)} +${fmt(back)} soul${back === 1 ? '' : 's'} back</p>
-        ${!DEMO && g.legendsOwned() ? '<p>Every Spirit leaves.</p>' : ''}
-        <p>${g.respecFree() ? '<b>Free until your second ascent.</b>' : `<b>${G.soul()} ${fmt(lost)}</b> lost.`}</p>
-        <div class="set-row"><button class="btn" data-act="close">Not yet</button><button class="btn primary big" data-act="respecGo">Respec</button></div>
+        <p class="respec-back">${t('ui.respec.back', { count: back, icon: G.soul(3), amount: fmt(back) })}</p>
+        ${!DEMO && g.legendsOwned() ? `<p>${t('ui.respec.spiritsLeave')}</p>` : ''}
+        <p>${g.respecFree() ? `<b>${t('ui.respec.free')}</b>` : t('ui.respec.lost', { icon: G.soul(), amount: fmt(lost) })}</p>
+        <div class="set-row"><button class="btn" data-act="close">${t('ui.confirm.notYet')}</button><button class="btn primary big" data-act="respecGo">${t('ui.respec.go')}</button></div>
       </div>`;
   }
 
@@ -3733,10 +3739,10 @@ export class Ui {
     this.modal = 'wipe';
     this.modalKey = 'wipe';
     this.el.modal.className = 'modal pnl m-confirm';
-    this.el.modal.innerHTML = `<header class="m-head"><h2>Wipe your save?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
+    this.el.modal.innerHTML = `<header class="m-head"><h2>${t('ui.wipe.title')}</h2><button class="btn icon" data-act="close"">${G.close()}</button></header>
       <div class="confirm">
-        <p>Everything goes: gold, companions, souls, Spirits, cards and trophies. This can't be undone.</p>
-        <div class="set-row"><button class="btn big" data-act="wipeBack">Keep my save</button><button class="btn danger big" data-act="wipeGo">Wipe everything</button></div>
+        <p>${t('ui.wipe.body')}</p>
+        <div class="set-row"><button class="btn big" data-act="wipeBack">${t('ui.wipe.keep')}</button><button class="btn danger big" data-act="wipeGo">${t('ui.wipe.go')}</button></div>
       </div>`;
     this.el.modal.querySelector<HTMLElement>('[data-act="wipeBack"]')?.focus({ preventScroll: true });
   }
@@ -3749,11 +3755,11 @@ export class Ui {
     this.modal = 'confirm';
     this.modalKey = 'confirm';
     this.el.modal.className = 'modal pnl m-confirm';
-    this.el.modal.innerHTML = `<header class="m-head"><h2>Ascend for ${G.soul()} ${fmt(pending)} soul${pending === 1 ? '' : 's'}?</h2><button class="btn icon" data-act="close">${G.close()}</button></header>
+    this.el.modal.innerHTML = `<header class="m-head"><h2>${t('ui.ascend.confirm', { count: pending, icon: G.soul(), amount: fmt(pending) })}</h2><button class="btn icon" data-act="close"">${G.close()}</button></header>
       <div class="confirm">
-        <p>${soulPct(pending)} damage. Gold, companions and floor reset.</p>
-        ${away ? `<p class="aw-away">On expeditions: ${away}</p>` : ''}
-        <div class="set-row"><button class="btn" data-act="abyssBack">Not yet</button>${away ? '<button class="btn primary big" data-act="recallAll">Call everyone home</button>' : '<button class="btn primary big" data-act="descendGo">Ascend</button>'}</div>
+        <p>${t('ui.ascend.confirmBody', { percent: soulPct(pending) })}</p>
+        ${away ? `<p class="aw-away">${t('ui.confirm.away', { count: away })}</p>` : ''}
+        <div class="set-row"><button class="btn" data-act="abyssBack">${t('ui.confirm.notYet')}</button>${away ? `<button class="btn primary big" data-act="recallAll">${t('ui.confirm.recall')}</button>` : `<button class="btn primary big" data-act="descendGo">${t('ui.ascend.go')}</button>`}</div>
       </div>`;
   }
 
@@ -3766,8 +3772,8 @@ export class Ui {
     const c = this.el.curtain;
     c.hidden = false;
     c.className = 'curtain in';
-    c.querySelector('b')!.textContent = `Ascent ${g.s.descents + 1}`;
-    c.querySelector('span')!.textContent = 'The Keep';
+    c.querySelector('b')!.textContent = t('ui.curtain.ascent', { n: g.s.descents + 1 });
+    c.querySelector('span')!.textContent = t('ui.keep');
     this.hooks.sound('descend', { vol: 0.8 });
     setTimeout(() => {
       g.descend();
@@ -3793,14 +3799,14 @@ export class Ui {
       el.className = 'update-pill pnl';
       this.el.banner.parentElement!.appendChild(el);
     }
-    el.innerHTML = `<span><b>Update available</b> v${esc(version)}</span><button class="btn small primary" data-update="now">Update now</button><button class="btn icon small" data-update="later" aria-label="Dismiss">${G.close()}</button>`;
+    el.innerHTML = `<span>${t('ui.update.available', { version: esc(version) })}</span><button class="btn small primary" data-update="now">${t('ui.update.now')}</button><button class="btn icon small" data-update="later" aria-label="${t('ui.update.dismiss')}">${G.close()}</button>`;
     const pill = el;
     pill.onclick = (e) => {
       const act = (e.target as HTMLElement).closest<HTMLElement>('[data-update]')?.dataset.update;
       if (act === 'later') pill.remove();
       if (act === 'now') {
         download();
-        pill.innerHTML = `<span><b>Downloading v${esc(version)}</b> Open it and replace Deepheart. Your save stays.</span><button class="btn icon small" data-update="later" aria-label="Dismiss">${G.close()}</button>`;
+        pill.innerHTML = `<span>${t('ui.update.downloading', { version: esc(version) })}</span><button class="btn icon small" data-update="later" aria-label="${t('ui.update.dismiss')}">${G.close()}</button>`;
       }
     };
   }
@@ -3820,12 +3826,12 @@ export class Ui {
     el.innerHTML = `<div class="de-in">
       <div class="de-heart">${G.heart(8)}</div>
       <h1>DEEPHEART</h1>
-      <p class="de-lead">Thanks for playing the demo!</p>
+      <p class="de-lead">${t('ui.demo.thanks')}</p>
       <div class="de-next">${silhouette(COMPS[DEMO_COMPANIONS].sprite, 96, '#2c2233')}<b>???</b></div>
-      <p class="de-more">More companions wait deeper down.</p>
-      <p class="de-run">You met ${met} companion${met === 1 ? '' : 's'} and found ${cards} card${cards === 1 ? '' : 's'}.</p>
-      <a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}Wishlist on Steam</a>
-      <button type="button" class="mm-btn de-menu">Main menu</button>
+      <p class="de-more">${t('ui.demo.more')}</p>
+      <p class="de-run">${t('ui.demo.run', { companions: t('ui.demo.companions', { count: met }), cards: t('ui.demo.cards', { count: cards }) })}</p>
+      <a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}${t('ui.demo.wishlist')}</a>
+      <button type="button" class="mm-btn de-menu">${t('ui.mainMenu')}</button>
     </div>`;
     el.querySelector('.de-menu')!.addEventListener('click', () => this.hooks.mainMenu());
     this.root.appendChild(el);
@@ -3883,11 +3889,11 @@ export class Ui {
     this.modal = 'offline';
     this.el.modalWrap.hidden = false;
     this.el.modal.className = 'modal pnl m-offline';
-    this.el.modal.innerHTML = `<header class="m-head"><h2>Welcome back</h2></header>
+    this.el.modal.innerHTML = `<header class="m-head"><h2>${t('ui.offline.title')}</h2></header>
       <div class="offline">
-        <p>You were away for <b>${duration(seconds)}</b>.</p>
-        <p>Your party was in the Keep.</p>
-        <button class="btn primary big" data-act="close">Okay</button>
+        <p>${t('ui.offline.away', { time: duration(seconds) })}</p>
+        <p>${t('ui.offline.inKeep')}</p>
+        <button class="btn primary big" data-act="close">${t('ui.offline.okay')}</button>
       </div>`;
   }
 
@@ -3903,7 +3909,7 @@ export class Ui {
     const c = this.el.curtain;
     c.hidden = false;
     c.className = 'curtain in';
-    c.querySelector('b')!.textContent = up ? 'The Keep' : `Floor ${fmt(g.s.floor)}`;
+    c.querySelector('b')!.textContent = up ? t('ui.keep') : t('ui.floor', { floor: fmt(g.s.floor) });
     c.querySelector('span')!.textContent = '';
     this.hooks.sound('descend', { vol: 0.5 });
     setTimeout(() => {
@@ -3964,8 +3970,8 @@ export class Ui {
     if (!this.tripFinds.size) return;
     const parts = [...this.tripFinds].map(([comp, f]) => {
       const plain = f.cards - f.gold;
-      const what = [plain ? (plain === 1 ? 'a card' : `${fmt(plain)} cards`) : '', f.gold ? (f.gold === 1 ? 'a gold card' : `${fmt(f.gold)} gold cards`) : ''].filter(Boolean).join(' and ');
-      return `<b>${esc(COMPS[comp].name)}</b> found ${what}`;
+      const what = [plain ? t('ui.trips.foundCards', { count: plain, n: fmt(plain) }) : '', f.gold ? t('ui.trips.foundGold', { count: f.gold, n: fmt(f.gold) }) : ''].filter(Boolean);
+      return t('ui.trips.found', { name: esc(COMPS[comp].name), what: list(what) });
     });
     const first = [...this.tripFinds.keys()][0];
     this.tripFinds.clear();
@@ -3984,12 +3990,12 @@ export class Ui {
     if (DEMO) return;
     const back = this.tripsBack.splice(0);
     const cards = back.flatMap((b) => b.cards);
-    const who = back.map((b) => `<p>${charFit(COMPS[b.comp].sprite, 22)} <b>${esc(COMPS[b.comp].name)}</b> · floor ${fmt(b.floor)} · ${fmt(b.kills)} kills</p>`).join('');
-    const html = `<header class="m-head"><h2>Back from ${back.length === 1 ? 'an expedition' : 'expeditions'}</h2></header>
+    const who = back.map((b) => `<p>${charFit(COMPS[b.comp].sprite, 22)} <b>${esc(COMPS[b.comp].name)}</b> · ${t('ui.floorLower', { floor: fmt(b.floor) })} · ${t('ui.trips.kills', { count: b.kills, n: fmt(b.kills) })}</p>`).join('');
+    const html = `<header class="m-head"><h2>${t('ui.trips.backTitle', { count: back.length })}</h2></header>
       <div class="offline">
         ${who}
-        ${cards.length ? `<p>Cards <b>${fmt(cards.length)}</b></p><div class="offline-cards">${this.offlineCardsHtml(cards)}</div>` : '<p class="muted">No cards</p>'}
-        <button class="btn primary big" data-act="${over ? 'tripsBackDone' : 'close'}">${cards.length ? 'Collect' : 'Okay'}</button>
+        ${cards.length ? `<p>${t('ui.trips.backCards', { n: fmt(cards.length) })}</p><div class="offline-cards">${this.offlineCardsHtml(cards)}</div>` : `<p class="muted">${t('ui.trips.noCards')}</p>`}
+        <button class="btn primary big" data-act="${over ? 'tripsBackDone' : 'close'}">${cards.length ? t('ui.offline.collect') : t('ui.offline.okay')}</button>
       </div>`;
     if (over) {
       this.tripsBackDone();
@@ -4020,16 +4026,16 @@ export class Ui {
     this.modal = 'offline';
     this.el.modalWrap.hidden = false;
     this.el.modal.className = 'modal pnl m-offline';
-    const kills = `${fmt(o.kills)} monster${o.kills === 1 ? '' : 's'}`;
-    this.el.modal.innerHTML = `<header class="m-head"><h2>Welcome back</h2></header>
+    const kills = t('ui.offline.monsters', { count: o.kills, n: fmt(o.kills) });
+    this.el.modal.innerHTML = `<header class="m-head"><h2>${t('ui.offline.title')}</h2></header>
       <div class="offline">
-        <p>You were away for <b>${duration(o.seconds)}</b>.</p>
-        <p>Your party kept fighting, killed <b>${kills}</b>${o.floor ? ` and reached <b>floor ${fmt(o.floor)}</b>` : ''}, and looted</p>
+        <p>${t('ui.offline.away', { time: duration(o.seconds) })}</p>
+        <p>${o.floor ? t('ui.offline.foughtFloor', { kills, floor: fmt(o.floor) }) : t('ui.offline.fought', { kills })}</p>
         <div class="offline-v">${sprite('coin', 5)}<b>${fmt(o.gold)}</b></div>
-        <p class="muted">gold</p>
+        <p class="muted">${t('ui.offline.gold')}</p>
         ${this.awaySpiritsHtml()}
-        ${o.cards.length ? `<p>and found <b>${o.cards.length === 1 ? 'a card' : `${o.cards.length} cards`}</b></p><div class="offline-cards">${this.offlineCardsHtml(o.cards)}</div>` : ''}
-        <button class="btn primary big" data-act="close">Collect</button>
+        ${o.cards.length ? `<p>${t('ui.offline.cards', { count: o.cards.length })}</p><div class="offline-cards">${this.offlineCardsHtml(o.cards)}</div>` : ''}
+        <button class="btn primary big" data-act="close">${t('ui.offline.collect')}</button>
       </div>`;
     // Collecting spins each card once, with how many came.
     this.offlineCards = this.groupCards(o.cards);
@@ -4062,7 +4068,7 @@ export class Ui {
   private offlineCardsHtml(cards: Extract<Drop, { t: 'card' }>[]) {
     return this.groupCards(cards).map((card) => {
       const n = card.copies ?? 1;
-      return `<span class="oc${card.newColor ? ' new' : ''}">${cardFace(CARD_BY_ID.get(card.id)!, 'got', card.gold, 32, card.lap)}${n > 1 ? `<b class="oc-n">×${n}</b>` : ''}${card.newColor ? '<em class="oc-new">New</em>' : ''}</span>`;
+      return `<span class="oc${card.newColor ? ' new' : ''}">${cardFace(CARD_BY_ID.get(card.id)!, 'got', card.gold, 32, card.lap)}${n > 1 ? `<b class="oc-n">×${n}</b>` : ''}${card.newColor ? `<em class="oc-new">${t('ui.cards.new')}</em>` : ''}</span>`;
     }).join('');
   }
 

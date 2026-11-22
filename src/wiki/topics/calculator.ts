@@ -1,9 +1,10 @@
 import Decimal from 'break_infinity.js';
-import { COMPS, LEGENDS, TROPHIES, UPGRADES, type LegendId } from '../../game/data.ts';
+import { ABILITY_BY_ID, COMPS, LEGENDS, TROPHIES, UPGRADES, type LegendId } from '../../game/data.ts';
 import {
   Game, MANUAL_RATE, SAVE_VERSION, STREAK_CAP, TUNE, newSave, type Buff, type SaveState,
 } from '../../game/game.ts';
 import { fmt } from '../../game/format.ts';
+import { decimal, percent, t } from '../../i18n/index.ts';
 import { esc, h2 } from '../kit.ts';
 import { spr } from '../sprites.ts';
 import type { Page } from '../pages.ts';
@@ -70,17 +71,17 @@ const delta = (now: Decimal | number, was: Decimal | number) => {
   const b = new Decimal(was);
   if (b.lte(0) || a.eq(b)) return '';
   const r = a.div(b).toNumber();
-  const text = r >= 10 ? `×${fmt(r)}` : `${r > 1 ? '+' : ''}${((r - 1) * 100).toFixed(1)}%`;
+  const text = r >= 10 ? `×${fmt(r)}` : `${r > 1 ? '+' : ''}${percent(r - 1, 1)}`;
   return ` <span class="cx-d ${r > 1 ? 'up' : 'down'}">${text}</span>`;
 };
 
-const body = () => `<p class="lede">Try out a build. Start from your save, a new game or a save code, change anything, and see what it does. It runs the game's own math.</p>
+const body = () => `<p class="lede">${t('wiki.calc.lede')}</p>
   <div class="cx-src"></div>
   <div class="cx">
     <div class="cx-in"></div>
     <aside class="cx-out"></aside>
   </div>
-  <p class="muted">Changes here never touch your save.</p>`;
+  <p class="muted">${t('wiki.calc.safe')}</p>`;
 
 function mount(root: HTMLElement) {
   const src = root.querySelector<HTMLElement>('.cx-src')!;
@@ -100,13 +101,13 @@ function mount(root: HTMLElement) {
 
   function showSource() {
     const opt = (k: Start, label: string, off = false) => `<button class="cx-seg${start === k ? ' on' : ''}" data-start="${k}"${off ? ' disabled' : ''}>${label}</button>`;
-    src.innerHTML = `<div class="cx-start"><span>Start from</span>
-        ${opt('save', 'My save', !found)}${opt('new', 'New game')}${opt('code', 'Save code')}
-        <button class="cx-btn" data-act="reset">Undo my changes</button></div>
-      ${start === 'code' ? `<div class="cx-paste"><p>Copy your save from Options in the game and paste it here.</p>
-        <textarea class="cx-code" rows="3" spellcheck="false"></textarea><button class="cx-btn" data-act="code">Load</button> <span class="cx-msg">${codeSave ? 'Loaded.' : ''}</span></div>` : ''}
-      ${found ? '' : '<p class="muted">No save in this browser yet.</p>'}
-      <p class="muted">Results show how far your changes move each number from where you started.</p>`;
+    src.innerHTML = `<div class="cx-start"><span>${t('wiki.calc.start')}</span>
+        ${opt('save', t('wiki.calc.start.save'), !found)}${opt('new', t('wiki.calc.start.new'))}${opt('code', t('wiki.calc.start.code'))}
+        <button class="cx-btn" data-act="reset">${t('wiki.calc.undo')}</button></div>
+      ${start === 'code' ? `<div class="cx-paste"><p>${t('wiki.calc.paste')}</p>
+        <textarea class="cx-code" rows="3" spellcheck="false"></textarea><button class="cx-btn" data-act="code">${t('wiki.calc.load')}</button> <span class="cx-msg">${codeSave ? t('wiki.calc.loaded') : ''}</span></div>` : ''}
+      ${found ? '' : `<p class="muted">${t('wiki.calc.noSave')}</p>`}
+      <p class="muted">${t('wiki.calc.deltas')}</p>`;
   }
 
   function startFrom(k: Start) {
@@ -123,20 +124,20 @@ function mount(root: HTMLElement) {
     const spirits = LEGENDS.map((d) => `<label class="cx-sp">${spr(d.sprite, 24)}<span>${d.name}</span><input type="number" min="0" max="${d.maxLv ?? 999}" step="1" data-spirit="${d.id}" value="${edit.legends[d.id] ?? 0}"></label>`).join('');
     const check = (k: keyof Scenario, label: string) => `<label class="cx-ck"><input type="checkbox" data-sc="${k}"${sc[k] ? ' checked' : ''}> ${label}</label>`;
     inputs.innerHTML = `
-      ${h2('Party')}
-      <div class="tbl"><table class="cx-t"><thead><tr><th>Companion</th><th>Level</th><th>Upgrades</th><th>Heartmarks</th></tr></thead><tbody>${comp}</tbody></table></div>
-      <p class="muted">Upgrades count up from the first: 3 means its first three. An upgrade needs its level.</p>
-      ${h2('Souls and Spirits')}
-      <div class="cx-row"><label>Souls kept <input type="number" min="0" step="1" data-kept value="${soulsKept(edit)}"></label>
-      <label>Trophies <input type="number" min="0" max="${TROPHIES.length}" step="1" data-trophies value="${edit.trophies.length}"></label></div>
+      ${h2(['party', t('wiki.calc.h.party')])}
+      <div class="tbl"><table class="cx-t"><thead><tr><th>${t('wiki.calc.party.companion')}</th><th>${t('wiki.calc.party.level')}</th><th>${t('wiki.calc.party.upgrades')}</th><th>${t('wiki.calc.party.marks')}</th></tr></thead><tbody>${comp}</tbody></table></div>
+      <p class="muted">${t('wiki.calc.party.note')}</p>
+      ${h2(['souls-and-spirits', t('wiki.calc.h.souls')])}
+      <div class="cx-row"><label>${t('wiki.calc.souls.kept')} <input type="number" min="0" step="1" data-kept value="${soulsKept(edit)}"></label>
+      <label>${t('wiki.calc.souls.trophies')} <input type="number" min="0" max="${TROPHIES.length}" step="1" data-trophies value="${edit.trophies.length}"></label></div>
       <div class="cx-sps">${spirits}</div>
-      ${h2('Situation')}
+      ${h2(['situation', t('wiki.calc.h.situation')])}
       <div class="cx-row">
-        <label>Attacks a second <input type="number" min="0" max="${MANUAL_RATE}" step="1" data-sc="rate" value="${sc.rate}"></label>
-        <label>Streak <input type="number" min="0" max="${STREAK_CAP}" step="1" data-sc="streak" value="${sc.streak}"></label>
-        <label>Rampage <select data-sc="rampage"><option value="0">Off</option><option value="1"${sc.rampage === 1 ? ' selected' : ''}>First tier</option><option value="2"${sc.rampage === 2 ? ' selected' : ''}>Top tier</option></select></label>
+        <label>${t('wiki.calc.situation.rate')} <input type="number" min="0" max="${MANUAL_RATE}" step="1" data-sc="rate" value="${sc.rate}"></label>
+        <label>${t('wiki.calc.situation.streak')} <input type="number" min="0" max="${STREAK_CAP}" step="1" data-sc="streak" value="${sc.streak}"></label>
+        <label>${t('wiki.calc.situation.rampage')} <select data-sc="rampage"><option value="0">${t('wiki.calc.situation.rampage.off')}</option><option value="1"${sc.rampage === 1 ? ' selected' : ''}>${t('wiki.calc.situation.rampage.first')}</option><option value="2"${sc.rampage === 2 ? ' selected' : ''}>${t('wiki.calc.situation.rampage.top')}</option></select></label>
       </div>
-      <div class="cx-row">${check('idle', 'Idle')}${check('bloodlust', 'Bloodlust')}${check('frenzy', 'Frenzy')}${check('treasure', 'Treasure Sense')}${check('goldRush', 'Gold Rush')}${check('drums', 'War Drums')}</div>`;
+      <div class="cx-row">${check('idle', t('wiki.calc.situation.idle'))}${check('bloodlust', t('wiki.goblins.bloodlust'))}${check('frenzy', t('wiki.goblins.frenzy'))}${check('treasure', ABILITY_BY_ID.get('treasure')!.name)}${check('goldRush', t('wiki.goblins.rush'))}${check('drums', ABILITY_BY_ID.get('drums')!.name)}</div>`;
     window.dispatchEvent(new Event('wiki:sprites'));
   }
 
@@ -151,18 +152,18 @@ function mount(root: HTMLElement) {
     const stat = (label: string, value: string, extra = '') => `<div class="cx-stat"><span>${label}</span><b>${value}${extra}</b></div>`;
     out.innerHTML = `
       <div class="cx-stats">
-        ${stat('Party DPS', fmt(now.dps()), delta(now.dps(), was.dps()))}
-        ${stat('Attack damage', fmt(hit), delta(hit, was.clickDamage()))}
-        ${stat('Crit', now.critChance() ? `${(now.critChance() * 100).toFixed(0)}% for ×${+now.critMult().toFixed(2)}` : 'Not unlocked')}
-        ${stat('Phantom Blade', now.autoRate() ? `${+now.autoRate().toFixed(1)} a second` : 'Not unlocked')}
-        ${stat('Gold', `×${fmt(now.goldMult())}`, delta(now.goldMult(), was.goldMult()))}
-        ${stat('Boss damage', `×${+now.breakdown().parts.boss.toFixed(2)}`)}
-        ${stat('Souls if you ascended', fmt(pending))}
+        ${stat(t('wiki.calc.out.dps'), fmt(now.dps()), delta(now.dps(), was.dps()))}
+        ${stat(t('wiki.calc.out.attack'), fmt(hit), delta(hit, was.clickDamage()))}
+        ${stat(t('wiki.calc.out.crit'), now.critChance() ? t('wiki.calc.out.crit.value', { chance: percent(now.critChance(), 0), mult: decimal(now.critMult(), 2) }) : t('wiki.calc.out.locked'))}
+        ${stat(ABILITY_BY_ID.get('blade')!.name, now.autoRate() ? t('wiki.calc.out.blade.value', { rate: decimal(now.autoRate(), 1) }) : t('wiki.calc.out.locked'))}
+        ${stat(t('wiki.calc.out.gold'), `×${fmt(now.goldMult())}`, delta(now.goldMult(), was.goldMult()))}
+        ${stat(t('wiki.calc.out.boss'), `×${decimal(now.breakdown().parts.boss, 2)}`)}
+        ${stat(t('wiki.calc.out.souls'), fmt(pending))}
       </div>
-      <h3>Who does the damage</h3>
-      ${party.length ? `<div class="tbl"><table><thead><tr><th>Companion</th><th class="num">DPS</th><th class="num">Share</th></tr></thead><tbody>
-        ${party.map((r) => `<tr><td><span class="who">${spr(r.c.sprite, 22)}${esc(r.c.name)}</span></td><td class="num">${fmt(r.dps)}</td><td class="num">${total.gt(0) ? `${(r.dps.div(total).toNumber() * 100).toFixed(1)}%` : '—'}</td></tr>`).join('')}
-      </tbody></table></div>` : '<p class="muted">No one hired.</p>'}
+      <h3>${t('wiki.calc.out.who')}</h3>
+      ${party.length ? `<div class="tbl"><table><thead><tr><th>${t('wiki.calc.out.who.companion')}</th><th class="num">${t('wiki.calc.out.who.dps')}</th><th class="num">${t('wiki.calc.out.who.share')}</th></tr></thead><tbody>
+        ${party.map((r) => `<tr><td><span class="who">${spr(r.c.sprite, 22)}${esc(r.c.name)}</span></td><td class="num">${fmt(r.dps)}</td><td class="num">${total.gt(0) ? percent(r.dps.div(total).toNumber(), 1) : '—'}</td></tr>`).join('')}
+      </tbody></table></div>` : `<p class="muted">${t('wiki.calc.out.none')}</p>`}
 `;
     window.dispatchEvent(new Event('wiki:sprites'));
   }
@@ -185,7 +186,7 @@ function mount(root: HTMLElement) {
       if (lv) edit.legends[d.spirit as LegendId] = lv;
       else delete edit.legends[d.spirit as LegendId];
     } else if ('kept' in d) edit.souls = edit.spentSouls + num(el);
-    else if ('trophies' in d) edit.trophies = TROPHIES.slice(0, Math.min(TROPHIES.length, num(el))).map((t) => t.id);
+    else if ('trophies' in d) edit.trophies = TROPHIES.slice(0, Math.min(TROPHIES.length, num(el))).map((trophy) => trophy.id);
     else if (d.sc) {
       const k = d.sc as keyof Scenario;
       (sc as unknown as Record<string, number | boolean>)[k] = el.type === 'checkbox' ? el.checked : num(el);
@@ -210,7 +211,7 @@ function mount(root: HTMLElement) {
     else if (el.dataset.act === 'code') {
       const loaded = decodeSave(src.querySelector<HTMLTextAreaElement>('.cx-code')!.value);
       if (!loaded) {
-        src.querySelector('.cx-msg')!.textContent = 'That code didn\'t work.';
+        src.querySelector('.cx-msg')!.textContent = t('wiki.calc.badCode');
         return;
       }
       codeSave = loaded;
@@ -226,4 +227,4 @@ function mount(root: HTMLElement) {
   showResults();
 }
 
-export const CALCULATOR: Page = { id: 'calculator', group: 'Start here', title: 'Calculator', summary: 'Try out a build: levels, upgrades, Spirits, souls and buffs.', body, mount };
+export const CALCULATOR: Page = { id: 'calculator', group: 'start', title: t('wiki.page.calculator'), summary: t('wiki.page.calculator.summary'), body, mount };

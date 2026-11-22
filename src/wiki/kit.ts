@@ -1,17 +1,20 @@
 /** Small builders the wiki's pages are written with. */
-
-export const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+import { decimal, percent, t } from '../i18n/index.ts';
 
 export const esc = (s: string) => s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
 
-export const h2 = (title: string) => `<h2 id="${slug(title)}">${title}</h2>`;
-export const h3 = (title: string) => `<h3 id="${slug(title)}">${title}</h3>`;
+/** A section: its anchor, which stays English so links and URLs work in every language, and its title. */
+export type Section = readonly [id: string, title: string];
 
-export const link = (page: string, text: string, section?: string) => `<a href="#/${page}${section ? `/${slug(section)}` : ''}">${text}</a>`;
+export const h2 = ([id, title]: Section) => `<h2 id="${id}">${title}</h2>`;
+export const h3 = ([id, title]: Section) => `<h3 id="${id}">${title}</h3>`;
 
-/** A contents box for a page's sections (pass the same titles given to h2). */
-export function toc(page: string, titles: string[]) {
-  return `<nav class="toc"><b>Contents</b><ol>${titles.map((t) => `<li>${link(page, t, t)}</li>`).join('')}</ol></nav>`;
+/** A link to a page, or to one of its sections by the section's id. */
+export const link = (page: string, text: string, section?: string) => `<a href="#/${page}${section ? `/${section}` : ''}">${text}</a>`;
+
+/** A contents box for a page's sections (pass the same sections given to h2). */
+export function toc(page: string, sections: Section[]) {
+  return `<nav class="toc"><b>${t('wiki.toc')}</b><ol>${sections.map(([id, title]) => `<li>${link(page, title, id)}</li>`).join('')}</ol></nav>`;
 }
 
 /** A column: its heading, and `num` for right-aligned figures or `c` for centered. */
@@ -31,18 +34,22 @@ export const splitTables = (cols: Col[], groups: (string | number)[][][]) =>
   `<div class="tbl split">${groups.map((rows) => bareTable(cols, rows)).join('')}</div>`;
 
 export function infobox(art: string, rows: [string, string][], flavor = '') {
-  return `<aside class="infobox"><div class="art">${art}</div><dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>${flavor ? `<p class="flavor">“${esc(flavor)}”</p>` : ''}</aside>`;
+  return `<aside class="infobox"><div class="art">${art}</div><dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>${flavor ? `<p class="flavor">${t('wiki.flavor', { flavor: esc(flavor) })}</p>` : ''}</aside>`;
 }
 
 export const range = (from: number, to: number, step = 1) => Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, k) => from + k * step);
 
+/** Seconds as "30s", "2.5s", "90s". */
+export const seconds = (s: number) => t('wiki.secs.s', { n: decimal(s, 1) });
+
 /** Seconds as "8 min", "30s", "1 h 20 min". */
 export function secs(s: number) {
-  if (s < 60) return `${+s.toFixed(1)}s`;
-  if (s < 3600) return `${+(s / 60).toFixed(1)} min`;
-  const h = Math.floor(s / 3600);
-  const m = Math.round((s % 3600) / 60);
-  return m ? `${h} h ${m} min` : `${h} h`;
+  if (s < 60) return seconds(s);
+  if (s < 3600) return t('wiki.secs.min', { n: decimal(s / 60, 1) });
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.round((s % 3600) / 60);
+  return minutes ? t('wiki.secs.hmin', { hours, minutes }) : t('wiki.secs.h', { hours });
 }
 
-export const pct = (n: number, digits = 1) => `${+(n * 100).toFixed(digits)}%`;
+/** A fraction as a percent with up to `digits` decimals: 0.125 → "12.5%". */
+export const pct = (n: number, digits = 1) => percent(n, digits, 0);

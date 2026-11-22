@@ -230,10 +230,12 @@ export const zoneFor = (floor: number) => ZONES[zoneOf(floor) % ZONES.length];
 /** Every lap through the eight zones comes back darker, washed in its own color. */
 const LAPS: [english: string, tint: number][] = [['', 0xffffff], ['Corrupted', 0xc89cff], ['Abyssal', 0xff8a8a], ['Hollow', 0x9cffd2], ['Eternal', 0xffd890]];
 /** `name` labels the lap ("Corrupted"). `word` is what it puts in monster and zone names through the data.card.colored
- *  and data.zone.colored templates: the same in English, a genitive where adjectives would need a gender ("Бездны"). */
-export const CORRUPTION: { name: string; word: string; tint: number }[] = LAPS.map(([english, tint], lap) => ({
+ *  and data.zone.colored templates: the same in English, a genitive where adjectives would need a gender ("Бездны").
+ *  `state` ends a sentence ("everything returns abyssal"). */
+export const CORRUPTION: { name: string; word: string; state: string; tint: number }[] = LAPS.map(([english, tint], lap) => ({
   name: text(`lap.${lap}.name`, english),
   word: text(`lap.${lap}.word`, english),
+  state: text(`lap.${lap}.state`, english.toLowerCase()),
   tint,
 }));
 

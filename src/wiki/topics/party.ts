@@ -1,10 +1,11 @@
-import { ABILITIES, ABILITY_BY_UPGRADE, COMPS, LEGENDS, LEVEL_BONUS, UPGRADES, levelMult, type CompDef, type UpgDef } from '../../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, COMPS, LEGENDS, LEVEL_BONUS, UPGRADES, levelMult, type AbilityId, type Attack, type CompDef, type UpgDef } from '../../game/data.ts';
 import {
   AUTO_BASE, AUTO_HIRE_ASCENTS, BASE_CRIT, BASE_CRIT_MULT, CLEAVE_BASE, CLICK_DPS, DRUMS_CRIT, FEVER_CLICKS, FEVER_TIME, FLURRY_RATE, IDLE_AFTER, MANUAL_RATE, MARK_POWER,
   RAMPAGE_EXTEND, RAMPAGE_STEPS, RAMPAGE_TIERS, REBUY_GAP, REVEAL_AT, STREAK_CAP, STREAK_GAP, TUNE,
 } from '../../game/game.ts';
 import { fmt } from '../../game/format.ts';
-import { esc, h2, infobox, link, pct, secs, splitTables, table, toc } from '../kit.ts';
+import { decimal, int, t, type UiKey } from '../../i18n/index.ts';
+import { esc, h2, infobox, link, pct, seconds, secs, splitTables, table, toc } from '../kit.ts';
 import { spr } from '../sprites.ts';
 import type { Page } from '../pages.ts';
 
@@ -12,59 +13,89 @@ const traitsOf = (i: number) => UPGRADES.filter((u) => u.req.t === 'owned' && u.
 const traitLevel = (u: UpgDef) => (u.req.t === 'owned' ? u.req.n : 0);
 const traitText = (u: UpgDef) => {
   const ability = ABILITY_BY_UPGRADE.get(u.id);
-  return ability ? `Unlocks ${link('abilities', ability.name, ability.name)}.` : esc(u.desc);
+  return ability ? t('wiki.comp.unlocks', { ability: link('abilities', ability.name, ability.id) }) : esc(u.desc);
 };
 const compId = (c: CompDef) => `companion-${c.id}`;
+const abilityName = (id: AbilityId) => ABILITY_BY_ID.get(id)!.name;
 
 const levelCost = (c: CompDef, lv: number) => c.cost * TUNE.costGrowth ** (lv - 1);
 const totalCost = (c: CompDef, lv: number) => (c.cost * (TUNE.costGrowth ** lv - 1)) / (TUNE.costGrowth - 1);
 const baseDamage = (c: CompDef, lv: number) => c.dps * lv * levelMult(lv);
+const costGrowth = () => decimal(TUNE.costGrowth, 3);
+
+/** A companion's kind of attack, shown on its page. */
+const ATTACK = {
+  arrow: 'wiki.comp.attack.arrow',
+  bolt: 'wiki.comp.attack.bolt',
+  storm: 'wiki.comp.attack.storm',
+  slash: 'wiki.comp.attack.slash',
+  fire: 'wiki.comp.attack.fire',
+  rune: 'wiki.comp.attack.rune',
+  dark: 'wiki.comp.attack.dark',
+  knife: 'wiki.comp.attack.knife',
+  spear: 'wiki.comp.attack.spear',
+  bomb: 'wiki.comp.attack.bomb',
+  orb: 'wiki.comp.attack.orb',
+  ice: 'wiki.comp.attack.ice',
+  flask: 'wiki.comp.attack.flask',
+  bat: 'wiki.comp.attack.bat',
+  skull: 'wiki.comp.attack.skull',
+  light: 'wiki.comp.attack.light',
+} as const satisfies Record<Attack, UiKey>;
 
 const LEVELS = [[1, 10, 25, 50, 75, 100, 125, 150], [175, 200, 225, 250, 300, 400, 500, 1000]];
 
 function companionPage(c: CompDef, i: number): Page {
   const traits = traitsOf(i);
   return {
-    id: compId(c), parent: 'companions', group: 'Your party', title: c.name, summary: c.flavor,
+    id: compId(c), parent: 'companions', group: 'party', title: c.name, summary: c.flavor,
     body: () => `${infobox(spr(c.sprite, 96), [
-      ['Hire', `${fmt(c.cost)} gold`],
-      ['Damage', `${fmt(c.dps)} a level`],
-      ['Attack', c.attack],
-      ['Upgrades', String(traits.length)],
+      [t('wiki.comp.hire'), t('wiki.comp.hire.gold', { gold: fmt(c.cost) })],
+      [t('wiki.comp.damage'), t('wiki.comp.damage.level', { damage: fmt(c.dps) })],
+      [t('wiki.comp.attack'), t(ATTACK[c.attack])],
+      [t('wiki.comp.upgrades'), String(traits.length)],
     ], c.flavor)}
       <p class="lede">${esc(c.flavor)}</p>
-      ${h2('Upgrades')}
-      <p>An upgrade opens when ${c.name} reaches its level, and is bought with gold on ${c.name}'s row. Upgrades are bought again every run.</p>
-      ${table([{ h: 'Level', cls: 'c' }, 'Upgrade', { h: 'Cost', cls: 'num' }, 'Effect'], traits.map((u) => [`<b>${traitLevel(u)}</b>`, esc(u.name), fmt(u.cost), traitText(u)]))}
-      ${h2('Levels')}
-      <p>Each level costs ×${TUNE.costGrowth} the last. Damage is ${fmt(c.dps)} × level, ×${LEVEL_BONUS.mult} every ${LEVEL_BONUS.every} levels from ${LEVEL_BONUS.from} (×${LEVEL_BONUS.thousand} at each 1000th level). The table leaves out upgrades and every other bonus.</p>
-      ${splitTables([{ h: 'Lvl', cls: 'c' }, { h: 'Level cost', cls: 'num' }, { h: 'Total', cls: 'num' }, { h: 'Damage', cls: 'num' }],
+      ${h2(['upgrades', t('wiki.comp.h.upgrades')])}
+      <p>${t('wiki.comp.upgrades.p', { name: c.name })}</p>
+      ${table([{ h: t('wiki.comp.upgrades.level'), cls: 'c' }, t('wiki.comp.upgrades.upgrade'), { h: t('wiki.comp.upgrades.cost'), cls: 'num' }, t('wiki.comp.upgrades.effect')], traits.map((u) => [`<b>${traitLevel(u)}</b>`, esc(u.name), fmt(u.cost), traitText(u)]))}
+      ${h2(['levels', t('wiki.comp.h.levels')])}
+      <p>${t('wiki.comp.levels', { growth: costGrowth(), damage: fmt(c.dps), mult: LEVEL_BONUS.mult, every: LEVEL_BONUS.every, from: LEVEL_BONUS.from, thousand: LEVEL_BONUS.thousand })}</p>
+      ${splitTables([{ h: t('wiki.comp.levels.lvl'), cls: 'c' }, { h: t('wiki.comp.levels.cost'), cls: 'num' }, { h: t('wiki.comp.levels.total'), cls: 'num' }, { h: t('wiki.comp.levels.damage'), cls: 'num' }],
         LEVELS.map((levels) => levels.map((lv) => [`<b>${lv}</b>`, fmt(levelCost(c, lv)), fmt(totalCost(c, lv)), fmt(baseDamage(c, lv))])))}
       <div class="clear"></div>`,
   };
 }
 
-const companionsBody = () => `<p class="lede">Companions fight for you. Hire them with gold, level them up, and buy their upgrades. Their damage is most of your damage.</p>
-  ${toc('companions', ['The roster', 'Hiring and leveling', 'Level milestones', 'Your hero', 'Heartmarks'])}
-  ${h2('The roster')}
-  ${table(['Companion', { h: 'Hire', cls: 'num' }, { h: 'Damage / level', cls: 'num' }, { h: 'Upgrades', cls: 'c' }], COMPS.map((c, i) => [
+const COMPANIONS = {
+  roster: ['the-roster', t('wiki.companions.h.roster')],
+  hiring: ['hiring-and-leveling', t('wiki.companions.h.hiring')],
+  milestones: ['level-milestones', t('wiki.companions.h.milestones')],
+  hero: ['your-hero', t('wiki.companions.h.hero')],
+  marks: ['heartmarks', t('wiki.companions.h.marks')],
+} as const;
+
+const companionsBody = () => `<p class="lede">${t('wiki.companions.lede')}</p>
+  ${toc('companions', [COMPANIONS.roster, COMPANIONS.hiring, COMPANIONS.milestones, COMPANIONS.hero, COMPANIONS.marks])}
+  ${h2(COMPANIONS.roster)}
+  ${table([t('wiki.companions.roster.companion'), { h: t('wiki.companions.roster.hire'), cls: 'num' }, { h: t('wiki.companions.roster.damage'), cls: 'num' }, { h: t('wiki.companions.roster.upgrades'), cls: 'c' }], COMPS.map((c, i) => [
     `<a class="who" href="#/${compId(c)}">${spr(c.sprite, 28)}${c.name}</a>`, fmt(c.cost), fmt(c.dps), traitsOf(i).length,
   ]))}
-  ${h2('Hiring and leveling')}
-  <p>The first level of a companion costs its hire price. Each level after costs ×${TUNE.costGrowth} the one before. The next companion in the roster shows up once you've had ${pct(REVEAL_AT, 0)} of its hire price this run.</p>
-  <p>The buy buttons above the roster set how many levels a click buys:</p>
-  ${table(['Button', 'Buys'], [
-    ['×1, ×10, ×100', 'That many levels'],
-    ['Next', 'Up to the next level that brings something: an upgrade, or a milestone'],
-    ['Max', 'As many as you can afford'],
+  ${h2(COMPANIONS.hiring)}
+  <p>${t('wiki.companions.hiring', { growth: costGrowth(), reveal: pct(REVEAL_AT, 0) })}</p>
+  <p>${t('wiki.companions.buttons')}</p>
+  ${table([t('wiki.companions.buttons.button'), t('wiki.companions.buttons.buys')], [
+    ['×1, ×10, ×100', t('wiki.companions.buttons.many')],
+    [t('wiki.companions.buttons.next'), t('wiki.companions.buttons.next.buys')],
+    [t('wiki.companions.buttons.max'), t('wiki.companions.buttons.max.buys')],
   ])}
-  ${h2('Level milestones')}
-  <p>From level ${LEVEL_BONUS.from}, every ${LEVEL_BONUS.every} levels multiplies that companion's damage by ${LEVEL_BONUS.mult}, and every 1000th level by ${LEVEL_BONUS.thousand} instead. These stack: level 250 is ×${levelMult(250)}.</p>
-  ${splitTables([{ h: 'Level', cls: 'c' }, { h: 'Damage ×', cls: 'num' }], [[200, 225, 250, 275, 300, 400, 500].map((lv) => [`<b>${lv}</b>`, fmt(levelMult(lv))]), [750, 1000, 1500, 2000, 3000].map((lv) => [`<b>${lv}</b>`, fmt(levelMult(lv))])])}
-  ${h2('Your hero')}
-  <p>One companion is your hero, marked with a star on its row. Click the star on another to switch. Your hero leaves the formation, follows your pointer, attacks what you point at, and picks up gold it walks over. It deals the same damage as it would in line.</p>
-  ${h2('Heartmarks')}
-  <p>Each Heartmark on a companion adds +${pct(MARK_POWER, 0)} to its damage. See ${link('heartmarks', 'Heartmarks')}.</p>`;
+  ${h2(COMPANIONS.milestones)}
+  <p>${t('wiki.companions.milestones', { from: LEVEL_BONUS.from, every: LEVEL_BONUS.every, mult: LEVEL_BONUS.mult, thousand: LEVEL_BONUS.thousand, at250: levelMult(250) })}</p>
+  ${splitTables([{ h: t('wiki.companions.milestones.level'), cls: 'c' }, { h: t('wiki.companions.milestones.damage'), cls: 'num' }], [[200, 225, 250, 275, 300, 400, 500].map((lv) => [`<b>${lv}</b>`, fmt(levelMult(lv))]), [750, 1000, 1500, 2000, 3000].map((lv) => [`<b>${lv}</b>`, fmt(levelMult(lv))])])}
+  ${h2(COMPANIONS.hero)}
+  <p>${t('wiki.companions.hero')}</p>
+  ${h2(COMPANIONS.marks)}
+  <p>${t('wiki.companions.marks', { power: pct(MARK_POWER, 0), heartmarks: link('heartmarks', t('wiki.companions.marks.link')) })}</p>`;
 
 /** The companions whose traits add to a crit stat, and the total they add. */
 function critTraits(stat: 'chance' | 'add') {
@@ -75,84 +106,100 @@ function critTraits(stat: 'chance' | 'add') {
 const critChance = critTraits('chance');
 const critDamage = critTraits('add');
 
-const attacksBody = () => `<p class="lede">You attack by clicking, tapping, or holding the button down. Your attacks borrow part of your party's damage.</p>
-  ${toc('attacks', ['Attack damage', 'Critical hits', 'Streaks', 'Idle'])}
-  ${h2('Attack damage')}
-  <p>An attack deals ${pct(CLICK_DPS, 0)} of your party's damage per second, plus 1% for each click upgrade you own (there are ${UPGRADES.filter((u) => u.effect.t === 'clickDps').length}). ${link('spirit-fist', 'The Fist')} multiplies it, and so does Frenzy from a ${link('goblins', 'treasure goblin')}. Rampage and Bloodlust boost the party, not your attacks.</p>
-  <p>You can attack up to ${MANUAL_RATE} times a second. Holding the button down attacks at that rate on its own. Flurry and the Phantom Blade aren't limited by it.</p>
-  ${h2('Critical hits')}
-  <p>Once the Ranger unlocks Critical Hits, your attacks, Flurry and the Phantom Blade can crit: a ${pct(BASE_CRIT, 0)} chance for ×${BASE_CRIT_MULT} damage to start. Companions don't crit.</p>
-  ${table(['Source', 'Crit chance', 'Crit damage'], [
-    ['Base', pct(BASE_CRIT, 0), `×${BASE_CRIT_MULT}`],
-    [`Upgrades (${critChance.names})`, `+${pct(critChance.total, 0)} in all`, ''],
-    [`Upgrades (${critDamage.names})`, '', `+${critDamage.total}× in all`],
-    ['War Drums', `+${pct(DRUMS_CRIT, 0)} for its duration`, ''],
-    [link('spirit-needle', 'The Needle'), 'up to +50%', ''],
-    [link('spirit-breaker', 'The Breaker'), '', '×(1 + 0.15 a level)'],
+const ATTACKS = {
+  damage: ['attack-damage', t('wiki.attacks.h.damage')],
+  crits: ['critical-hits', t('wiki.attacks.h.crits')],
+  streaks: ['streaks', t('wiki.attacks.h.streaks')],
+  idle: ['idle', t('wiki.attacks.h.idle')],
+} as const;
+
+const attacksBody = () => `<p class="lede">${t('wiki.attacks.lede')}</p>
+  ${toc('attacks', [ATTACKS.damage, ATTACKS.crits, ATTACKS.streaks, ATTACKS.idle])}
+  ${h2(ATTACKS.damage)}
+  <p>${t('wiki.attacks.damage', {
+    share: pct(CLICK_DPS, 0), count: UPGRADES.filter((u) => u.effect.t === 'clickDps').length,
+    fist: link('spirit-fist', t('wiki.attacks.damage.fist')), goblin: link('goblins', t('wiki.attacks.damage.goblin')),
+  })}</p>
+  <p>${t('wiki.attacks.rate', { count: MANUAL_RATE })}</p>
+  ${h2(ATTACKS.crits)}
+  <p>${t('wiki.attacks.crits', { chance: pct(BASE_CRIT, 0), mult: BASE_CRIT_MULT })}</p>
+  ${table([t('wiki.attacks.crits.source'), t('wiki.attacks.crits.chance'), t('wiki.attacks.crits.damage')], [
+    [t('wiki.attacks.crits.base'), pct(BASE_CRIT, 0), `×${BASE_CRIT_MULT}`],
+    [t('wiki.attacks.crits.upgrades', { companions: critChance.names }), t('wiki.attacks.crits.upgrades.chance', { chance: pct(critChance.total, 0) }), ''],
+    [t('wiki.attacks.crits.upgrades', { companions: critDamage.names }), '', t('wiki.attacks.crits.upgrades.damage', { add: decimal(critDamage.total, 2) })],
+    [abilityName('drums'), t('wiki.attacks.crits.drums', { chance: pct(DRUMS_CRIT, 0) }), ''],
+    [link('spirit-needle', t('wiki.attacks.crits.needle')), t('wiki.attacks.crits.needle.chance'), ''],
+    [link('spirit-breaker', t('wiki.attacks.crits.breaker')), '', t('wiki.attacks.crits.breaker.damage')],
   ])}
-  ${h2('Streaks')}
-  <p>Each attack within ${STREAK_GAP} seconds of the last adds to your streak, up to ${STREAK_CAP.toLocaleString('en-US')}. Stop for ${STREAK_GAP} seconds and it starts over. ${link('spirit-unbroken', 'The Unbroken')} turns your streak into damage.</p>
-  ${h2('Idle')}
-  <p>You're idle after ${IDLE_AFTER} seconds without attacking by hand. Flurry and the Phantom Blade don't count as attacking. ${link('spirit-sleeper', 'The Sleeper')} and ${link('spirit-patient', 'the Patient')} only work while you're idle, and time away always counts as idle.</p>`;
+  ${h2(ATTACKS.streaks)}
+  <p>${t('wiki.attacks.streaks', { gap: STREAK_GAP, cap: int(STREAK_CAP), unbroken: link('spirit-unbroken', t('wiki.attacks.streaks.unbroken')) })}</p>
+  ${h2(ATTACKS.idle)}
+  <p>${t('wiki.attacks.idle', { count: IDLE_AFTER, sleeper: link('spirit-sleeper', t('wiki.attacks.idle.sleeper')), patient: link('spirit-patient', t('wiki.attacks.idle.patient')) })}</p>`;
+
+const ABILITY_KIND = { passive: 'wiki.abilities.kind.passive', charge: 'wiki.abilities.kind.charge', button: 'wiki.abilities.kind.button' } as const;
 
 const abilitiesBody = () => {
   const spiritFor = (id: string) => LEGENDS.find((d) => d.lengthens?.ability === id);
-  return `<p class="lede">Abilities come from companion upgrades. Buying the upgrade unlocks the ability for the rest of the run. You earn them again after every ascent.</p>
-    ${table(['Ability', 'Unlocked by', 'Kind', 'Lasts', 'Cooldown', 'Longer with'], ABILITIES.map((a) => {
+  const brawler = COMPS[ABILITY_BY_ID.get('rampage')!.comp];
+  return `<p class="lede">${t('wiki.abilities.lede')}</p>
+    ${table([t('wiki.abilities.ability'), t('wiki.abilities.unlockedBy'), t('wiki.abilities.kind'), t('wiki.abilities.lasts'), t('wiki.abilities.cooldown'), t('wiki.abilities.longer')], ABILITIES.map((a) => {
       const c = COMPS[a.comp];
       const u = UPGRADES.find((x) => x.id === `m${a.comp}_${a.trait}`)!;
       const spirit = spiritFor(a.id);
-      return [`<b id="${a.name.toLowerCase().replace(/[^a-z]+/g, '-')}">${a.name}</b>`, `<span class="who">${spr(c.sprite, 22)}${c.name}, level ${traitLevel(u)}</span>`,
-        a.kind === 'passive' ? 'Always on' : a.kind === 'charge' ? 'Charged' : 'Button',
-        a.id === 'rampage' ? `${FEVER_TIME}s` : a.dur ? `${a.dur}s` : '—', a.cooldown ? secs(a.cooldown) : '—',
-        spirit ? `${link(`spirit-${spirit.id}`, spirit.name)} (+${spirit.lengthens!.secs}s a level)` : '—'];
+      return [`<b id="${a.id}">${a.name}</b>`, `<span class="who">${spr(c.sprite, 22)}${t('wiki.abilities.unlockedBy.cell', { name: c.name, level: traitLevel(u) })}</span>`,
+        t(ABILITY_KIND[a.kind]),
+        a.id === 'rampage' ? seconds(FEVER_TIME) : a.dur ? seconds(a.dur) : '—', a.cooldown ? secs(a.cooldown) : '—',
+        spirit ? t('wiki.abilities.longer.cell', { spirit: link(`spirit-${spirit.id}`, spirit.name), seconds: seconds(spirit.lengthens!.secs) }) : '—'];
     }))}
-    ${h2('What each one does')}
-    ${table(['Ability', 'Effect'], [
-      ['Phantom Blade', `Attacks the front monster for you, ${AUTO_BASE} time a second. Each blade upgrade adds one more (up to 6 a second). Its hits count as attacks for crits and Cleave.`],
-      ['Flurry', `Attacks wherever you point, ${FLURRY_RATE} times a second. These count toward Rampage.`],
-      ['Critical Hits', `Lets attacks crit. See ${link('attacks', 'Attacks', 'Critical hits')}.`],
-      ['Rampage', 'See below.'],
-      ['Cleave', `Your attacks also hit every other monster for ${pct(CLEAVE_BASE, 0)} of their damage. Two upgrades raise it (Shieldmaiden ×1.25, Paladin ×1.5).`],
-      ['Treasure Sense', 'Monsters drop ×3 gold.'],
-      ['War Drums', `+${pct(DRUMS_CRIT, 0)} crit chance.`],
-      ['Phantom Legion', 'Every Phantom Blade attack hits every monster on the floor.'],
+    ${h2(['what-each-one-does', t('wiki.abilities.h.what')])}
+    ${table([t('wiki.abilities.ability'), t('wiki.abilities.effect')], [
+      [abilityName('blade'), t('wiki.abilities.blade', { count: AUTO_BASE })],
+      [abilityName('flurry'), t('wiki.abilities.flurry', { count: FLURRY_RATE })],
+      [abilityName('crit'), t('wiki.abilities.crit', { attacks: link('attacks', t('wiki.abilities.crit.attacks'), 'critical-hits') })],
+      [abilityName('rampage'), t('wiki.abilities.rampage')],
+      [abilityName('cleave'), t('wiki.abilities.cleave', { share: pct(CLEAVE_BASE, 0) })],
+      [abilityName('treasure'), t('wiki.abilities.treasure')],
+      [abilityName('drums'), t('wiki.abilities.drums', { chance: pct(DRUMS_CRIT, 0) })],
+      [abilityName('legion'), t('wiki.abilities.legion')],
     ])}
-    <p>${link('spirit-restless', 'The Restless')} shortens every button cooldown. Cooldowns keep counting down while you're away. Ascending resets them.</p>
-    ${h2('Rampage')}
-    <p>Your attacks charge the Rampage meter: ${FEVER_CLICKS} attacks fill it (about a minute of holding the button). Set it off when it's full and your party deals ×${RAMPAGE_TIERS[0]} damage for ${FEVER_TIME} seconds.</p>
-    <p>Keep attacking through it: after ${RAMPAGE_STEPS[0]} more attacks it climbs to ×${RAMPAGE_TIERS[1]} and gains ${RAMPAGE_EXTEND} seconds. The meter doesn't charge while a Rampage runs.</p>
-    ${table(['Upgrade (Dwarf Brawler)', 'Effect'], [['Level 75', 'Rampage fills 25% faster'], ['Level 100', 'Rampage lasts 50% longer'], ['Level 125', '+1 to both multipliers']])}
-    <p>${link('spirit-lingering', 'The Lingering')} adds a second a level.</p>`;
+    <p>${t('wiki.abilities.restless', { restless: link('spirit-restless', t('wiki.abilities.restless.link')) })}</p>
+    ${h2(['rampage', t('wiki.abilities.h.rampage')])}
+    <p>${t('wiki.abilities.rampage.meter', { count: FEVER_CLICKS, mult: RAMPAGE_TIERS[0], seconds: FEVER_TIME })}</p>
+    <p>${t('wiki.abilities.rampage.climb', { count: RAMPAGE_STEPS[0], mult: RAMPAGE_TIERS[1], seconds: RAMPAGE_EXTEND })}</p>
+    ${table([t('wiki.abilities.rampage.upgrade', { name: brawler.name }), t('wiki.abilities.effect')], [
+      [t('wiki.abilities.rampage.level', { level: 75 }), t('wiki.abilities.rampage.fills')],
+      [t('wiki.abilities.rampage.level', { level: 100 }), t('wiki.abilities.rampage.lasts')],
+      [t('wiki.abilities.rampage.level', { level: 125 }), t('wiki.abilities.rampage.both')],
+    ])}
+    <p>${t('wiki.abilities.lingering', { lingering: link('spirit-lingering', t('wiki.abilities.lingering.link')) })}</p>`;
 };
 
-const traitsBody = () => {
-  const kinds: [string, string, number][] = [
-    ['×2 to that companion', 'Doubles that companion\'s damage.', UPGRADES.filter((u) => u.effect.t === 'comp').length],
-    ['Party', 'Every companion deals +50% damage. These multiply together.', UPGRADES.filter((u) => u.effect.t === 'party').length],
-    ['Click', 'Attacks deal +1% of your party\'s damage.', UPGRADES.filter((u) => u.effect.t === 'clickDps').length],
-    ['Gold', 'Monsters drop +50% gold (added together).', UPGRADES.filter((u) => u.effect.t === 'gold').length],
-    ['Boss', '+25% damage to bosses (added together).', UPGRADES.filter((u) => u.effect.t === 'boss').length],
-    ['Phantom Blade', '+1 Phantom Blade attack a second.', UPGRADES.filter((u) => u.effect.t === 'auto').length],
-    ['Crit chance', '+2% or +3% crit chance.', UPGRADES.filter((u) => u.effect.t === 'crit' && u.effect.chance).length],
-    ['Crit damage', '+1× or +2× crit damage.', UPGRADES.filter((u) => u.effect.t === 'crit' && u.effect.add).length],
-    ['Cleave', 'Cleave ×1.25 or ×1.5.', UPGRADES.filter((u) => u.effect.t === 'cleave').length],
-    ['Rampage', 'Fills faster, lasts longer or hits harder.', UPGRADES.filter((u) => u.effect.t === 'fever').length],
-    ['Ability', 'Unlocks an ability.', UPGRADES.filter((u) => u.effect.t === 'skill').length],
-  ];
-  return `<p class="lede">Each companion has four to seven upgrades, opening at levels 10, 25, 50, 75, 100, 125 and 150.</p>
-    ${h2('Kinds of upgrade')}
-    ${table(['Kind', 'Effect', { h: 'How many', cls: 'c' }], kinds.map(([k, e, n]) => [`<b>${k}</b>`, e, n]))}
-    <p>Every companion's upgrades are listed on its page under ${link('companions', 'Companions')}. An upgrade costs a multiple of its companion's hire price: ×12, ×30, ×150, ×1,000, ×10,000, ×60,000 and ×300,000 for the seven levels.</p>
-    ${h2('Auto-buy')}
-    <p>After your first ascent, Auto Upgrades appears over your party. With it on, every ${REBUY_GAP} seconds the game buys any upgrade you've bought before, cheapest first. Upgrades you've never bought stay yours to find.</p>
-    <p>From ascent ${AUTO_HIRE_ASCENTS}, Auto Levels joins it: the game buys companion levels back up to each one's best. It buys what will pay for itself soonest (counting how long it takes to afford), and saves up for a much better buy that's only a few seconds away. It never hires anyone new or goes past a companion's best.</p>`;
-};
+const UPGRADE_KINDS = [
+  ['wiki.upgrades.kind.comp', 'wiki.upgrades.kind.comp.effect', (u: UpgDef) => u.effect.t === 'comp'],
+  ['wiki.upgrades.kind.party', 'wiki.upgrades.kind.party.effect', (u: UpgDef) => u.effect.t === 'party'],
+  ['wiki.upgrades.kind.click', 'wiki.upgrades.kind.click.effect', (u: UpgDef) => u.effect.t === 'clickDps'],
+  ['wiki.upgrades.kind.gold', 'wiki.upgrades.kind.gold.effect', (u: UpgDef) => u.effect.t === 'gold'],
+  ['wiki.upgrades.kind.boss', 'wiki.upgrades.kind.boss.effect', (u: UpgDef) => u.effect.t === 'boss'],
+  ['wiki.upgrades.kind.blade', 'wiki.upgrades.kind.blade.effect', (u: UpgDef) => u.effect.t === 'auto'],
+  ['wiki.upgrades.kind.critChance', 'wiki.upgrades.kind.critChance.effect', (u: UpgDef) => u.effect.t === 'crit' && !!u.effect.chance],
+  ['wiki.upgrades.kind.critDamage', 'wiki.upgrades.kind.critDamage.effect', (u: UpgDef) => u.effect.t === 'crit' && !!u.effect.add],
+  ['wiki.upgrades.kind.cleave', 'wiki.upgrades.kind.cleave.effect', (u: UpgDef) => u.effect.t === 'cleave'],
+  ['wiki.upgrades.kind.rampage', 'wiki.upgrades.kind.rampage.effect', (u: UpgDef) => u.effect.t === 'fever'],
+  ['wiki.upgrades.kind.ability', 'wiki.upgrades.kind.ability.effect', (u: UpgDef) => u.effect.t === 'skill'],
+] as const;
+
+const traitsBody = () => `<p class="lede">${t('wiki.upgrades.lede')}</p>
+    ${h2(['kinds-of-upgrade', t('wiki.upgrades.h.kinds')])}
+    ${table([t('wiki.upgrades.kind'), t('wiki.upgrades.effect'), { h: t('wiki.upgrades.count'), cls: 'c' }], UPGRADE_KINDS.map(([kind, effect, is]) => [`<b>${t(kind)}</b>`, t(effect), UPGRADES.filter(is).length]))}
+    <p>${t('wiki.upgrades.costs', { companions: link('companions', t('wiki.upgrades.costs.companions')) })}</p>
+    ${h2(['auto-buy', t('wiki.upgrades.h.auto')])}
+    <p>${t('wiki.upgrades.auto', { gap: decimal(REBUY_GAP, 2) })}</p>
+    <p>${t('wiki.upgrades.autoLevels', { ascents: AUTO_HIRE_ASCENTS })}</p>`;
 
 export const PARTY_PAGES: Page[] = [
-  { id: 'companions', group: 'Your party', title: 'Companions', summary: 'Every companion, hiring, levels, milestones and your hero.', body: companionsBody },
-  { id: 'attacks', group: 'Your party', title: 'Attacks and crits', summary: 'Attack damage, critical hits, streaks and idle.', body: attacksBody },
-  { id: 'abilities', group: 'Your party', title: 'Abilities', summary: 'Every ability, its unlock, duration and cooldown, and Rampage.', body: abilitiesBody },
-  { id: 'upgrades', group: 'Your party', title: 'Upgrades and auto-buy', summary: 'The kinds of upgrade and how auto-buy works.', body: traitsBody },
+  { id: 'companions', group: 'party', title: t('wiki.page.companions'), summary: t('wiki.page.companions.summary'), body: companionsBody },
+  { id: 'attacks', group: 'party', title: t('wiki.page.attacks'), summary: t('wiki.page.attacks.summary'), body: attacksBody },
+  { id: 'abilities', group: 'party', title: t('wiki.page.abilities'), summary: t('wiki.page.abilities.summary'), body: abilitiesBody },
+  { id: 'upgrades', group: 'party', title: t('wiki.page.upgrades'), summary: t('wiki.page.upgrades.summary'), body: traitsBody },
   ...COMPS.map(companionPage),
 ];

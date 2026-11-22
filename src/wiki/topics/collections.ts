@@ -1,101 +1,144 @@
 import { CARDS, CORRUPTION, CURSORS, LEGENDS, TROPHIES, ZONES, type CardDef, type TrophyDef } from '../../game/data.ts';
 import { ABILITIES, COMPS, type AbilityId } from '../../game/data.ts';
 import { AWAKEN_ON, CARD_ODDS, CHAMP_CHANCE, FIRST_CARD, DAN_GIVES, EXPEDITION_LEVEL, FLOOR_KILLS, GOLD_SET_BONUS, SET_BONUS, TRIP_HOURS, VICTOR_GIVES } from '../../game/game.ts';
-import { esc, h2, link, pct, table, toc } from '../kit.ts';
+import { fixed, int, t, type UiKey } from '../../i18n/index.ts';
+import { esc, h2, h3, link, pct, table, toc } from '../kit.ts';
 import { spr } from '../sprites.ts';
 import { kokoSvg } from '../../ui/koko.ts';
 import { skillIcon } from '../../ui/icons.ts';
 import type { Page } from '../pages.ts';
 
 const LAP_COLOR = ['#c9b8a0', ...CORRUPTION.slice(1).map((c) => `#${c.tint.toString(16).padStart(6, '0')}`)];
-const lapName = (lap: number) => (lap ? CORRUPTION[lap].name : 'Plain');
+const lapName = (lap: number) => (lap ? CORRUPTION[lap].name : t('wiki.lap.plain'));
 const dots = (c: CardDef) => c.laps.map((lap) => `<i title="${lapName(lap)}" style="display:inline-block;width:9px;height:9px;margin-right:3px;background:${LAP_COLOR[lap]};box-shadow:0 0 0 2px #0b0710"></i>`).join('');
-const KIND = { monster: 'Monster', mid: 'Mid-boss', boss: 'Zone boss', goblin: 'Goblin' } as const;
+const KIND = { monster: 'wiki.cards.kind.monster', mid: 'wiki.cards.kind.mid', boss: 'wiki.cards.kind.boss', goblin: 'wiki.cards.kind.goblin' } as const;
 /** The soul glyph the Ascend trophies use (as the game's Ascend button draws it). */
 const SOUL = `<svg viewBox="0 0 7 8" width="21" height="24" shape-rendering="crispEdges" fill="#b38cff" aria-hidden="true">${[[3, 0, 1, 1], [2, 1, 3, 1], [1, 2, 5, 3], [2, 5, 3, 1], [1, 6, 1, 1], [3, 6, 1, 1], [5, 6, 1, 1], [0, 7, 1, 1], [2, 7, 1, 1], [4, 7, 1, 1], [6, 7, 1, 1]].map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}"/>`).join('')}</svg>`;
 const collector = LEGENDS.find((d) => d.id === 'collector')!;
 
+const CARDS_SECTIONS = {
+  drops: ['drop-chances', t('wiki.cards.h.drops')],
+  colors: ['colors', t('wiki.cards.h.colors')],
+  gold: ['gold-cards', t('wiki.cards.h.gold')],
+  sets: ['sets', t('wiki.cards.h.sets')],
+  every: ['every-card', t('wiki.cards.h.every')],
+  trading: ['trading', t('wiki.cards.h.trading')],
+} as const;
+
+const odds = (n: number) => t('wiki.cards.drops.odds', { odds: int(n) });
+const champOdds = (n: number) => t('wiki.cards.drops.odds.champ', { odds: int(n) });
+
 const cardsBody = () => {
   const versions = CARDS.reduce((n, c) => n + c.laps.length * (c.gold ? 2 : 1), 0);
-  const zones = [...ZONES.map((z, i) => ({ name: z.name, zone: i })), { name: 'Treasure goblins', zone: -1 }];
-  return `<p class="lede">Every kind of monster has a card. They're a collection: ${CARDS.length} cards, each in the colors of the laps it appears on, plain and gold.</p>
-    ${toc('cards', ['Drop chances', 'Colors', 'Gold cards', 'Sets', 'Every card', ...(AWAKEN_ON ? ['Trading'] : [])])}
-    ${h2('Drop chances')}
-    ${table(['From', 'Chance'], [
-      ['A monster', `1 in ${CARD_ODDS.monster.toLocaleString('en-US')}`],
-      ['A boss', `1 in ${CARD_ODDS.boss.toLocaleString('en-US')}`],
-      ['A champion (gold card)', `1 in ${CARD_ODDS.champ.toLocaleString('en-US')}, then the plain chance`],
-      ['A champion boss (gold card)', `1 in ${CARD_ODDS.champBoss.toLocaleString('en-US')}, then the plain chance`],
-      ['A treasure goblin', `1 in ${CARD_ODDS.goblin.toLocaleString('en-US')}`],
-      ['A rainbow goblin', `1 in ${CARD_ODDS.rainbow.toLocaleString('en-US')}`],
+  const zones = [...ZONES.map((z, i) => ({ name: z.name, zone: i })), { name: t('wiki.cards.goblins'), zone: -1 }];
+  const sections = [CARDS_SECTIONS.drops, CARDS_SECTIONS.colors, CARDS_SECTIONS.gold, CARDS_SECTIONS.sets, CARDS_SECTIONS.every, ...(AWAKEN_ON ? [CARDS_SECTIONS.trading] : [])];
+  return `<p class="lede">${t('wiki.cards.lede', { count: CARDS.length })}</p>
+    ${toc('cards', sections)}
+    ${h2(CARDS_SECTIONS.drops)}
+    ${table([t('wiki.cards.drops.from'), t('wiki.cards.drops.chance')], [
+      [t('wiki.cards.drops.monster'), odds(CARD_ODDS.monster)],
+      [t('wiki.cards.drops.boss'), odds(CARD_ODDS.boss)],
+      [t('wiki.cards.drops.champ'), champOdds(CARD_ODDS.champ)],
+      [t('wiki.cards.drops.champBoss'), champOdds(CARD_ODDS.champBoss)],
+      [t('wiki.cards.drops.goblin'), odds(CARD_ODDS.goblin)],
+      [t('wiki.cards.drops.rainbow'), odds(CARD_ODDS.rainbow)],
     ])}
-    <p>Your first card is sure to drop from a monster somewhere between kill ${FIRST_CARD.from.toLocaleString('en-US')} and kill ${FIRST_CARD.by.toLocaleString('en-US')} (about floors ${FIRST_CARD.from / FLOOR_KILLS} to ${FIRST_CARD.by / FLOOR_KILLS}).</p>
-    <p>${link(`spirit-${collector.id}`, collector.name)} raises every chance, up to two and a half times. ${link('spirit-ronin', 'The Ronin')} raises it for kills that deal far more than a monster's health. Swept floors roll a card for every kill, and time away rolls them too (plain cards only). ${link('expeditions', 'Expeditions')} roll them for every kill a hunter makes.</p>
-    ${h2('Colors')}
-    <p>A card drops in the color of the lap you're on, if that card comes in it: plain on floors 1–80, then ${CORRUPTION.slice(1).map((c) => c.name).join(', ')}. A zone's newcomers only come in the later colors, and only two of its first crowd come back. Goblin cards are plain only.</p>
-    ${h2('Gold cards')}
-    <p>Only champions drop gold cards: gold monsters and champion bosses. Goblins have no gold card.</p>
-    ${h2('Sets')}
-    <p>A zone's cards in one color are a set: its monsters, its mid-boss and its boss (the goblins belong to no set). Each finished set adds +${Math.round(SET_BONUS * 100)}% to all damage, and each finished in gold +${Math.round(GOLD_SET_BONUS * 100)}%. ${ZONES.length * CORRUPTION.length} sets in all, and as many in gold.</p>
-    <p>Sets also start your runs deeper. After an ascent or an awakening, a new run begins past every zone, in the order you meet them, whose set in that zone's color you've finished, and pays the gold those floors would have.</p>
-    ${h2('Every card')}
-    <p>${versions} versions in all, counting each color plain and gold.</p>
+    <p>${t('wiki.cards.drops.first', { from: int(FIRST_CARD.from), by: int(FIRST_CARD.by), fromFloor: FIRST_CARD.from / FLOOR_KILLS, byFloor: FIRST_CARD.by / FLOOR_KILLS })}</p>
+    <p>${t('wiki.cards.drops.raise', {
+      collector: link(`spirit-${collector.id}`, collector.name), ronin: link('spirit-ronin', t('wiki.cards.drops.ronin')), expeditions: link('expeditions', t('wiki.cards.drops.expeditions')),
+    })}</p>
+    ${h2(CARDS_SECTIONS.colors)}
+    <p>${t('wiki.cards.colors', { colors: CORRUPTION.slice(1).map((c) => c.name).join(', ') })}</p>
+    ${h2(CARDS_SECTIONS.gold)}
+    <p>${t('wiki.cards.gold')}</p>
+    ${h2(CARDS_SECTIONS.sets)}
+    <p>${t('wiki.cards.sets', { set: pct(SET_BONUS, 0), gold: pct(GOLD_SET_BONUS, 0), count: ZONES.length * CORRUPTION.length })}</p>
+    <p>${t('wiki.cards.sets.start')}</p>
+    ${h2(CARDS_SECTIONS.every)}
+    <p>${t('wiki.cards.every', { count: versions })}</p>
     ${zones.map(({ name, zone }) => {
       const cards = CARDS.filter((c) => c.zone === zone);
-      return cards.length ? `<h3 id="cards-${zone}">${esc(name)}</h3>${table(['Card', 'Kind', 'Colors', { h: 'Gold', cls: 'c' }], cards.map((c) => [
-        `<span class="who">${spr(c.sprite, 26)}${esc(c.name)}</span>`, KIND[c.kind], dots(c), c.gold ? '✓' : '—',
+      return cards.length ? `${h3([`cards-${zone}`, esc(name)])}${table([t('wiki.cards.every.card'), t('wiki.cards.every.kind'), t('wiki.cards.every.colors'), { h: t('wiki.cards.every.gold'), cls: 'c' }], cards.map((c) => [
+        `<span class="who">${spr(c.sprite, 26)}${esc(c.name)}</span>`, t(KIND[c.kind]), dots(c), c.gold ? '✓' : '—',
       ]))}` : '';
     }).join('')}
-    ${AWAKEN_ON ? `${h2('Trading')}<p>Dan takes ${DAN_GIVES} spare cards for a random card from the zone of one you gave. Victor takes ${VICTOR_GIVES} spares for a random gold card.</p>` : ''}`;
+    ${AWAKEN_ON ? `${h2(CARDS_SECTIONS.trading)}<p>${t('wiki.cards.trading', { dan: DAN_GIVES, victor: VICTOR_GIVES })}</p>` : ''}`;
 };
 
 /** Trophies that belong to systems that aren't in the game yet stay off the list. */
-const live = (t: TrophyDef) => !(['awakens', 'boundAll', 'boundEarned'].includes(t.req.t) && !AWAKEN_ON);
+const live = (trophy: TrophyDef) => !(['awakens', 'boundAll', 'boundEarned'].includes(trophy.req.t) && !AWAKEN_ON);
 /** Hidden trophies stay off the wiki's lists too. */
-const listed = (t: TrophyDef) => live(t) && !t.hidden;
+const listed = (trophy: TrophyDef) => live(trophy) && !trophy.hidden;
 
-const GROUPS: [string, TrophyDef['req']['t'][]][] = [
-  ['Floors', ['floor']], ['Gold', ['gold']], ['Kills', ['kills']], ['Bosses', ['bosses', 'clutches', 'champions']],
-  ['Companions', ['level', 'levelAll']], ['Attacks', ['clicks', 'crits', 'fevers', 'rampage']], ['Damage', ['dps']],
-  ['Goblins', ['raids', 'missed', 'rainbows', 'vaults']], ['Ascents', ['descents']], ['Expeditions', ['trips', 'tripCards', 'tripKills']],
-  ['Cards', ['cards', 'versions', 'goldCards']], ['Awakening', ['awakens', 'boundAll', 'boundEarned']], ['The Keep', ['pets']],
+const TROPHY_GROUPS: { id: string; label: UiKey; kinds: TrophyDef['req']['t'][] }[] = [
+  { id: 'floors', label: 'wiki.trophies.group.floors', kinds: ['floor'] },
+  { id: 'gold', label: 'wiki.trophies.group.gold', kinds: ['gold'] },
+  { id: 'kills', label: 'wiki.trophies.group.kills', kinds: ['kills'] },
+  { id: 'bosses', label: 'wiki.trophies.group.bosses', kinds: ['bosses', 'clutches', 'champions'] },
+  { id: 'companions', label: 'wiki.trophies.group.companions', kinds: ['level', 'levelAll'] },
+  { id: 'attacks', label: 'wiki.trophies.group.attacks', kinds: ['clicks', 'crits', 'fevers', 'rampage'] },
+  { id: 'damage', label: 'wiki.trophies.group.damage', kinds: ['dps'] },
+  { id: 'goblins', label: 'wiki.trophies.group.goblins', kinds: ['raids', 'missed', 'rainbows', 'vaults'] },
+  { id: 'ascents', label: 'wiki.trophies.group.ascents', kinds: ['descents'] },
+  { id: 'expeditions', label: 'wiki.trophies.group.expeditions', kinds: ['trips', 'tripCards', 'tripKills'] },
+  { id: 'cards', label: 'wiki.trophies.group.cards', kinds: ['cards', 'versions', 'goldCards'] },
+  { id: 'awakening', label: 'wiki.trophies.group.awakening', kinds: ['awakens', 'boundAll', 'boundEarned'] },
+  { id: 'the-keep', label: 'wiki.trophies.group.keep', kinds: ['pets'] },
 ];
+
+const trophyIcon = (trophy: TrophyDef) => {
+  const { sprite } = trophy.icon;
+  if (sprite === 'soul') return SOUL;
+  if (sprite === 'koko') return kokoSvg(22);
+  return sprite.startsWith('skill:') ? skillIcon(sprite.slice(6) as AbilityId, 22) : spr(sprite, 22);
+};
 
 const trophiesBody = () => {
   const trophies = TROPHIES.filter(live);
-  const cursors = CURSORS.filter((c) => !c.trophy || trophies.some((t) => t.id === c.trophy));
-  return `<p class="lede">Trophies mark milestones. Each one you earn adds +1% to all damage, for good.</p>
-    <p>There are ${trophies.length} trophies, so +${trophies.length}% in all. Some also unlock a ${link('trophies', 'cursor', 'Cursors')}.</p>
-    ${toc('trophies', [...GROUPS.filter(([, kinds]) => trophies.some((t) => kinds.includes(t.req.t))).map(([g]) => g), 'Cursors'])}
-    ${GROUPS.map(([group, kinds]) => {
-      const list = trophies.filter((t) => listed(t) && kinds.includes(t.req.t));
-      return list.length ? `${h2(group)}${table(['Trophy', 'How'], list.map((t) => [`<span class="who">${t.icon.sprite === 'soul' ? SOUL : t.icon.sprite === 'koko' ? kokoSvg(22) : t.icon.sprite.startsWith('skill:') ? skillIcon(t.icon.sprite.slice(6) as AbilityId, 22) : spr(t.icon.sprite, 22)}<b>${esc(t.name)}</b></span>`, esc(t.desc)]))}` : '';
+  const cursors = CURSORS.filter((c) => !c.trophy || trophies.some((trophy) => trophy.id === c.trophy));
+  const groups = TROPHY_GROUPS.map((group) => ({ section: [group.id, t(group.label)] as const, list: trophies.filter((trophy) => group.kinds.includes(trophy.req.t)) }));
+  const cursorSection = ['cursors', t('wiki.trophies.h.cursors')] as const;
+  return `<p class="lede">${t('wiki.trophies.lede')}</p>
+    <p>${t('wiki.trophies.count', { count: trophies.length, total: pct(trophies.length / 100, 0), cursor: link('trophies', t('wiki.trophies.count.cursor'), 'cursors') })}</p>
+    ${toc('trophies', [...groups.filter((group) => group.list.length).map((group) => group.section), cursorSection])}
+    ${groups.map(({ section, list }) => {
+      const shown = list.filter(listed);
+      return shown.length ? `${h2(section)}${table([t('wiki.trophies.trophy'), t('wiki.trophies.how')], shown.map((trophy) => [`<span class="who">${trophyIcon(trophy)}<b>${esc(trophy.name)}</b></span>`, esc(trophy.desc)]))}` : '';
     }).join('')}
-    ${h2('Cursors')}
-    <p>Cursor skins, picked in Options.</p>
-    ${table(['Cursor', 'Unlocked by'], cursors.map((c) => {
-      const t = TROPHIES.find((x) => x.id === c.trophy);
-      return [`<span class="who">${spr(c.sprite, 22)}${esc(c.name)}</span>`, t ? `${esc(t.name)}: ${esc(t.desc)}` : 'Always'];
+    ${h2(cursorSection)}
+    <p>${t('wiki.trophies.cursors')}</p>
+    ${table([t('wiki.trophies.cursors.cursor'), t('wiki.trophies.cursors.by')], cursors.map((c) => {
+      const trophy = TROPHIES.find((x) => x.id === c.trophy);
+      return [`<span class="who">${spr(c.sprite, 22)}${esc(c.name)}</span>`, trophy ? t('wiki.trophies.cursors.trophy', { trophy: esc(trophy.name), how: esc(trophy.desc) }) : t('wiki.trophies.cursors.always')];
     }))}`;
 };
 
-const tripsBody = () => `<p class="lede">Send a companion at level ${EXPEDITION_LEVEL} or more to a floor you've reached to hunt its cards, in real time.</p>
-  ${toc('expeditions', ['Opening', 'Sending a hunter', 'What a hunter finds', 'Coming home'])}
-  ${h2('Opening')}
-  <p>Expeditions open the first time any companion reaches level ${EXPEDITION_LEVEL}. The ladder in the Keep's entrance is where you send them.</p>
-  ${h2('Sending a hunter')}
-  <p>Any companion at level ${EXPEDITION_LEVEL} or more in this run can go, as many at once as you like. Pick any floor you've reached. While it's away a hunter leaves your party: its damage and its upgrades go with it, and it can't be leveled. Its skill stays.</p>
-  ${table(['Companion', 'Takes'], [...new Set(ABILITIES.map((a) => a.comp))].map((i) => [COMPS[i].name, ABILITIES.filter((a) => a.comp === i).map((a) => a.name).join(', ')]))}
-  ${h2('What a hunter finds')}
-  <p>A hunter fights at its damage per second from when it left. On a plain floor it kills as fast as its damage allows against the floor's monsters, up to the sweep limit of ${FLOOR_KILLS} kills every 0.6 seconds. On a boss floor it fights the boss, up to one every 2 seconds.</p>
-  <p>Every kill rolls for its card at the usual chance (1 in ${CARD_ODDS.monster.toLocaleString('en-US')} for a monster), with ${link('spirit-collector', 'the Collector')} (the Ronin doesn't help on a hunt). ${pct(CHAMP_CHANCE, 0)} of the monsters killed are champions and roll for gold cards. A hunter's bosses are never champions. Cards come in the floor's color.</p>
-  <p>Up to about 100 floors above your deepest, a strong hunter kills at the sweep limit. Near your deepest it slows down a lot.</p>
-  ${h2('Coming home')}
-  <p>A hunter stays out up to ${TRIP_HOURS} hours, time away included, then comes home on its own. You can call one home sooner from the ladder. Before ascending or awakening you call everyone home yourself. Each hunter brings what it found so far.</p>`;
+const TRIPS = {
+  opening: ['opening', t('wiki.trips.h.opening')],
+  sending: ['sending-a-hunter', t('wiki.trips.h.sending')],
+  finds: ['what-a-hunter-finds', t('wiki.trips.h.finds')],
+  home: ['coming-home', t('wiki.trips.h.home')],
+} as const;
+
+/** Levels are written without grouping: "level 1000". */
+const tripLevel = () => fixed(EXPEDITION_LEVEL, 0);
+
+const tripsBody = () => `<p class="lede">${t('wiki.trips.lede', { level: tripLevel() })}</p>
+  ${toc('expeditions', [TRIPS.opening, TRIPS.sending, TRIPS.finds, TRIPS.home])}
+  ${h2(TRIPS.opening)}
+  <p>${t('wiki.trips.opening', { level: tripLevel() })}</p>
+  ${h2(TRIPS.sending)}
+  <p>${t('wiki.trips.sending', { level: tripLevel() })}</p>
+  ${table([t('wiki.trips.sending.companion'), t('wiki.trips.sending.takes')], [...new Set(ABILITIES.map((a) => a.comp))].map((i) => [COMPS[i].name, ABILITIES.filter((a) => a.comp === i).map((a) => a.name).join(', ')]))}
+  ${h2(TRIPS.finds)}
+  <p>${t('wiki.trips.finds', { count: FLOOR_KILLS })}</p>
+  <p>${t('wiki.trips.finds.cards', { odds: int(CARD_ODDS.monster), collector: link('spirit-collector', t('wiki.trips.finds.collector')), chance: pct(CHAMP_CHANCE, 0) })}</p>
+  <p>${t('wiki.trips.finds.deep')}</p>
+  ${h2(TRIPS.home)}
+  <p>${t('wiki.trips.home', { count: TRIP_HOURS })}</p>`;
 
 export const COLLECTION_PAGES: Page[] = [
-  { id: 'cards', group: 'Collections', title: 'Cards', summary: 'Drop chances, colors, gold cards and every card.', body: cardsBody },
-  { id: 'expeditions', group: 'Collections', title: 'Expeditions', summary: 'Sending companions to hunt cards on a floor you choose.', body: tripsBody },
-  { id: 'trophies', group: 'Collections', title: 'Trophies', summary: `Every trophy and cursor. Each trophy is +1% damage.`, body: trophiesBody },
+  { id: 'cards', group: 'collections', title: t('wiki.page.cards'), summary: t('wiki.page.cards.summary'), body: cardsBody },
+  { id: 'expeditions', group: 'collections', title: t('wiki.page.expeditions'), summary: t('wiki.page.expeditions.summary'), body: tripsBody },
+  { id: 'trophies', group: 'collections', title: t('wiki.page.trophies'), summary: t('wiki.page.trophies.summary'), body: trophiesBody },
 ];
-

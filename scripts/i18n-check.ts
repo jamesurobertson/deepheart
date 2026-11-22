@@ -102,8 +102,10 @@ for (const [pack, chars] of allChars) {
 /** Files whose text the player sees. data.ts is covered by tc(); scripts and the renderer show no words. */
 const UI_FILES = [...CODE.filter((f) => /^src\/(ui|wiki)\//.test(f)), 'src/main.ts', 'src/crash.ts', 'src/demo.ts', 'src/game/game.ts'];
 /** Words that are the same in every language: the game's name, input names, units of the number system. */
-const ALLOWED = /^(Deepheart|DEEPHEART|Jersey|10|Text|Silkscreen|Steam|Escape|Enter|Shift|Space|Tab|Esc|Backspace|Arrow\w+|Key[A-Z]|Digit\d|monospace|ui-monospace|sans-serif|serif)$/;
+const ALLOWED = /^(Deepheart|DEEPHEART|Jersey|10|Text|Silkscreen|Steam|Escape|Enter|Shift|Space|Tab|Esc|Backspace|Arrow\w*|Digit|Key[A-Z]|Digit\d|monospace|ui-monospace|sans-serif|serif)$/;
 const listStrings = process.argv.includes('--strings');
+/** Every class the stylesheets define: a string made only of these is a class list, not text. */
+const CSS_CLASSES = new Set(['src/style.css', 'src/wiki/wiki.css'].flatMap((file) => [...readFileSync(file, 'utf8').matchAll(/\.([a-z][\w-]*)/g)].map((m) => m[1])));
 let hardCoded = 0;
 for (const file of UI_FILES) {
   const lines = source.get(file)!.split('\n');
@@ -118,7 +120,10 @@ for (const file of UI_FILES) {
       // What's left of a string once the markup, ${…}, entities and attributes are taken out.
       const text = body.replace(/\$\{[^}]*\}?/g, ' ').replace(/<[^>]*>?/g, ' ').replace(/&\w+;/g, ' ').replace(/[\w-]+="[^"]*"/g, ' ').trim();
       if (!/[A-Za-z]{2}/.test(text) || text.split(/[\s,·]+/).filter(Boolean).every((word) => ALLOWED.test(word))) continue;
-      if (/(^|,\s*)[.#[]|\[data-|:not\(|^(button|a|input|textarea|select)(,|$)/.test(text)) continue;
+      if (/(^|,\s*)[.#[]|\[data-|\[type=|:not\(|^(button|a|input|textarea|select)(,|$)/.test(text)) continue;
+      if (/^(rgba?|hsla?|translate|scale|rotate|brightness|grayscale|saturate|blur|drop-shadow|linear-gradient|radial-gradient)\(/.test(text)) continue;
+      if (/^[-\s]*(ms|s|px|deg|%)$/.test(text)) continue;
+      if (text.split(/\s+/).every((token) => CSS_CLASSES.has(token))) continue;
       if (/^[\w.:/#?=&%-]+$/.test(text) && !/^[A-Z][a-z]+$/.test(text)) continue;
       if (/[:;{}]|px\b|\d(s|ms|deg|%)\b|^\.|^\[|^#|^https?:|\.(png|mp3|txt|ts|css|woff2?)\b/.test(text)) continue;
       if (/^[a-z][\w-]*( [a-z][\w-]*)*$/.test(text) && !/ /.test(text)) continue;

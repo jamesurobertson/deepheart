@@ -98,5 +98,5 @@ export const decimal = (n: number, digits: number) => numberFormat(digits, 0).fo
 /** A fraction as a percent: 0.25 → "25%", "25 %". */
 export const percent = (v: number, digits = 0, minDigits = digits) => numberFormat(digits, minDigits, 'percent').format(v);
 
-/** "Squire, Ranger and Brawler" in the language's way. */
-export const list = (items: string[]) => new Intl.ListFormat(intlLocale(), { type: 'conjunction' }).format(items);
+/** "Squire, Ranger and Brawler" in the language's way (English as the game has always written it: no serial comma). */
+export const list = (items: string[]) => new Intl.ListFormat(intlLocale() === 'en' ? 'en-GB' : intlLocale(), { type: 'conjunction' }).format(items);

@@ -1,6 +1,7 @@
 import '@fontsource/silkscreen/400.css';
 import '@fontsource/jersey-10/400.css';
 import './wiki.css';
+import { intlLocale, t } from '../i18n/index.ts';
 import { PAGES, GROUPS, type Page } from './pages.ts';
 import { hydrateSprites, loadSprites } from './sprites.ts';
 
@@ -9,13 +10,13 @@ const app = document.getElementById('wiki')!;
 
 app.innerHTML = `
   <header class="w-top">
-    <button class="w-menu" aria-label="Pages">☰</button>
-    <a class="w-brand" href="#/home"><span class="w-heart"></span>Deepheart Wiki</a>
+    <button class="w-menu" aria-label="${t('wiki.menu')}">☰</button>
+    <a class="w-brand" href="#/home"><span class="w-heart"></span>${t('wiki.brand')}</a>
     <div class="w-search">
-      <input type="search" placeholder="Search the wiki (press /)" aria-label="Search the wiki" autocomplete="off" spellcheck="false">
+      <input type="search" placeholder="${t('wiki.search.placeholder')}" aria-label="${t('wiki.search.label')}" autocomplete="off" spellcheck="false">
       <div class="w-results" hidden></div>
     </div>
-    <a class="w-play" href="../">Play</a>
+    <a class="w-play" href="../">${t('wiki.play')}</a>
   </header>
   <nav class="w-side"></nav>
   <main class="w-main"></main>`;
@@ -26,25 +27,29 @@ const input = app.querySelector<HTMLInputElement>('.w-search input')!;
 const results = app.querySelector<HTMLElement>('.w-results')!;
 
 side.innerHTML = GROUPS.map((group) => {
-  const links = PAGES.filter((p) => p.group === group && !p.parent)
+  const links = PAGES.filter((p) => p.group === group.id && !p.parent)
     .map((p) => `<a href="#/${p.id}" data-page="${p.id}">${p.title}</a>`).join('');
-  return `<div class="w-group"><h4>${group}</h4>${links}</div>`;
+  return `<div class="w-group"><h4>${t(group.label)}</h4>${links}</div>`;
 }).join('');
+document.querySelector('meta[name="description"]')?.setAttribute('content', t('wiki.description'));
 
 // ---------- search ----------
 
-interface Entry { page: Page; section: string; heading: string; text: string; lower: string }
+/** Lowercased the way the wiki's language does it, so searching works in any language. */
+const lower = (s: string) => s.toLocaleLowerCase(intlLocale());
+
+interface Entry { page: Page; section: string; heading: string; text: string; folded: string }
 
 const index: Entry[] = [];
 const scratch = document.createElement('div');
 for (const page of PAGES) {
   scratch.innerHTML = page.body();
-  let current: Entry = { page, section: '', heading: page.title, text: '', lower: '' };
+  let current: Entry = { page, section: '', heading: page.title, text: '', folded: '' };
   index.push(current);
   const walk = (node: Node) => {
     for (const child of node.childNodes) {
       if (child instanceof HTMLElement && /^H[23]$/.test(child.tagName) && child.id) {
-        current = { page, section: child.id, heading: child.textContent ?? '', text: '', lower: '' };
+        current = { page, section: child.id, heading: child.textContent ?? '', text: '', folded: '' };
         index.push(current);
       } else if (child.nodeType === Node.TEXT_NODE) current.text += `${child.textContent} `;
       else walk(child);
@@ -54,23 +59,23 @@ for (const page of PAGES) {
 }
 for (const entry of index) {
   entry.text = entry.text.replace(/\s+/g, ' ').trim();
-  entry.lower = `${entry.page.title} ${entry.heading} ${entry.text}`.toLowerCase();
+  entry.folded = lower(`${entry.page.title} ${entry.heading} ${entry.text}`);
 }
 
-const terms = (q: string) => q.toLowerCase().split(/\s+/).filter(Boolean);
+const terms = (q: string) => lower(q).split(/\s+/).filter(Boolean);
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function search(q: string) {
   const words = terms(q);
   if (!words.length) return [];
   return index
-    .filter((entry) => words.every((w) => entry.lower.includes(w)))
+    .filter((entry) => words.every((w) => entry.folded.includes(w)))
     .map((entry) => {
       let score = 0;
       for (const w of words) {
-        if (entry.page.title.toLowerCase().includes(w)) score += entry.section ? 4 : 12;
-        if (entry.heading.toLowerCase().includes(w)) score += 6;
-        score += Math.min(3, entry.text.toLowerCase().split(w).length - 1);
+        if (lower(entry.page.title).includes(w)) score += entry.section ? 4 : 12;
+        if (lower(entry.heading).includes(w)) score += 6;
+        score += Math.min(3, lower(entry.text).split(w).length - 1);
       }
       return { entry, score };
     })
@@ -80,8 +85,8 @@ function search(q: string) {
 }
 
 function snippet(text: string, words: string[]) {
-  const lower = text.toLowerCase();
-  const at = Math.max(0, Math.min(...words.map((w) => lower.indexOf(w)).filter((i) => i >= 0), text.length) - 50);
+  const folded = lower(text);
+  const at = Math.max(0, Math.min(...words.map((w) => folded.indexOf(w)).filter((i) => i >= 0), text.length) - 50);
   let out = (at > 0 ? '…' : '') + text.slice(at, at + 150) + (at + 150 < text.length ? '…' : '');
   out = out.replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]!);
   const re = new RegExp(`(${words.map(escapeRe).join('|')})`, 'gi');
@@ -104,7 +109,7 @@ function showResults() {
     ? hits.map((hit, i) => `<a class="w-hit${i === picked ? ' on' : ''}" href="#/${hit.page.id}${hit.section ? `/${hit.section}` : ''}" data-i="${i}">
         <b>${hit.page.title}${hit.section ? ` <span>› ${hit.heading}</span>` : ''}</b>
         <small>${snippet(hit.text || hit.page.summary || '', words)}</small></a>`).join('')
-    : '<p class="w-none">Nothing found.</p>';
+    : `<p class="w-none">${t('wiki.search.none')}</p>`;
   results.hidden = false;
 }
 
@@ -175,7 +180,7 @@ function render() {
   const crumbs = parent ? `<p class="w-crumbs"><a href="#/${parent.id}">${parent.title}</a> ›</p>` : '';
   main.innerHTML = `<article>${crumbs}<h1>${page.title}</h1>${page.body()}</article>`;
   page.mount?.(main);
-  document.title = page.id === 'home' ? 'Deepheart Wiki' : `${page.title} · Deepheart Wiki`;
+  document.title = page.id === 'home' ? t('wiki.brand') : `${page.title} · ${t('wiki.brand')}`;
   side.querySelectorAll('a').forEach((a) => a.classList.toggle('on', a.dataset.page === (parent?.id ?? page.id)));
   hydrateSprites(main);
   const marked = markWords(highlight);

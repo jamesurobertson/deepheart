@@ -11,7 +11,9 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+// @ts-expect-error subset-font ships no types
 import subsetFont from 'subset-font';
+// @ts-expect-error fontverter's types aren't a module
 import fontverter from 'fontverter';
 
 const RELEASE = '2026.11.10';
@@ -86,7 +88,6 @@ async function localeChars(code: string): Promise<Set<string>> {
 
 const face = (family: string, url: string, sizeAdjust: string, range: string) =>
   `@font-face {\n  font-family: '${family}';\n  src: url('${url}') format('woff2');\n  font-weight: 100 900;\n  size-adjust: ${sizeAdjust};\n  unicode-range: ${range};\n  font-display: swap;\n}\n`;
-const rangeOf = (chars: Iterable<string>) => [...chars].map((ch) => `U+${ch.codePointAt(0)!.toString(16).toUpperCase()}`).join(',');
 
 const base = new Set<string>();
 for (const file of BASE_FONTS) for (const ch of await charsOf(readFileSync(file))) base.add(ch);
