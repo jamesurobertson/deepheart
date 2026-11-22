@@ -1,9 +1,9 @@
 import type { Message, PluralForms } from './types.ts';
 
-/** Only Latin-1 and Latin Extended-A letters, so the pixel fonts' latin and latin-ext subsets draw every one. */
+/** Latin-1 only: the letters every shipped Latin-script language uses, so the pixel fonts draw every one. */
 const ACCENTS: Record<string, string> = {
-  a: 'á', b: 'ƀ', c: 'ç', d: 'ď', e: 'é', g: 'ğ', h: 'ĥ', i: 'í', j: 'ĵ', k: 'ķ', l: 'ļ', n: 'ñ', o: 'ö', r: 'ŕ', s: 'š', t: 'ţ', u: 'û', w: 'ŵ', y: 'ý', z: 'ž',
-  A: 'Á', C: 'Ç', D: 'Ď', E: 'É', G: 'Ğ', H: 'Ĥ', I: 'Í', J: 'Ĵ', K: 'Ķ', L: 'Ļ', N: 'Ñ', O: 'Ö', R: 'Ŕ', S: 'Š', T: 'Ţ', U: 'Û', W: 'Ŵ', Y: 'Ý', Z: 'Ž',
+  a: 'á', c: 'ç', e: 'é', i: 'í', n: 'ñ', o: 'ö', u: 'û', y: 'ý',
+  A: 'Á', C: 'Ç', E: 'É', I: 'Í', N: 'Ñ', O: 'Ö', U: 'Û', Y: 'Ý',
 };
 const VOWELS = 'aeiouAEIOU';
 /** Placeholders, tags and entities pass through untouched. */
