@@ -1773,3 +1773,7 @@ body.soon-page #stage, body.soon-page #ui { display: none; }
 /* A Spirit's or a Bound's Level up wraps inside its card instead of running past it. */
 .lc-up { max-width: 100%; }
 .lc-up .btn { max-width: 100%; flex-wrap: wrap; height: auto; padding-block: 4px; text-align: center; }
+/* A long Spirit or Bound name wraps beside its level instead of pushing the level out of the card. */
+.lc-nm b { min-width: 0; overflow-wrap: anywhere; }
+/* A card's name in a small box: a long word hyphenates or breaks, and a third line grows the box rather than being cut off. */
+.mc-name { height: auto; min-height: 22px; overflow-wrap: anywhere; hyphens: auto; }
