@@ -4,8 +4,8 @@ import { t } from '../i18n/index.ts';
 import Decimal from 'break_infinity.js';
 import {
   CARD_BY_ID, COST_GROWTH, AWAKEN_FLOOR, CLUTCH_SECONDS, COMPS, BOUND, BOUND_BY_ID, boundCost, TROPHIES, UPGRADES, UPG_BY_ID, bandFor, bossFor, featuredFor, modsFor, pickMonster,
-  CARDS, CORRUPTION, ZONES, GOBLIN_CARD, RAINBOW_CARD, cardId, lapOf, LEVEL_BONUS, levelBonuses, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
-  LEGENDS, LEGEND_BY_ID, NEEDLE_CRIT, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost,
+  CARDS, CORRUPTION, ZONES, GOBLIN_CARD, RAINBOW_CARD, lapOf, LEVEL_BONUS, levelBonuses, nextMilestone, ABILITY_BY_ID, ABILITY_BY_UPGRADE, abilityUpgrade, isTraitId,
+  LEGENDS, LEGEND_BY_ID, NEEDLE_CRIT, OFFER_SIZE, RESPEC_REFUND, legendCost, legendShare, summonCost, rerollCost, plain,
   type AbilityId, type LegendId, type BoundId,
   type Attack, type Effect, type ModId, type MonsterDef, type RaidReward, type Req, type TrophyReq, type UpgDef,
 } from './data.ts';
@@ -223,7 +223,7 @@ export function buffName(buff: Buff): string {
     case 'horde': return t('game.buff.horde');
     case 'vault': return t('game.buff.vault');
     case 'fever': return t('game.buff.fever');
-    default: return ABILITY_BY_ID.get(buff.id as AbilityId)?.name ?? buff.name ?? '';
+    default: return ABILITY_BY_ID.get(buff.id as AbilityId)?.name ?? '';
   }
 }
 
@@ -485,7 +485,7 @@ const CARD_SETS = ZONES.flatMap((_, zone) => CORRUPTION.map((_, lap) => ({ zone,
 /** The companions' order before the roster grew to 32 (October 2026): saves without a roster were kept in it. */
 /** What the 24 cost to hire at the time. */
 const PRICES_24: Record<string, number> = { squire: 5, ranger: 40, brawler: 250, apprentice: 2000, hunter: 12_000, shieldmaiden: 80_000, thief: 6e5, dancer: 4e6, corsair: 3e7, runesmith: 2e8, paladin: 1.5e9, stormcaller: 1e10, venomblade: 7e10, doctor: 5e11, frostimp: 4e12, hollow: 2.5e13, oathbreaker: 2e14, archmage: 1.2e15, wraith: 2e19, necro: 6e22, king: 1.5e24, angel: 1e28, ogre: 1.8e28, demon: 1e32 };
-const ROSTER_24 = 'squire ranger brawler apprentice hunter shieldmaiden thief dancer corsair runesmith paladin stormcaller venomblade doctor frostimp hollow oathbreaker archmage wraith necro king angel ogre demon'.split(' ');
+const ROSTER_24 = 'squire ranger brawler apprentice hunter shieldmaiden thief dancer corsair runesmith paladin stormcaller venomblade doctor frostimp hollow oathbreaker archmage wraith necro king angel ogre demon'.split(' '); // i18n-ignore: companion ids
 
 /** A save whose companions were kept in another order gets every per-companion list moved to the order they're in
  *  now: levels, Heartmarks, traits bought, the hero, hunters and who has reached the expedition level. */
@@ -1203,11 +1203,12 @@ export class Game {
   /** What an ability does right now, with your upgrades counted (whether or not it's unlocked or running). */
   abilityText(id: AbilityId): string {
     const p = this.c.parts;
-    const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
-    if (id === 'crit') return `Your attacks and Phantom Blade have a ${pct(Math.min(1, p.critBase + p.critUpg + NEEDLE_CRIT * legendShare(this.legendLv('needle'))))} chance for ×${+((p.critMultBase + p.critMultUpg) * (1 + 0.15 * this.legendLv('breaker'))).toFixed(2)} damage.`;
-    if (id === 'blade') return `Attacks for you, ${this.c.autoBase === 1 ? 'once' : `${+this.c.autoBase.toFixed(1)} times`} a second.`;
-    if (id === 'cleave') return `Your attacks also hit every other monster for ${pct(CLEAVE_BASE * p.cleaveUpg)} damage.`;
-    if (id === 'rampage') return `Builds as you attack. Your party deals ×${+this.feverMult(0).toFixed(1)}–×${+this.feverMult(RAMPAGE_TIERS.length - 1).toFixed(1)} damage for ${Math.round(this.rampageDuration())}s.`;
+    const pct = (n: number) => `${plain(n * 100, 1)}%`;
+    if (id === 'crit') return t('game.ability.crit', { chance: pct(Math.min(1, p.critBase + p.critUpg + NEEDLE_CRIT * legendShare(this.legendLv('needle')))), mult: plain((p.critMultBase + p.critMultUpg) * (1 + 0.15 * this.legendLv('breaker')), 2) });
+    // (`count` only picks "once"; the shown rate keeps its decimal.)
+    if (id === 'blade') return t('game.ability.blade', { count: this.c.autoBase, rate: plain(this.c.autoBase, 1) });
+    if (id === 'cleave') return t('game.ability.cleave', { pct: pct(CLEAVE_BASE * p.cleaveUpg) });
+    if (id === 'rampage') return t('game.ability.rampage', { low: plain(this.feverMult(0), 1), high: plain(this.feverMult(RAMPAGE_TIERS.length - 1), 1), secs: plain(Math.round(this.rampageDuration())) });
     return ABILITY_BY_ID.get(id)!.desc;
   }
 
@@ -2708,15 +2709,15 @@ export class Game {
       for (let c = poisson((champs * luck) / goldOdds); c > 0; c--) find(id, true);
     };
     if (isBossFloor(floor)) {
-      roll(cardId(bossFor(floor).name), kills, 0, CARD_ODDS.boss, CARD_ODDS.champBoss);
+      roll(bossFor(floor).id, kills, 0, CARD_ODDS.boss, CARD_ODDS.champBoss);
       return;
     }
     const featured = featuredFor(floor);
     const band = bandFor(floor);
     for (const def of new Set([featured, ...band])) {
-      const share = (def.name === featured.name ? 0.5 : 0) + (0.5 * band.filter((d) => d.name === def.name).length) / band.length;
+      const share = (def.id === featured.id ? 0.5 : 0) + (0.5 * band.filter((d) => d.id === def.id).length) / band.length;
       const n = Math.round(kills * share);
-      if (n) roll(cardId(def.name), n, this.championsOn() ? Math.round(n * CHAMP_CHANCE) : 0, CARD_ODDS.monster, CARD_ODDS.champ);
+      if (n) roll(def.id, n, this.championsOn() ? Math.round(n * CHAMP_CHANCE) : 0, CARD_ODDS.monster, CARD_ODDS.champ);
     }
   }
 
@@ -2724,7 +2725,7 @@ export class Game {
 
   /** Count a kill toward its card's tally; returns the card id. */
   private slay(def: MonsterDef, floor = this.s.floor, champ = false) {
-    const id = cardId(def.name);
+    const id = def.id;
     this.s.slain[id] = (this.s.slain[id] ?? 0) + 1;
     const lap = Math.min(lapOf(floor), CORRUPTION.length - 1);
     if (lap) (this.s.slainLaps[id] ??= CORRUPTION.map(() => 0))[lap]++;
@@ -2880,7 +2881,7 @@ export class Game {
     const pool = this.tradeable(zone);
     if (!pool.length || !this.takeCards(give)) return null;
     this.s.trades++;
-    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, 'Dan');
+    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, 'Dan'); // i18n-ignore: saved as the card's `via`
   }
 
   /** Victor: ten cards from anywhere for a random gold card. */
@@ -2890,7 +2891,7 @@ export class Game {
     const pool = this.tradeable().filter((c) => c.gold);
     if (!pool.length || !this.takeCards(give)) return null;
     this.s.trades++;
-    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, true, 'Victor');
+    return this.receive(pool[Math.floor(Math.random() * pool.length)].id, true, 'Victor'); // i18n-ignore: saved as the card's `via`
   }
 
   /** Hand over these copies (an id twice means two copies), taken from whichever color you have most of. */
@@ -3372,10 +3373,10 @@ export class Game {
     let odds = CARD_ODDS.monster / (this.collectorMult() * this.overkillMult(overkill));
     if (this.debugCards) odds = Math.max(1, odds / 500);
     for (const def of new Set([featured, ...band])) {
-      const share = (def.name === featured.name ? 0.5 : 0) + (0.5 * band.filter((d) => d.name === def.name).length) / band.length;
+      const share = (def.id === featured.id ? 0.5 : 0) + (0.5 * band.filter((d) => d.id === def.id).length) / band.length;
       const n = Math.round(kills * share);
       if (!n) continue;
-      const id = cardId(def.name);
+      const id = def.id;
       this.s.slain[id] = (this.s.slain[id] ?? 0) + n;
       if (lap) (this.s.slainLaps[id] ??= CORRUPTION.map(() => 0))[lap] += n;
       for (let k = poisson(n / odds); k > 0; k--) this.giveCard(id, false, 'sweep');

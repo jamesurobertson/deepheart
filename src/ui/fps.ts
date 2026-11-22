@@ -1,3 +1,5 @@
+import { fixed, t } from '../i18n/index.ts';
+
 /** A dev-only corner readout (?fps): frames a second, the slowest frame gap, and how long each frame's work took. */
 export function fpsOverlay() {
   const el = document.createElement('div');
@@ -8,17 +10,17 @@ export function fpsOverlay() {
   let worst = 0;
   let prev = 0;
   let from = performance.now();
-  return (t: number, workMs: number) => {
-    if (prev) worst = Math.max(worst, t - prev);
-    prev = t;
+  return (now: number, workMs: number) => {
+    if (prev) worst = Math.max(worst, now - prev);
+    prev = now;
     frames++;
     work += workMs;
-    const span = t - from;
+    const span = now - from;
     if (span < 500) return;
-    el.textContent = `${Math.round((frames * 1000) / span)} fps · worst ${worst.toFixed(0)} ms\nwork ${(work / frames).toFixed(1)} ms`;
+    el.textContent = t('menu.fps.readout', { fps: Math.round((frames * 1000) / span), worst: fixed(worst, 0), work: fixed(work / frames, 1) });
     frames = 0;
     work = 0;
     worst = 0;
-    from = t;
+    from = now;
   };
 }

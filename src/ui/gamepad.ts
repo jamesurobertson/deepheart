@@ -6,6 +6,8 @@
  *  number to type (a floor) steps instead: ◀ ▶ by 1, ▲ ▼ by 10, LB RB by 100. In a window or on the title screen
  *  the sticks and d-pad step between buttons and LB RB change tabs. Prompts show the controller's own buttons (Kenney's Input Prompts, by kind of pad) while it's the last
  *  thing used; the mouse, keyboard or a finger puts the usual words back. */
+import { t } from '../i18n/index.ts';
+
 const REACH = 'button:not([disabled]), a[href], [tabindex="0"], input:not([disabled])';
 /** In a window, or around the screen from Menu, anything with a tooltip can be stepped to as well (a trophy, a card,
  *  an ability), to read it. */
@@ -17,6 +19,15 @@ const REPEAT_MS = 220;
 const BUY_REPEAT_MS = 160;
 const ARROWS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } as const;
 type Dir = keyof typeof ARROWS;
+/** What the prompt bar says a button does. */
+const PROMPT = {
+  go: 'menu.pad.go', cancel: 'menu.pad.cancel', select: 'menu.pad.select', back: 'menu.pad.back', walk: 'menu.pad.walk', use: 'menu.pad.use',
+  move: 'menu.pad.move', attack: 'menu.pad.attack', level: 'menu.pad.level', upgrade: 'menu.pad.upgrade', options: 'menu.pad.options',
+  browse: 'menu.pad.browse', tabs: 'menu.pad.tabs', change: 'menu.pad.change',
+} as const;
+/** A prompt's word, or a number box's step (shown as it is). */
+type Prompt = keyof typeof PROMPT | '±1' | '±10' | '±100';
+const promptLabel = (prompt: Prompt) => (prompt in PROMPT ? t(PROMPT[prompt as keyof typeof PROMPT]) : prompt);
 /** The ability (its number key) on LB, RB and Y, and on each with LT held. */
 const ABILITY_KEY: Record<string, [string, string]> = { b4: ['1', '4'], b5: ['3', '5'], b3: ['2', '6'] };
 /** Each ability's button(s), for its prompt. */
@@ -274,18 +285,18 @@ export function installGamepad() {
       return;
     }
     const modal = modalOpen();
-    const items: [string[], string][] = numberBox() ? [[['left', 'right'], '±1'], [['up', 'down'], '±10'], [['lb', 'rb'], '±100'], [['a'], 'Go'], [['b'], 'Cancel']]
-      : modal ? [[['a'], 'Select'], [['b'], 'Back']]
-      : titleOpen() ? [[['a'], 'Select']]
-      : docked ? [[['a'], 'Select'], [['b'], 'Back']]
-      : inKeep() ? [[['ls'], 'Walk'], [['y'], 'Use'], [['a'], 'Level'], [['x'], 'Upgrade'], [['menu'], 'Options'], [['view'], 'Browse']]
-      : [[['ls'], 'Move'], [['rt'], 'Attack'], [['a'], 'Level'], [['x'], 'Upgrade'], [['menu'], 'Options'], [['view'], 'Browse']];
-    if (!numberBox() && modal && document.querySelector('.modal-wrap:not([hidden]) .tabs')) items.splice(1, 0, [['lb', 'rb'], 'Tabs']);
-    if (!numberBox() && modal && document.querySelector('.modal-wrap:not([hidden]) .opts .opt:not(.opt-go)')) items.splice(1, 0, [['left', 'right'], 'Change']);
-    const key = family + items.map(([, w]) => w).join();
+    const items: [string[], Prompt][] = numberBox() ? [[['left', 'right'], '±1'], [['up', 'down'], '±10'], [['lb', 'rb'], '±100'], [['a'], 'go'], [['b'], 'cancel']]
+      : modal ? [[['a'], 'select'], [['b'], 'back']]
+      : titleOpen() ? [[['a'], 'select']]
+      : docked ? [[['a'], 'select'], [['b'], 'back']]
+      : inKeep() ? [[['ls'], 'walk'], [['y'], 'use'], [['a'], 'level'], [['x'], 'upgrade'], [['menu'], 'options'], [['view'], 'browse']]
+      : [[['ls'], 'move'], [['rt'], 'attack'], [['a'], 'level'], [['x'], 'upgrade'], [['menu'], 'options'], [['view'], 'browse']];
+    if (!numberBox() && modal && document.querySelector('.modal-wrap:not([hidden]) .tabs')) items.splice(1, 0, [['lb', 'rb'], 'tabs']);
+    if (!numberBox() && modal && document.querySelector('.modal-wrap:not([hidden]) .opts .opt:not(.opt-go)')) items.splice(1, 0, [['left', 'right'], 'change']);
+    const key = family + items.map(([, prompt]) => prompt).join();
     if (key !== barKey) {
       barKey = key;
-      bar.innerHTML = items.map(([keys, what]) => `<span>${keys.map((k) => padGlyph(k, 26)).join('')}<b>${what}</b></span>`).join('');
+      bar.innerHTML = items.map(([keys, prompt]) => `<span>${keys.map((k) => padGlyph(k, 26)).join('')}<b>${promptLabel(prompt)}</b></span>`).join('');
     }
     const over = modal || titleOpen();
     bar.classList.toggle('over', over);
@@ -429,7 +440,7 @@ export function installGamepad() {
       }
       if (modal && (fresh('b4') || fresh('b5'))) {
         const tabs = [...document.querySelectorAll<HTMLElement>('.modal-wrap:not([hidden]) .tabs .tab')].filter(visible);
-        const on = Math.max(0, tabs.findIndex((t) => t.classList.contains('on')));
+        const on = Math.max(0, tabs.findIndex((tab) => tab.classList.contains('on')));
         if (tabs.length > 1) {
           click(tabs[(on + (fresh('b5') ? 1 : tabs.length - 1)) % tabs.length]);
           // (A new page of rows: start on its first.)

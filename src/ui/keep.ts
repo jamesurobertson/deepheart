@@ -4,6 +4,7 @@ import { BOUND, COMPS, LEGENDS, LEGEND_BY_ID, ZONES, boundName, type BoundId, ty
 import type { Game } from '../game/game.ts';
 import { KOKO_EYE, KOKO_FUR, KOKO_ROWS, KOKO_TAIL } from './koko.ts';
 import { spiritForm, spriteFrames, uiAtlas } from './px.ts';
+import { t, type UiKey } from '../i18n/index.ts';
 
 /**
  * The Keep, the castle above the dungeon: a top-down map in the dungeon's own tiles. You come up the stairs in the
@@ -84,16 +85,18 @@ const HEART_TIME = 1.6;
 /** What each station is, where it's used from (cells you stand on), where its label floats, and (spirits, which you
  *  can walk through) the cells of its body that a click picks it by. */
 type Station = { id: KeepStation; label: string; cells: [number, number][]; tag: [number, number]; body?: [number, number][] };
-const STATIONS: Station[] = [
+/** A station that is always there, its name a message key (looked up when it's shown). */
+type FixedStation = Omit<Station, 'label'> & { label: UiKey };
+const STATIONS: FixedStation[] = [
   // (Written out, not mapped from PEOPLE: a call here would keep the Keep, names and all, in the demo's bundle.)
-  { id: 'dan', label: 'Dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 19.55], body: [[3, 18], [3, 17]] },
-  { id: 'victor', label: 'Victor', cells: [[2, 20], [3, 21], [4, 20], [3, 19]], tag: [3, 21.55], body: [[3, 20], [3, 19]] },
+  { id: 'dan', label: 'keep.station.dan', cells: [[2, 18], [3, 19], [4, 18], [3, 17]], tag: [3, 19.55], body: [[3, 18], [3, 17]] },
+  { id: 'victor', label: 'keep.station.victor', cells: [[2, 20], [3, 21], [4, 20], [3, 19]], tag: [3, 21.55], body: [[3, 20], [3, 19]] },
   // The way down works from anywhere round the stairs, not just on them.
-  { id: 'stairs', label: 'The Dungeon', cells: Array.from({ length: STAIRS.steps + 1 }, (_, k) => STAIRS.x - 1 + k).flatMap((x) => [30, 31, 32, 33, 34].map((y): [number, number] => [x, y])), tag: [25, 35.1], body: STAIR_CELLS },
-  { id: 'koko', label: 'Koko', cells: [[2, 21], [3, 21], [2, 22], [4, 22], [2, 23], [3, 23], [4, 23]], tag: [KOKO[0], KOKO[1] + 1.55], body: [KOKO, [KOKO[0], KOKO[1] - 1]] },
-  { id: 'heart', label: 'The Heart', cells: [[6, 5], [7, 5], [8, 5], [6, 4], [8, 4]], tag: [7, 6.1], body: [[7, 4], [7, 3]] },
+  { id: 'stairs', label: 'keep.station.stairs', cells: Array.from({ length: STAIRS.steps + 1 }, (_, k) => STAIRS.x - 1 + k).flatMap((x) => [30, 31, 32, 33, 34].map((y): [number, number] => [x, y])), tag: [25, 35.1], body: STAIR_CELLS },
+  { id: 'koko', label: 'keep.station.koko', cells: [[2, 21], [3, 21], [2, 22], [4, 22], [2, 23], [3, 23], [4, 23]], tag: [KOKO[0], KOKO[1] + 1.55], body: [KOKO, [KOKO[0], KOKO[1] - 1]] },
+  { id: 'heart', label: 'keep.station.heart', cells: [[6, 5], [7, 5], [8, 5], [6, 4], [8, 4]], tag: [7, 6.1], body: [[7, 4], [7, 3]] },
 ];
-const TRIPS: Station = { id: 'trips', label: 'Expeditions', cells: [[27, 27], [26, 27], [28, 27], [27, 28], [26, 28], [28, 28]], tag: [27, 28.55], body: [[27, 27]] };
+const TRIPS: FixedStation = { id: 'trips', label: 'keep.station.trips', cells: [[27, 27], [26, 27], [28, 27], [27, 28], [26, 28], [28, 28]], tag: [27, 28.55], body: [[27, 27]] };
 /** Where you arrive: just off the top of the stairs (not so close the way down is on offer), the party coming up them
  *  behind you. */
 const ARRIVE: [number, number] = [18, 32];
@@ -106,7 +109,7 @@ const WARP = 0.38;
 const RISE = 0.6;
 const STAGGER = 0.14;
 /** The menu's arrive easing, cubic-bezier(0.2, 1.5, 0.4, 1): a quick rise that overshoots and settles. */
-const overshoot = (t: number) => 1 + 2.4 * (t - 1) ** 3 + 1.4 * (t - 1) ** 2;
+const overshoot = (progress: number) => 1 + 2.4 * (progress - 1) ** 3 + 1.4 * (progress - 1) ** 2;
 /** The shrine: the Spirits on offer float here as spirits, big, side by side (their feet on these cells). */
 const SHRINE: [number, number] = [23, 6];
 const SPIRITS: [number, number][] = [[18, 7], [23, 7], [28, 7]];
@@ -212,7 +215,7 @@ export class KeepView {
     }
     this.tiles = autotile(this.cells);
     // A south wall's cap is drawn along the bottom of the room's last floor row.
-    for (const t of this.tiles[2]) if (t.name === 'wall_top_mid' && this.cells[t.y]?.[t.x] === '.') this.capped.add(`${t.x},${t.y}`);
+    for (const piece of this.tiles[2]) if (piece.name === 'wall_top_mid' && this.cells[piece.y]?.[piece.x] === '.') this.capped.add(`${piece.x},${piece.y}`);
     for (const [name, x, y, how] of THINGS) {
       if (how) continue;
       if (name === 'column') this.columns.push([x, y]);
@@ -525,7 +528,8 @@ export class KeepView {
     const mine = this.guards().map(({ d, at }) => ({ ...figure(`legend:${d.id}`, d.name, at, 2), tag: [at[0], at[1] + 1.3] as [number, number] }));
     const bound = this.bound().map(({ b, at }) => ({ ...figure(`bound:${b.id}`, boundName(b), at, 2), tag: [at[0], at[1] + 1.3] as [number, number] }));
     const reachable = this.game.s.awakens ? STATIONS : STATIONS.filter((st) => st.id !== 'heart');
-    return [...reachable, ...(this.game.tripsOpen() ? [TRIPS] : []), ...offer, ...mine, ...bound];
+    const fixed = [...reachable, ...(this.game.tripsOpen() ? [TRIPS] : [])].map((st): Station => ({ ...st, label: t(st.label) }));
+    return [...fixed, ...offer, ...mine, ...bound];
   }
 
   /** Your followers in line behind the hero. The line keeps its order (in the save, between visits): a new hero steps
@@ -555,13 +559,13 @@ export class KeepView {
 
   /** What using a station does, for its key prompt. */
   private verb(id: KeepStation) {
-    if (id === 'stairs') return 'Go down';
-    if (id === 'dan' || id === 'victor') return 'Trade';
-    if (id === 'trips') return 'Send';
-    if (id === 'koko') return 'Pet';
-    if (id === 'heart') return this.game.canAwaken() ? 'Awaken' : 'Open';
-    if (id.startsWith('offer:')) return 'View';
-    return 'Open';
+    if (id === 'stairs') return t('keep.verb.down');
+    if (id === 'dan' || id === 'victor') return t('keep.verb.trade');
+    if (id === 'trips') return t('keep.verb.send');
+    if (id === 'koko') return t('keep.verb.pet');
+    if (id === 'heart') return this.game.canAwaken() ? t('keep.verb.awaken') : t('keep.verb.open');
+    if (id.startsWith('offer:')) return t('keep.verb.view');
+    return t('keep.verb.open');
   }
 
   /** Where each station's label goes on screen. */
@@ -576,7 +580,7 @@ export class KeepView {
       const [tx, ty] = below ? [st.tag[0], st.tag[1] - 0.45] : [STAIRS.x + STAIRS.steps / 2 - 0.5, STAIRS.y - 0.1];
       // Names show when you point at them or stand there. The expedition ladder the first time you see it: named, with
       // what it's for, until you've used it.
-      const tip = st.id === 'trips' && !this.game.s.ladderSeen ? 'Send companions to hunt cards' : undefined;
+      const tip = st.id === 'trips' && !this.game.s.ladderSeen ? t('keep.trips.tip') : undefined;
       const shown = !!tip || (st.id === 'heart' && this.game.canAwaken()) || this.near === st.id || this.hover === st.id;
       return { id: st.id, label: st.label, verb: this.verb(st.id), x: r.left + r.width / 2 + (tx + 0.5 - this.cam.x) * s, y: r.top + r.height / 2 + (ty - this.cam.y) * s, below, shown, tip };
     });
@@ -604,9 +608,9 @@ export class KeepView {
     c = document.createElement('canvas');
     c.width = r.w;
     c.height = r.h;
-    const t = c.getContext('2d')!;
-    t.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-    const data = t.getImageData(0, 0, r.w, r.h);
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    const data = ctx.getImageData(0, 0, r.w, r.h);
     const color = new THREE.Color();
     const hsl = { h: 0, s: 0, l: 0 };
     for (let k = 0; k < data.data.length; k += 4) {
@@ -618,7 +622,7 @@ export class KeepView {
       const rgb = color.getStyle(THREE.SRGBColorSpace).match(/\d+/g)!.map(Number);
       data.data.set(rgb.slice(0, 3), k);
     }
-    t.putImageData(data, 0, 0);
+    ctx.putImageData(data, 0, 0);
     this.souls.set(key, c);
     return c;
   }
@@ -632,14 +636,14 @@ export class KeepView {
     c = document.createElement('canvas');
     c.width = r.w;
     c.height = r.h;
-    const t = c.getContext('2d')!;
-    t.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-    t.globalCompositeOperation = 'multiply';
-    t.fillStyle = `#${tint.toString(16).padStart(6, '0')}`;
-    t.fillRect(0, 0, r.w, r.h);
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = `#${tint.toString(16).padStart(6, '0')}`;
+    ctx.fillRect(0, 0, r.w, r.h);
     // Multiply fills the clear pixels too: cut back to the sprite's own shape.
-    t.globalCompositeOperation = 'destination-in';
-    t.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
     this.tints.set(key, c);
     return c;
   }
@@ -682,11 +686,11 @@ export class KeepView {
     c = document.createElement('canvas');
     c.width = r.w;
     c.height = r.h;
-    const t = c.getContext('2d')!;
-    t.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-    t.globalCompositeOperation = 'source-in';
-    t.fillStyle = color;
-    t.fillRect(0, 0, r.w, r.h);
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, r.w, r.h);
     byFrame.set(key, c);
     return c;
   }
@@ -765,9 +769,9 @@ export class KeepView {
       const f = Math.abs(Math.sin((y * CASTLE_W + x) * 12.9898) * 43758.5453) % 1;
       return f < 0.78 ? 1 : 2 + Math.floor(((f - 0.78) / 0.22) * 7);
     };
-    for (const t of this.tiles[0]) tile(atlas.rect(`floor_${worn(t.x, t.y)}`), t.x, t.y);
-    for (const t of this.tiles[1]) tile(atlas.rect(t.name), t.x, t.y);
-    for (const t of this.tiles[2]) if (!this.capped.has(`${t.x},${t.y}`)) tile(atlas.rect(t.name), t.x, t.y);
+    for (const piece of this.tiles[0]) tile(atlas.rect(`floor_${worn(piece.x, piece.y)}`), piece.x, piece.y);
+    for (const piece of this.tiles[1]) tile(atlas.rect(piece.name), piece.x, piece.y);
+    for (const piece of this.tiles[2]) if (!this.capped.has(`${piece.x},${piece.y}`)) tile(atlas.rect(piece.name), piece.x, piece.y);
     this.drawStairs(g, img, atlas, worn);
     if (this.game.tripsOpen()) tile(rect('floor_ladder'), LADDER[0], LADDER[1]);
     for (const [name, x, y, how] of THINGS) {
@@ -841,11 +845,11 @@ export class KeepView {
         standLit(`legend:${d.id}`, src.img, r, at[0] + 0.5, at[1] + 1, at[0] > 23);
         // Soul sparkles drifting up around them and in front of them.
         for (let w = 0; w < 7; w++) {
-          const t = (this.time * 0.35 + w / 7 + k * 0.17) % 1;
+          const phase = (this.time * 0.35 + w / 7 + k * 0.17) % 1;
           const big = w % 3 === 0;
           g.fillStyle = big ? '#e2d2ff' : '#b38cff';
-          g.globalAlpha = Math.sin(t * Math.PI) * (big ? 0.85 : 0.6);
-          g.fillRect(Math.round((at[0] + 0.5) * 16 + ((w * 5) % 15) - 7 + Math.sin(this.time * 1.5 + w + k) * 2), Math.round((at[1] + 1) * 16 + 1 - t * 28), big ? 2 : 1, big ? 2 : 1);
+          g.globalAlpha = Math.sin(phase * Math.PI) * (big ? 0.85 : 0.6);
+          g.fillRect(Math.round((at[0] + 0.5) * 16 + ((w * 5) % 15) - 7 + Math.sin(this.time * 1.5 + w + k) * 2), Math.round((at[1] + 1) * 16 + 1 - phase * 28), big ? 2 : 1, big ? 2 : 1);
         }
         g.globalAlpha = 1;
       } });
@@ -870,30 +874,30 @@ export class KeepView {
     }
     if (offer.length) {
       offer.slice(0, SPIRITS.length).forEach((id, k) => {
-        const t = (since - WARP - k * STAGGER) / RISE;
-        if (t < 0) return;
+        const rise = (since - WARP - k * STAGGER) / RISE;
+        if (rise < 0) return;
         const [x, y] = SPIRITS[k];
-        if (t < 1) {
+        if (rise < 1) {
           standing.push({ y: y + 1.01, draw: () => {
             const beam = g.createLinearGradient(0, (y + 1) * 16, 0, (y - 4) * 16);
-            beam.addColorStop(0, `rgba(214, 190, 255, ${0.7 * (1 - t)})`);
+            beam.addColorStop(0, `rgba(214, 190, 255, ${0.7 * (1 - rise)})`);
             beam.addColorStop(1, 'rgba(179, 140, 255, 0)');
             g.fillStyle = beam;
             g.fillRect((x + 0.5) * 16 - 12, (y - 4) * 16, 24, 5 * 16);
           } });
         }
-        const fx = t < 1 ? { dy: (1 - overshoot(t)) * 1.6, alpha: Math.min(1, t / 0.6), sy: 0.2 + 0.8 * overshoot(t), flash: Math.max(0, 1 - t * 1.6) } : undefined;
+        const fx = rise < 1 ? { dy: (1 - overshoot(rise)) * 1.6, alpha: Math.min(1, rise / 0.6), sy: 0.2 + 0.8 * overshoot(rise), flash: Math.max(0, 1 - rise * 1.6) } : undefined;
         spirit(LEGEND_BY_ID.get(id)!.sprite, SPIRITS[k], k, 2, `offer:${id}`, fx);
       });
     }
     // Wisps rising across the shrine.
     standing.push({ y: SHRINE[1] + 1.5, draw: () => {
       for (let k = 0; k < 26; k++) {
-        const t = (this.time * 0.45 + k / 26) % 1;
+        const phase = (this.time * 0.45 + k / 26) % 1;
         const big = k % 4 === 0;
         g.fillStyle = big ? '#efe4ff' : '#c9a6ff';
-        g.globalAlpha = Math.sin(t * Math.PI) * (big ? 0.95 : 0.7);
-        g.fillRect(Math.round((16.5 + ((k * 4.7) % 13)) * 16 + Math.sin(this.time * 2 + k) * 2), Math.round((SHRINE[1] + 3.2) * 16 - t * 90), big ? 2 : 1, big ? 2 : 1);
+        g.globalAlpha = Math.sin(phase * Math.PI) * (big ? 0.95 : 0.7);
+        g.fillRect(Math.round((16.5 + ((k * 4.7) % 13)) * 16 + Math.sin(this.time * 2 + k) * 2), Math.round((SHRINE[1] + 3.2) * 16 - phase * 90), big ? 2 : 1, big ? 2 : 1);
       }
       g.globalAlpha = 1;
     } });
@@ -938,10 +942,10 @@ export class KeepView {
         else standLit(`bound:${b.id}`, src.img, r, at[0] + 0.5, at[1] + 1, at[0] > HEART[0]);
         if (unbought) g.restore();
         for (let w = 0; w < 6; w++) {
-          const t = (this.time * 0.3 + w / 6 + k * 0.21) % 1;
+          const phase = (this.time * 0.3 + w / 6 + k * 0.21) % 1;
           g.fillStyle = w % 3 === 0 ? '#ffb3c4' : '#ff5a7e';
-          g.globalAlpha = Math.sin(t * Math.PI) * 0.7;
-          g.fillRect(Math.round((at[0] + 0.5) * 16 + ((w * 5) % 15) - 7 + Math.sin(this.time * 1.3 + w + k) * 2), Math.round((at[1] + 1) * 16 + 1 - t * 30), 1, 1);
+          g.globalAlpha = Math.sin(phase * Math.PI) * 0.7;
+          g.fillRect(Math.round((at[0] + 0.5) * 16 + ((w * 5) % 15) - 7 + Math.sin(this.time * 1.3 + w + k) * 2), Math.round((at[1] + 1) * 16 + 1 - phase * 30), 1, 1);
         }
         g.globalAlpha = 1;
       } });
@@ -1061,7 +1065,7 @@ export class KeepView {
     }
     standing.sort((a, b) => a.y - b.y).forEach((s2) => s2.draw());
     // A south wall stands in front of the room: its cap goes over anyone right up against it (feet, rings and all).
-    for (const t of this.tiles[2]) if (this.capped.has(`${t.x},${t.y}`)) tile(atlas.rect(t.name), t.x, t.y);
+    for (const piece of this.tiles[2]) if (this.capped.has(`${piece.x},${piece.y}`)) tile(atlas.rect(piece.name), piece.x, piece.y);
     // The Heart's glow, once it's stirred.
     if (ready || awake) {
       const hx = (HEART[0] + 0.5) * 16, hy = (HEART[1] - 1.1) * 16;

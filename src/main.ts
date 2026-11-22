@@ -326,6 +326,7 @@ async function boot() {
       for (let k = 0; k < floors && !scene.busy; k++) game.devClearFloor();
     };
     const look = 'padding:6px 10px;font:14px Silkscreen,monospace;background:#2a1d14;color:#ffd27a;border:2px solid #7a5a2a;border-radius:4px;cursor:pointer';
+    // i18n-ignore-start (dev-only test buttons)
     const nexts = document.createElement('div');
     nexts.style.cssText = 'position:fixed;left:12px;top:132px;z-index:50;display:flex;gap:4px';
     const nextButton = (label: string, title: string, floors: number) => {
@@ -362,10 +363,11 @@ async function boot() {
       skips.appendChild(hourButton);
     });
     document.body.appendChild(skips);
+    // i18n-ignore-end
     addEventListener('keydown', (e) => {
       if (e.repeat || (e.target as HTMLElement).closest('input, textarea')) return;
       if (e.key.toLowerCase() === 'n') next(e.shiftKey ? 10 : 1);
-      const hours = e.metaKey && SKIP_HOURS[Number(e.code.replace('Digit', '')) - 1];
+      const hours = e.metaKey && SKIP_HOURS[Number(e.code.replace('Digit', '')) - 1]; // i18n-ignore
       if (hours) {
         e.preventDefault();
         skip(hours);

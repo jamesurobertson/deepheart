@@ -3,6 +3,7 @@ import { duration, fmt } from '../game/format.ts';
 import type { Game } from '../game/game.ts';
 import { DEMO, STEAM_URL, WIKI_URL } from '../demo.ts';
 import { G, spriteFrames } from './px.ts';
+import { t, type UiKey } from '../i18n/index.ts';
 
 export interface MenuHooks {
   /** Into the game: the run there is (Continue, Play the Demo), or the fresh one a New Game made. */
@@ -15,10 +16,11 @@ export interface MenuHooks {
 }
 
 /** Every pack the game's art, sound and music come from (all CC0), as the README credits them. */
-const CREDITS: { what: string; items: { name: string; by?: string; url: string }[] }[] = [
+const CREDITS: { what: UiKey; items: { name: string; by?: string; url: string }[] }[] = [
   {
-    what: 'Art',
+    what: 'menu.credits.art',
     items: [
+      // i18n-ignore-start
       { name: 'DungeonTileset II and its Sewers add-on', by: '0x72', url: 'https://0x72.itch.io/dungeontileset-ii' },
       { name: 'Enchanted Forest Characters', by: 'Superdark', url: 'https://superdark.itch.io/enchanted-forest-characters' },
       { name: 'Custom Dungeon tileset', by: 'Omniboy', url: 'https://omniboy.itch.io/custom-dungeon-16x16-tileset' },
@@ -27,15 +29,19 @@ const CREDITS: { what: string; items: { name: string; by?: string; url: string }
       { name: 'CR+ TileSet', by: 'AnriTool', url: 'https://anritool.itch.io/cr-tileset' },
       { name: 'Pixel Art Spells', by: 'DevWizard', url: 'https://opengameart.org/content/pixel-art-spells' },
       { name: 'Input Prompts', by: 'Kenney', url: 'https://kenney.nl/assets/input-prompts' },
+      // i18n-ignore-end
     ],
   },
   {
-    what: 'Sound',
+    what: 'menu.credits.sound',
+    // i18n-ignore-start
     items: [{ name: 'Impact, Interface, RPG Audio and Music Jingles', by: 'Kenney', url: 'https://kenney.nl' }],
+    // i18n-ignore-end
   },
   {
-    what: 'Music',
+    what: 'menu.credits.music',
     items: [
+      // i18n-ignore-start
       { name: 'Chiptune Adventures', by: 'Juhani Junkala', url: 'https://opengameart.org/content/4-chiptunes-adventure' },
       { name: '5 Chiptunes (Action)', by: 'Juhani Junkala', url: 'https://opengameart.org/node/55580' },
       { name: 'Spooky Dungeon', by: 'Memoraphile', url: 'https://opengameart.org/content/spooky-dungeon' },
@@ -44,6 +50,7 @@ const CREDITS: { what: string; items: { name: string; by?: string; url: string }
       { name: 'Dark Forest Waltz', by: 'The Art Bros', url: 'https://opengameart.org/content/10-track-modern-chiptune-demo' },
       { name: 'Fields of Ice', by: 'Jonathan So', url: 'https://opengameart.org/content/fields-of-ice' },
       { name: 'The Bard\'s Tale', by: 'RandomMind', url: 'https://opengameart.org/content/chiptune-medieval-the-bards-tale' },
+      // i18n-ignore-end
     ],
   },
 ];
@@ -105,7 +112,7 @@ export class TitleMenu {
     const canvas = document.createElement('canvas');
     canvas.className = 'mm-stairs';
     canvas.tabIndex = 0;
-    canvas.setAttribute('aria-label', 'The stairway: left and right (or A and D) walk, up, W or Space jumps, down or S drops a step, Escape goes back to the menu');
+    canvas.setAttribute('aria-label', t('menu.stairs.label'));
     this.el.appendChild(canvas);
     // Your hero, once you move them, draws on a layer over the menu: the menu's words are ledges too, floating in the
     // dark (the heart, the title, the tagline, every line of the list, the DEMO stamp, the Wishlist button, and on the
@@ -160,41 +167,41 @@ export class TitleMenu {
   /** The demo's is the same, with a DEMO stamp on the logo and Wishlist on Steam as the button that stands out. */
   private mainMenu() {
     const s = this.game.s;
-    const where = !DEMO && s.inKeep ? 'The Keep' : `Floor ${fmt(s.floor)} · ${esc(zoneName(s.floor))}`;
+    const where = !DEMO && s.inKeep ? t('menu.run.keep') : t('menu.run.floor', { floor: fmt(s.floor), zone: esc(zoneName(s.floor)) });
     const run = this.hasRun ? `<p class="mm-run">${where} · ${duration(s.playTime)}</p>` : '';
-    const logo = DEMO ? `<div class="mm-stamped">${LOGO}<span class="mm-stamp">DEMO</span></div>` : LOGO;
-    const play = this.hasRun ? 'Continue' : DEMO ? 'Play the Demo' : 'New Game';
-    return `<div class="mm-head">${HEART}${logo}<p class="mm-tag">AN IDLE DUNGEON CRAWLER</p></div>
-      ${DEMO ? `<a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}Wishlist on Steam</a>` : ''}
+    const logo = DEMO ? `<div class="mm-stamped">${LOGO}<span class="mm-stamp">${t('menu.demo')}</span></div>` : LOGO;
+    const play = this.hasRun ? t('menu.continue') : DEMO ? t('menu.playDemo') : t('menu.newGame');
+    return `<div class="mm-head">${HEART}${logo}<p class="mm-tag">${t('menu.tagline')}</p></div>
+      ${DEMO ? `<a class="mm-btn steam" href="${STEAM_URL}" target="_blank" rel="noopener">${G.steam(26)}${t('menu.wishlist')}</a>` : ''}
       <nav class="mm-list">
         <button type="button" data-mm="${this.hasRun || DEMO ? 'play' : 'new'}"><span>▸</span>${play}</button>${run}
-        ${this.hasRun ? '<button type="button" data-mm="new"><span>▸</span>New Game</button>' : ''}
-        <button type="button" data-mm="options"><span>▸</span>Options</button>
-        ${DEMO ? '' : `<a href="${WIKI_URL}" target="_blank" rel="noopener"><span>▸</span>Wiki</a>`}
-        <button type="button" data-mm="credits"><span>▸</span>Credits</button>
-        ${this.hooks.quit ? '<button type="button" data-mm="quit"><span>▸</span>Quit</button>' : ''}
+        ${this.hasRun ? `<button type="button" data-mm="new"><span>▸</span>${t('menu.newGame')}</button>` : ''}
+        <button type="button" data-mm="options"><span>▸</span>${t('menu.options')}</button>
+        ${DEMO ? '' : `<a href="${WIKI_URL}" target="_blank" rel="noopener"><span>▸</span>${t('menu.wiki')}</a>`}
+        <button type="button" data-mm="credits"><span>▸</span>${t('menu.credits')}</button>
+        ${this.hooks.quit ? `<button type="button" data-mm="quit"><span>▸</span>${t('menu.quit')}</button>` : ''}
       </nav>`;
   }
 
   private confirm() {
     return `<div class="mm-head">${HEART}${LOGO}</div>
       <div class="mm-confirm">
-        <p>Start a new game? Your run (floor ${fmt(this.game.s.floor)}, ${duration(this.game.s.playTime)}) will be lost.</p>
+        <p>${t('menu.confirm.text', { floor: fmt(this.game.s.floor), time: duration(this.game.s.playTime) })}</p>
         <div class="mm-row">
-          <button type="button" class="mm-btn danger" data-mm="restart">Start over</button>
-          <button type="button" class="mm-btn" data-mm="main">Keep my run</button>
+          <button type="button" class="mm-btn danger" data-mm="restart">${t('menu.confirm.restart')}</button>
+          <button type="button" class="mm-btn" data-mm="main">${t('menu.confirm.keep')}</button>
         </div>
       </div>`;
   }
 
   private credits() {
-    const sections = CREDITS.map((c) => `<section><h3>${c.what}</h3><ul>${c.items.map((i) =>
-      `<li><a href="${i.url}" target="_blank" rel="noopener">${esc(i.name)}</a>${i.by ? ` <span>by ${esc(i.by)}</span>` : ''}</li>`).join('')}</ul></section>`).join('');
+    const sections = CREDITS.map((section) => `<section><h3>${t(section.what)}</h3><ul>${section.items.map((item) =>
+      `<li><a href="${item.url}" target="_blank" rel="noopener">${esc(item.name)}</a>${item.by ? ` <span>${t('menu.credits.by', { name: esc(item.by) })}</span>` : ''}</li>`).join('')}</ul></section>`).join('');
     return `<div class="mm-credits">
-        <h2>Credits</h2>
-        <p class="mm-by">Deepheart by James Robertson. All art, sound and music are CC0: thank you to everyone who made them free.</p>
+        <h2>${t('menu.credits.title')}</h2>
+        <p class="mm-by">${t('menu.credits.lede')}</p>
         ${sections}
-        <div class="mm-foot"><button type="button" class="mm-btn" data-mm="main">Back</button></div>
+        <div class="mm-foot"><button type="button" class="mm-btn" data-mm="main">${t('menu.credits.back')}</button></div>
       </div>`;
   }
 }

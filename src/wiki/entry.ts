@@ -1,3 +1,4 @@
+import '../i18n/fonts/base.css';
 import { initI18n } from '../i18n/boot.ts';
 
 await initI18n();

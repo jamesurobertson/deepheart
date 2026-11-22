@@ -19,7 +19,6 @@ declare global {
 
 const LOADERS = import.meta.glob<{ default: LocaleFile | LocaleOverride }>('./locales/*.ts');
 const FONTS: Record<FontPack, () => Promise<unknown>> = {
-  cyrillic: () => import('./fonts/cyrillic.css'),
   'zh-CN': () => import('./fonts/zh-CN.css'),
   ja: () => import('./fonts/ja.css'),
   ko: () => import('./fonts/ko.css'),

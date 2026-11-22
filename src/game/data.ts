@@ -4,6 +4,18 @@
  */
 
 import { DEMO } from '../demo.ts';
+import { fixed, int, numberWords, t, tc } from '../i18n/index.ts';
+
+/** The demo's stand-in for the full game's names. */
+const BLANK = '???';
+/** Game content in the player's language, its English registered under `key`. Blanks and empty text aren't content. */
+const text = (key: string, english: string) => (english === BLANK || !english ? english : tc(key, english));
+
+/** A number as toFixed(digits) shows it, trailing zeros dropped and no grouping, with the language's decimal mark. */
+export function plain(n: number, digits = 0): string {
+  const rounded = Number(n.toFixed(digits));
+  return fixed(rounded, (String(rounded).split('.')[1] ?? '').length);
+}
 
 /** A picture for the UI: a sprite from the dungeon sheet, optionally with a badge. */
 export interface Icon {
@@ -29,7 +41,7 @@ export interface CompDef {
 }
 
 const c = (id: string, name: string, sprite: string, cost: number, dps: number, attack: Attack, flavor: string, big = false): CompDef =>
-  ({ id, name, sprite, cost, dps, attack, flavor, big });
+  ({ id, name: text(`comp.${id}.name`, name), sprite, cost, dps, attack, flavor: text(`comp.${id}.flavor`, flavor), big });
 
 /** Prices go by place in the list, whoever stands there, spaced as Clicker Heroes spaces its heroes, and gold is all a
  *  companion waits on. The first sixteen cost 5 monsters' gold on the floor they should arrive on: the demo's eight by
@@ -53,7 +65,7 @@ export const COMPS: CompDef[] = [
   c('thief', 'Shadow Thief', 'cr_green_thief', 3.2e5, 4_700, 'knife', 'He carries six daggers. Seven would simply be bragging.'),
   c('corsair', 'Corsair Captain', 'cr_pirate_captain', 1.3e6, 16_000, 'bomb', 'Sailed the seven seas. Still confused by stairs.'),
   // The demo stops at the Corsair Captain: past him, one silhouette for the full game.
-  ...(DEMO ? [c('runesmith', '???', 'dwarf_f', 5e6, 87_000, 'rune', '')] : [
+  ...(DEMO ? [c('runesmith', BLANK, 'dwarf_f', 5e6, 87_000, 'rune', '')] : [
     c('runesmith', 'Runesmith', 'dwarf_f', 2.8e8, 1.4e6, 'rune', 'Maybe should be in OSRS. But here we are.'),
     c('woodelf', 'Wood Elf', 'ef_elf_f', 1.3e10, 3.6e7, 'arrow', 'Grew up in the Enchanted Grove. Has opinions about what you did to it.'),
     c('stormcaller', 'Stormcaller', 'wizzard_f', 6.4e11, 9.5e8, 'storm', 'Brings her own weather. Down here, of all places.'),
@@ -108,6 +120,8 @@ export const compIndex = (id: string) => {
 // ---------- monsters and zones ----------
 
 export interface MonsterDef {
+  /** Its card's id, from the English name: what cards, kills and matching go by in every language. */
+  id: string;
   sprite: string;
   name: string;
   /** Health multiplier. */
@@ -119,12 +133,25 @@ export interface MonsterDef {
   move?: 'emerge' | 'fly';
 }
 
-const m = (sprite: string, name: string, hp = 1, tint?: number, move?: MonsterDef['move']): MonsterDef => ({ sprite, name, hp, tint, move });
+const cardIds = new Map<string, string>();
+/** "Ogre Chieftain" → "ogre-chieftain". Always from the English name (a MonsterDef carries it as `id`). */
+export function cardId(name: string): string {
+  let id = cardIds.get(name);
+  if (!id) cardIds.set(name, (id = name.toLowerCase().replace(/[^a-z]+/g, '-')));
+  return id;
+}
+
+const m = (sprite: string, name: string, hp = 1, tint?: number, move?: MonsterDef['move']): MonsterDef => {
+  const id = cardId(name);
+  return { id, sprite, name: text(`monster.${id}.name`, name), hp, tint, move };
+};
 
 /** Tile theme a zone is built from (see the renderer). */
 export type Tiles = 'halls' | 'crypt' | 'jungle' | 'tomb' | 'sewer';
 
 export interface ZoneDef {
+  /** Stable id for its text ("upper-halls"). */
+  id: string;
   name: string;
   tiles: Tiles;
   /** Crowd for ordinary floors. */
@@ -141,74 +168,74 @@ export interface ZoneDef {
  * Ten floors per zone, each with its own look, crowd and bosses. After the last one the
  * zones come round again, deeper and harder ("The Upper Halls II").
  */
-export const ZONES: ZoneDef[] = [
+export const ZONES: ZoneDef[] = ([
   {
-    name: 'The Upper Halls', tiles: 'halls',
+    id: 'upper-halls', name: 'The Upper Halls', tiles: 'halls',
     band: [m('goblin', 'Goblin', 0.9), m('tiny_zombie', 'Rotling'), m('imp', 'Imp', 0.8), m('tiny_slug', 'Slug', 1.2), m('ef_bandit', 'Deserter')],
     mid: m('ef_bear', 'Cave Bear'), boss: m('ogre', 'Ogre Chieftain'),
     lap: DEMO ? [] : [m('cr_crimson_wraith', 'Crimson Wraith'), m('cr_plague_crow', 'Plague Crow', 0.9), m('knight_f', 'Fallen Knight', 1.2)],
   },
   {
-    name: 'The Bone Crypts', tiles: 'crypt',
+    id: 'bone-crypts', name: 'The Bone Crypts', tiles: 'crypt',
     band: [m('skelet', 'Skeleton'), m('tiny_zombie', 'Rotling'), m('skelet', 'Skeleton Archer', 0.9, 0xe8d49a), m('necromancer', 'Grave Priest', 0.9), m('rm_zombie', 'Ghoul', 1.1)],
     mid: m('ef_golem', 'Bone Golem', 1, 0xd8d0c0), boss: m('necromancer', 'The Lich', 1, 0xb0a0ff),
     lap: DEMO ? [] : [m('cr_skeleton', 'Grave Walker'), m('cr_blue_wraith', 'Pale Wraith'), m('cr_frost_skeleton', 'Santa Skeleton', 0.9, 0xd0c8ff)],
   },
   {
-    name: 'The Overgrown Warrens', tiles: 'jungle',
+    id: 'overgrown-warrens', name: 'The Overgrown Warrens', tiles: 'jungle',
     band: [m('orc_warrior', 'Orc Warrior', 1.2), m('orc_shaman', 'Orc Shaman', 0.9), m('ef_wolf', 'Dire Wolf'), m('ef_smallmushroom', 'Sporeling', 0.8), m('ef_normalmushroom', 'Mushroom Folk')],
     mid: m('ef_largemushroom', 'Elder Shroom'), boss: m('ef_troll', 'Troll Brute'),
     lap: DEMO ? [] : [m('cr_orc_pirate', 'Orc Raider', 1.2), m('cr_slime', 'Moss Slime', 0.8), m('cr_green_thief', 'Warren Thief')],
   },
   // The demo ends at floor 30: the zones after it are blanks.
-  ...(DEMO ? Array.from({ length: 5 }, (): ZoneDef => ({ name: '???', tiles: 'halls', band: [m('goblin', '???')], mid: m('goblin', '???'), boss: m('goblin', '???'), lap: [] })) : [
+  ...(DEMO ? Array.from({ length: 5 }, (_, k): ZoneDef => ({ id: `blank-${k}`, name: BLANK, tiles: 'halls', band: [m('goblin', BLANK)], mid: m('goblin', BLANK), boss: m('goblin', BLANK), lap: [] })) : [
     {
-      name: 'The Sunken Tomb', tiles: 'tomb',
+      id: 'sunken-tomb', name: 'The Sunken Tomb', tiles: 'tomb',
       band: [m('ef_gnollscout', 'Gnoll Scout', 0.9), m('ef_gnollbrute', 'Gnoll Brute', 1.2), m('ef_gnollshaman', 'Gnoll Shaman'), m('masked_orc', 'Masked Looter')],
       mid: m('ef_gnolloverseer', 'Gnoll Overseer'), boss: m('ef_golem', 'Tomb Golem', 1, 0xe8c888),
       lap: [m('cr_pirate', 'Drowned Pirate'), m('cr_pirate_captain', 'Drowned Captain', 1.2), m('cr_skeleton_pirate', 'Bone Corsair')],
     },
     {
-      name: 'The Rotting Deep', tiles: 'sewer',
+      id: 'rotting-deep', name: 'The Rotting Deep', tiles: 'sewer',
       band: [m('zombie', 'Zombie', 1.1), m('slug', 'Great Slug', 1.3), m('swampy', 'Bog Lurker', 1.2), m('muddy', 'Mudling', 1.1), m('sw_bat', 'Sewer Bat', 0.8, undefined, 'fly')],
       mid: m('sw_slugbot', 'Sludge Walker'), boss: m('sw_tentacle', 'The Thing Below', 1, undefined, 'emerge'),
       lap: [m('cr_slime', 'Rot Slime', 1, 0xc0a0ff), m('cr_plague_crow', 'Carrion Crow', 1, 0xc8a070), m('cr_gourd', 'Rotten Gourd', 1.1, 0xa8b870), m('big_zombie', 'The Rotten King', 1.4)],
     },
     {
-      name: 'The Enchanted Grove', tiles: 'jungle',
+      id: 'enchanted-grove', name: 'The Enchanted Grove', tiles: 'jungle',
       band: [m('ef_centaur_m', 'Centaur'), m('ef_centaur_f', 'Centaur Archer', 0.9), m('ef_forestguardian', 'Grove Warden', 1.2), m('ef_wolf', 'Moon Wolf', 1, 0xb8a8ff)],
       mid: m('ef_bear', 'Grove Bear', 1, 0xb0f0a0), boss: m('ef_ent', 'The Elder Ent'),
       lap: [m('cr_gourd', 'Gourd Knight', 1.1), m('cr_green_thief', 'Grove Bandit', 1, 0xa8c8ff), m('cr_wizard', 'Mad Hermit', 0.9)],
     },
     {
-      name: 'The Demon Gate', tiles: 'halls',
+      id: 'demon-gate', name: 'The Demon Gate', tiles: 'halls',
       band: [m('chort', 'Chort'), m('wogol', 'Wogol', 1.1), m('imp', 'Imp', 0.8), m('masked_orc', 'Cultist', 1.2, 0xff8a8a)],
       mid: m('ogre', 'Hellfire Ogre', 1, 0xff9070), boss: m('sm_oni_red', 'Pit Lord'),
       lap: [m('sd_knight_elite', 'Gilded Zealot', 1.2), m('knight_f', 'Fallen Knight', 1.2), m('cr_king', 'Damned King', 1.1)],
     },
     {
-      name: 'The Frozen Vault', tiles: 'halls',
+      id: 'frozen-vault', name: 'The Frozen Vault', tiles: 'halls',
       band: [m('ice_zombie', 'Frost Husk', 1.2), m('skelet', 'Frozen Skeleton', 1, 0xb0e0ff), m('ef_wolf', 'Frost Wolf', 1, 0xd0f0ff), m('necromancer', 'Rime Witch', 0.9, 0xa0d8ff)],
       mid: m('ef_golem', 'Ice Golem', 1, 0xa8e0ff), boss: m('ef_troll', 'Frost Troll', 1, 0xa8d8ff),
       lap: [m('sm_oni_blue', 'Frost Oni', 0.9), m('cr_snowman', 'Snow Brute', 1.2), m('cr_ice_ghost', 'Rime Ghost'), m('cr_nutcracker', 'Tin Soldier')],
     },
   ] satisfies ZoneDef[]),
-];
+] satisfies ZoneDef[]).map((zone) => ({ ...zone, name: text(`zone.${zone.id}.name`, zone.name) }));
 
 /** Zone index for a floor (0-based, keeps counting past the last zone). */
 export const zoneOf = (floor: number) => Math.floor((floor - 1) / 10);
 
 export const zoneFor = (floor: number) => ZONES[zoneOf(floor) % ZONES.length];
 
-/** "The Sunken Tomb", then "The Corrupted Sunken Tomb" once the zones come round again. */
 /** Every lap through the eight zones comes back darker, washed in its own color. */
-export const CORRUPTION: { name: string; tint: number }[] = [
-  { name: '', tint: 0xffffff },
-  { name: 'Corrupted', tint: 0xc89cff },
-  { name: 'Abyssal', tint: 0xff8a8a },
-  { name: 'Hollow', tint: 0x9cffd2 },
-  { name: 'Eternal', tint: 0xffd890 },
-];
+const LAPS: [english: string, tint: number][] = [['', 0xffffff], ['Corrupted', 0xc89cff], ['Abyssal', 0xff8a8a], ['Hollow', 0x9cffd2], ['Eternal', 0xffd890]];
+/** `name` labels the lap ("Corrupted"). `word` is what it puts in monster and zone names through the data.card.colored
+ *  and data.zone.colored templates: the same in English, a genitive where adjectives would need a gender ("Бездны"). */
+export const CORRUPTION: { name: string; word: string; tint: number }[] = LAPS.map(([english, tint], lap) => ({
+  name: text(`lap.${lap}.name`, english),
+  word: text(`lap.${lap}.word`, english),
+  tint,
+}));
 
 /** Laps completed through the eight zones by this floor (0 for floors 1–80). */
 export function lapOf(floor: number): number {
@@ -219,13 +246,16 @@ export function corruptionOf(lap: number) {
   return CORRUPTION[Math.min(lap, CORRUPTION.length - 1)];
 }
 
+/** "The Sunken Tomb", then "The Corrupted Sunken Tomb" once the zones come round again, then "… II" past the last color. */
 export function zoneName(floor: number): string {
   const z = zoneOf(floor);
   const lap = lapOf(floor);
-  const base = ZONES[z % ZONES.length].name.replace(/^The /, '');
-  if (!lap) return ZONES[z % ZONES.length].name;
-  const extra = lap >= CORRUPTION.length ? ` ${['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][Math.min(lap - CORRUPTION.length, 8)]}` : '';
-  return `The ${corruptionOf(lap).name} ${base}${extra}`;
+  const name = ZONES[z % ZONES.length].name;
+  if (!lap) return name;
+  // English zone names carry their article: the template puts the color after it. A translation's name is whole.
+  const colored = t('data.zone.colored', { color: corruptionOf(lap).word, zone: name.replace(/^The /, '') });
+  if (lap < CORRUPTION.length) return colored;
+  return t('data.zone.numbered', { zone: colored, numeral: ['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][Math.min(lap - CORRUPTION.length, 8)] });
 }
 
 /** A zone's crowd: on later laps its newcomers push in alongside two of the originals. */
@@ -468,25 +498,21 @@ const MILESTONE_FLAVOR: Record<string, string[]> = {
   }),
 };
 
-function milestoneName(comp: string, k: number) {
-  return MILESTONE_NAMES[comp][k];
-}
-
 /** What a trait does, in words and in effect (see TRAIT_PLAN). */
 function traitEffect(kind: string, comp: number): { effect: Effect; desc: string } {
   const num = Number(kind.replace(/\D+/g, ''));
-  if (kind === 'own') return { effect: { t: 'comp', comp, mult: 2 }, desc: `${COMPS[comp].name} deals ×2 damage.` };
-  if (kind === 'party') return { effect: { t: 'party', mult: 1.5 }, desc: 'Every companion deals +50% damage.' };
-  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.01 }, desc: "Your attacks and Phantom Blade also deal +1% of your party's damage." };
-  if (kind === 'gold') return { effect: { t: 'gold', pct: 0.5 }, desc: 'Monsters drop +50% gold.' };
-  if (kind === 'boss') return { effect: { t: 'boss', pct: 0.25 }, desc: '+25% damage to bosses.' };
-  if (kind === 'blade') return { effect: { t: 'auto', add: 1 }, desc: 'Phantom Blade +1/s.' };
-  if (kind.startsWith('cleave')) return { effect: { t: 'cleave', pct: num / 100 }, desc: `Cleave +${num}% damage.` };
-  if (kind === 'fevfill') return { effect: { t: 'fever', fill: 1.25 }, desc: 'Rampage fills 25% faster.' };
-  if (kind === 'fevdur') return { effect: { t: 'fever', dur: 1.5 }, desc: 'Rampage lasts 50% longer.' };
-  if (kind === 'fevpow') return { effect: { t: 'fever', power: 1 }, desc: 'Rampage hits harder: +1 to both its multipliers.' };
-  if (kind.startsWith('critx')) return { effect: { t: 'crit', add: num }, desc: `Crit damage +${num}×.` };
-  if (kind.startsWith('crit')) return { effect: { t: 'crit', chance: num / 100 }, desc: `Crit chance +${num}%.` };
+  if (kind === 'own') return { effect: { t: 'comp', comp, mult: 2 }, desc: t('data.trait.own', { name: COMPS[comp].name }) };
+  if (kind === 'party') return { effect: { t: 'party', mult: 1.5 }, desc: t('data.trait.party') };
+  if (kind === 'click') return { effect: { t: 'clickDps', pct: 0.01 }, desc: t('data.trait.click') };
+  if (kind === 'gold') return { effect: { t: 'gold', pct: 0.5 }, desc: t('data.trait.gold') };
+  if (kind === 'boss') return { effect: { t: 'boss', pct: 0.25 }, desc: t('data.trait.boss') };
+  if (kind === 'blade') return { effect: { t: 'auto', add: 1 }, desc: t('data.trait.blade') };
+  if (kind.startsWith('cleave')) return { effect: { t: 'cleave', pct: num / 100 }, desc: t('data.trait.cleave', { pct: num }) };
+  if (kind === 'fevfill') return { effect: { t: 'fever', fill: 1.25 }, desc: t('data.trait.fevfill') };
+  if (kind === 'fevdur') return { effect: { t: 'fever', dur: 1.5 }, desc: t('data.trait.fevdur') };
+  if (kind === 'fevpow') return { effect: { t: 'fever', power: 1 }, desc: t('data.trait.fevpow') };
+  if (kind.startsWith('critx')) return { effect: { t: 'crit', add: num }, desc: t('data.trait.critx', { mult: num }) };
+  if (kind.startsWith('crit')) return { effect: { t: 'crit', chance: num / 100 }, desc: t('data.trait.crit', { pct: num }) };
   return { effect: { t: 'skill' }, desc: '' };
 }
 
@@ -496,7 +522,7 @@ function buildUpgrades(): UpgDef[] {
     TRAIT_PLAN[comp.id]?.forEach((kind, k) => {
       const { effect, desc } = traitEffect(kind, i);
       out.push({
-        id: `m${i}_${k}`, name: milestoneName(comp.id, k), flavor: MILESTONE_FLAVOR[comp.id][k], desc,
+        id: `m${i}_${k}`, name: text(`upgrade.${comp.id}.${k}.name`, MILESTONE_NAMES[comp.id][k]), flavor: text(`upgrade.${comp.id}.${k}.flavor`, MILESTONE_FLAVOR[comp.id][k]), desc,
         cost: comp.cost * TRAIT_COST[k], icon: { sprite: comp.sprite, tier: Math.min(k, ROMAN.length - 1) },
         effect, req: { t: 'owned', comp: i, n: milestoneAt(k) },
       });
@@ -527,7 +553,7 @@ export interface AbilityDef {
 
 /** In the order you're likely to meet them. Each is unlocked by buying one companion trait, and earned again every run.
  *  Cooldowns are uneven (8, 12, 20, 25 and 30 minutes) so they drift apart: lining them all up costs real waiting. */
-export const ABILITIES: AbilityDef[] = [
+export const ABILITIES: AbilityDef[] = ([
   { id: 'blade', name: 'Phantom Blade', desc: 'Attacks for you, once a second.', kind: 'passive', comp: compIndex('squire'), trait: 0 },
   { id: 'flurry', name: 'Flurry', desc: 'Attacks for you, 10 times a second.', kind: 'button', comp: compIndex('squire'), trait: 1, dur: 30, cooldown: 8 * 60 },
   { id: 'crit', name: 'Critical Hits', desc: 'Your attacks and Phantom Blade have a 3% chance for ×2 damage.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
@@ -538,7 +564,7 @@ export const ABILITIES: AbilityDef[] = [
     { id: 'drums', name: 'War Drums', desc: '+50% crit chance.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 20 * 60 },
     { id: 'legion', name: 'Phantom Legion', desc: 'A Phantom Blade for every monster.', kind: 'button', comp: compIndex('stormcaller'), trait: 4, dur: 30, cooldown: 30 * 60 },
   ] satisfies AbilityDef[]),
-];
+] satisfies AbilityDef[]).map((a) => ({ ...a, name: text(`ability.${a.id}.name`, a.name), desc: text(`ability.${a.id}.desc`, a.desc) }));
 export const ABILITY_BY_ID = new Map(ABILITIES.map((a) => [a.id, a]));
 /** The trait upgrade that unlocks an ability. */
 export const abilityUpgrade = (a: AbilityDef) => `m${a.comp}_${a.trait}`;
@@ -560,13 +586,13 @@ export interface ModDef {
   color: string;
 }
 
-export const MODS: ModDef[] = [
+export const MODS: ModDef[] = ([
   { id: 'armored', name: 'Armored', desc: 'Companions deal 75% less damage to it.', color: '#9fb4c8' },
   { id: 'enraged', name: 'Enraged', desc: 'Only half the time to beat it.', color: '#ff6a4a' },
   { id: 'regen', name: 'Regenerating', desc: 'Heals 3% of its health every second.', color: '#7ee07a' },
   { id: 'split', name: 'Splitting', desc: 'Splits in two when it dies.', color: '#d58aff' },
   { id: 'giant', name: 'Giant', desc: 'Three times the health, and 50% more time.', color: '#ffc24a' },
-];
+] satisfies ModDef[]).map((d) => ({ ...d, name: text(`mod.${d.id}.name`, d.name), desc: text(`mod.${d.id}.desc`, d.desc) }));
 export const MOD_BY_ID = new Map(MODS.map((d) => [d.id, d]));
 
 /** Modifiers come round in this order, so each zone boss brings a different one. */
@@ -636,11 +662,18 @@ export const NEEDLE_CRIT = 0.5;
 export const OFFER_SIZE = 3;
 export const RESPEC_REFUND = 0.75;
 
-const pct = (n: number) => `${+(n * 100).toFixed(1)}%`;
-const per = (k: number) => (lv: number) => `+${Math.round(k * lv * 100)}%`;
+const pct = (n: number) => `${plain(n * 100, 1)}%`;
+const per = (k: number) => (lv: number) => `+${plain(Math.round(k * lv * 100))}%`;
 const share = (cap: number, show: (n: number) => string) => (lv: number) => show(cap * legendShare(lv));
-const o = (d: LegendDef) => d;
-const longer = (ability: AbilityId, secs: number) => ({ lengthens: { ability, secs }, value: (lv: number) => `+${secs * lv}s` });
+const seconds = (secs: string) => t('data.value.seconds', { secs });
+const o = (d: LegendDef): LegendDef => ({
+  ...d,
+  name: text(`legend.${d.id}.name`, d.name),
+  what: text(`legend.${d.id}.what`, d.what),
+  ...(d.note ? { note: text(`legend.${d.id}.note`, d.note) } : {}),
+  ...(d.term ? { term: text(`legend.${d.id}.term`, d.term) } : {}),
+});
+const longer = (ability: AbilityId, secs: number) => ({ lengthens: { ability, secs }, value: (lv: number) => seconds(plain(secs * lv)) });
 
 export const LEGENDS: LegendDef[] = DEMO ? [] : [
   o({ id: 'sleeper', name: 'The Sleeper', kind: 'power', sprite: 'sm_oldman', what: 'Damage while idle', value: per(0.25) }),
@@ -651,23 +684,23 @@ export const LEGENDS: LegendDef[] = DEMO ? [] : [
   o({ id: 'hoard', name: 'The Hoard', kind: 'power', sprite: 'sd_mountain_king', what: 'All gold', value: per(0.05) }),
   o({ id: 'patient', name: 'The Patient', kind: 'power', sprite: 'sm_sohei', what: 'Gold while idle', value: per(0.5) }),
   o({ id: 'goblinking', name: 'The Wish', kind: 'power', sprite: 'ef_fairy', what: 'Goblin and vault gold', value: per(0.5) }),
-  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'sm_large_samurai', what: 'Damage per streak attack', term: 'streak', value: (lv) => `+${+(0.01 * lv).toFixed(2)}%`, note: 'A streak ends 2 seconds after your last attack, and counts up to 2,000 attacks.' }),
-  o({ id: 'hourglass', name: 'The Hourglass', kind: 'utility', sprite: 'sd_magic_shopkeeper', what: 'Time to beat a boss', value: share(30, (n) => `+${+n.toFixed(1)}s`) }),
+  o({ id: 'unbroken', name: 'The Unbroken', kind: 'power', sprite: 'sm_large_samurai', what: 'Damage per streak attack', term: 'streak', value: (lv) => `+${plain(0.01 * lv, 2)}%`, note: 'A streak ends 2 seconds after your last attack, and counts up to 2,000 attacks.' }),
+  o({ id: 'hourglass', name: 'The Hourglass', kind: 'utility', sprite: 'sd_magic_shopkeeper', what: 'Time to beat a boss', value: share(30, (n) => seconds(plain(n, 1))) }),
   o({ id: 'wither', name: 'The Wither', kind: 'utility', sprite: 'sd_bishop', what: 'Boss health', value: share(0.5, (n) => `−${pct(n)}`) }),
-  o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${lv}`, maxLv: 10 }),
+  o({ id: 'thinning', name: 'The Thinning', kind: 'utility', sprite: 'sd_butcher', what: 'Kills to clear a floor', value: (lv) => `−${plain(lv)}`, maxLv: 10 }),
   o({ id: 'haggler', name: 'The Haggler', kind: 'utility', sprite: 'sm_merchant', what: 'Companion level costs', value: (lv) => `−${pct(1 - 0.95 ** lv)}` }),
   o({ id: 'restless', name: 'The Restless', kind: 'utility', sprite: 'sm_kabuki', what: 'Ability cooldowns', value: share(0.75, (n) => `−${pct(n)}`) }),
   o({ id: 'soulcaller', name: 'The Soulcaller', kind: 'utility', sprite: 'sm_tengu', what: 'Champion boss chance', term: 'Champion', note: 'Bosses can be champions from floor 100.', value: share(0.75, (n) => pct(0.25 + n)) }),
   o({ id: 'lure', name: 'The Lure', kind: 'utility', sprite: 'chest_mimic_open', what: 'Treasure goblin rate', value: share(2, (n) => `+${pct(n)}`) }),
   o({ id: 'collector', name: 'The Collector', kind: 'utility', sprite: 'sd_princess', what: 'Card drop chance', value: share(1.5, (n) => `+${pct(n)}`) }),
-  o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance from overkill', term: 'overkill', value: (lv) => `up to ×${+(1 + lv / 4).toFixed(2)}`, note: "A kill that deals N× a monster's health has N× the chance to drop its card." }),
+  o({ id: 'ronin', name: 'The Ronin', kind: 'utility', sprite: 'sm_samurai', what: 'Card chance from overkill', term: 'overkill', value: (lv) => t('data.legend.ronin.value', { mult: plain(1 + lv / 4, 2) }), note: "A kill that deals N× a monster's health has N× the chance to drop its card." }),
   o({ id: 'lingering', name: 'The Lingering', kind: 'utility', sprite: 'sm_geisha', what: 'Rampage duration', ...longer('rampage', 1) }),
   o({ id: 'whirl', name: 'The Whirl', kind: 'utility', sprite: 'ef_ranger', what: 'Flurry duration', ...longer('flurry', 2) }),
   o({ id: 'headsman', name: 'The Headsman', kind: 'utility', sprite: 'sd_knight_heavy', what: 'Cleave duration', ...longer('cleave', 4) }),
   o({ id: 'magpie', name: 'The Magpie', kind: 'utility', sprite: 'sd_merchant', what: 'Treasure Sense duration', ...longer('treasure', 2) }),
   o({ id: 'drummer', name: 'The Drummer', kind: 'utility', sprite: 'cr_nutcracker', what: 'War Drums duration', ...longer('drums', 2) }),
   o({ id: 'host', name: 'The Host', kind: 'utility', sprite: 'ef_tallcleric', what: 'Phantom Legion duration', ...longer('legion', 2) }),
-  o({ id: 'hungry', name: 'The Hungry Dark', kind: 'sink', sprite: 'sm_oni_king', what: 'All damage', value: (lv) => `+${lv * 11}%` }),
+  o({ id: 'hungry', name: 'The Hungry Dark', kind: 'sink', sprite: 'sm_oni_king', what: 'All damage', value: (lv) => `+${plain(lv * 11)}%` }),
 ];
 export const LEGEND_BY_ID = new Map(LEGENDS.map((d) => [d.id, d]));
 
@@ -693,17 +726,17 @@ export interface BoundDef {
   spirit?: LegendId;
 }
 
-const pct25 = (lv: number) => `+${lv * 25}%`;
-export const BOUND: BoundDef[] = DEMO ? [] : [
-  { id: 'ogre', zone: 0, what: 'All damage', value: (lv) => `+${lv * 100}%` },
-  { id: 'pitlord', zone: 6, what: 'Souls from champion bosses', value: (lv) => `×${1 + 10 * lv * lv}` },
-  { id: 'lich', zone: 1, what: 'Spirit costs', value: (lv) => `−${Math.round((1 - 0.95 ** lv) * 100)}%`, max: 20 },
-  { id: 'frost', zone: 7, what: 'The Thinning\'s cap', value: (lv) => `−${10 + lv} kills`, max: 5, spirit: 'thinning' },
+const pct25 = (lv: number) => `+${plain(lv * 25)}%`;
+export const BOUND: BoundDef[] = (DEMO ? [] : [
+  { id: 'ogre', zone: 0, what: 'All damage', value: (lv) => `+${plain(lv * 100)}%` },
+  { id: 'pitlord', zone: 6, what: 'Souls from champion bosses', value: (lv) => `×${plain(1 + 10 * lv * lv)}` },
+  { id: 'lich', zone: 1, what: 'Spirit costs', value: (lv) => `−${plain(Math.round((1 - 0.95 ** lv) * 100))}%`, max: 20 },
+  { id: 'frost', zone: 7, what: 'The Thinning\'s cap', value: (lv) => t('data.bound.frost.value', { count: 10 + lv }), max: 5, spirit: 'thinning' },
   { id: 'troll', zone: 2, what: 'The Wither\'s effect', value: pct25, spirit: 'wither' },
   { id: 'golem', zone: 3, what: 'The Soulcaller\'s effect', value: pct25, spirit: 'soulcaller' },
   { id: 'thing', zone: 4, what: 'The Lure\'s effect', value: pct25, spirit: 'lure' },
   { id: 'ent', zone: 5, what: 'The Hourglass\'s effect', value: pct25, spirit: 'hourglass' },
-];
+] satisfies BoundDef[]).map((b) => ({ ...b, what: text(`bound.${b.id}.what`, b.what) }));
 export const BOUND_BY_ID = new Map(BOUND.map((b) => [b.id, b]));
 export const boundName = (b: BoundDef) => ZONES[b.zone].boss.name;
 export const boundCost = (b: BoundDef, lv: number) => (b.id === 'ogre' ? 1 : lv + 1);
@@ -732,14 +765,6 @@ export interface CardDef {
   gold: boolean;
 }
 
-const cardIds = new Map<string, string>();
-/** "Ogre Chieftain" → "ogre-chieftain". */
-export function cardId(name: string): string {
-  let id = cardIds.get(name);
-  if (!id) cardIds.set(name, (id = name.toLowerCase().replace(/[^a-z]+/g, '-')));
-  return id;
-}
-
 export const GOBLIN_CARD = 'treasure-goblin';
 export const RAINBOW_CARD = 'rainbow-goblin';
 
@@ -756,13 +781,13 @@ export interface CardPlace {
 
 /** The floors in a zone (from its first) where this monster is the one the floor is known for. */
 function commonOn(d: MonsterDef, first: number) {
-  return Array.from({ length: 9 }, (_, k) => first + k).filter((f) => f % 5 && featuredFor(f).name === d.name);
+  return Array.from({ length: 9 }, (_, k) => first + k).filter((f) => f % 5 && featuredFor(f).id === d.id);
 }
 
 function buildCards(): CardDef[] {
   const out = new Map<string, CardDef>();
   const add = (d: MonsterDef, kind: CardKind, zone: number, lap: number, place: Omit<CardPlace, 'floor'>, floor: number) => {
-    const id = cardId(d.name);
+    const { id } = d;
     const card = out.get(id) ?? { id, name: d.name, sprite: d.sprite, tint: d.tint, kind, zone, where: CORRUPTION.map(() => []), laps: [], floor, gold: true };
     out.set(id, card);
     card.where[lap].push({ ...place, floor });
@@ -781,16 +806,17 @@ function buildCards(): CardDef[] {
     });
   });
   // The goblins come in one color only: their cards live on the plain page, whatever lap they're caught on.
-  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: 'Treasure Goblin', sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: CORRUPTION.map(() => []), laps: [0], floor: 1, gold: false });
-  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: 'Rainbow Goblin', sprite: 'goblin', kind: 'goblin', zone: -1, where: CORRUPTION.map(() => []), laps: [0], floor: 1, gold: false });
+  out.set(GOBLIN_CARD, { id: GOBLIN_CARD, name: text(`monster.${GOBLIN_CARD}.name`, 'Treasure Goblin'), sprite: 'goblin', tint: 0xffe08a, kind: 'goblin', zone: -1, where: CORRUPTION.map(() => []), laps: [0], floor: 1, gold: false });
+  out.set(RAINBOW_CARD, { id: RAINBOW_CARD, name: text(`monster.${RAINBOW_CARD}.name`, 'Rainbow Goblin'), sprite: 'goblin', kind: 'goblin', zone: -1, where: CORRUPTION.map(() => []), laps: [0], floor: 1, gold: false });
   return [...out.values()];
 }
 
-/** "Abyssal Skeleton", "The Abyssal Lich": a card's name in a lap's color. */
+/** "Abyssal Skeleton", "The Abyssal Lich": a card's name (as shown) in a lap's color. */
 export function cardName(name: string, lap: number) {
-  const color = lap ? CORRUPTION[lap].name : '';
+  const color = lap ? CORRUPTION[lap].word : '';
   if (!color) return name;
-  return name.startsWith('The ') ? `The ${color} ${name.slice(4)}` : `${color} ${name}`;
+  // English names with an article take the color after it; a translation's names come whole.
+  return name.startsWith('The ') ? t('data.card.colored.the', { color, name: name.slice(4) }) : t('data.card.colored', { color, name });
 }
 
 export const CARDS = buildCards();
@@ -840,19 +866,15 @@ export interface TrophyDef {
   hidden?: boolean;
 }
 
-/** A round power of ten in words for trophy text ("1 sextillion"), falling back to 1e80 past the named ones. */
-const POWER_WORDS: Record<number, string> = { 6: 'million', 9: 'billion', 12: 'trillion', 15: 'quadrillion', 18: 'quintillion', 21: 'sextillion', 24: 'septillion', 27: 'octillion', 30: 'nonillion', 33: 'decillion', 36: 'undecillion', 39: 'duodecillion', 42: 'tredecillion', 45: 'quattuordecillion', 60: 'novemdecillion' };
+/** A round power of ten in words for trophy text ("1 sextillion"), falling back to 1e80 past the language's named ones. */
 function bigWords(n: number): string {
   const e = Math.round(Math.log10(n));
-  if (e < 6) return n.toLocaleString('en-US');
-  if (e === 100) return 'a googol';
-  const w = POWER_WORDS[e - (e % 3)];
-  return w ? `${10 ** (e % 3)} ${w}` : `1e${e}`;
+  if (e < 6) return int(n);
+  if (e === 100) return t('data.trophy.googol');
+  const { group, long } = numberWords();
+  const step = Math.floor(e / group);
+  return long[step] ? t('data.trophy.power', { n: int(10 ** (e - step * group)), word: long[step] }) : `1e${e}`;
 }
-
-const count = (n: number) => n.toLocaleString('en-US');
-const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
-const times = (n: number) => (n === 1 ? 'once' : `${count(n)} times`);
 
 function buildTrophies(): TrophyDef[] {
   const out: TrophyDef[] = [];
@@ -860,91 +882,95 @@ function buildTrophies(): TrophyDef[] {
   const tag = (n: number) => (n >= 1e6 ? `e${Math.round(Math.log10(n))}` : String(n));
   const tiers = (prefix: string, list: [number, string][], desc: (n: number) => string, sprite: string, req: (n: number) => TrophyReq, tierFrom = 0) =>
     list.forEach(([n, name], k) => out.push({ id: `${prefix}-${tag(n)}`, name, desc: desc(n), icon: { sprite, tier: Math.min(10, k + tierFrom) }, req: req(n) }));
+  /** A trophy whose description is written out whole. */
+  const single = (id: string, name: string, desc: string, icon: Icon, req: TrophyReq) => out.push({ id, name, desc: text(`trophy.${id}.desc`, desc), icon, req });
 
   tiers('floor', [[10, 'Down the Stairs'], [50, 'The Long Descent'], [100, 'The Underneath'], [400, 'The Bottom?'], [500, 'There Is No Bottom'], [750, 'Geology Gives Up'], [1000, 'A Thousand Down'], [1500, 'No Signal'], [2000, 'Two Thousand Fathoms'], [3000, 'Root of the World'], [5000, 'Where the Heart Beats']],
-    (n) => `Clear floor ${count(n)}.`, 'stairs', (n) => ({ t: 'floor', n }));
+    (n) => t('data.trophy.floor', { floor: n }), 'stairs', (n) => ({ t: 'floor', n }));
   if (!DEMO) {
-    [1, 2, 3, 4].forEach((n, k) => out.push({ id: `lap${k}`, name: ['Corruption', 'The Abyss Stares Back', 'Hollowed Out', 'Eternity'][k], desc: `Reach floor ${n * 80 + 1}, where the zones return ${CORRUPTION[n].name.toLowerCase()}.`, icon: { sprite: 'skull', tier: k + 1 }, req: { t: 'floor', n: n * 80 } }));
+    [1, 2, 3, 4].forEach((n, k) => single(`lap${k}`, ['Corruption', 'The Abyss Stares Back', 'Hollowed Out', 'Eternity'][k], `Reach floor ${n * 80 + 1}, where the zones return ${LAPS[n][0].toLowerCase()}.`, { sprite: 'skull', tier: k + 1 }, { t: 'floor', n: n * 80 }));
   }
   tiers('gold', [[1e9, 'Coin Purse'], [1e24, 'Strongbox'], [1e40, 'Treasury'], [1e60, 'Dragon Hoard'], [1e90, 'Kingdom\'s Ransom'], [1e120, 'Sea of Gold'], [1e160, 'Beyond Counting']],
-    (n) => `Collect ${bigWords(n)} gold in total.`, 'coin', (n) => ({ t: 'gold', n }));
+    (n) => t('data.trophy.gold', { amount: bigWords(n) }), 'coin', (n) => ({ t: 'gold', n }));
   tiers('dps', [[1e6, 'Fighter'], [1e24, 'Warlord'], [1e40, 'Cataclysm'], [1e60, 'Apocalypse'], [1e80, 'World Breaker'], [1e100, 'Googol'], [1e150, 'Heat Death'], [1e200, 'Big Bang']],
-    (n) => `Reach ${bigWords(n)} damage per second.`, 'weapon_waraxe', (n) => ({ t: 'dps', n }));
+    (n) => t('data.trophy.dps', { amount: bigWords(n) }), 'weapon_waraxe', (n) => ({ t: 'dps', n }));
   tiers('kill', [[1000, 'Slayer'], [100_000, 'Massacre'], [1e6, 'Extinction Event'], [1e7, 'The Reaper'], [1e8, 'Nothing Left Alive']],
-    (n) => `Kill ${count(n)} monsters.`, 'skull', (n) => ({ t: 'kills', n }));
+    (n) => t('data.trophy.kill', { count: n }), 'skull', (n) => ({ t: 'kills', n }));
   tiers('boss', [[10, 'Kingsbane'], [100, 'Tyrant Killer'], [1000, 'Boss Rush'], [5000, 'Serial Regicide'], [25_000, 'Throne of Bones']],
-    (n) => `Defeat ${count(n)} bosses.`, 'ogre', (n) => ({ t: 'bosses', n }));
+    (n) => t('data.trophy.boss', { count: n }), 'ogre', (n) => ({ t: 'bosses', n }));
   tiers('champ', [[1, 'Champion Slayer'], [100, 'Crown Collector'], [1000, 'Champion of Champions'], [10_000, 'Undisputed']],
-    (n) => `Slay ${n === 1 ? 'a champion' : `${count(n)} champions`}.`, 'weapon_red_gem_sword', (n) => ({ t: 'champions', n }));
+    (n) => t('data.trophy.champ', { count: n }), 'weapon_red_gem_sword', (n) => ({ t: 'champions', n }));
   tiers('clutch', [[1, 'By a Hair'], [20, 'Nerves of Steel'], [100, 'Was That Necessary?']],
-    (n) => `Beat ${n === 1 ? 'a boss' : `${n} bosses`} with ${CLUTCH_SECONDS} seconds or less on the clock.`, 'flask_yellow', (n) => ({ t: 'clutches', n }));
+    (n) => t('data.trophy.clutch', { count: n, secs: CLUTCH_SECONDS }), 'flask_yellow', (n) => ({ t: 'clutches', n }));
   if (!DEMO) {
-    out.push({ id: 'hire-all', name: 'Full Party', desc: `Hire all ${COMPS.length} companions.`, icon: { sprite: COMPS[0].sprite, tier: 0 }, req: { t: 'levelAll', n: 1 } });
+    out.push({ id: 'hire-all', name: 'Full Party', desc: t('data.trophy.hireAll', { count: COMPS.length }), icon: { sprite: COMPS[0].sprite, tier: 0 }, req: { t: 'levelAll', n: 1 } });
   }
   tiers('level', [[1000, 'Legendary'], [2500, 'Mythic'], [5000, 'Immortal'], [10_000, 'Overleveled']],
-    (n) => `Get a companion to level ${count(n)}.`, 'cr_gold_knight', (n) => ({ t: 'level', n }), 1);
+    (n) => t('data.trophy.level', { level: n }), 'cr_gold_knight', (n) => ({ t: 'level', n }), 1);
   tiers('levelall', [[500, 'Loyal Company'], [1000, 'Legendary Company'], [2500, 'Mythic Company']],
-    (n) => `Get every companion to level ${count(n)}.`, COMPS[0].sprite, (n) => ({ t: 'levelAll', n }), 1);
+    (n) => t('data.trophy.levelAll', { level: n }), COMPS[0].sprite, (n) => ({ t: 'levelAll', n }), 1);
   tiers('clicks', [[100, 'Tap Tap'], [10_000, 'Clicker'], [100_000, 'Still Clicking'], [1e6, 'Carpal Tunnel']],
-    (n) => `Attack ${count(n)} times.`, 'weapon_knife', (n) => ({ t: 'clicks', n }));
+    (n) => t('data.trophy.clicks', { count: n }), 'weapon_knife', (n) => ({ t: 'clicks', n }));
   tiers('crit', [[1, 'Critical!'], [10_000, 'Sharp Eye'], [100_000, 'Surgeon'], [1e6, 'Critical Condition']],
-    (n) => `Land ${count(n)} critical ${plural(n, 'hit')}.`, 'skill:crit', (n) => ({ t: 'crits', n }));
+    (n) => t('data.trophy.crit', { count: n }), 'skill:crit', (n) => ({ t: 'crits', n }));
   tiers('fev', [[1, 'Rampage!'], [100, 'Berserker'], [1000, 'Anger Issues']],
-    (n) => `Go on a Rampage ${times(n)}.`, 'flask_big_red', (n) => ({ t: 'fevers', n }));
-  out.push({ id: 'rampage0', name: 'Bloodrush', desc: 'Keep attacking until a Rampage reaches its top tier.', icon: { sprite: 'flask_big_red', tier: 1 }, req: { t: 'rampage', n: 1 } });
+    (n) => t('data.trophy.rampages', { count: n }), 'flask_big_red', (n) => ({ t: 'fevers', n }));
+  single('rampage0', 'Bloodrush', 'Keep attacking until a Rampage reaches its top tier.', { sprite: 'flask_big_red', tier: 1 }, { t: 'rampage', n: 1 });
   tiers('raid', [[1, 'Finders Keepers'], [77, 'Red-Handed'], [777, 'Jackpot'], [2777, 'No One Escapes'], [7777, 'Treasure Lord']],
-    (n) => `Catch ${n === 1 ? 'a treasure goblin' : `${count(n)} treasure goblins`}.`, 'goblin', (n) => ({ t: 'raids', n }));
+    (n) => t('data.trophy.raid', { count: n }), 'goblin', (n) => ({ t: 'raids', n }));
   const missed: [number, string, string][] = [
     [1, 'Butterfingers', ''],
     [100, 'Slippery Little Guys', ''],
-    [1000, 'Goblin Enabler', ' They are telling their friends.'],
-    [5000, 'Goblin Philanthropist', ' You are funding their retirement.'],
-    [20_000, 'Official Goblin Sponsor', ' They have named a tunnel after you.'],
-    [50_000, 'The Goblins Thank You', ' There is a statue of you in Goblin Town.'],
+    [1000, 'Goblin Enabler', 'They are telling their friends.'],
+    [5000, 'Goblin Philanthropist', 'You are funding their retirement.'],
+    [20_000, 'Official Goblin Sponsor', 'They have named a tunnel after you.'],
+    [50_000, 'The Goblins Thank You', 'There is a statue of you in Goblin Town.'],
   ];
-  missed.forEach(([n, name, joke], k) => out.push({ id: `miss-${n}`, name, desc: `Let ${n === 1 ? 'a treasure goblin' : `${count(n)} treasure goblins`} get away.${joke}`, icon: { sprite: 'goblin', tier: k }, req: { t: 'missed', n } }));
+  missed.forEach(([n, name, joke], k) => out.push({
+    id: `miss-${n}`, name,
+    desc: joke ? t('data.trophy.missedJoke', { count: n, joke: text(`trophy.miss-${n}.joke`, joke) }) : t('data.trophy.missed', { count: n }),
+    icon: { sprite: 'goblin', tier: k }, req: { t: 'missed', n },
+  }));
   tiers('rainbow', [[1, 'Double Rainbow'], [50, 'Chasing Rainbows'], [500, 'End of the Rainbow']],
-    (n) => `Catch ${n === 1 ? 'a rainbow goblin' : `${count(n)} rainbow goblins`}.`, 'goblin_rainbow', (n) => ({ t: 'rainbows', n }), 2);
+    (n) => t('data.trophy.rainbow', { count: n }), 'goblin_rainbow', (n) => ({ t: 'rainbows', n }), 2);
   tiers('vault', [[1, 'Over the Rainbow'], [25, 'Vault Raider'], [250, 'Goblin Banker']],
-    (n) => (n === 1 ? 'Open the Rainbow Vault.' : `Open the Rainbow Vault ${count(n)} times.`), 'chest_full_open', (n) => ({ t: 'vaults', n }));
+    (n) => t('data.trophy.vault', { count: n }), 'chest_full_open', (n) => ({ t: 'vaults', n }));
   tiers('desc', [[1, 'Up for Air'], [10, 'Return Ticket'], [50, 'Commuter'], [250, 'Always Back Down']],
-    (n) => `Ascend ${times(n)}.`, 'soul', (n) => ({ t: 'descents', n }));
+    (n) => t('data.trophy.ascend', { count: n }), 'soul', (n) => ({ t: 'descents', n }));
   if (!DEMO) {
     const heartFrom = out.length;
     tiers('awk', [[1, 'It Wakes'], [5, 'Heartbeat'], [25, 'Snooze Button'], [100, 'Pacemaker']],
-      (n) => `Awaken the Heart ${times(n)}.`, 'ui_heart_full', (n) => ({ t: 'awakens', n }));
-    out.push({ id: 'bound-all', name: 'All Eight', desc: 'Wake every one of the Bound.', icon: { sprite: ZONES[ZONES.length - 1].boss.sprite, tier: 1 }, req: { t: 'boundAll', n: 1 } });
+      (n) => t('data.trophy.awaken', { count: n }), 'ui_heart_full', (n) => ({ t: 'awakens', n }));
+    single('bound-all', 'All Eight', 'Wake every one of the Bound.', { sprite: ZONES[ZONES.length - 1].boss.sprite, tier: 1 }, { t: 'boundAll', n: 1 });
     tiers('bound', [[50, 'Soul Debt'], [250, 'Paid in Full']],
-      (n) => `Earn ${count(n)} bound souls in total.`, ZONES[0].boss.sprite, (n) => ({ t: 'boundEarned', n }), 2);
+      (n) => t('data.trophy.boundEarned', { count: n }), ZONES[0].boss.sprite, (n) => ({ t: 'boundEarned', n }), 2);
     // The Heart's trophies stay secret until earned, so they don't spoil it.
     for (const trophy of out.slice(heartFrom)) trophy.hidden = true;
-    out.push({ id: 'trip-1', name: 'Gone Hunting', desc: 'Send a companion on an expedition.', icon: { sprite: 'floor_ladder', tier: 1 }, req: { t: 'trips', n: 1 } });
+    single('trip-1', 'Gone Hunting', 'Send a companion on an expedition.', { sprite: 'floor_ladder', tier: 1 }, { t: 'trips', n: 1 });
     tiers('tripcard', [[25, 'Spoils'], [250, 'Postcards']],
-      (n) => `Find ${count(n)} cards on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripCards', n }), 2);
+      (n) => t('data.trophy.tripCards', { count: n }), 'floor_ladder', (n) => ({ t: 'tripCards', n }), 2);
     tiers('tripkill', [[1e4, 'Pest Control'], [1e6, 'Hired Muscle']],
-      (n) => `Defeat ${count(n)} monsters on expeditions.`, 'floor_ladder', (n) => ({ t: 'tripKills', n }), 2);
-    out.push({ id: 'pet-1', name: 'Good Kitty', desc: 'Pet Koko.', icon: { sprite: 'koko', tier: 0 }, req: { t: 'pets', n: 1 } });
+      (n) => t('data.trophy.tripKills', { count: n }), 'floor_ladder', (n) => ({ t: 'tripKills', n }), 2);
+    single('pet-1', 'Good Kitty', 'Pet Koko.', { sprite: 'koko', tier: 0 }, { t: 'pets', n: 1 });
     ([[10, 'Cat Person'], [100, 'Her Favorite'], [1000, "Koko's Human"]] as const).forEach(([n, name], k) =>
-      out.push({ id: `pet-${n}`, name, desc: `Pet Koko ${count(n)} times.`, icon: { sprite: 'koko', tier: k + 1 }, req: { t: 'pets', n }, hidden: true }));
+      out.push({ id: `pet-${n}`, name, desc: t('data.trophy.pets', { count: n }), icon: { sprite: 'koko', tier: k + 1 }, req: { t: 'pets', n }, hidden: true }));
   }
   if (!DEMO) {
     tiers('set', [[1, 'Full Set'], [5, 'Set Collector'], [10, 'Complete Collection']],
-      (n) => `Finish ${n === 1 ? 'a card set' : `${n} card sets`}.`, 'imp', (n) => ({ t: 'sets', n }), 1);
+      (n) => t('data.trophy.sets', { count: n }), 'imp', (n) => ({ t: 'sets', n }), 1);
     tiers('gset', [[1, 'Gold Set'], [5, 'Gilt Edge']],
-      (n) => `Finish ${n === 1 ? 'a gold card set' : `${n} gold card sets`}.`, 'imp_gilded', (n) => ({ t: 'goldSets', n }), 3);
+      (n) => t('data.trophy.goldSets', { count: n }), 'imp_gilded', (n) => ({ t: 'goldSets', n }), 3);
   }
   const versions = CARDS.reduce((sum, c) => sum + c.laps.length * (c.gold ? 2 : 1), 0);
-  out.push(
-    { id: 'card-1', name: 'Card Carrier', desc: 'Find a monster card.', icon: { sprite: 'imp', tier: 0 }, req: { t: 'cards', n: 1 } },
-    { id: 'card-25', name: 'Card Sharp', desc: 'Find 25 different monster cards.', icon: { sprite: 'imp', tier: 1 }, req: { t: 'cards', n: 25 } },
-    { id: 'card-all', name: 'Bestiary', desc: 'Find every monster card.', icon: { sprite: 'imp', tier: 2 }, req: { t: 'cards', n: CARDS.length } },
-    { id: 'versions-250', name: 'Monster Manual', desc: 'Collect 250 cards.', icon: { sprite: 'imp', tier: 3 }, req: { t: 'versions', n: 250 } },
-    { id: 'versions-all', name: 'Every Last Monster', desc: 'Collect every card.', icon: { sprite: 'imp', tier: 4 }, req: { t: 'versions', n: versions } },
-    { id: 'gcard-1', name: 'Gilded', desc: 'Find a gold card.', icon: { sprite: 'imp_gilded', tier: 2 }, req: { t: 'goldCards', n: 1 } },
-    { id: 'gcard-25', name: 'Gold Standard', desc: 'Find 25 different gold cards.', icon: { sprite: 'imp_gilded', tier: 3 }, req: { t: 'goldCards', n: 25 } },
-    { id: 'gcard-all', name: 'Midas Deck', desc: 'Find every gold card.', icon: { sprite: 'imp_gilded', tier: 4 }, req: { t: 'goldCards', n: CARDS.filter((c) => c.gold).length } },
-  );
-  return out;
+  single('card-1', 'Card Carrier', 'Find a monster card.', { sprite: 'imp', tier: 0 }, { t: 'cards', n: 1 });
+  single('card-25', 'Card Sharp', 'Find 25 different monster cards.', { sprite: 'imp', tier: 1 }, { t: 'cards', n: 25 });
+  single('card-all', 'Bestiary', 'Find every monster card.', { sprite: 'imp', tier: 2 }, { t: 'cards', n: CARDS.length });
+  single('versions-250', 'Monster Manual', 'Collect 250 cards.', { sprite: 'imp', tier: 3 }, { t: 'versions', n: 250 });
+  single('versions-all', 'Every Last Monster', 'Collect every card.', { sprite: 'imp', tier: 4 }, { t: 'versions', n: versions });
+  single('gcard-1', 'Gilded', 'Find a gold card.', { sprite: 'imp_gilded', tier: 2 }, { t: 'goldCards', n: 1 });
+  single('gcard-25', 'Gold Standard', 'Find 25 different gold cards.', { sprite: 'imp_gilded', tier: 3 }, { t: 'goldCards', n: 25 });
+  single('gcard-all', 'Midas Deck', 'Find every gold card.', { sprite: 'imp_gilded', tier: 4 }, { t: 'goldCards', n: CARDS.filter((c) => c.gold).length });
+  return out.map((trophy) => ({ ...trophy, name: text(`trophy.${trophy.id}.name`, trophy.name) }));
 }
 
 export const TROPHIES = buildTrophies();
@@ -995,56 +1021,58 @@ export const CURSORS: CursorDef[] = [
   { id: 'darkbolt', name: 'Dark Bolt', sprite: 'spell_darkness_bolt', trophy: 'floor-5000' },
   { id: 'orb', name: 'Magic Orb', sprite: 'spell_magic_orb', trophy: 'versions-all' },
   // (The demo has fewer trophies: their cursors go with them.)
-].filter((cursor) => !cursor.trophy || TROPHIES.some((t) => t.id === cursor.trophy));
+].filter((cursor) => !cursor.trophy || TROPHIES.some((trophy) => trophy.id === cursor.trophy)).map((cursor) => ({ ...cursor, name: text(`cursor.${cursor.id}.name`, cursor.name) }));
 
 // ---------- news ticker ----------
 
 export interface News {
+  /** Stable id for its text. */
+  id: string;
   text: string;
   when?: (s: { floor: number; owned: number[]; depth: number; raids: number; kills: number; awakens: number }) => boolean;
   /** Only now and then in the running. */
   rare?: boolean;
 }
 
-export const NEWS: News[] = [
+export const NEWS: News[] = ([
   // Hints, before the first awakening, that the dungeon is a dream.
-  { text: 'Every monster down here has a card. Nobody remembers printing them.', when: (s) => !s.awakens, rare: true },
-  { text: 'The stairs go down. They always go down.', when: (s) => s.floor < 5 },
-  { text: 'Your Squire asks if the dungeon has a bottom. You do not answer.', when: (s) => s.owned[compIndex('squire')] > 0 },
-  { text: 'The Ranger keeps a tally of her kills on the wall. She has run out of wall.', when: (s) => s.owned[compIndex('ranger')] > 10 },
-  { text: 'The dwarf insists on punching the bosses personally.', when: (s) => s.owned[compIndex('brawler')] > 0 },
-  { text: 'The Apprentice set his beard on fire again. It still counts as damage.', when: (s) => s.owned[compIndex('apprentice')] > 0 },
-  { text: 'The Lizard Hunter claims she can hear the dungeon breathing.', when: (s) => s.owned[compIndex('hunter')] > 0 },
-  { text: 'The Shieldmaiden says the shield is "fine." It is more dent than shield.', when: (s) => s.owned[compIndex('shieldmaiden')] > 0 },
+  { id: 'cards', text: 'Every monster down here has a card. Nobody remembers printing them.', when: (s) => !s.awakens, rare: true },
+  { id: 'stairs', text: 'The stairs go down. They always go down.', when: (s) => s.floor < 5 },
+  { id: 'squire', text: 'Your Squire asks if the dungeon has a bottom. You do not answer.', when: (s) => s.owned[compIndex('squire')] > 0 },
+  { id: 'ranger', text: 'The Ranger keeps a tally of her kills on the wall. She has run out of wall.', when: (s) => s.owned[compIndex('ranger')] > 10 },
+  { id: 'brawler', text: 'The dwarf insists on punching the bosses personally.', when: (s) => s.owned[compIndex('brawler')] > 0 },
+  { id: 'apprentice', text: 'The Apprentice set his beard on fire again. It still counts as damage.', when: (s) => s.owned[compIndex('apprentice')] > 0 },
+  { id: 'hunter', text: 'The Lizard Hunter claims she can hear the dungeon breathing.', when: (s) => s.owned[compIndex('hunter')] > 0 },
+  { id: 'shieldmaiden', text: 'The Shieldmaiden says the shield is "fine." It is more dent than shield.', when: (s) => s.owned[compIndex('shieldmaiden')] > 0 },
   ...(DEMO ? [] : [
-    { text: "The Stormcaller's forecast: lightning, with a chance of more lightning.", when: (s) => s.owned[compIndex('stormcaller')] > 0 },
-    { text: 'The Plague Doctor keeps taking notes on the monsters. And on you.', when: (s) => s.owned[compIndex('doctor')] > 0 },
-    { text: 'The Lantern Knight has not spoken once. He did grin wider today.', when: (s) => s.owned[compIndex('hollow')] > 0 },
-    { text: 'The angel will not say what it fell from.', when: (s) => s.owned[compIndex('angel')] > 0 },
-    { text: 'The Necromancer apologizes to each monster before it dies.', when: (s) => s.owned[compIndex('necro')] > 0 },
-    { text: 'The Tamed Oni has adopted a slug. Nobody has told him we kill those.', when: (s) => s.owned[compIndex('ogre')] > 0 },
-    { text: 'The demon keeps asking to renegotiate the contract.', when: (s) => s.owned[compIndex('demon')] > 0 },
+    { id: 'stormcaller', text: "The Stormcaller's forecast: lightning, with a chance of more lightning.", when: (s) => s.owned[compIndex('stormcaller')] > 0 },
+    { id: 'doctor', text: 'The Plague Doctor keeps taking notes on the monsters. And on you.', when: (s) => s.owned[compIndex('doctor')] > 0 },
+    { id: 'hollow', text: 'The Lantern Knight has not spoken once. He did grin wider today.', when: (s) => s.owned[compIndex('hollow')] > 0 },
+    { id: 'angel', text: 'The angel will not say what it fell from.', when: (s) => s.owned[compIndex('angel')] > 0 },
+    { id: 'necro', text: 'The Necromancer apologizes to each monster before it dies.', when: (s) => s.owned[compIndex('necro')] > 0 },
+    { id: 'ogre', text: 'The Tamed Oni has adopted a slug. Nobody has told him we kill those.', when: (s) => s.owned[compIndex('ogre')] > 0 },
+    { id: 'demon', text: 'The demon keeps asking to renegotiate the contract.', when: (s) => s.owned[compIndex('demon')] > 0 },
   ] satisfies News[]),
-  { text: 'A goblin was seen running off.', when: (s) => s.raids > 0 },
-  { text: 'The goblins have started a union. It meets at the bottom of the dungeon.', when: (s) => s.raids > 10 },
-  { text: 'Someone up top has written a song about you. The verses keep getting darker.', when: (s) => s.kills > 1000 },
-  { text: 'The monsters below have heard about you. Several have asked for transfers.', when: (s) => s.kills > 10000 },
-  { text: 'Someone has scratched "Go deeper" into the wall. The handwriting looks like yours.', when: (s) => s.depth > 0 },
-  { text: 'You could swear you have walked these floors before.', when: (s) => s.depth > 1 },
-  { text: 'The walls have a pulse. Everyone has agreed not to mention it.', when: (s) => s.floor > 70 },
-  { text: 'The heart below is waiting for you.', when: (s) => s.floor > 100 },
+  { id: 'goblin', text: 'A goblin was seen running off.', when: (s) => s.raids > 0 },
+  { id: 'union', text: 'The goblins have started a union. It meets at the bottom of the dungeon.', when: (s) => s.raids > 10 },
+  { id: 'song', text: 'Someone up top has written a song about you. The verses keep getting darker.', when: (s) => s.kills > 1000 },
+  { id: 'transfers', text: 'The monsters below have heard about you. Several have asked for transfers.', when: (s) => s.kills > 10000 },
+  { id: 'deeper', text: 'Someone has scratched "Go deeper" into the wall. The handwriting looks like yours.', when: (s) => s.depth > 0 },
+  { id: 'before', text: 'You could swear you have walked these floors before.', when: (s) => s.depth > 1 },
+  { id: 'pulse', text: 'The walls have a pulse. Everyone has agreed not to mention it.', when: (s) => s.floor > 70 },
+  { id: 'heart', text: 'The heart below is waiting for you.', when: (s) => s.floor > 100 },
   ...(DEMO ? [] : [
-    { text: 'The floor numbers stopped meaning anything a while ago.', when: (s) => s.floor > 200 },
-    { text: 'A signpost says "Floor 1." Someone has crossed it out twice.', when: (s) => s.floor > 300 },
-    { text: 'The monsters here have never seen the sun. They are not curious.', when: (s) => s.floor > 500 },
-    { text: 'Your shadow has started lagging behind. It looks tired.', when: (s) => s.floor > 800 },
-    { text: 'The stairs have begun to count your steps back to you.', when: (s) => s.floor > 1200 },
-    { text: 'The echoes down here arrive a few seconds late.', when: (s) => s.floor > 2000 },
-    { text: 'The heart skipped a beat and did not mention it.', when: (s) => s.floor > 3000 },
+    { id: 'numbers', text: 'The floor numbers stopped meaning anything a while ago.', when: (s) => s.floor > 200 },
+    { id: 'signpost', text: 'A signpost says "Floor 1." Someone has crossed it out twice.', when: (s) => s.floor > 300 },
+    { id: 'sun', text: 'The monsters here have never seen the sun. They are not curious.', when: (s) => s.floor > 500 },
+    { id: 'shadow', text: 'Your shadow has started lagging behind. It looks tired.', when: (s) => s.floor > 800 },
+    { id: 'steps', text: 'The stairs have begun to count your steps back to you.', when: (s) => s.floor > 1200 },
+    { id: 'echoes', text: 'The echoes down here arrive a few seconds late.', when: (s) => s.floor > 2000 },
+    { id: 'skipped', text: 'The heart skipped a beat and did not mention it.', when: (s) => s.floor > 3000 },
   ] satisfies News[]),
-  { text: 'Reminder: the dungeon is not a metaphor. Probably.' },
-  { text: 'The torches all lean toward the stairs down.' },
-  { text: 'A monster tried to surrender today. It was killed anyway. Rules are rules.' },
-];
+  { id: 'metaphor', text: 'Reminder: the dungeon is not a metaphor. Probably.' },
+  { id: 'torches', text: 'The torches all lean toward the stairs down.' },
+  { id: 'surrender', text: 'A monster tried to surrender today. It was killed anyway. Rules are rules.' },
+] satisfies News[]).map((news) => ({ ...news, text: text(`news.${news.id}`, news.text) }));
 
 export type RaidReward = 'plunder' | 'bloodlust' | 'heartstorm' | 'horde' | 'deadeye' | 'brutal' | 'soulstorm' | 'vault' | 'rainbow';

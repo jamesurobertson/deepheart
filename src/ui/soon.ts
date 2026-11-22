@@ -1,5 +1,6 @@
 import { STEAM_URL } from '../demo.ts';
 import { HEART, LOGO } from './menu.ts';
+import { t } from '../i18n/index.ts';
 
 /** Phones get a page instead of the game: it's made for a mouse and a big screen. */
 
@@ -15,8 +16,8 @@ export function showComingSoon() {
   const page = document.createElement('main');
   page.className = 'soon';
   page.innerHTML = `${HEART}${LOGO}
-    <p class="soon-line">Coming soon to Steam</p>
+    <p class="soon-line">${t('menu.soon.line')}</p>
     <a class="btn primary soon-steam" href="${STEAM_URL}" target="_blank" rel="noopener">Steam</a>
-    <p class="soon-note">Play free on a computer</p>`;
+    <p class="soon-note">${t('menu.soon.note')}</p>`;
   document.body.appendChild(page);
 }

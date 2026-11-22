@@ -30,14 +30,15 @@ export interface LocaleMeta {
   steam: string;
   /** Missing messages are looked up here before English (es-419 → es). */
   extends?: string;
-  /** Extra pixel-font faces this language's script needs (src/i18n/fonts). */
+  /** Extra pixel-font faces this language's script needs, loaded only for it (src/i18n/fonts). */
   fonts?: FontPack;
   /** A machine translation nobody fluent has checked yet. */
   draft?: boolean;
   numbers: NumberWords;
 }
 
-export type FontPack = 'cyrillic' | 'zh-CN' | 'ja' | 'ko';
+/** A CJK script's glyphs (scripts/i18n-fonts.ts). Latin and Cyrillic are in every language's fonts already. */
+export type FontPack = 'zh-CN' | 'ja' | 'ko';
 
 export interface NumberWords {
   /** How many digits a step up the suffixes is: 3 (K, M, B…) or 4 (万, 亿…). */

@@ -1,0 +1,704 @@
+[
+  {
+    "api": "FLOOR_10",
+    "name": "Down the Stairs",
+    "desc": "Clear floor 10.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_50",
+    "name": "The Long Descent",
+    "desc": "Clear floor 50.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_100",
+    "name": "The Underneath",
+    "desc": "Clear floor 100.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_400",
+    "name": "The Bottom?",
+    "desc": "Clear floor 400.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_500",
+    "name": "There Is No Bottom",
+    "desc": "Clear floor 500.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_750",
+    "name": "Geology Gives Up",
+    "desc": "Clear floor 750.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1000",
+    "name": "A Thousand Down",
+    "desc": "Clear floor 1,000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_1500",
+    "name": "No Signal",
+    "desc": "Clear floor 1,500.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_2000",
+    "name": "Two Thousand Fathoms",
+    "desc": "Clear floor 2,000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_3000",
+    "name": "Root of the World",
+    "desc": "Clear floor 3,000.",
+    "hidden": false
+  },
+  {
+    "api": "FLOOR_5000",
+    "name": "Where the Heart Beats",
+    "desc": "Clear floor 5,000.",
+    "hidden": false
+  },
+  {
+    "api": "LAP0",
+    "name": "Corruption",
+    "desc": "Reach floor 81, where the zones return corrupted.",
+    "hidden": false
+  },
+  {
+    "api": "LAP1",
+    "name": "The Abyss Stares Back",
+    "desc": "Reach floor 161, where the zones return abyssal.",
+    "hidden": false
+  },
+  {
+    "api": "LAP2",
+    "name": "Hollowed Out",
+    "desc": "Reach floor 241, where the zones return hollow.",
+    "hidden": false
+  },
+  {
+    "api": "LAP3",
+    "name": "Eternity",
+    "desc": "Reach floor 321, where the zones return eternal.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E9",
+    "name": "Coin Purse",
+    "desc": "Collect 1 billion gold in total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E24",
+    "name": "Strongbox",
+    "desc": "Collect 1 septillion gold in total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E40",
+    "name": "Treasury",
+    "desc": "Collect 10 duodecillion gold in total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E60",
+    "name": "Dragon Hoard",
+    "desc": "Collect 1 novemdecillion gold in total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E90",
+    "name": "Kingdom's Ransom",
+    "desc": "Collect 1e90 gold in total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E120",
+    "name": "Sea of Gold",
+    "desc": "Collect 1e120 gold in total.",
+    "hidden": false
+  },
+  {
+    "api": "GOLD_E160",
+    "name": "Beyond Counting",
+    "desc": "Collect 1e160 gold in total.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E6",
+    "name": "Fighter",
+    "desc": "Reach 1 million damage per second.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E24",
+    "name": "Warlord",
+    "desc": "Reach 1 septillion damage per second.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E40",
+    "name": "Cataclysm",
+    "desc": "Reach 10 duodecillion damage per second.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E60",
+    "name": "Apocalypse",
+    "desc": "Reach 1 novemdecillion damage per second.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E80",
+    "name": "World Breaker",
+    "desc": "Reach 1e80 damage per second.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E100",
+    "name": "Googol",
+    "desc": "Reach a googol damage per second.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E150",
+    "name": "Heat Death",
+    "desc": "Reach 1e150 damage per second.",
+    "hidden": false
+  },
+  {
+    "api": "DPS_E200",
+    "name": "Big Bang",
+    "desc": "Reach 1e200 damage per second.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_1000",
+    "name": "Slayer",
+    "desc": "Kill 1,000 monsters.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_100000",
+    "name": "Massacre",
+    "desc": "Kill 100,000 monsters.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E6",
+    "name": "Extinction Event",
+    "desc": "Kill 1,000,000 monsters.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E7",
+    "name": "The Reaper",
+    "desc": "Kill 10,000,000 monsters.",
+    "hidden": false
+  },
+  {
+    "api": "KILL_E8",
+    "name": "Nothing Left Alive",
+    "desc": "Kill 100,000,000 monsters.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_10",
+    "name": "Kingsbane",
+    "desc": "Defeat 10 bosses.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_100",
+    "name": "Tyrant Killer",
+    "desc": "Defeat 100 bosses.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_1000",
+    "name": "Boss Rush",
+    "desc": "Defeat 1,000 bosses.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_5000",
+    "name": "Serial Regicide",
+    "desc": "Defeat 5,000 bosses.",
+    "hidden": false
+  },
+  {
+    "api": "BOSS_25000",
+    "name": "Throne of Bones",
+    "desc": "Defeat 25,000 bosses.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1",
+    "name": "Champion Slayer",
+    "desc": "Slay a champion.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_100",
+    "name": "Crown Collector",
+    "desc": "Slay 100 champions.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_1000",
+    "name": "Champion of Champions",
+    "desc": "Slay 1,000 champions.",
+    "hidden": false
+  },
+  {
+    "api": "CHAMP_10000",
+    "name": "Undisputed",
+    "desc": "Slay 10,000 champions.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_1",
+    "name": "By a Hair",
+    "desc": "Beat a boss with 3 seconds or less on the clock.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_20",
+    "name": "Nerves of Steel",
+    "desc": "Beat 20 bosses with 3 seconds or less on the clock.",
+    "hidden": false
+  },
+  {
+    "api": "CLUTCH_100",
+    "name": "Was That Necessary?",
+    "desc": "Beat 100 bosses with 3 seconds or less on the clock.",
+    "hidden": false
+  },
+  {
+    "api": "HIRE_ALL",
+    "name": "Full Party",
+    "desc": "Hire all 32 companions.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_1000",
+    "name": "Legendary",
+    "desc": "Get a companion to level 1,000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_2500",
+    "name": "Mythic",
+    "desc": "Get a companion to level 2,500.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_5000",
+    "name": "Immortal",
+    "desc": "Get a companion to level 5,000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVEL_10000",
+    "name": "Overleveled",
+    "desc": "Get a companion to level 10,000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_500",
+    "name": "Loyal Company",
+    "desc": "Get every companion to level 500.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_1000",
+    "name": "Legendary Company",
+    "desc": "Get every companion to level 1,000.",
+    "hidden": false
+  },
+  {
+    "api": "LEVELALL_2500",
+    "name": "Mythic Company",
+    "desc": "Get every companion to level 2,500.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100",
+    "name": "Tap Tap",
+    "desc": "Attack 100 times.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_10000",
+    "name": "Clicker",
+    "desc": "Attack 10,000 times.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_100000",
+    "name": "Still Clicking",
+    "desc": "Attack 100,000 times.",
+    "hidden": false
+  },
+  {
+    "api": "CLICKS_E6",
+    "name": "Carpal Tunnel",
+    "desc": "Attack 1,000,000 times.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_1",
+    "name": "Critical!",
+    "desc": "Land 1 critical hit.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_10000",
+    "name": "Sharp Eye",
+    "desc": "Land 10,000 critical hits.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_100000",
+    "name": "Surgeon",
+    "desc": "Land 100,000 critical hits.",
+    "hidden": false
+  },
+  {
+    "api": "CRIT_E6",
+    "name": "Critical Condition",
+    "desc": "Land 1,000,000 critical hits.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1",
+    "name": "Rampage!",
+    "desc": "Go on a Rampage once.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_100",
+    "name": "Berserker",
+    "desc": "Go on a Rampage 100 times.",
+    "hidden": false
+  },
+  {
+    "api": "FEV_1000",
+    "name": "Anger Issues",
+    "desc": "Go on a Rampage 1,000 times.",
+    "hidden": false
+  },
+  {
+    "api": "RAMPAGE0",
+    "name": "Bloodrush",
+    "desc": "Keep attacking until a Rampage reaches its top tier.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_1",
+    "name": "Finders Keepers",
+    "desc": "Catch a treasure goblin.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_77",
+    "name": "Red-Handed",
+    "desc": "Catch 77 treasure goblins.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_777",
+    "name": "Jackpot",
+    "desc": "Catch 777 treasure goblins.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_2777",
+    "name": "No One Escapes",
+    "desc": "Catch 2,777 treasure goblins.",
+    "hidden": false
+  },
+  {
+    "api": "RAID_7777",
+    "name": "Treasure Lord",
+    "desc": "Catch 7,777 treasure goblins.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1",
+    "name": "Butterfingers",
+    "desc": "Let a treasure goblin get away.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_100",
+    "name": "Slippery Little Guys",
+    "desc": "Let 100 treasure goblins get away.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_1000",
+    "name": "Goblin Enabler",
+    "desc": "Let 1,000 treasure goblins get away. They are telling their friends.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_5000",
+    "name": "Goblin Philanthropist",
+    "desc": "Let 5,000 treasure goblins get away. You are funding their retirement.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_20000",
+    "name": "Official Goblin Sponsor",
+    "desc": "Let 20,000 treasure goblins get away. They have named a tunnel after you.",
+    "hidden": false
+  },
+  {
+    "api": "MISS_50000",
+    "name": "The Goblins Thank You",
+    "desc": "Let 50,000 treasure goblins get away. There is a statue of you in Goblin Town.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_1",
+    "name": "Double Rainbow",
+    "desc": "Catch a rainbow goblin.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_50",
+    "name": "Chasing Rainbows",
+    "desc": "Catch 50 rainbow goblins.",
+    "hidden": false
+  },
+  {
+    "api": "RAINBOW_500",
+    "name": "End of the Rainbow",
+    "desc": "Catch 500 rainbow goblins.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_1",
+    "name": "Over the Rainbow",
+    "desc": "Open the Rainbow Vault.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_25",
+    "name": "Vault Raider",
+    "desc": "Open the Rainbow Vault 25 times.",
+    "hidden": false
+  },
+  {
+    "api": "VAULT_250",
+    "name": "Goblin Banker",
+    "desc": "Open the Rainbow Vault 250 times.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_1",
+    "name": "Up for Air",
+    "desc": "Ascend once.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_10",
+    "name": "Return Ticket",
+    "desc": "Ascend 10 times.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_50",
+    "name": "Commuter",
+    "desc": "Ascend 50 times.",
+    "hidden": false
+  },
+  {
+    "api": "DESC_250",
+    "name": "Always Back Down",
+    "desc": "Ascend 250 times.",
+    "hidden": false
+  },
+  {
+    "api": "AWK_1",
+    "name": "It Wakes",
+    "desc": "Awaken the Heart once.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_5",
+    "name": "Heartbeat",
+    "desc": "Awaken the Heart 5 times.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_25",
+    "name": "Snooze Button",
+    "desc": "Awaken the Heart 25 times.",
+    "hidden": true
+  },
+  {
+    "api": "AWK_100",
+    "name": "Pacemaker",
+    "desc": "Awaken the Heart 100 times.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_ALL",
+    "name": "All Eight",
+    "desc": "Wake every one of the Bound.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_50",
+    "name": "Soul Debt",
+    "desc": "Earn 50 bound souls in total.",
+    "hidden": true
+  },
+  {
+    "api": "BOUND_250",
+    "name": "Paid in Full",
+    "desc": "Earn 250 bound souls in total.",
+    "hidden": true
+  },
+  {
+    "api": "TRIP_1",
+    "name": "Gone Hunting",
+    "desc": "Send a companion on an expedition.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_25",
+    "name": "Spoils",
+    "desc": "Find 25 cards on expeditions.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPCARD_250",
+    "name": "Postcards",
+    "desc": "Find 250 cards on expeditions.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_10000",
+    "name": "Pest Control",
+    "desc": "Defeat 10,000 monsters on expeditions.",
+    "hidden": false
+  },
+  {
+    "api": "TRIPKILL_E6",
+    "name": "Hired Muscle",
+    "desc": "Defeat 1,000,000 monsters on expeditions.",
+    "hidden": false
+  },
+  {
+    "api": "PET_1",
+    "name": "Good Kitty",
+    "desc": "Pet Koko.",
+    "hidden": false
+  },
+  {
+    "api": "PET_10",
+    "name": "Cat Person",
+    "desc": "Pet Koko 10 times.",
+    "hidden": true
+  },
+  {
+    "api": "PET_100",
+    "name": "Her Favorite",
+    "desc": "Pet Koko 100 times.",
+    "hidden": true
+  },
+  {
+    "api": "PET_1000",
+    "name": "Koko's Human",
+    "desc": "Pet Koko 1,000 times.",
+    "hidden": true
+  },
+  {
+    "api": "SET_1",
+    "name": "Full Set",
+    "desc": "Finish a card set.",
+    "hidden": false
+  },
+  {
+    "api": "SET_5",
+    "name": "Set Collector",
+    "desc": "Finish 5 card sets.",
+    "hidden": false
+  },
+  {
+    "api": "SET_10",
+    "name": "Complete Collection",
+    "desc": "Finish 10 card sets.",
+    "hidden": false
+  },
+  {
+    "api": "GSET_1",
+    "name": "Gold Set",
+    "desc": "Finish a gold card set.",
+    "hidden": false
+  },
+  {
+    "api": "GSET_5",
+    "name": "Gilt Edge",
+    "desc": "Finish 5 gold card sets.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_1",
+    "name": "Card Carrier",
+    "desc": "Find a monster card.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_25",
+    "name": "Card Sharp",
+    "desc": "Find 25 different monster cards.",
+    "hidden": false
+  },
+  {
+    "api": "CARD_ALL",
+    "name": "Bestiary",
+    "desc": "Find every monster card.",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_250",
+    "name": "Monster Manual",
+    "desc": "Collect 250 cards.",
+    "hidden": false
+  },
+  {
+    "api": "VERSIONS_ALL",
+    "name": "Every Last Monster",
+    "desc": "Collect every card.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_1",
+    "name": "Gilded",
+    "desc": "Find a gold card.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_25",
+    "name": "Gold Standard",
+    "desc": "Find 25 different gold cards.",
+    "hidden": false
+  },
+  {
+    "api": "GCARD_ALL",
+    "name": "Midas Deck",
+    "desc": "Find every gold card.",
+    "hidden": false
+  }
+]

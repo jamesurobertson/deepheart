@@ -81,7 +81,7 @@ for (const file of LOCALES) {
   }
   const chars = new Set<string>();
   for (const text of [...Object.values(messages).flatMap(forms), ...meta.numbers.short, ...meta.numbers.long]) for (const ch of text.replace(/<[^>]*>|\{\w+\}|&\w+;/g, '')) chars.add(ch);
-  allChars.set(meta.fonts ?? 'latin', new Set([...(allChars.get(meta.fonts ?? 'latin') ?? []), ...chars]));
+  allChars.set(meta.fonts ?? 'base', new Set([...(allChars.get(meta.fonts ?? 'base') ?? []), ...chars]));
 }
 
 // ---------- fonts ----------
@@ -89,7 +89,7 @@ for (const file of LOCALES) {
 for (const [pack, chars] of allChars) {
   const list = `src/i18n/fonts/${pack}.chars.txt`;
   if (!existsSync(list)) {
-    if (pack !== 'latin') fail(`fonts: ${list} is missing: npm run i18n:fonts`);
+    fail(`fonts: ${list} is missing: npm run i18n:fonts`);
     continue;
   }
   const covered = new Set(readFileSync(list, 'utf8'));
