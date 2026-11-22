@@ -11,7 +11,7 @@
 @font-face {
   font-family: 'Jersey 10';
   src: url('./ko.woff2') format('woff2');
-  font-weight: 100 900;
+  font-weight: 400;
   size-adjust: 120%;
   unicode-range: U+1100-11FF,U+2E80-2FDF,U+2FF0-303F,U+3040-30FF,U+3130-318F,U+31F0-31FF,U+3200-33FF,U+3400-4DBF,U+4E00-9FFF,U+A960-A97F,U+AC00-D7AF,U+D7B0-D7FF,U+F900-FAFF,U+FE30-FE4F,U+FF00-FFEF;
   font-display: swap;
@@ -19,7 +19,15 @@
 @font-face {
   font-family: 'Silkscreen';
   src: url('./ko.woff2') format('woff2');
-  font-weight: 100 900;
+  font-weight: 400;
+  size-adjust: 100%;
+  unicode-range: U+1100-11FF,U+2E80-2FDF,U+2FF0-303F,U+3040-30FF,U+3130-318F,U+31F0-31FF,U+3200-33FF,U+3400-4DBF,U+4E00-9FFF,U+A960-A97F,U+AC00-D7AF,U+D7B0-D7FF,U+F900-FAFF,U+FE30-FE4F,U+FF00-FFEF;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Silkscreen';
+  src: url('./ko.woff2') format('woff2');
+  font-weight: 700;
   size-adjust: 100%;
   unicode-range: U+1100-11FF,U+2E80-2FDF,U+2FF0-303F,U+3040-30FF,U+3130-318F,U+31F0-31FF,U+3200-33FF,U+3400-4DBF,U+4E00-9FFF,U+A960-A97F,U+AC00-D7AF,U+D7B0-D7FF,U+F900-FAFF,U+FE30-FE4F,U+FF00-FFEF;
   font-display: swap;

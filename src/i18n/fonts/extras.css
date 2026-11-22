@@ -10,7 +10,7 @@
 @font-face {
   font-family: 'Jersey 10';
   src: url('./extras.woff2') format('woff2');
-  font-weight: 100 900;
+  font-weight: 400;
   size-adjust: 120%;
   unicode-range: U+B2,U+2192,U+4E2D,U+4F53,U+6587,U+65E5,U+672C,U+7B80,U+8A9E,U+AD6D,U+C5B4,U+D55C;
   font-display: swap;
@@ -18,7 +18,15 @@
 @font-face {
   font-family: 'Silkscreen';
   src: url('./extras.woff2') format('woff2');
-  font-weight: 100 900;
+  font-weight: 400;
+  size-adjust: 100%;
+  unicode-range: U+B2,U+2192,U+4E2D,U+4F53,U+6587,U+65E5,U+672C,U+7B80,U+8A9E,U+AD6D,U+C5B4,U+D55C;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Silkscreen';
+  src: url('./extras.woff2') format('woff2');
+  font-weight: 700;
   size-adjust: 100%;
   unicode-range: U+B2,U+2192,U+4E2D,U+4F53,U+6587,U+65E5,U+672C,U+7B80,U+8A9E,U+AD6D,U+C5B4,U+D55C;
   font-display: swap;
