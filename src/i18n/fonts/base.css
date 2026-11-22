@@ -1,7 +1,7 @@
 /*
  * Faces every language gets, under the game's own font names so no other rule changes. The browser fetches each only
  * when a character in its range is on screen. Cyrillic: Tiny5 (OFL), sized to land on whole pixels at the game's usual
- * sizes. The language names in the picker: Fusion Pixel (OFL), cut to those few characters (scripts/i18n-fonts.ts).
+ * sizes. The language names in the picker and a few signs come from extras.css (scripts/i18n-fonts.ts).
  */
 @font-face {
   font-family: 'Jersey Text';
@@ -47,13 +47,5 @@
   src: url('../../../node_modules/@fontsource/tiny5/files/tiny5-cyrillic-ext-400-normal.woff2') format('woff2');
   font-weight: 100 900;
   unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Jersey Text';
-  src: url('./names.woff2') format('woff2');
-  font-weight: 100 900;
-  size-adjust: 150%;
-  unicode-range: U+4E2D, U+4F53, U+6587, U+65E5, U+672C, U+7B80, U+8A9E, U+AD6D, U+C5B4, U+D55C;
   font-display: swap;
 }

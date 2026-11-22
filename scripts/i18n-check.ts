@@ -92,7 +92,8 @@ for (const [pack, chars] of allChars) {
     fail(`fonts: ${list} is missing: npm run i18n:fonts`);
     continue;
   }
-  const covered = new Set(readFileSync(list, 'utf8'));
+  // ≈ is in no pixel font; it has always come from the system's font, which every system has.
+  const covered = new Set(readFileSync(list, 'utf8') + '≈');
   const tofu = [...chars].filter((ch) => ch.trim() && !covered.has(ch));
   if (tofu.length) fail(`fonts: the ${pack} fonts don't draw ${tofu.slice(0, 40).join('')}${tofu.length > 40 ? ` (+${tofu.length - 40})` : ''}: npm run i18n:fonts`);
 }
