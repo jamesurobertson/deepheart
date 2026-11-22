@@ -16,7 +16,7 @@ let meta: LocaleMeta = EN_META;
 let chain: Record<string, Message>[] = [EN as Record<string, Message>];
 let pseudo = false;
 let plurals = new Intl.PluralRules('en');
-const numberFormats = new Map<string, Intl.NumberFormat>();
+const numberFormats = new Map<string, Formatter>();
 
 /** Every content key the game data asked for, with its English: what the checker and the demo build go by. */
 export const CONTENT_SOURCE = new Map<string, string>();
@@ -35,6 +35,14 @@ export const localeCode = () => (pseudo ? PSEUDO : meta.code);
 /** The language Intl formats numbers and plurals in (the pseudo-locale counts like English). */
 export const intlLocale = () => meta.code;
 export const numberWords = (): NumberWords => meta.numbers;
+
+/** The spelled-out word for a step of numberWords().long, in the form that goes after `count` shown with `decimals`
+ *  ("1 Million", "1,000 Millionen"). */
+export function numberWord(step: number, count: number, decimals = 0): string {
+  const word = meta.numbers.long[step];
+  if (word === undefined || typeof word === 'string') return word ?? '';
+  return word[new Intl.PluralRules(meta.code, { minimumFractionDigits: decimals }).select(count)] ?? word.other;
+}
 
 function lookup(key: string): Message | undefined {
   for (const dict of chain) {
@@ -81,10 +89,16 @@ export function tc(key: string, english: string, params?: Params): string {
   return fill(english, params);
 }
 
-function numberFormat(digits: number, minDigits = digits, style: 'decimal' | 'percent' = 'decimal', grouping = true) {
+type Formatter = { format(n: number): string };
+
+/** French and others group with a narrow no-break space, which the pixel fonts don't have: a plain no-break space stands in. */
+function numberFormat(digits: number, minDigits = digits, style: 'decimal' | 'percent' = 'decimal', grouping = true): Formatter {
   const id = `${style}:${minDigits}:${digits}:${grouping}`;
   let f = numberFormats.get(id);
-  if (!f) numberFormats.set(id, (f = new Intl.NumberFormat(intlLocale(), { style, minimumFractionDigits: minDigits, maximumFractionDigits: digits, useGrouping: grouping })));
+  if (!f) {
+    const intl = new Intl.NumberFormat(intlLocale(), { style, minimumFractionDigits: minDigits, maximumFractionDigits: digits, useGrouping: grouping });
+    numberFormats.set(id, (f = { format: (n: number) => intl.format(n).replace(/[\u202f\u2009]/g, '\u00a0') }));
+  }
   return f;
 }
 

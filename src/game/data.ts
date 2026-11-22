@@ -4,7 +4,7 @@
  */
 
 import { DEMO } from '../demo.ts';
-import { fixed, int, numberWords, t, tc } from '../i18n/index.ts';
+import { fixed, int, numberWord, numberWords, t, tc } from '../i18n/index.ts';
 
 /** The demo's stand-in for the full game's names. */
 const BLANK = '???';
@@ -875,7 +875,8 @@ function bigWords(n: number): string {
   if (e === 100) return t('data.trophy.googol');
   const { group, long } = numberWords();
   const step = Math.floor(e / group);
-  return long[step] ? t('data.trophy.power', { n: int(10 ** (e - step * group)), word: long[step] }) : `1e${e}`;
+  const count = 10 ** (e - step * group);
+  return long[step] ? t('data.trophy.power', { n: int(count), word: numberWord(step, count) }) : `1e${e}`;
 }
 
 function buildTrophies(): TrophyDef[] {

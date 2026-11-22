@@ -45,8 +45,9 @@ export interface NumberWords {
   group: 3 | 4;
   /** Short suffix per step ("" first), for the HUD and prices. Past the last one, scientific notation. */
   short: string[];
-  /** The same steps spelled out for the big gold counter ("" first). */
-  long: string[];
+  /** The same steps spelled out ("" first): "million", or plural forms where the word follows the count ("1 Million",
+   *  "10 Millionen"; "1,234 миллиона"). */
+  long: (string | PluralForms)[];
 }
 
 export interface LocaleFile {

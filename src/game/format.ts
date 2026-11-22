@@ -1,5 +1,5 @@
 import Decimal from 'break_infinity.js';
-import { fixed, int, intlLocale, numberWords, percent } from '../i18n/index.ts';
+import { fixed, int, intlLocale, numberWord, numberWords, percent } from '../i18n/index.ts';
 
 let notation: 'short' | 'sci' = 'short';
 export function setNotation(n: 'short' | 'sci') {
@@ -45,7 +45,10 @@ export function fmtLong(value: number | Decimal): { value: string; unit: string 
   if (n < 1e6) return { value: int(Math.floor(n)), unit: '' };
   const words = numberWords();
   const tier = Math.floor(Math.log10(n) / words.group);
-  if (notation === 'short' && tier < words.long.length) return { value: fixed(n / 10 ** (tier * words.group), 3), unit: words.long[tier] };
+  if (notation === 'short' && tier < words.long.length) {
+    const value = n / 10 ** (tier * words.group);
+    return { value: fixed(value, 3), unit: numberWord(tier, value, 3) };
+  }
   return { value: sciNumber(n, 3), unit: '' };
 }
 

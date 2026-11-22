@@ -1,6 +1,6 @@
 import { DESCEND_FLOOR, FLOOR_KILLS } from '../../game/game.ts';
 import { fmt } from '../../game/format.ts';
-import { numberWords, t } from '../../i18n/index.ts';
+import { numberWord, numberWords, t } from '../../i18n/index.ts';
 import { h2, link, table, toc } from '../kit.ts';
 import type { Page } from '../pages.ts';
 
@@ -64,8 +64,8 @@ const settingsBody = () => `<p class="lede">${t('wiki.settings.lede')}</p>
 
 /** The suffixes and their names in the player's language, from K (10³) up to the last named one. */
 const suffixRows = () => {
-  const { short, long } = numberWords();
-  return short.slice(1, long.length).map((suffix, k) => [`<b>${suffix}</b>`, long[k + 1], `10<sup>${(k + 1) * 3}</sup>`, fmt(1.23 * 10 ** ((k + 1) * 3))]);
+  const { group, short, long } = numberWords();
+  return short.slice(1, long.length).map((suffix, k) => [`<b>${suffix}</b>`, numberWord(k + 1, 2), `10<sup>${(k + 1) * group}</sup>`, fmt(1.23 * 10 ** ((k + 1) * group))]);
 };
 
 const numbersBody = () => `<p class="lede">${t('wiki.numbers.lede')}</p>

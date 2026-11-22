@@ -53,7 +53,7 @@ const forms = (m: Message) => (typeof m === 'string' ? [m] : Object.values(m).fi
 const union = (m: Message, of: (text: string) => string[]) => [...new Set(forms(m).flatMap(of))].sort();
 const same = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 
-interface LocaleModule { default: { meta: { code: string; extends?: string; fonts?: string; numbers: { short: string[]; long: string[] } }; messages: Record<string, Message> } }
+interface LocaleModule { default: { meta: { code: string; extends?: string; fonts?: string; numbers: { short: string[]; long: Message[] } }; messages: Record<string, Message> } }
 const LOCALES = existsSync('src/i18n/locales') ? readdirSync('src/i18n/locales').filter((f) => f.endsWith('.ts')) : [];
 const allChars = new Map<string, Set<string>>();
 for (const file of LOCALES) {
@@ -80,7 +80,7 @@ for (const file of LOCALES) {
     if (!same(englishTags, messageTags)) fail(`${where}: "${key}" has tags ${messageTags.join(' ') || 'none'}, English has ${englishTags.join(' ') || 'none'}`);
   }
   const chars = new Set<string>();
-  for (const text of [...Object.values(messages).flatMap(forms), ...meta.numbers.short, ...meta.numbers.long]) for (const ch of text.replace(/<[^>]*>|\{\w+\}|&\w+;/g, '')) chars.add(ch);
+  for (const text of [...Object.values(messages).flatMap(forms), ...meta.numbers.short, ...meta.numbers.long.flatMap(forms)]) for (const ch of text.replace(/<[^>]*>|\{\w+\}|&\w+;/g, '')) chars.add(ch);
   allChars.set(meta.fonts ?? 'base', new Set([...(allChars.get(meta.fonts ?? 'base') ?? []), ...chars]));
 }
 

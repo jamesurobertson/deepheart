@@ -81,9 +81,10 @@ function fusionPixel(build: string): Buffer {
 async function localeChars(code: string): Promise<Set<string>> {
   const file = `src/i18n/locales/${code}.ts`;
   if (!existsSync(file)) return new Set();
-  const { meta, messages } = (await import(pathToFileURL(file).href)).default as { meta: { numbers: { short: string[]; long: string[] } }; messages: Record<string, string | Record<string, string>> };
+  const { meta, messages } = (await import(pathToFileURL(file).href)).default as { meta: { numbers: { short: string[]; long: (string | Record<string, string>)[] } }; messages: Record<string, string | Record<string, string>> };
   const texts = Object.values(messages).flatMap((m) => (typeof m === 'string' ? [m] : Object.values(m)));
-  return new Set([...texts, ...meta.numbers.short, ...meta.numbers.long].join('').replace(/<[^>]*>|\{\w+\}/g, ''));
+  const words = meta.numbers.long.flatMap((m) => (typeof m === 'string' ? [m] : Object.values(m)));
+  return new Set([...texts, ...meta.numbers.short, ...words].join('').replace(/<[^>]*>|\{\w+\}/g, ''));
 }
 
 const face = (family: string, url: string, sizeAdjust: string, range: string) =>
