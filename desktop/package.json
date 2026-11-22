@@ -45,7 +45,10 @@
       "icon": "build/icon.png",
       "category": "public.app-category.games",
       "identity": "-",
-      "hardenedRuntime": false
+      "hardenedRuntime": false,
+      "files": [
+        "!node_modules/steamworks.js/dist/{win64,linux64}/**"
+      ]
     },
     "win": {
       "target": [
@@ -56,7 +59,11 @@
           ]
         }
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "files": [
+        "!node_modules/steamworks.js/dist/{osx,linux64}/**",
+        "!node_modules/steamworks.js/dist/win64/*.lib"
+      ]
     },
     "linux": {
       "target": [
@@ -68,7 +75,10 @@
         }
       ],
       "icon": "build/icon.png",
-      "category": "Game"
+      "category": "Game",
+      "files": [
+        "!node_modules/steamworks.js/dist/{osx,win64}/**"
+      ]
     },
     "artifactName": "Deepheart-${version}-${os}-${arch}.${ext}",
     "nsis": {
