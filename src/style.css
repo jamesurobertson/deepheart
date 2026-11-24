@@ -1159,6 +1159,12 @@ body.compact .cur { width: auto; height: auto; aspect-ratio: 1; }
 }
 .soul-chip { display: inline-flex; align-items: center; gap: 3px; }
 .floor-sub .mod { margin-left: 4px; font-size: 9px; padding: 1px 3px 2px; }
+/* CJK glyphs are drawn 12px tall (scripts/cjk-sizes.ts), more than the chip's line, and Cyrillic's Й and Ё rise above
+   its caps: give them the room so they clear the border. */
+:lang(ja) .mod, :lang(ko) .mod, :lang(zh) .mod { line-height: 12px; padding: 4px 4px 1px 5px; }
+:lang(ja) .floor-sub .mod, :lang(ko) .floor-sub .mod, :lang(zh) .floor-sub .mod { padding: 3px 3px 0 4px; }
+:lang(ru) .mod { padding: 4px 4px 2px; }
+:lang(ru) .floor-sub .mod { padding: 4px 3px 1px; }
 .hp-mods { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 3px; white-space: nowrap; }
 .tt-l .mod { margin-right: 4px; vertical-align: 1px; }
 
