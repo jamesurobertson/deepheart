@@ -423,6 +423,8 @@ export default {
     'ui.cards.gold': '황금',
     'ui.cards.more': '더 깊은 곳에 카드가 더 있어요.',
     'ui.cards.goblins': '보물 고블린',
+    'ui.cards.prev': '이전 카드',
+    'ui.cards.next': '다음 카드',
 
     'ui.settings.title': '설정',
     'ui.settings.tab.sound': '사운드',

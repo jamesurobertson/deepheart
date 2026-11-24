@@ -95,7 +95,7 @@ export const hover = (el: Element | null | undefined, on: boolean) =>
 
 const visible = (el: HTMLElement) => {
   const box = el.getBoundingClientRect();
-  return box.width > 0 && box.height > 0 && !el.closest('[hidden]');
+  return box.width > 0 && box.height > 0 && !el.closest('[hidden], [inert]');
 };
 
 /** The nearest visible control in a direction. ▲ ▼ go a row at a time (the next row's closest, as reading goes);
@@ -157,6 +157,9 @@ export function installGamepad() {
 
   const modalOpen = () => !!document.querySelector('.modal-wrap:not([hidden])');
   const titleOpen = () => !!document.querySelector('.title-menu');
+  /** A card close up: ◀ ▶ (and LB RB) press its `[data-step]` arrows, to the card before or after. */
+  const cardPop = () => document.querySelector<HTMLElement>('.modal-wrap:not([hidden]) .cardpop');
+  const stepIn = (pop: HTMLElement, dir: Dir) => click(pop.querySelector(`[data-step="${dir}"]:not([hidden])`));
   const inKeep = () => document.body.classList.contains('in-keep');
   const scope = (): ParentNode => document.querySelector('.modal-wrap:not([hidden])') ?? document.querySelector('.title-menu') ?? document.getElementById('ui') ?? document;
   const rows = () => [...document.querySelectorAll<HTMLElement>('.gens .gen[data-comp]')].filter(visible);
@@ -174,7 +177,7 @@ export function installGamepad() {
   const keyOn = (el: HTMLElement, key: string) => el.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }));
   /** The d-pad (or a stick) lands on a button: focused, with its tooltip. */
   const land = (el: HTMLElement | null) => {
-    if (!el) return;
+    if (!el || el.closest('[inert]')) return;
     // (A trophy or a card isn't a button: it takes the focus all the same, just not from Tab.)
     if (!el.matches(REACH)) el.tabIndex = -1;
     el.focus({ preventScroll: false });
@@ -291,7 +294,8 @@ export function installGamepad() {
       : docked ? [[['a'], 'select'], [['b'], 'back']]
       : inKeep() ? [[['ls'], 'walk'], [['y'], 'use'], [['a'], 'level'], [['x'], 'upgrade'], [['menu'], 'options'], [['view'], 'browse']]
       : [[['ls'], 'move'], [['rt'], 'attack'], [['a'], 'level'], [['x'], 'upgrade'], [['menu'], 'options'], [['view'], 'browse']];
-    if (!numberBox() && modal && document.querySelector('.modal-wrap:not([hidden]) .tabs')) items.splice(1, 0, [['lb', 'rb'], 'tabs']);
+    if (cardPop()) items.splice(0, 1, [['left', 'right'], 'browse']);
+    else if (!numberBox() && modal && document.querySelector('.modal-wrap:not([hidden]) .tabs')) items.splice(1, 0, [['lb', 'rb'], 'tabs']);
     if (!numberBox() && modal && document.querySelector('.modal-wrap:not([hidden]) .opts .opt:not(.opt-go)')) items.splice(1, 0, [['left', 'right'], 'change']);
     const key = family + items.map(([, prompt]) => prompt).join();
     if (key !== barKey) {
@@ -417,9 +421,11 @@ export function installGamepad() {
       // Stepping between buttons; A presses, LB RB change a window's tabs. On a setting's row (Options), ◀ ▶ change
       // its value instead: a toggle flips, a choice steps, a volume moves a tenth.
       const dir = dpad ?? stickDir;
+      const pop = cardPop();
       if (dir && (dir !== heldDir || now >= repeatAt)) {
         const opt = focused()?.closest<HTMLElement>('.opt');
-        if (opt && (dir === 'left' || dir === 'right')) {
+        if (pop) stepIn(pop, dir);
+        else if (opt && (dir === 'left' || dir === 'right')) {
           const range = opt.querySelector<HTMLInputElement>('input[type=range]');
           if (range) {
             range.value = String(Math.max(0, Math.min(100, Number(range.value) + (dir === 'right' ? 10 : -10))));
@@ -438,7 +444,8 @@ export function installGamepad() {
           click(el);
         }
       }
-      if (modal && (fresh('b4') || fresh('b5'))) {
+      if (pop && (fresh('b4') || fresh('b5'))) stepIn(pop, fresh('b5') ? 'right' : 'left');
+      else if (modal && (fresh('b4') || fresh('b5'))) {
         const tabs = [...document.querySelectorAll<HTMLElement>('.modal-wrap:not([hidden]) .tabs .tab')].filter(visible);
         const on = Math.max(0, tabs.findIndex((tab) => tab.classList.contains('on')));
         if (tabs.length > 1) {

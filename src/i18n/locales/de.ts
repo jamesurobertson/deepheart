@@ -430,6 +430,8 @@ export default {
     'ui.cards.gold': 'Gold',
     'ui.cards.more': 'Tiefer unten warten weitere Karten.',
     'ui.cards.goblins': 'Schatzgoblins',
+    'ui.cards.prev': 'Vorherige Karte',
+    'ui.cards.next': 'Nächste Karte',
 
     'ui.settings.title': 'Optionen',
     'ui.settings.tab.sound': 'Ton',

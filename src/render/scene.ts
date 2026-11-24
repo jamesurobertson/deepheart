@@ -132,6 +132,48 @@ function corrupt(p: Palette, lap: number): Palette {
   return { ...p, torch: toward(p.torch, 0.85), hemi: toward(p.hemi, 0.75), fog: new THREE.Color(p.fog).lerp(c, 0.12).getHex(), wall: wash(p.wall), floor: wash(p.floor) };
 }
 
+const backdrops = new Map<number, { url: string; torch: string; fog: string }>();
+/** A zone's room seen straight on, drawn small from its own tiles and lit with its palette (on a later lap, corrupted):
+ *  brick wall with its banners, the floor in front. For showing a card against where it's found. */
+export function zoneBackdrop(atlas: Atlas, zone: number) {
+  const hit = backdrops.get(zone);
+  if (hit) return hit;
+  const p = corrupt(PALETTES[zone % PALETTES.length], Math.floor(zone / ZONES.length));
+  const theme = tilesFor(zone);
+  const pre = theme === 'jungle' || theme === 'tomb' ? `${theme}_` : theme === 'sewer' ? 'sewer_' : '';
+  const r = seeded(zone * 131 + 7);
+  const top = atlas.rect(theme === 'sewer' ? 'sewer_wall_top' : pre ? `${pre}wall_top` : 'wall_top_mid');
+  const brick = atlas.rect(`${pre}wall_mid`);
+  const banner = theme !== 'sewer' && atlas.has(`${pre}wall_banner_${p.banner}`) ? atlas.rect(`${pre}wall_banner_${p.banner}`) : null;
+  const floors = theme === 'sewer' ? [1, 1, 1, 2, 3].map((i) => atlas.rect(`sewer_floor_${i}`))
+    : theme === 'crypt' ? [atlas.rect('floor_1'), atlas.rect('floor_1'), ...[1, 5, 9].map((i) => atlas.rect(`crypt_floor_${i}`))]
+      : [2, 2, 2, 3, 4].map((i) => atlas.rect(pre ? `${pre}floor_${i}` : `floor_${i - 1}`));
+  const T = 16;
+  const cols = 12;
+  const c = document.createElement('canvas');
+  c.width = cols * T;
+  c.height = 10 * T;
+  const g = c.getContext('2d')!;
+  const img = atlas.texture.image as HTMLImageElement;
+  const tile = (rect: Rect, x: number, y: number) => g.drawImage(img, rect.x, rect.y, rect.w, rect.h, x * T, y * T, T, T);
+  for (let x = 0; x < cols; x++) {
+    tile(top, x, 0);
+    for (let y = 1; y < 6; y++) tile(banner && y === 2 && (x === 3 || x === 8) ? banner : brick, x, y);
+    for (let y = 6; y < 10; y++) tile(floors[Math.floor(r() * floors.length)], x, y);
+  }
+  // The dungeon's light on it: stone tinted as the zone tints it, the wall a shade darker than the floor.
+  const data = g.getImageData(0, 0, c.width, c.height);
+  for (let i = 0; i < data.data.length; i += 4) {
+    const shade = i / 4 < cols * T * 6 * T ? p.wall.map((v) => v * 0.62) : p.floor.map((v) => v * 0.8);
+    for (let k = 0; k < 3; k++) data.data[i + k] = Math.min(255, data.data[i + k] * shade[k]);
+  }
+  g.putImageData(data, 0, 0);
+  const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
+  const out = { url: c.toDataURL(), torch: hex(p.torch), fog: hex(p.fog) };
+  backdrops.set(zone, out);
+  return out;
+}
+
 /** Your hero's top walking speed (world units a second). */
 const HERO_SPEED = 6.5;
 /** The rainbow's bands, outside in. */

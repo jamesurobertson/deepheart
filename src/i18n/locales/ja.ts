@@ -419,6 +419,8 @@ export default {
     'ui.cards.gold': '金',
     'ui.cards.more': 'さらに深くで、まだ見ぬカードが待っています。',
     'ui.cards.goblins': 'トレジャーゴブリン',
+    'ui.cards.prev': '前のカード',
+    'ui.cards.next': '次のカード',
 
     'ui.settings.title': 'オプション',
     'ui.settings.tab.sound': 'サウンド',

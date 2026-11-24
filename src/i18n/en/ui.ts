@@ -401,6 +401,8 @@ export const UI = {
   'ui.cards.gold': 'Gold',
   'ui.cards.more': 'More cards wait deeper down.',
   'ui.cards.goblins': 'Treasure goblins',
+  'ui.cards.prev': 'Previous card',
+  'ui.cards.next': 'Next card',
 
   'ui.settings.title': 'Options',
   'ui.settings.tab.sound': 'Sound',

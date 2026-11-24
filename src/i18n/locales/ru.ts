@@ -477,6 +477,8 @@ export default {
     'ui.cards.gold': 'Золотая',
     'ui.cards.more': 'Новые карты ждут глубже.',
     'ui.cards.goblins': 'Гоблины-сокровищники',
+    'ui.cards.prev': 'Предыдущая карта',
+    'ui.cards.next': 'Следующая карта',
 
     'ui.settings.title': 'Настройки',
     'ui.settings.tab.sound': 'Звук',

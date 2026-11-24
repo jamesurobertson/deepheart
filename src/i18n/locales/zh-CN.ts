@@ -419,6 +419,8 @@ export default {
     'ui.cards.gold': '金卡',
     'ui.cards.more': '更多卡牌在更深处等着你。',
     'ui.cards.goblins': '宝藏哥布林',
+    'ui.cards.prev': '上一张卡牌',
+    'ui.cards.next': '下一张卡牌',
 
     'ui.settings.title': '选项',
     'ui.settings.tab.sound': '声音',

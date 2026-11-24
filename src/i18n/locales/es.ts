@@ -431,6 +431,8 @@ export default {
     'ui.cards.gold': 'Dorada',
     'ui.cards.more': 'Más cartas esperan más abajo.',
     'ui.cards.goblins': 'Goblins del tesoro',
+    'ui.cards.prev': 'Carta anterior',
+    'ui.cards.next': 'Carta siguiente',
 
     'ui.settings.title': 'Opciones',
     'ui.settings.tab.sound': 'Sonido',

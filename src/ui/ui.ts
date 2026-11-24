@@ -1,13 +1,13 @@
 import { morph } from './morph.ts';
-import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MOD_BY_ID, NEWS, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, corruptionOf, lapOf, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
+import { ABILITIES, ABILITY_BY_ID, ABILITY_BY_UPGRADE, LEVEL_BONUS, levelMult, milestoneAt, milestoneMult, LEGENDS, LEGEND_BY_ID, OFFER_SIZE, legendCost, legendShare, type LegendDef, type LegendId, traitLevels, type AbilityId, CARDS, CARD_BY_ID, cardName, COMPS, CORRUPTION, ZONES, CURSORS, BOUND, boundCost, boundName, type BoundDef, type BoundId, MOD_BY_ID, NEWS, ROMAN, TROPHIES, UPG_BY_ID, nextMilestone, bandFor, bossFor, featuredFor, type CardPlace, corruptionOf, lapOf, zoneName, zoneOf, type Icon, type ModId, type UpgDef } from '../game/data.ts';
 import Decimal from 'break_infinity.js';
 import { duration, fmt, setNotation } from '../game/format.ts';
 import { AWAKEN_ON, AWAKEN_TEASE, GOLD_SET_BONUS, SET_BONUS, DAN_GIVES, VICTOR_GIVES, DESCEND_FLOOR, EXPEDITION_LEVEL, MARK_MOVE, MARK_REROLL, TRIP_HOURS, TUNE, buffName, giftVia, isBossFloor, type BankedBy, type Buff, type Game, type GameEvent, type OfflineSummary } from '../game/game.ts';
-import type { Drop, Scene } from '../render/scene.ts';
+import { zoneBackdrop, type Drop, type Scene } from '../render/scene.ts';
 import { KeepView, type KeepStation } from './keep.ts';
 import { CARD_FRAME } from '../render/cards.ts';
 import type { SfxName } from '../audio/sfx.ts';
-import { G, cardArt, charFit, keepDoor, silhouette, spiritForm, sprite, spriteFit, spriteFrames } from './px.ts';
+import { G, cardArt, charFit, keepDoor, uiAtlas, silhouette, spiritForm, sprite, spriteFit, spriteFrames } from './px.ts';
 import { ABILITY_PAD, hover, keyOf, neighbor, padCombo, padFamily, padGlyph, padHooks, padPick } from './gamepad.ts';
 import { skillIcon } from './icons.ts';
 import { kokoSvg } from './koko.ts';
@@ -79,6 +79,9 @@ function cardFace(card: (typeof CARDS)[number], state: 'locked' | 'got', gilded 
   const art = cardArt(card, box, state === 'got' && card.id === 'rainbow-goblin' ? 'rainbow' : '', lap);
   return `<span class="mcard ${state}${gilded ? ' gilded' : ''}" style="--fc:${frame}"><span class="mc-art">${art}</span><span class="mc-name">${state === 'locked' ? '???' : esc(card.name)}</span></span>`;
 }
+
+/** Where a card turns up: its zone and floors (a boss: its floor). */
+const placeLine = (place: CardPlace) => `${esc(place.zone)} · <span class="floors">${place.boss ? t('ui.tip.card.bossFloor', { floor: fmt(place.from) }) : t('ui.tip.card.floors', { from: place.from, to: place.to })}</span>`;
 
 /** The trophies on show: hidden ones only once earned. */
 const shownTrophies = (g: Game) => TROPHIES.filter((t) => !t.hidden || g.hasTrophy(t.id));
@@ -695,6 +698,12 @@ export class Ui {
       if (e.key.startsWith('Arrow') && this.modal && e.isTrusted && !(e.target as HTMLElement).closest('input[type=number], textarea')) this.arrowInModal(e);
       if ((e.target as HTMLElement).closest('input, textarea')) return;
       if (e.key === 'Escape' && this.modal) this.backModal();
+      // A card in the panel isn't a button: Enter or Space on it opens it all the same.
+      const cardCell = this.modal === 'cards' && !this.popCard && (e.key === 'Enter' || e.key === ' ') ? (e.target as HTMLElement).closest<HTMLElement>('.mc-cell[data-tip^="card:"]') : null;
+      if (cardCell) {
+        e.preventDefault();
+        this.openPop(cardCell.dataset.tip!.slice(5));
+      }
       // ? lists the shortcuts.
       if (e.key === '?' && !e.repeat) {
         if (this.modal === 'keys') this.backModal();
@@ -797,6 +806,11 @@ export class Ui {
       if (upg) {
         if (this.game.buyUpg(upg.dataset.upg!)) this.hideTip();
         else this.deny(upg);
+        return;
+      }
+      const cardCell = this.modal === 'cards' && !this.popCard ? t.closest<HTMLElement>('.mc-cell[data-tip^="card:"]') : null;
+      if (cardCell) {
+        this.openPop(cardCell.dataset.tip!.slice(5));
         return;
       }
       const cardView = t.closest<HTMLElement>('[data-card-lap], [data-card-gold]');
@@ -910,7 +924,7 @@ export class Ui {
       if (act) this.action(act.dataset.act!, act);
     });
     this.el.modalWrap.addEventListener('pointerdown', (e) => {
-      if (e.target === this.el.modalWrap) this.backModal();
+      if (e.target === this.el.modalWrap || (e.target as HTMLElement).matches('.cardpop')) this.backModal();
     });
 
     r.addEventListener('input', (e) => {
@@ -982,6 +996,7 @@ export class Ui {
     const s = g.s.settings;
     switch (act) {
       case 'close': this.backModal(); break;
+      case 'cpTurn': this.stepPop(el.dataset.step === 'left' ? -1 : 1); break;
       case 'autoUpg':
         g.s.settings.autoUpg = !g.s.settings.autoUpg;
         g.s.autoTipSeen = true;
@@ -1801,7 +1816,10 @@ export class Ui {
     setText(cb, `+${newCards}`);
 
     this.hints();
-    if (this.modal && ['trophies', 'cards', 'abyss', 'spirits', 'marks', 'heart', 'trips', 'stats', 'party', 'records', 'ascents'].includes(this.modal) && !this.descending) this.renderModal(true);
+    if (this.modal && ['trophies', 'cards', 'abyss', 'spirits', 'marks', 'heart', 'trips', 'stats', 'party', 'records', 'ascents'].includes(this.modal) && !this.descending) {
+      this.renderModal(true);
+      this.renderPop();
+    }
     if (this.tripsBack.length && (!this.modal || this.modal === 'trips') && !this.descending && !this.keepFading) this.showTripsBack(this.modal === 'trips');
     this.tellTripFinds();
     this.refreshTip();
@@ -2470,35 +2488,13 @@ export class Ui {
       return `<div class="tt-h">${icon(trophy.icon, 32, false)}<b>${esc(trophy.name)}</b><span class="tt-own">${g.hasTrophy(id) ? t('ui.tip.unlocked') : t('ui.tip.locked')}</span></div><p class="tt-d">${esc(trophy.desc)}</p>`;
     }
     if (kind === 'card') {
-      const c = CARD_BY_ID.get(id)!;
-      const n = g.cardCount(id);
-      const gilded = g.hasGoldCard(id);
-      // In the Cards panel you're looking at one color (a lap's tint, plain or gold): where, how many and how many slain
-      // are that color's. Elsewhere, where it turns up on the lap you're on.
-      const inPanel = this.modal === 'cards';
-      const view = Math.min(this.cardLap, lapOf(g.s.bestFloor), CORRUPTION.length - 1);
-      const onLap = Math.min(lapOf(g.s.floor), CORRUPTION.length - 1);
-      const lap = inPanel ? view : c.laps.includes(onLap) ? onLap : c.laps[0];
-      const goldView = inPanel && this.cardGold;
-      const places = c.where[lap].filter((w) => w.floor <= g.s.bestFloor);
-      const lines = places.map((w) => `<li>${esc(w.zone)} · ${w.boss ? t('ui.tip.card.bossFloor', { floor: fmt(w.from) }) : t('ui.tip.card.floors', { from: w.from, to: w.to })}</li>`).join('');
-      const common = places.flatMap((w) => w.common);
-      const commonLine = common.length ? `<p class="tt-d">${t('ui.tip.card.common', { count: common.length, floors: list(common.map((floor) => int(floor))) })}</p>` : '';
+      const info = this.cardInfo(id);
+      const lines = info.places.map((place) => `<li>${placeLine(place)}</li>`).join('');
+      const commonLine = info.common.length ? `<p class="tt-d">${t('ui.tip.card.common', { count: info.common.length, floors: list(info.common.map((floor) => int(floor))) })}</p>` : '';
       // Until you've killed one, only where to find it: not its name.
-      if (!n && !g.cardMet(id)) return `<div class="tt-h"><b>???</b></div><ul class="tt-l">${lines}</ul>`;
-      const what = t(CARD_KIND[c.kind]);
-      const own = g.s.cards[id];
-      const here = inPanel ? ((goldView ? own?.gold : own?.n)?.[view] ?? 0) : n;
-      const gilt = inPanel ? goldView : gilded;
-      const head = `<div class="tt-h"><b style="color:${gilt && here ? CARD_FRAME.gold : CARD_FRAME[c.kind]}">${t(goldView ? 'ui.tip.card.goldName' : 'ui.card.name', { name: esc(cardName(c.name, inPanel ? view : 0)) })}</b><span class="tt-own">${here ? `×${here}` : what}</span></div>`;
-      // When the copy you're looking at was first found: the kill it dropped on, or where it came from.
-      const found = (at?: number, via?: string) => (at ? t(c.kind === 'goblin' ? 'ui.card.foundCatch' : 'ui.card.foundKill', { n: fmt(at) }) : via ? this.viaLine(via) : '');
-      const first = goldView ? found(own?.goldAt, own?.goldVia) : here && (!inPanel || view === 0) ? found(own?.at, own?.via) : '';
-      const caught = id === 'rainbow-goblin' ? g.s.rainbows : g.s.raids - g.s.rainbows;
-      const tally = c.kind === 'goblin' ? t('ui.tip.card.caught', { n: fmt(caught) })
-        : goldView ? t('ui.tip.card.champsSlain', { n: fmt(g.champsSlainOn(id, view)) })
-          : t('ui.tip.card.slain', { n: fmt(inPanel ? g.slainOn(id, view) : g.s.slain[id] ?? 0) });
-      return `${head}<ul class="tt-l">${lines}</ul>${commonLine}${goldView ? `<p class="tt-d">${t('ui.tip.card.fromChampions')}</p>` : ''}${first ? `<p class="tt-got">${first}</p>` : ''}<p class="tt-f">${tally}</p>`;
+      if (!info.known) return `<div class="tt-h"><b>???</b></div><ul class="tt-l">${lines}</ul>`;
+      const head = `<div class="tt-h"><b style="color:${info.gilt && info.count ? CARD_FRAME.gold : CARD_FRAME[info.card.kind]}">${t(info.goldView ? 'ui.tip.card.goldName' : 'ui.card.name', { name: esc(info.name) })}</b><span class="tt-own">${info.count ? `×${info.count}` : t(CARD_KIND[info.card.kind])}</span></div>`;
+      return `${head}<ul class="tt-l">${lines}</ul>${commonLine}${info.goldView ? `<p class="tt-d">${t('ui.tip.card.fromChampions')}</p>` : ''}${info.first ? `<p class="tt-got">${info.first}</p>` : ''}<p class="tt-f">${t(info.tally.key, { n: fmt(info.tally.n) })}</p>`;
     }
     if (kind === 'note') return `<p class="tt-d">${esc(key.slice(5))}</p>`;
     if (!DEMO) {
@@ -2603,6 +2599,41 @@ export class Ui {
     return '';
   }
 
+  /** Everything known about a card. In the Cards panel (and its close-up) it's the color being looked at (a lap's
+   *  tint, plain or gold): where, how many and how many slain are that color's. Elsewhere, where it turns up on the lap
+   *  you're on. */
+  private cardInfo(id: string) {
+    const g = this.game;
+    const card = CARD_BY_ID.get(id)!;
+    const inPanel = this.modal === 'cards';
+    const view = Math.min(this.cardLap, lapOf(g.s.bestFloor), CORRUPTION.length - 1);
+    const onLap = Math.min(lapOf(g.s.floor), CORRUPTION.length - 1);
+    const lap = inPanel ? view : card.laps.includes(onLap) ? onLap : card.laps[0];
+    const goldView = inPanel && this.cardGold;
+    const places = card.where[lap].filter((w) => w.floor <= g.s.bestFloor);
+    const own = g.s.cards[id];
+    const count = inPanel ? ((goldView ? own?.gold : own?.n)?.[view] ?? 0) : g.cardCount(id);
+    // When the copy you're looking at was first found: the kill it dropped on, or where it came from.
+    const found = (at?: number, via?: string) => (at ? t(card.kind === 'goblin' ? 'ui.card.foundCatch' : 'ui.card.foundKill', { n: fmt(at) }) : via ? this.viaLine(via) : '');
+    const caught = id === 'rainbow-goblin' ? g.s.rainbows : g.s.raids - g.s.rainbows;
+    const tally = card.kind === 'goblin' ? { key: 'ui.tip.card.caught' as const, n: caught }
+      : goldView ? { key: 'ui.tip.card.champsSlain' as const, n: g.champsSlainOn(id, view) }
+        : { key: 'ui.tip.card.slain' as const, n: inPanel ? g.slainOn(id, view) : g.s.slain[id] ?? 0 };
+    return {
+      card,
+      view,
+      goldView,
+      name: cardName(card.name, inPanel ? view : 0),
+      places,
+      common: places.flatMap((w) => w.common),
+      known: g.cardCount(id) > 0 || g.cardMet(id),
+      count,
+      gilt: inPanel ? goldView : g.hasGoldCard(id),
+      first: goldView ? found(own?.goldAt, own?.goldVia) : count && (!inPanel || view === 0) ? found(own?.at, own?.via) : '',
+      tally,
+    };
+  }
+
   private upgPreview(u: UpgDef): string {
     const g = this.game;
     const e = u.effect;
@@ -2634,6 +2665,7 @@ export class Ui {
   // ---------- modals ----------
 
   openModal(name: string) {
+    if (this.popCard) this.closePop();
     // Opened from Options (Shortcuts): Options waits behind it, and closing it goes back there.
     this.modalBack = this.modal === 'settings' && name !== 'settings' ? 'settings' : null;
     const from = this.modal;
@@ -2660,7 +2692,7 @@ export class Ui {
   /** Tab keeps to the open window, wrapping at either end; from outside it, it lands on the first thing past the ✕. */
   private tabInModal(e: KeyboardEvent) {
     const items = [...this.el.modalWrap.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([tabindex="-1"]), textarea, [tabindex="0"]')]
-      .filter((el) => el.getClientRects().length > 0);
+      .filter((el) => el.getClientRects().length > 0 && !el.closest('[inert]'));
     if (!items.length) return;
     const at = items.indexOf(document.activeElement as HTMLElement);
     let next: HTMLElement | undefined;
@@ -2680,6 +2712,8 @@ export class Ui {
     if (!dir) return;
     e.preventDefault();
     const wrap = this.el.modalWrap;
+    // A card close up: ◀ ▶ step to the next card you have.
+    if (this.popCard) return wrap.querySelector<HTMLElement>(`.cardpop [data-step="${dir}"]:not([hidden])`)?.click();
     const at = wrap.contains(document.activeElement) ? document.activeElement as HTMLElement : null;
     const sideways = dir === 'left' || dir === 'right';
     const tab = at?.closest<HTMLElement>('.tabs .tab');
@@ -2717,6 +2751,11 @@ export class Ui {
 
   /** You close the window (Escape, B, its ✕, a click outside it): back to the one it was opened from, or closed. */
   backModal() {
+    if (this.popCard) {
+      this.closePop();
+      this.hooks.sound('close', { vol: 0.4 });
+      return;
+    }
     const back = this.modalBack;
     if (!back) return this.closeModal();
     this.hideTip();
@@ -2725,6 +2764,7 @@ export class Ui {
   }
 
   closeModal() {
+    if (this.popCard) this.closePop();
     this.modalBack = null;
     // (A card that arrived with the Collection open was seen coming in.)
     if (this.modal === 'trophies' || this.modal === 'cards') {
@@ -3168,6 +3208,111 @@ export class Ui {
     const more = CARDS.some((c) => !seen(c)) ? `<p class="cards-more">${t('ui.cards.more')}</p>` : '';
     return bar + ZONES.map((z, i) => section(z.name, CARDS.filter((c) => c.zone === i), i === hereZone, i)).join('')
       + section(t('ui.cards.goblins'), CARDS.filter((c) => c.zone < 0)) + more;
+  }
+
+  // ---------- a card close up ----------
+
+  /** The card popped out of the Cards panel (null: none). */
+  private popCard: string | null = null;
+  /** What the close-up last showed: a tick redraws it only when it changed. */
+  private popKey = '';
+
+  /** The cards you have in the panel's view, in its order: the ones ◀ ▶ step through. */
+  private popOrder() {
+    return [...this.el.modal.querySelectorAll<HTMLElement>('.mc-cell:has(.mcard.got)')].map((cell) => cell.dataset.tip!.slice(5));
+  }
+
+  /** A card you have, out of the panel and big, against the place it's found. */
+  private openPop(id: string) {
+    const cell = this.el.modal.querySelector<HTMLElement>(`.mc-cell[data-tip="card:${id}"]`);
+    if (!cell?.querySelector('.mcard.got')) return;
+    this.hideTip();
+    hover(this.keyTip, false);
+    this.keyTip = null;
+    this.popCard = id;
+    // The panel behind sits out: no focus, Tab, arrows or controller reach it while the card is out.
+    this.el.modal.inert = true;
+    const pop = document.createElement('div');
+    pop.className = 'cardpop';
+    pop.tabIndex = -1;
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-modal', 'true');
+    pop.innerHTML = `<div class="cp-panel pnl"><div class="cp-stage"><div class="cp-card"></div>
+        <button class="btn icon cp-turn prev" data-act="cpTurn" data-step="left" aria-label="${t('ui.cards.prev')}">${G.left()}</button>
+        <button class="btn icon cp-turn next" data-act="cpTurn" data-step="right" aria-label="${t('ui.cards.next')}">${G.right()}</button></div>
+      <div class="cp-info"></div><button class="btn icon cp-close" data-act="close" aria-label="${t('ui.close')}">${G.close()}</button></div>`;
+    this.el.modalWrap.appendChild(pop);
+    this.popKey = '';
+    this.renderPop();
+    pop.focus({ preventScroll: true });
+    this.hooks.sound('card', { vol: 0.5 });
+    // It comes up out of its place in the grid.
+    const card = pop.querySelector<HTMLElement>('.cp-card')!;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const from = cell.getBoundingClientRect();
+    const to = card.getBoundingClientRect();
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    card.animate([{ transform: `translate(${dx}px, ${dy}px) scale(${from.width / to.width})` }, { transform: 'none' }], { duration: 340, easing: 'cubic-bezier(0.2, 1.15, 0.4, 1)' }); // i18n-ignore
+  }
+
+  private closePop() {
+    const id = this.popCard;
+    this.popCard = null;
+    this.el.modalWrap.querySelector('.cardpop')?.remove();
+    this.el.modal.inert = false;
+    // Back on the card it was opened on (or stepped to), for the arrows or a controller to go on from.
+    const cell = this.el.modal.querySelector<HTMLElement>(`.mc-cell[data-tip="card:${id}"]`);
+    if (!cell) return;
+    cell.tabIndex = -1;
+    cell.focus({ preventScroll: true });
+    cell.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** The next card you have (`step` ±1). */
+  private stepPop(step: number) {
+    const order = this.popOrder();
+    const id = order[order.indexOf(this.popCard!) + step];
+    if (!id) return;
+    this.popCard = id;
+    this.renderPop();
+    this.hooks.sound('card', { vol: 0.3, rate: 1.15, jitter: 0.1 });
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    this.el.modalWrap.querySelector('.cp-card')?.animate([{ transform: `translateX(${step * 30}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 200, easing: 'ease-out' });
+  }
+
+  /** The close-up's card, its zone behind it and what's known of it (on a tick, only what changed). */
+  private renderPop() {
+    const pop = this.el.modalWrap.querySelector<HTMLElement>('.cardpop');
+    const id = this.popCard;
+    const atlas = uiAtlas();
+    if (!pop || !id || !atlas) return;
+    const g = this.game;
+    const info = this.cardInfo(id);
+    const { card, view, goldView, count } = info;
+    const order = this.popOrder();
+    const at = order.indexOf(id);
+    // Goblins turn up anywhere: theirs is the zone you're in.
+    const room = zoneBackdrop(atlas, card.zone < 0 ? zoneOf(g.s.floor) : card.zone + view * ZONES.length);
+    const face = cardFace(card, 'got', goldView, document.body.classList.contains('compact') ? 64 : 128, view);
+    const notes = [
+      info.common.length ? t('ui.tip.card.common', { count: info.common.length, floors: list(info.common.map((floor) => int(floor))) }) : '',
+      goldView ? t('ui.tip.card.fromChampions') : '',
+    ].filter(Boolean).map((line) => `<p class="cp-note">${line}</p>`).join('');
+    const text = `<p class="cp-kind"><span>${t(CARD_KIND[card.kind])}</span>${goldView ? `<span class="cp-gold">★ ${t('ui.cards.gold')}</span>` : ''}<b>×${count}</b></p>
+      <h2 class="cp-name">${esc(info.name)}</h2>
+      <ul class="cp-where">${info.places.map((place) => `<li>${placeLine(place)}</li>`).join('')}</ul>${notes}
+      <p class="cp-tally">${t(info.tally.key, { n: `<b>${fmt(info.tally.n)}</b>` })}</p>${info.first ? `<p class="cp-found">${info.first}</p>` : ''}`;
+    const style = `--room:url(${room.url});--torch:${room.torch};--fog:${room.fog};--fc:${goldView ? CARD_FRAME.gold : CARD_FRAME[card.kind]}`;
+    const key = face + text + style + at + order.length;
+    if (key === this.popKey) return;
+    this.popKey = key;
+    pop.classList.toggle('gold', goldView);
+    pop.querySelector<HTMLElement>('.cp-panel')!.setAttribute('style', style);
+    morph(pop.querySelector<HTMLElement>('.cp-card')!, face);
+    morph(pop.querySelector<HTMLElement>('.cp-info')!, text);
+    pop.querySelector<HTMLElement>('.cp-turn.prev')!.hidden = at <= 0;
+    pop.querySelector<HTMLElement>('.cp-turn.next')!.hidden = at < 0 || at >= order.length - 1;
   }
 
   /** Options' pages (the cursor's only for a mouse: a controller has none). */

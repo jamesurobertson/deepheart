@@ -260,6 +260,17 @@
 :root:not(:has(#wiki)) .mc-name { font-family: 'DH CJK 12000', var(--f-text), monospace; }
 :root:not(:has(#wiki)) .tab > .badge { font-family: 'DH CJK 7500', var(--f-text), monospace; }
 :root:not(:has(#wiki)) .sub > .badge { font-family: 'DH CJK 8571', var(--f-text), monospace; }
+:root:not(:has(#wiki)) .cp-card .mc-name { font-family: 'DH CJK 6667', var(--f-text), monospace; }
+:root:not(:has(#wiki)) .cp-kind { font-family: 'DH CJK 10909', 'Silkscreen', monospace; }
+:root:not(:has(#wiki)) .cp-kind b { font-family: 'DH CJK 6000', 'Jersey 10', monospace; }
+:root:not(:has(#wiki)) .cp-name { font-family: 'DH CJK 6000', 'Jersey 10', monospace; }
+:root:not(:has(#wiki)) .cp-where { font-family: 'DH CJK 7059', var(--f-text), monospace; }
+:root:not(:has(#wiki)) .cp-note { font-family: 'DH CJK 7500', var(--f-text), monospace; }
+:root:not(:has(#wiki)) .cp-tally { font-family: 'DH CJK 7059', var(--f-text), monospace; }
+:root:not(:has(#wiki)) .cp-tally b { font-family: 'DH CJK 6667', 'Jersey 10', monospace; }
+:root:not(:has(#wiki)) .cp-found { font-family: 'DH CJK 7500', var(--f-text), monospace; }
+:root:not(:has(#wiki)) body.compact .cp-card .mc-name { font-family: 'DH CJK 9231', var(--f-text), monospace; }
+:root:not(:has(#wiki)) body.compact .cp-name { font-family: 'DH CJK 7500', var(--f-text), monospace; }
 :root:not(:has(#wiki)) .cr-front .mc-name { font-family: 'DH CJK 8000', var(--f-text), monospace; }
 :root:not(:has(#wiki)) .cr-tap { font-family: 'DH CJK 10000', 'Silkscreen', monospace; }
 :root:not(:has(#wiki)) .cr-text small { font-family: 'DH CJK 10000', 'Silkscreen', monospace; }
