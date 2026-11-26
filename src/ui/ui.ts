@@ -697,7 +697,8 @@ export class Ui {
       // (Only real keys: a controller sends arrows of its own to walk your hero.)
       if (e.key.startsWith('Arrow') && this.modal && e.isTrusted && !(e.target as HTMLElement).closest('input[type=number], textarea')) this.arrowInModal(e);
       if ((e.target as HTMLElement).closest('input, textarea')) return;
-      if (e.key === 'Escape' && this.modal) this.backModal();
+      const escapedModal = e.key === 'Escape' && !!this.modal;
+      if (escapedModal) this.backModal();
       // A card in the panel isn't a button: Enter or Space on it opens it all the same.
       const cardCell = this.modal === 'cards' && !this.popCard && (e.key === 'Enter' || e.key === ' ') ? (e.target as HTMLElement).closest<HTMLElement>('.mc-cell[data-tip^="card:"]') : null;
       if (cardCell) {
@@ -709,9 +710,9 @@ export class Ui {
         if (this.modal === 'keys') this.backModal();
         else if (!this.modal) this.openModal('keys');
       }
-      // H hides the interface for screenshots; H again or Escape brings it back.
+      // H hides the interface for screenshots; H again or Escape brings it back (an Escape that shut a window stops there).
       if (e.key.toLowerCase() === 'h' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) this.setUiHidden(!this.uiHidden);
-      else if (e.key === 'Escape') this.setUiHidden(false);
+      else if (e.key === 'Escape' && !escapedModal) this.setUiHidden(false);
       // The number keys use the abilities in the column, in order.
       if (/^[1-9]$/.test(e.key) && !e.repeat && !this.modal) {
         const id = KEYED[Number(e.key) - 1];
