@@ -3072,13 +3072,13 @@ export class Game {
   update(dt: number) {
     const s = this.s;
     this.realtime();
-    if (s.inKeep) return;
+    if (s.inKeep) return this.coolDown(dt);
     s.playTime += dt;
     this.sinceAttack += dt;
     if (this.sinceAttack > STREAK_GAP) this.streak = 0;
     for (const d of this.drops) d.t += dt;
     while (this.drops.length && this.drops[0].t >= GOLD_WAIT) this.bankDrop(0, 'time');
-    for (const id in s.cooldowns) if ((s.cooldowns[id] -= dt) <= 0) delete s.cooldowns[id];
+    this.coolDown(dt);
     s.runTime += dt;
     if (!this.idle()) {
       s.activeTime += dt;
@@ -3221,9 +3221,13 @@ export class Game {
     this.downed = DOWNED_SECONDS;
   }
 
+  private coolDown(seconds: number) {
+    for (const id in this.s.cooldowns) if ((this.s.cooldowns[id] -= seconds) <= 0) delete this.s.cooldowns[id];
+  }
+
   /** Time passing while the fight is paused (the stairs between zones, the title menu): skill cooldowns still run. */
   passTime(seconds: number) {
-    for (const id in this.s.cooldowns) if ((this.s.cooldowns[id] -= seconds) <= 0) delete this.s.cooldowns[id];
+    this.coolDown(seconds);
     this.autoBuy(seconds);
   }
 
@@ -3347,7 +3351,7 @@ export class Game {
    */
   applyOffline(seconds: number): OfflineSummary {
     this.s.buffs = this.s.buffs.filter((b) => (b.t -= seconds) > 0);
-    for (const id in this.s.cooldowns) if ((this.s.cooldowns[id] -= seconds) <= 0) delete this.s.cooldowns[id];
+    this.coolDown(seconds);
     this.invalidate();
     this.sinceAttack += seconds;
     // Away counts as idle: the Sleeper and the Patient work through it.
