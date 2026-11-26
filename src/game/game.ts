@@ -1172,7 +1172,7 @@ export class Game {
   }
 
   clickDamage() {
-    return this.c.click.times(this.buffMult('click') * (1 + 0.0001 * this.legendLv('unbroken') * this.streak));
+    return this.c.click.times(this.buffMult('click') * this.unbrokenMult());
   }
 
   /** One of your clicks right now, as it lands, plus cleave on every other monster in the room. (Rampage is the party's,
@@ -2374,9 +2374,14 @@ export class Game {
     return this.idle() ? 1 + 0.25 * this.legendLv('sleeper') : 1;
   }
 
+  /** The Unbroken's boost at the streak you're on. */
+  unbrokenMult() {
+    return 1 + 0.0001 * this.legendLv('unbroken') * this.streak;
+  }
+
   /** Multipliers that change from moment to moment: the Sleeper while idle, the Unbroken with your streak. */
   private liveMult() {
-    return this.sleeperMult() * (1 + 0.0001 * this.legendLv('unbroken') * this.streak);
+    return this.sleeperMult() * this.unbrokenMult();
   }
 
   // ---------- Heartmarks ----------

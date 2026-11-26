@@ -3421,10 +3421,12 @@ export class Ui {
       ...(!DEMO && g.s.awakens ? [mul(boundName(BOUND.find((x) => x.id === 'ogre')!), p.ogre, t('ui.tip.level', { level: g.boundLv('ogre') }), t('ui.stats.ogreHow'))] : []),
     ];
 
+    const spirit = (id: LegendId, mult: number) => mul(LEGEND_BY_ID.get(id)!.name, mult, t('ui.tip.level', { level: g.legendLv(id) }), t('ui.stats.aSpirit'));
     const dps = panel(t('ui.stats.partyDamage'), fmt(g.dps()), t('ui.stats.perSec'), [
       row(t('ui.stats.companions'), fmt(baseSum), DEMO ? t('ui.stats.companionsNoteDemo') : t('ui.stats.companionsNote')),
       ...allRows,
       mul(t('ui.stats.partyUpgrades'), p.party, t('ui.stats.partyUpgradesNote'), t('ui.stats.partyUpgradesHow')),
+      ...(DEMO ? [] : [spirit('sleeper', g.sleeperMult()), spirit('unbroken', g.unbrokenMult())]),
       mul(t('ui.stats.buffs'), b.buffDps, buffNames('dps'), [t('game.buff.fever'), t('game.buff.bloodlust')].join(', ')),
     ]);
 
@@ -3432,7 +3434,7 @@ export class Ui {
       row(t('ui.stats.base'), '1'),
       row(t('ui.stats.allDamage'), x(b.all), DEMO ? t('ui.stats.allDamageNoteDemo') : t('ui.stats.allDamageNote')),
       row(t('ui.stats.share'), `+${fmt(g.baseDps().times(p.clickDps))}`, p.clickDpsUpg ? t('ui.stats.shareNoteUpg', { percent: pc(p.clickDps), upg: pc(p.clickDpsUpg) }) : t('ui.stats.shareNote', { percent: pc(p.clickDps) })),
-      ...(DEMO ? [] : [mul(LEGEND_BY_ID.get('fist')!.name, 1 + 0.1 * g.legendLv('fist'), t('ui.tip.level', { level: g.legendLv('fist') }), t('ui.stats.aSpirit'))]),
+      ...(DEMO ? [] : [spirit('fist', 1 + 0.1 * g.legendLv('fist')), spirit('unbroken', g.unbrokenMult())]),
       mul(t('ui.stats.buffs'), b.buffClick, buffNames('click'), t('game.buff.heartstorm')),
       row(t('ui.stats.duringRampage'), x(g.feverMult())),
     ]);
