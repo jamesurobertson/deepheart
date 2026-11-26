@@ -474,7 +474,7 @@ export interface Expedition {
   pausedAt?: number;
   /** Kills already rolled for cards, and the cards found so far (handed over when the hunter comes home). */
   rolled?: number;
-  found?: { id: string; gold: boolean }[];
+  found?: { id: string; gold: boolean; kill?: number }[];
 }
 
 /** Every card set: one zone in one color, its monsters, mid-boss and boss (the goblins belong to no set). */
@@ -722,6 +722,11 @@ function poisson(mean: number) {
   let k = 0;
   for (let p = Math.random(); p > limit; p *= Math.random()) k++;
   return k;
+}
+
+/** Which kills each of `drops` cards fell on, earliest first, among the `n` kills that came after `before`. */
+function dropKills(before: number, n: number, drops: number) {
+  return Array.from({ length: drops }, () => before + 1 + Math.floor(Math.random() * n)).sort((a, b) => a - b);
 }
 
 function seeded(a: number, b: number) {
@@ -2648,7 +2653,7 @@ export class Game {
     this.hunt(e, true);
     const kills = this.tripKills(e);
     const before = this.events.length;
-    for (const f of e.found ?? []) this.giveCard(f.id, f.gold, 'trip', e.floor);
+    for (const f of e.found ?? []) this.giveCard(f.id, f.gold, 'trip', e.floor, f.kill);
     const cards = this.events.slice(before).filter((ev): ev is Extract<GameEvent, { t: 'card' }> => ev.t === 'card');
     this.s.tripCards += cards.length;
     this.s.tripKills += kills;
@@ -2673,8 +2678,8 @@ export class Game {
     const found = (e.found ??= []);
     let cards = 0;
     let gold = 0;
-    this.huntFinds(fresh, e.floor, (id, isGold) => {
-      found.push({ id, gold: isGold });
+    this.huntFinds(fresh, e.floor, (id, isGold, kill) => {
+      found.push({ id, gold: isGold, kill });
       cards++;
       if (isGold) gold++;
     });
@@ -2697,16 +2702,17 @@ export class Game {
 
   /** A hunt's kills, in bulk: the floor's mix of monsters (or its boss), CHAMP_CHANCE of them champions rolling gold,
    *  every card drawn at once at the dungeon's odds, with the Collector. Champion bosses are yours to fight: none on a hunt. */
-  private huntFinds(kills: number, floor: number, find: (id: string, gold: boolean) => void) {
+  private huntFinds(kills: number, floor: number, find: (id: string, gold: boolean, kill: number) => void) {
     if (kills <= 0) return;
     const lap = Math.min(lapOf(floor), CORRUPTION.length - 1);
     const luck = this.tripLuck();
     const roll = (id: string, n: number, champs: number, odds: number, goldOdds: number) => {
-      this.s.slain[id] = (this.s.slain[id] ?? 0) + n;
+      const before = this.s.slain[id] ?? 0;
+      this.s.slain[id] = before + n;
       if (lap) (this.s.slainLaps[id] ??= CORRUPTION.map(() => 0))[lap] += n;
       if (champs) (this.s.champSlain[id] ??= CORRUPTION.map(() => 0))[lap] += champs;
-      for (let c = poisson((n * luck) / odds); c > 0; c--) find(id, false);
-      for (let c = poisson((champs * luck) / goldOdds); c > 0; c--) find(id, true);
+      for (const kill of dropKills(before, n, poisson((n * luck) / odds))) find(id, false, kill);
+      for (const kill of dropKills(before, n, poisson((champs * luck) / goldOdds))) find(id, true, kill);
     };
     if (isBossFloor(floor)) {
       roll(bossFor(floor).id, kills, 0, CARD_ODDS.boss, CARD_ODDS.champBoss);
@@ -2775,10 +2781,10 @@ export class Game {
     else if (this.cardRoll(boss ? CARD_ODDS.boss : CARD_ODDS.monster, mult)) this.giveCard(id, false, src);
   }
 
-  giveCard(id: string, gold = false, src: 'kill' | 'sweep' | 'raid' | 'trip' = 'kill', floor = this.s.floor) {
+  /** `kill`: which kill of its monster the card fell on, when that isn't the latest one (kills counted in bulk). */
+  giveCard(id: string, gold = false, src: 'kill' | 'sweep' | 'raid' | 'trip' = 'kill', floor = this.s.floor, kill = this.cardKill(id)) {
     const c = (this.s.cards[id] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
     const first = gold ? !this.hasGoldCard(id) : !this.cardCount(id);
-    const kill = this.cardKill(id);
     if (first && gold) c.goldAt = kill;
     else if (first) c.at = kill;
     const laps = CARD_BY_ID.get(id)!.laps;
@@ -3377,9 +3383,10 @@ export class Game {
       const n = Math.round(kills * share);
       if (!n) continue;
       const id = def.id;
-      this.s.slain[id] = (this.s.slain[id] ?? 0) + n;
+      const before = this.s.slain[id] ?? 0;
+      this.s.slain[id] = before + n;
       if (lap) (this.s.slainLaps[id] ??= CORRUPTION.map(() => 0))[lap] += n;
-      for (let k = poisson(n / odds); k > 0; k--) this.giveCard(id, false, 'sweep');
+      for (const kill of dropKills(before, n, poisson(n / odds))) this.giveCard(id, false, 'sweep', undefined, kill);
     }
   }
 
