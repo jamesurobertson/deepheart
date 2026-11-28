@@ -707,7 +707,6 @@ export default {
     'keep.station.trips': '원정',
     'keep.verb.down': '내려가기',
     'keep.verb.trade': '교환',
-    'keep.verb.send': '파견',
     'keep.verb.pet': '쓰다듬기',
     'keep.verb.awaken': '각성',
     'keep.verb.open': '열기',

@@ -712,7 +712,6 @@ export default {
     'keep.station.trips': 'Expeditionen',
     'keep.verb.down': 'Hinabsteigen',
     'keep.verb.trade': 'Tauschen',
-    'keep.verb.send': 'Schicken',
     'keep.verb.pet': 'Streicheln',
     'keep.verb.awaken': 'Erwecken',
     'keep.verb.open': 'Öffnen',

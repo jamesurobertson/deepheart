@@ -774,7 +774,6 @@ export default {
     'keep.station.trips': 'Вылазки',
     'keep.verb.down': 'Спуститься',
     'keep.verb.trade': 'Обменять',
-    'keep.verb.send': 'Отправить',
     'keep.verb.pet': 'Погладить',
     'keep.verb.awaken': 'Пробудить',
     'keep.verb.open': 'Открыть',

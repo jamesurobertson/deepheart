@@ -701,7 +701,6 @@ export default {
     'keep.station.trips': '远征',
     'keep.verb.down': '深入',
     'keep.verb.trade': '交易',
-    'keep.verb.send': '派遣',
     'keep.verb.pet': '摸摸',
     'keep.verb.awaken': '唤醒',
     'keep.verb.open': '打开',

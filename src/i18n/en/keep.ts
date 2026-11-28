@@ -8,7 +8,6 @@ export const KEEP = {
   'keep.station.trips': 'Expeditions',
   'keep.verb.down': 'Go down',
   'keep.verb.trade': 'Trade',
-  'keep.verb.send': 'Send',
   'keep.verb.pet': 'Pet',
   'keep.verb.awaken': 'Awaken',
   'keep.verb.open': 'Open',

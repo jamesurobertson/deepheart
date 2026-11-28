@@ -561,10 +561,9 @@ export class KeepView {
   private verb(id: KeepStation) {
     if (id === 'stairs') return t('keep.verb.down');
     if (id === 'dan' || id === 'victor') return t('keep.verb.trade');
-    if (id === 'trips') return t('keep.verb.send');
     if (id === 'koko') return t('keep.verb.pet');
     if (id === 'heart') return this.game.canAwaken() ? t('keep.verb.awaken') : t('keep.verb.open');
-    if (id.startsWith('offer:')) return t('keep.verb.view');
+    if (id.startsWith('offer:') || id === 'trips') return t('keep.verb.view');
     return t('keep.verb.open');
   }
 

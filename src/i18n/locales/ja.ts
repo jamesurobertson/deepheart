@@ -701,7 +701,6 @@ export default {
     'keep.station.trips': '遠征',
     'keep.verb.down': '降りる',
     'keep.verb.trade': '交換',
-    'keep.verb.send': '派遣',
     'keep.verb.pet': 'なでる',
     'keep.verb.awaken': '覚醒',
     'keep.verb.open': '開く',

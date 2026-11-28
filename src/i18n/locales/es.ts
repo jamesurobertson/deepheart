@@ -713,7 +713,6 @@ export default {
     'keep.station.trips': 'Expediciones',
     'keep.verb.down': 'Bajar',
     'keep.verb.trade': 'Intercambiar',
-    'keep.verb.send': 'Enviar',
     'keep.verb.pet': 'Acariciar',
     'keep.verb.awaken': 'Despertar',
     'keep.verb.open': 'Abrir',
