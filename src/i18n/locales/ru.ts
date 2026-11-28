@@ -1745,7 +1745,7 @@ export default {
     'comp.archmage.flavor': 'Старше подземелья. Уверяет, что раньше оно было меньше.',
     'comp.archmage.name': 'Архимаг',
     'comp.bard.flavor': 'Мы не знаем, как он сюда попал.',
-    'comp.bard.name': 'Странствующий бард',
+    'comp.bard.name': 'Рокер',
     'comp.brawler.flavor': 'Пришёл за золотом. Остался ради мордобоя.',
     'comp.brawler.name': 'Гном-драчун',
     'comp.cleric.flavor': 'Он здесь, чтобы лечить отряд. Пока не пришлось, так что он бьёт.',

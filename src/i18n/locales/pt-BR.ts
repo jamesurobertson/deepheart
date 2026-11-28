@@ -1615,7 +1615,7 @@ export default {
     'comp.archmage.flavor': 'Mais velho que a masmorra. Jura que ela era menor naquela época.',
     'comp.archmage.name': 'Arquimago',
     'comp.bard.flavor': 'Não sabemos bem como ele entrou aqui.',
-    'comp.bard.name': 'Bardo Errante',
+    'comp.bard.name': 'Roqueiro',
     'comp.brawler.flavor': 'Veio pelo ouro. Ficou pelos socos.',
     'comp.brawler.name': 'Anão Brigão',
     'comp.cleric.flavor': 'Está aqui para curar o grupo. Ainda não precisou, então ele bate nas coisas.',

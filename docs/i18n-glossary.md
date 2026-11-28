@@ -636,7 +636,7 @@ Companion names are role names used like proper names: no article (except The Co
 | woodelf | Wood Elf | f | 木精灵 | Лесная эльфийка | Elfa del bosque | | Elfa da Floresta | Waldelfe | Elfe sylvestre | ウッドエルフ | 우드 엘프 |
 | stormcaller | Stormcaller | f | 唤雷者 | Призывательница бурь | Invocadora de tormentas | | Invocadora de Tempestades | Sturmruferin | Invocatrice d'orages | 嵐呼び | 폭풍술사 |
 | dancer | Blade Dancer | m | 剑舞者 | Танцор с клинками | Danzante de espadas | | Dançarino das Lâminas | Klingentänzer | Danseur de lames | 剣舞士 | 검무사 |
-| bard | Wandering Bard | m | 游吟诗人 | Странствующий бард | Bardo errante | | Bardo Errante | Wandernder Barde | Barde errant | さすらいの吟遊詩人 | 떠돌이 음유시인 |
+| bard | Rocker | m | 摇滚歌手 | Рокер | Rockero | | Roqueiro | Rocker | Rockeur | ロッカー | 로커 |
 | venomblade | Venomblade | f | 毒刃 | Ядовитый клинок | Hoja venenosa | | Lâmina Venenosa | Giftklinge | Lame venimeuse | 毒刃 | 독검사 |
 | doctor | Plague Doctor | m | 瘟疫医生 | Чумной доктор | Médico de la peste | | Médico da Peste | Pestdoktor | Médecin de peste | ペスト医師 | 역병 의사 |
 | cleric | Cleric | m | 牧师 | Жрец | Clérigo | | Clérigo | Kleriker | Clerc | 僧侶 | 성직자 |

@@ -70,7 +70,7 @@ export const COMPS: CompDef[] = [
     c('woodelf', 'Wood Elf', 'ef_elf_f', 1.3e10, 3.6e7, 'arrow', 'Grew up in the Enchanted Grove. Has opinions about what you did to it.'),
     c('stormcaller', 'Stormcaller', 'wizzard_f', 6.4e11, 9.5e8, 'storm', 'Brings her own weather. Down here, of all places.'),
     c('dancer', 'Blade Dancer', 'elf_m', 3e13, 2.5e10, 'slash', 'Fights like it is a performance. Nobody claps.'),
-    c('bard', 'Wandering Bard', 'rm_rocker', 1.4e15, 6e11, 'orb', 'We\'re not sure how he got in here.'),
+    c('bard', 'Rocker', 'rm_rocker', 1.4e15, 6e11, 'orb', 'We\'re not sure how he got in here.'),
     c('venomblade', 'Venomblade', 'lizard_f', 6.8e16, 1.6e13, 'dark', 'Every blade is poisoned. She has a lot.'),
     c('doctor', 'Plague Doctor', 'doc', 3.2e18, 4.1e14, 'flask', 'Treats monsters with a strict regimen of dying.'),
     c('cleric', 'Cleric', 'ef_normalcleric', 1.5e20, 1e16, 'light', 'Here to heal the party. Hasn\'t had to yet, so he hits things.'),

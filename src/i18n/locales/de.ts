@@ -1577,7 +1577,7 @@ export default {
     'comp.archmage.flavor': 'Älter als das Verlies. Besteht darauf, dass es damals kleiner war.',
     'comp.archmage.name': 'Erzmagier',
     'comp.bard.flavor': 'Wir wissen nicht, wie er hier reingekommen ist.',
-    'comp.bard.name': 'Wandernder Barde',
+    'comp.bard.name': 'Rocker',
     'comp.brawler.flavor': 'Kam wegen des Golds. Blieb wegen der Prügelei.',
     'comp.brawler.name': 'Zwergenraufbold',
     'comp.cleric.flavor': 'Soll die Gruppe heilen. Musste noch nie, also haut er drauf.',

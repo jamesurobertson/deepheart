@@ -1497,7 +1497,7 @@ export default {
     'comp.archmage.flavor': 'ダンジョンより年上。昔のダンジョンはもっと小さかったと言い張る。',
     'comp.archmage.name': '大魔導士',
     'comp.bard.flavor': 'どうやって入ってきたのか、誰にもわからない。',
-    'comp.bard.name': 'さすらいの吟遊詩人',
+    'comp.bard.name': 'ロッカー',
     'comp.brawler.flavor': 'ゴールド目当てで来た。殴るのが楽しくて居残った。',
     'comp.brawler.name': 'ドワーフの喧嘩屋',
     'comp.cleric.flavor': 'パーティーを癒やしに来た。まだその出番がないので、とりあえず殴っている。',

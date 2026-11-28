@@ -1549,7 +1549,7 @@ export default {
     'comp.archmage.flavor': '던전보다 나이가 많다. 그때는 던전이 더 작았다고 우긴다.',
     'comp.archmage.name': '대마법사',
     'comp.bard.flavor': '여기 어떻게 들어왔는지 아무도 모른다.',
-    'comp.bard.name': '떠돌이 음유시인',
+    'comp.bard.name': '로커',
     'comp.brawler.flavor': '골드 때문에 왔다. 주먹질 때문에 남았다.',
     'comp.brawler.name': '드워프 싸움꾼',
     'comp.cleric.flavor': '파티를 치료하러 왔다. 아직 그럴 일이 없어서 일단 때린다.',

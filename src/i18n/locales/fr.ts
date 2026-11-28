@@ -1522,7 +1522,7 @@ export default {
     "comp.archmage.flavor": "Plus vieux que le donjon. Assure que le donjon était plus petit à l'époque.",
     "comp.archmage.name": "Archimage",
     "comp.bard.flavor": "On ne sait pas trop comment il est entré.",
-    "comp.bard.name": "Barde errant",
+    "comp.bard.name": "Rockeur",
     "comp.brawler.flavor": "Venu pour l'or. Resté pour les coups de poing.",
     "comp.brawler.name": "Nain bagarreur",
     "comp.cleric.flavor": "Là pour soigner le groupe. N'en a pas encore eu besoin, alors il tape.",

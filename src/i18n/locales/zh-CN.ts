@@ -1543,7 +1543,7 @@ export default {
     'comp.archmage.flavor': '比地牢还老。坚称当年地牢没这么大。',
     'comp.archmage.name': '大法师',
     'comp.bard.flavor': '我们也不知道他是怎么进来的。',
-    'comp.bard.name': '游吟诗人',
+    'comp.bard.name': '摇滚歌手',
     'comp.brawler.flavor': '为金币而来，为揍人而留。',
     'comp.brawler.name': '矮人斗士',
     'comp.cleric.flavor': '本来是来给队伍治疗的。至今没派上用场，所以他改打怪了。',

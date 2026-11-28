@@ -31,7 +31,7 @@ export const CONTENT = {
   "comp.archmage.flavor": "Older than the dungeon. Insists the dungeon was smaller back then.",
   "comp.archmage.name": "Archmage",
   "comp.bard.flavor": "We're not sure how he got in here.",
-  "comp.bard.name": "Wandering Bard",
+  "comp.bard.name": "Rocker",
   "comp.brawler.flavor": "Came for the gold. Stayed for the punching.",
   "comp.brawler.name": "Dwarf Brawler",
   "comp.cleric.flavor": "Here to heal the party. Hasn't had to yet, so he hits things.",
