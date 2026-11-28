@@ -422,8 +422,6 @@ export default {
     "ui.marks.damage": "Dégâts",
     "ui.table.companion": "Compagnon",
     "ui.table.marks": "Marques",
-
-    "ui.trade.last": "Dernière",
     "ui.trade.anyGold": "N'importe quelle carte dorée",
     "ui.trade.fromSets": "Parmi les séries données",
     "ui.trade.chanceNew": "{percent} de chances qu'elle soit nouvelle",

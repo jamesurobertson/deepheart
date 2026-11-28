@@ -401,8 +401,6 @@ export default {
     'ui.marks.damage': '피해',
     'ui.table.companion': '동료',
     'ui.table.marks': '각인',
-
-    'ui.trade.last': '최근',
     'ui.trade.anyGold': '아무 황금 카드',
     'ui.trade.fromSets': '내준 카드의 세트에서',
     'ui.trade.chanceNew': '새 카드일 확률 {percent}',

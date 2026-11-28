@@ -408,8 +408,6 @@ export default {
     'ui.marks.damage': 'Schaden',
     'ui.table.companion': 'Gefährte',
     'ui.table.marks': 'Male',
-
-    'ui.trade.last': 'Zuletzt',
     'ui.trade.anyGold': 'Beliebige Goldkarte',
     'ui.trade.fromSets': 'Aus den Sets, die du gibst',
     'ui.trade.chanceNew': '{percent} Chance, dass sie neu ist',

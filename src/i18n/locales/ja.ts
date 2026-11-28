@@ -397,8 +397,6 @@ export default {
     'ui.marks.damage': 'ダメージ',
     'ui.table.companion': '仲間',
     'ui.table.marks': '刻印',
-
-    'ui.trade.last': '最後の1枚',
     'ui.trade.anyGold': 'いずれかの金カード',
     'ui.trade.fromSets': '渡したカードのセットから',
     'ui.trade.chanceNew': '新しいカードの確率{percent}',

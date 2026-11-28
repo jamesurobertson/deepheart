@@ -2650,6 +2650,7 @@ export class Ui {
     const places = card.where[lap].filter((w) => w.floor <= g.s.bestFloor);
     const own = g.s.cards[id];
     const count = inPanel ? ((goldView ? own?.gold : own?.n)?.[view] ?? 0) : g.cardCount(id);
+    const inCollection = inPanel ? g.cardFound(id, view, goldView) : g.cardKnown(id);
     // When the copy you're looking at was first found: the kill it dropped on, or where it came from.
     const found = (at?: number, via?: string) => (at ? t(card.kind === 'goblin' ? 'ui.card.foundCatch' : 'ui.card.foundKill', { n: fmt(at) }) : via ? this.viaLine(via) : '');
     const caught = id === 'rainbow-goblin' ? g.s.rainbows : g.s.raids - g.s.rainbows;
@@ -2663,10 +2664,10 @@ export class Ui {
       name: cardName(card.name, inPanel ? view : 0),
       places,
       common: places.flatMap((w) => w.common),
-      known: g.cardCount(id) > 0 || g.cardMet(id),
+      known: g.cardKnown(id) || g.cardMet(id),
       count,
       gilt: inPanel ? goldView : g.hasGoldCard(id),
-      first: goldView ? found(own?.goldAt, own?.goldVia) : count && (!inPanel || view === 0) ? found(own?.at, own?.via) : '',
+      first: goldView ? found(own?.goldAt, own?.goldVia) : inCollection && (!inPanel || view === 0) ? found(own?.at, own?.via) : '',
       tally,
     };
   }
@@ -3094,7 +3095,7 @@ export class Ui {
     const split = [...count].map(([zone, n]) => ({ zone, share: n / side.length })).sort((a, b) => b.share - a.share);
     const fresh = split.reduce((sum, { zone, share }) => {
       const pool = g.tradeable(zone);
-      return sum + (pool.length ? (share * pool.filter((c) => !g.cardCount(c.id)).length) / pool.length : 0);
+      return sum + (pool.length ? (share * pool.filter((c) => !g.cardKnown(c.id)).length) / pool.length : 0);
     }, 0);
     return { split, fresh };
   }
@@ -3104,14 +3105,11 @@ export class Ui {
     const need = this.tradeNeed(who);
     const name = t(TRADER_NAME[who]);
     const { side, got, line } = this.trade;
-    const face = (id: string, attrs: string, extra = '', last = false) => {
+    const face = (id: string, attrs: string, extra = '') => {
       const c = CARD_BY_ID.get(id)!;
-      return `<button class="tr-card${last ? ' last' : ''}" ${attrs}>${cardFace(c, 'got', false, 40, c.laps[0])}${extra}</button>`;
+      return `<button class="tr-card" ${attrs}>${cardFace(c, 'got', false, 40, c.laps[0])}${extra}</button>`;
     };
-    const g = this.game;
-    // A put-down card that's your last copy keeps its tag on the table.
-    const isLast = (id: string, k: number) => side.slice(0, k + 1).filter((x) => x === id).length === g.plainCards(id);
-    const slots = Array.from({ length: need }, (_, k) => (side[k] ? face(side[k], `data-take="${side[k]}"`, isLast(side[k], k) ? `<i class="tr-last">${t('ui.trade.last')}</i>` : '', isLast(side[k], k)) : '<span class="tr-slot"></span>')).join('');
+    const slots = Array.from({ length: need }, (_, k) => (side[k] ? face(side[k], `data-take="${side[k]}"`) : '<span class="tr-slot"></span>')).join('');
     const odds = this.tradeOdds(who);
     const setName = (zone: number) => ZONES[zone].name.replace(/^The /, '');
     const his = got
@@ -3126,9 +3124,9 @@ export class Ui {
     const fresh = got || (who === 'dan' && !odds.split.length) ? '' : `<p class="tr-odds">${odds.fresh ? t('ui.trade.chanceNew', { percent: percent(odds.fresh) }) : t('ui.trade.haveAll')}</p>`;
     const hand = this.tradeHand();
     const full = side.length >= need;
-    // Your last copy of a card can go too, marked so it's never given away by accident.
+    // A last copy can go too: its color stays in your collection.
     const cards = hand.length
-      ? hand.map((h) => face(h.c.id, `data-put="${h.c.id}"${full ? ' disabled' : ''}`, h.n === 1 ? `<i class="tr-last">${t('ui.trade.last')}</i>` : `<i class="tr-n">×${h.n}</i>`, h.n === 1)).join('')
+      ? hand.map((h) => face(h.c.id, `data-put="${h.c.id}"${full ? ' disabled' : ''}`, h.n > 1 ? `<i class="tr-n">×${h.n}</i>` : '')).join('')
       : `<p class="muted">${t('ui.trade.noCards')}</p>`;
     const buttons = got
       ? `<button class="btn" data-act="tradeAgain">${t('ui.trade.again')}</button><button class="btn primary" data-act="close">${t('ui.trade.done')}</button>`
@@ -3199,13 +3197,13 @@ export class Ui {
   private cardsHtml(): string {
     const g = this.game;
     const goblinSeen = (id: string) => (id === 'rainbow-goblin' ? g.s.rainbowSeen : g.s.raids + g.s.missed > 0);
-    const seen = (c: (typeof CARDS)[number]) => g.cardCount(c.id) > 0 || (c.kind === 'goblin' ? goblinSeen(c.id) : c.floor <= g.s.bestFloor);
+    const seen = (c: (typeof CARDS)[number]) => g.cardKnown(c.id) || (c.kind === 'goblin' ? goblinSeen(c.id) : c.floor <= g.s.bestFloor);
     // One collection per lap you've reached, each in ordinary and gold copies.
     const lapsReached = Math.min(lapOf(g.s.bestFloor), CORRUPTION.length - 1);
     const view = Math.min(this.cardLap, lapsReached);
     const gold = this.cardGold;
     const inView = (c: (typeof CARDS)[number], lap = view) => seen(c) && (c.laps.includes(lap) || owned(c, lap)) && (!gold || c.gold);
-    const owned = (c: (typeof CARDS)[number], lap = view) => ((gold ? g.s.cards[c.id]?.gold : g.s.cards[c.id]?.n)?.[lap] ?? 0) > 0;
+    const owned = (c: (typeof CARDS)[number], lap = view) => g.cardFound(c.id, lap, gold);
     // Where you are: a marker on your zone's row, and a dot on the cards that can drop on this floor.
     const floor = g.s.floor;
     const lap = lapOf(floor);
@@ -4004,7 +4002,7 @@ export class Ui {
     if (this.modal) this.closeModal();
     document.body.classList.add('demo-over');
     const met = g.s.owned.filter((n) => n > 0).length;
-    const cards = Object.values(g.s.cards).reduce((n, c) => n + c.n.reduce((a, b) => a + (b > 0 ? 1 : 0), 0) + c.gold.reduce((a, b) => a + (b > 0 ? 1 : 0), 0), 0);
+    const cards = g.cardVersions();
     const el = document.createElement('div');
     el.className = 'demo-end';
     el.innerHTML = `<div class="de-in">

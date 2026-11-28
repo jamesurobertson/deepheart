@@ -379,8 +379,6 @@ export const UI = {
   'ui.marks.damage': 'Damage',
   'ui.table.companion': 'Companion',
   'ui.table.marks': 'Marks',
-
-  'ui.trade.last': 'Last',
   'ui.trade.anyGold': 'Any gold card',
   'ui.trade.fromSets': 'From the sets you give',
   'ui.trade.chanceNew': "{percent} chance it's new",

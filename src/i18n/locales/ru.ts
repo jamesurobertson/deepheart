@@ -455,8 +455,6 @@ export default {
     'ui.marks.damage': 'Урон',
     'ui.table.companion': 'Соратник',
     'ui.table.marks': 'Метки',
-
-    'ui.trade.last': 'Последняя',
     'ui.trade.anyGold': 'Любая золотая карта',
     'ui.trade.fromSets': 'Из наборов, которые вы отдаёте',
     'ui.trade.chanceNew': 'Шанс новой: {percent}',

@@ -423,8 +423,6 @@ export default {
     'ui.marks.damage': 'Dano',
     'ui.table.companion': 'Companheiro',
     'ui.table.marks': 'Marcas',
-
-    'ui.trade.last': 'Última',
     'ui.trade.anyGold': 'Qualquer carta dourada',
     'ui.trade.fromSets': 'Dos conjuntos que você entregar',
     'ui.trade.chanceNew': '{percent} de chance de ser nova',

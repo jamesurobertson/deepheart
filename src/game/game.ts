@@ -444,8 +444,9 @@ export interface SaveState {
   rampage: number;
   /** Cards by id: copies per edition (normal, then each corruption; only normal is shown so far), plain and gold, and
    *  the kill (for goblins, the catch) that first dropped each. */
-  /** Copies by lap; the kill your first one (and first gold one) dropped on, or the brother you traded it from. */
-  cards: Record<string, { n: number[]; gold: number[]; at?: number; goldAt?: number; via?: string; goldVia?: string }>;
+  /** Copies by lap; the kill your first one (and first gold one) dropped on, or the brother you traded it from.
+   *  `found`: the colors whose every plain copy was traded away (1 each), still in the collection and its sets. */
+  cards: Record<string, { n: number[]; gold: number[]; at?: number; goldAt?: number; via?: string; goldVia?: string; found?: number[] }>;
   /** Monsters slain per card id (a swept floor counts the monsters it wipes out). */
   slain: Record<string, number>;
   /** Of those, the ones slain in each later color (by lap; index 0 is unused, plain kills are the rest). */
@@ -874,6 +875,7 @@ export class Game {
         card.goldAt ??= old.goldAt;
         card.via ??= old.via;
         card.goldVia ??= old.goldVia;
+        if (old.found) card.found = CORRUPTION.map((_, i) => (card.found?.[i] || old.found![i] ? 1 : 0));
         delete s.cards[was];
       }
       if (s.slain?.[was]) {
@@ -1066,7 +1068,7 @@ export class Game {
   /** Whether you have every card of this zone in this color (or in gold). */
   setDone(zone: number, lap: number, gold: boolean) {
     const set = CARD_SETS.find((s) => s.zone === zone && s.lap === lap);
-    return !!set && set.cards.every((id) => ((gold ? this.s.cards[id]?.gold : this.s.cards[id]?.n)?.[lap] ?? 0) > 0);
+    return !!set && set.cards.every((id) => this.cardFound(id, lap, gold));
   }
 
   /** Card sets completed: zones with every card in a color (or in gold). */
@@ -2792,13 +2794,13 @@ export class Game {
   /** `kill`: which kill of its monster the card fell on, when that isn't the latest one (kills counted in bulk). */
   giveCard(id: string, gold = false, src: 'kill' | 'sweep' | 'raid' | 'trip' = 'kill', floor = this.s.floor, kill = this.cardKill(id)) {
     const c = (this.s.cards[id] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
-    const first = gold ? !this.hasGoldCard(id) : !this.cardCount(id);
+    const first = gold ? !this.hasGoldCard(id) : !this.cardKnown(id);
     if (first && gold) c.goldAt = kill;
     else if (first) c.at = kill;
     const laps = CARD_BY_ID.get(id)!.laps;
     const here = Math.min(lapOf(floor), CORRUPTION.length - 1);
     const lap = laps.includes(here) ? here : laps[0];
-    const newColor = (gold ? c.gold : c.n)[lap] === 0;
+    const newColor = !this.cardFound(id, lap, gold);
     (gold ? c.gold : c.n)[lap]++;
     this.unseen(id, lap, gold);
     if (newColor) this.markNew(id, lap, gold);
@@ -2858,13 +2860,25 @@ export class Game {
     return !!this.s.cards[id]?.gold.some((n) => n > 0);
   }
 
-  cardsFound() {
-    return CARDS.filter((c) => this.cardCount(c.id) > 0).length;
+  /** Whether this color of a card is in your collection: a copy held, or every copy traded away (gold never is). */
+  cardFound(id: string, lap: number, gold = false) {
+    const c = this.s.cards[id];
+    if (!c) return false;
+    return gold ? c.gold[lap] > 0 : c.n[lap] > 0 || !!c.found?.[lap];
   }
 
-  /** Versions of cards you have, each color plain and gold counted apart; and how many there are to find. */
+  /** Whether the card is in your collection in any color, plain or gold. */
+  cardKnown(id: string) {
+    return this.cardCount(id) > 0 || !!this.s.cards[id]?.found?.some((mark) => mark);
+  }
+
+  cardsFound() {
+    return CARDS.filter((c) => this.cardKnown(c.id)).length;
+  }
+
+  /** Versions of cards in your collection, each color plain and gold counted apart; and how many there are to find. */
   cardVersions() {
-    return CARDS.reduce((sum, c) => sum + c.laps.filter((lap) => this.s.cards[c.id]?.n[lap]).length + (c.gold ? c.laps.filter((lap) => this.s.cards[c.id]?.gold[lap]).length : 0), 0);
+    return CARDS.reduce((sum, c) => sum + c.laps.filter((lap) => this.cardFound(c.id, lap)).length + (c.gold ? c.laps.filter((lap) => this.cardFound(c.id, lap, true)).length : 0), 0);
   }
 
   cardVersionsTotal() {
@@ -2873,9 +2887,8 @@ export class Game {
 
   // ---------- trading with the brothers ----------
 
-  /** Plain copies beyond the first of each color: the ones you can trade away (gold copies are never traded, and a
-   *  trade never takes the last of a color out of the binder). */
-  /** Plain copies of a card you could trade (gold ones are never traded). */
+  /** Plain copies of a card you could trade (gold ones are never traded). A last copy can go too: its color stays in
+   *  the collection and its sets. */
   plainCards(id: string) {
     const c = this.s.cards[id];
     return c ? c.n.reduce((a, n) => a + n, 0) : 0;
@@ -2918,9 +2931,9 @@ export class Game {
       for (let k = 0; k < n; k++) {
         const lap = c.n.indexOf(Math.max(...c.n));
         c.n[lap]--;
+        if (!c.n[lap]) (c.found ??= CORRUPTION.map(() => 0))[lap] = 1;
       }
     }
-    // (Trading a last copy away can break a set.)
     this.invalidate();
     return true;
   }
@@ -2930,7 +2943,7 @@ export class Game {
     if (DEMO) return null;
     if (this.s.gifts.includes(who)) return null;
     const early = CARDS.filter((c) => c.kind === 'monster' && c.zone <= 1 && c.laps.includes(0));
-    const missing = early.filter((c) => !this.cardCount(c.id));
+    const missing = early.filter((c) => !this.cardKnown(c.id));
     const pool = missing.length ? missing : early;
     this.s.gifts.push(who);
     return this.receive(pool[Math.floor(Math.random() * pool.length)].id, false, giftVia(who));
@@ -2938,12 +2951,12 @@ export class Game {
 
   private receive(id: string, gold: boolean, from: string) {
     const c = (this.s.cards[id] ??= { n: CORRUPTION.map(() => 0), gold: CORRUPTION.map(() => 0) });
-    const first = gold ? !this.hasGoldCard(id) : !this.cardCount(id);
+    const first = gold ? !this.hasGoldCard(id) : !this.cardKnown(id);
     if (first && gold) c.goldVia = from;
     else if (first) c.via = from;
     // Later-lap newcomers have no plain copy: they arrive in the first color they come in.
     const lap = Math.min(lapOf(CARD_BY_ID.get(id)!.floor), CORRUPTION.length - 1);
-    const newColor = (gold ? c.gold : c.n)[lap] === 0;
+    const newColor = !this.cardFound(id, lap, gold);
     (gold ? c.gold : c.n)[lap]++;
     this.unseen(id, lap, gold);
     if (newColor) this.markNew(id, lap, gold);

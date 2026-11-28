@@ -397,8 +397,6 @@ export default {
     'ui.marks.damage': '伤害',
     'ui.table.companion': '同伴',
     'ui.table.marks': '心印',
-
-    'ui.trade.last': '上次',
     'ui.trade.anyGold': '任意金卡',
     'ui.trade.fromSets': '从你交出的套组中抽',
     'ui.trade.chanceNew': '{percent}概率是新卡',
