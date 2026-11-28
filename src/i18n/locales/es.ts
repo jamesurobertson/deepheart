@@ -184,9 +184,9 @@ export default {
     'ui.party.dps': '{dps} DPS',
 
     'ui.hint.hero': '¡Este es tu héroe!',
-    'ui.hint.heroTouch': 'El del anillo dorado · mantén el dedo en la pantalla para guiarlo',
-    'ui.hint.heroPad': 'El del anillo dorado · muévelo con {stick}',
-    'ui.hint.heroMouse': 'El del anillo dorado · sigue a tu ratón',
+    'ui.hint.heroTouch': 'El del anillo dorado, mantén el dedo en la pantalla para guiarlo',
+    'ui.hint.heroPad': 'El del anillo dorado, muévelo con {stick}',
+    'ui.hint.heroMouse': 'El del anillo dorado, sigue a tu ratón',
     'ui.hint.star': 'Prueba como héroe: {name}',
     'ui.hint.nextOne': 'el siguiente',
     'ui.hint.starPad': 'Pulsa {button} para cambiar',

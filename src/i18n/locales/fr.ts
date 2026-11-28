@@ -197,9 +197,9 @@ export default {
     "ui.party.dps": "{dps} DPS",
 
     "ui.hint.hero": "Voici votre héros !",
-    "ui.hint.heroTouch": "Celui à l'anneau doré · maintenez le doigt pour le guider",
-    "ui.hint.heroPad": "Celui à l'anneau doré · guidez-le avec {stick}",
-    "ui.hint.heroMouse": "Celui à l'anneau doré · il suit votre souris",
+    "ui.hint.heroTouch": "Celui à l'anneau doré, maintenez le doigt pour le guider",
+    "ui.hint.heroPad": "Celui à l'anneau doré, guidez-le avec {stick}",
+    "ui.hint.heroMouse": "Celui à l'anneau doré, il suit votre souris",
     "ui.hint.star": "Essayez {name} comme héros",
     "ui.hint.nextOne": "le suivant",
     "ui.hint.starPad": "Appuyez sur {button} pour changer",

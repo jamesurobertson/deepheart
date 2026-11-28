@@ -172,9 +172,9 @@ export default {
     'ui.party.dps': '秒伤{dps}',
 
     'ui.hint.hero': '这是你的主角！',
-    'ui.hint.heroTouch': '戴金环的那位 · 按住屏幕带领TA',
-    'ui.hint.heroPad': '戴金环的那位 · 用{stick}带TA走',
-    'ui.hint.heroMouse': '戴金环的那位 · TA会跟着你的鼠标',
+    'ui.hint.heroTouch': '戴金环的那位，按住屏幕带领TA',
+    'ui.hint.heroPad': '戴金环的那位，用{stick}带TA走',
+    'ui.hint.heroMouse': '戴金环的那位，TA会跟着你的鼠标',
     'ui.hint.star': '试试让{name}当主角',
     'ui.hint.nextOne': '下一位',
     'ui.hint.starPad': '按{button}切换',

@@ -152,9 +152,9 @@ export const UI = {
   'ui.party.dps': '{dps} dps',
 
   'ui.hint.hero': 'This is your hero!',
-  'ui.hint.heroTouch': 'The one with the gold ring · hold a finger down to lead them',
-  'ui.hint.heroPad': 'The one with the gold ring · walk them with {stick}',
-  'ui.hint.heroMouse': 'The one with the gold ring · they follow your mouse',
+  'ui.hint.heroTouch': 'The one with the gold ring, hold a finger down to lead them',
+  'ui.hint.heroPad': 'The one with the gold ring, walk them with {stick}',
+  'ui.hint.heroMouse': 'The one with the gold ring, they follow your mouse',
   'ui.hint.star': 'Try making the {name} your hero',
   'ui.hint.nextOne': 'next one',
   'ui.hint.starPad': 'Press {button} to switch',

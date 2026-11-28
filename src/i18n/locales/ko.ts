@@ -174,9 +174,9 @@ export default {
     'ui.party.dps': 'DPS {dps}',
 
     'ui.hint.hero': '이게 주인공이에요!',
-    'ui.hint.heroTouch': '금색 고리가 있는 동료 · 손가락을 누르고 있으면 이끌 수 있어요',
-    'ui.hint.heroPad': '금색 고리가 있는 동료 · {stick} 스틱으로 움직이세요',
-    'ui.hint.heroMouse': '금색 고리가 있는 동료 · 마우스를 따라와요',
+    'ui.hint.heroTouch': '금색 고리가 있는 동료, 손가락을 누르고 있으면 이끌 수 있어요',
+    'ui.hint.heroPad': '금색 고리가 있는 동료, {stick} 스틱으로 움직이세요',
+    'ui.hint.heroMouse': '금색 고리가 있는 동료, 마우스를 따라와요',
     'ui.hint.star': '주인공으로 {name} 어때요?',
     'ui.hint.nextOne': '다음 동료',
     'ui.hint.starPad': '{button} 버튼으로 교체',

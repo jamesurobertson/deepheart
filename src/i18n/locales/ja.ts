@@ -172,9 +172,9 @@ export default {
     'ui.party.dps': '{dps} DPS',
 
     'ui.hint.hero': 'これが主人公です！',
-    'ui.hint.heroTouch': '金の輪の仲間です · 指で押さえ続けると導けます',
-    'ui.hint.heroPad': '金の輪の仲間です · {stick}で歩かせられます',
-    'ui.hint.heroMouse': '金の輪の仲間です · マウスについてきます',
+    'ui.hint.heroTouch': '金の輪の仲間です。指で押さえ続けると導けます',
+    'ui.hint.heroPad': '金の輪の仲間です。{stick}で歩かせられます',
+    'ui.hint.heroMouse': '金の輪の仲間です。マウスについてきます',
     'ui.hint.star': '{name}を主人公にしてみましょう',
     'ui.hint.nextOne': '次の仲間',
     'ui.hint.starPad': '{button}で切り替えられます',

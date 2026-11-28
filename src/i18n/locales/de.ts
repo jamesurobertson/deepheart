@@ -183,9 +183,9 @@ export default {
     'ui.party.dps': '{dps} DPS',
 
     'ui.hint.hero': 'Das ist dein Held!',
-    'ui.hint.heroTouch': 'Der mit dem goldenen Ring · halte einen Finger gedrückt, um ihn zu führen',
-    'ui.hint.heroPad': 'Der mit dem goldenen Ring · steuere ihn mit {stick}',
-    'ui.hint.heroMouse': 'Der mit dem goldenen Ring · er folgt deiner Maus',
+    'ui.hint.heroTouch': 'Der mit dem goldenen Ring, halte einen Finger gedrückt, um ihn zu führen',
+    'ui.hint.heroPad': 'Der mit dem goldenen Ring, steuere ihn mit {stick}',
+    'ui.hint.heroMouse': 'Der mit dem goldenen Ring, er folgt deiner Maus',
     'ui.hint.star': 'Probier einen anderen Helden: {name}',
     'ui.hint.nextOne': 'der Nächste',
     'ui.hint.starPad': 'Drücke {button} zum Wechseln',

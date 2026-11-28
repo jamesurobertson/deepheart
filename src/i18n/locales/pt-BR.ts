@@ -198,9 +198,9 @@ export default {
     'ui.party.dps': '{dps} dps',
 
     'ui.hint.hero': 'Este é o seu herói!',
-    'ui.hint.heroTouch': 'O do anel dourado · segure o dedo na tela para guiá-lo',
-    'ui.hint.heroPad': 'O do anel dourado · mova-o com {stick}',
-    'ui.hint.heroMouse': 'O do anel dourado · ele segue o seu mouse',
+    'ui.hint.heroTouch': 'O do anel dourado, segure o dedo na tela para guiá-lo',
+    'ui.hint.heroPad': 'O do anel dourado, mova-o com {stick}',
+    'ui.hint.heroMouse': 'O do anel dourado, ele segue o seu mouse',
     'ui.hint.star': 'Que tal {name} como seu herói?',
     'ui.hint.nextOne': 'o próximo',
     'ui.hint.starPad': 'Pressione {button} para trocar',

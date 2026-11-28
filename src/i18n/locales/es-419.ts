@@ -28,7 +28,7 @@ export default {
     'ui.buff.drums': '+50% de golpes críticos',
     'ui.banner.clutch': '¡POR UN PELO!',
     'ui.toast.mark': '<b>¡Marca del Corazón!</b> {name}: +{percent}% de daño',
-    'ui.hint.heroMouse': 'El del anillo dorado · sigue a tu mouse',
+    'ui.hint.heroMouse': 'El del anillo dorado, sigue a tu mouse',
     'ui.hint.starPad': 'Presiona {button} para cambiar',
     'ui.hint.hirePad': 'Presiona {button} para contratar',
     'ui.hint.levelPad': 'Presiona {button} para subir de nivel',
