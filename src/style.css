@@ -1637,7 +1637,9 @@ body.card-up .keep-labels { visibility: hidden; }
 .spirit-u { color: #e2d2ff; text-decoration: underline dotted var(--soul); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: help; }
 .badge.bound { background: #5a1a2c; color: var(--ess-hi); }
 .badge.bound.hot { background: #6a1830; box-shadow: 0 0 0 2px var(--ink), inset 0 0 0 2px var(--ess), 0 0 12px rgba(255, 90, 126, 0.8); }
-.dock-heart .glyph { color: var(--ess); }
+/* (Six pixels tall to the others' seven: lifted by the one, so its top lines up with theirs.) */
+.dock-heart .glyph { color: var(--ess); margin-bottom: 3px; }
+body.compact .dock-heart .glyph { margin-bottom: 0; }
 
 /* Awaken the Heart: what you gain beside what you lose. */
 .modal.m-awaken { width: min(620px, calc(100vw - 24px)); }
