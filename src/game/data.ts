@@ -383,9 +383,9 @@ const TRAIT_PLAN: Record<string, string[]> = {
   shieldmaiden: ['own', 'boss', 'skill', 'cleave25', 'boss', 'party'],
   thief: ['own', 'crit2', 'gold', 'crit3', 'gold'],
   gingerbread: ['own', 'own', 'click', 'own'],
+  corsair: ['own', 'gold', 'own', 'skill', 'gold', 'party'],
   ...(DEMO ? {} : {
     dancer: ['own', 'critx1', 'click', 'critx1', 'own'],
-    corsair: ['own', 'gold', 'own', 'skill', 'gold', 'party'],
     runesmith: ['own', 'own', 'own', 'skill', 'blade', 'boss'],
     paladin: ['own', 'boss', 'click', 'own', 'cleave50'],
     stormcaller: ['own', 'own', 'click', 'own', 'skill', 'blade', 'party'],
@@ -422,9 +422,9 @@ const MILESTONE_NAMES: Record<string, string[]> = {
   shieldmaiden: ['Shield Bash', 'Board Meeting', 'Living Wall', 'Best Defense', 'Bash Course', 'Hold the Line'],
   thief: ['Light Fingers', 'Sticky Fingers', 'Pickpocket', 'Knife to Meet You', 'Steal of a Deal'],
   gingerbread: ['Fresh Out of the Oven', 'Crumb Trail', 'Hard Crust', 'Extra Icing'],
+  corsair: ['Sea Legs', 'Plunder Ground', 'Shiver Me Timbers', 'Sunken Treasure', 'Below Deck', 'Full Sail'],
   ...(DEMO ? {} : {
     dancer: ['First Position', 'Pirouette', 'Dance Off', 'Cutting a Rug', 'Sword Dance'],
-    corsair: ['Sea Legs', 'Plunder Ground', 'Shiver Me Timbers', 'Sunken Treasure', 'Below Deck', 'Full Sail'],
     runesmith: ['Chisel In', 'Floor Plan', 'Rune for Cover', 'Set in Stone', 'Groundbreaking', 'Rock Bottom'],
     paladin: ['Holy Moly', 'Purge Party', 'Smite Club', 'Light Work', 'Holy Order'],
     stormcaller: ['Brainstorm', 'Under the Weather', 'Cloud Cover', 'Storm Front', 'Eye of the Storm', 'Lightning Rod', 'Perfect Storm'],
@@ -472,9 +472,9 @@ const MILESTONE_FLAVOR: Record<string, string[]> = {
   shieldmaiden: ['Her idea of defense is getting there first.', 'The shield meets the face. Meeting adjourned.', "Walls don't usually chase you.", 'Is a good offense. She checked.', 'She teaches it. Monsters fail it.', 'Everyone behind her fights braver.'],
   thief: ["Your purse feels lighter. That's normal.", 'Counts his daggers every morning. Still six.', 'Monsters have pockets. Had.', 'He says it every time. Nobody\'s laughed yet.', "He's very proud of this price."],
   gingerbread: ['Still warm, and furious about it.', 'Monsters follow it. Briefly.', 'Stale on purpose. Hits harder.', 'Dressed for battle, in frosting.'],
+  corsair: ['Steady on any floor. Even the wet ones.', 'Anything not nailed down is treasure. He brought a crowbar.', 'The monsters shiver first.', 'Found a chest at the bottom of the sea. Now he hits things with it.', 'The lower the deck, the bigger the haul.', 'The whole crew hits harder with the wind behind them.'],
   ...(DEMO ? {} : {
     dancer: ["Also the monster's last position.", 'One spin, three slices.', 'The monsters lost. It wasn\'t close.', 'And everything standing on it.', "Don't stand too close. Don't stand at all."],
-    corsair: ['Steady on any floor. Even the wet ones.', 'Anything not nailed down is treasure. He brought a crowbar.', 'The monsters shiver first.', 'Found a chest at the bottom of the sea. Now he hits things with it.', 'The lower the deck, the bigger the haul.', 'The whole crew hits harder with the wind behind them.'],
     runesmith: ['Every swing leaves a mark. Some marks explode.', 'Step one: carve the floor. Step two: stand back.', "Monsters run. Runes don't care.", "The runes are permanent. The monsters aren't.", 'Ask the floor.', 'Bosses hit the floor. The floor hits back.'],
     paladin: ['A prayer and a punch.', "Everyone's invited. Nobody leaves.", 'Everyone\'s welcome. Monsters get the full ceremony.', 'Purging is easy when you glow.', 'The order is: hit it again.'],
     stormcaller: ['Her best ideas come with lightning.', 'The monsters are. Permanently.', 'Rains indoors. Nobody brought an umbrella.', "She's always at the front of it.", 'The only calm spot is right behind her.', 'The blade keeps getting struck. It likes it.', 'Everyone fights better in her weather.'],
@@ -561,8 +561,8 @@ export const ABILITIES: AbilityDef[] = ([
   { id: 'crit', name: 'Critical Hits', desc: 'Your attacks and Phantom Blade have a 3% chance for ×2 damage.', kind: 'passive', comp: compIndex('ranger'), trait: 1 },
   { id: 'rampage', name: 'Rampage', desc: 'Builds as you attack. Your party deals ×2–×3 damage for 10s.', kind: 'charge', comp: compIndex('brawler'), trait: 2 },
   { id: 'cleave', name: 'Cleave', desc: 'Your attacks also hit every other monster for 10% damage.', kind: 'button', comp: compIndex('shieldmaiden'), trait: 2, dur: 60, cooldown: 12 * 60 },
+  { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 25 * 60 },
   ...(DEMO ? [] : [
-    { id: 'treasure', name: 'Treasure Sense', desc: 'Monsters drop ×3 gold.', kind: 'button', comp: compIndex('corsair'), trait: 3, dur: 30, cooldown: 25 * 60 },
     { id: 'drums', name: 'War Drums', desc: '+50% crit chance.', kind: 'button', comp: compIndex('runesmith'), trait: 3, dur: 30, cooldown: 20 * 60 },
     { id: 'legion', name: 'Phantom Legion', desc: 'A Phantom Blade for every monster.', kind: 'button', comp: compIndex('stormcaller'), trait: 4, dur: 30, cooldown: 30 * 60 },
   ] satisfies AbilityDef[]),

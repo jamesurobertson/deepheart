@@ -191,6 +191,8 @@ const soulPct = (n: number) => `+${fmt(n * TUNE.soulPower * 100)}%`;
 const soulPrice = (n: number, size = 1.5) => t('ui.price.souls', { count: n, icon: G.soul(size), amount: fmt(n) });
 
 /** The skills you press, in column order: their number keys (passive abilities don't get one). */
+/** The full game's button skills past the demo's own (War Drums, Phantom Legion): locked slots in the demo. */
+const DEMO_LOCKED_SKILLS = 2;
 const KEYED = ABILITIES.filter((a) => a.kind !== 'passive').map((a) => a.id);
 const abilityKey = (id: AbilityId) => KEYED.indexOf(id) + 1;
 
@@ -458,6 +460,16 @@ export class Ui {
       slot.dataset.tip = `ab:${a.id}`;
       slot.innerHTML = `${skillIcon(a.id, 33)}<span class="ab-fill"></span><span class="ab-time"></span><span class="ab-lock">${G.lock()}</span>`;
       this.el.abilities.appendChild(slot);
+      // The demo's last button skill: after it, a locked slot for each of the full game's.
+      if (DEMO && a === column.filter((x) => x.kind !== 'passive').at(-1)) {
+        for (let k = 0; k < DEMO_LOCKED_SKILLS; k++) {
+          const locked = document.createElement('div');
+          locked.className = 'ab locked full-game';
+          locked.dataset.tip = 'fullGame';
+          locked.innerHTML = `<span class="ab-lock">${G.lock()}</span>`;
+          this.el.abilities.appendChild(locked);
+        }
+      }
     }
 
     this.bind();
@@ -2026,7 +2038,7 @@ export class Ui {
   /** The ability column: locked, always on, ready, running (time left), cooling down, or charging (Rampage). */
   private renderAbilities() {
     const g = this.game;
-    for (const slot of this.el.abilities.children as HTMLCollectionOf<HTMLElement>) {
+    for (const slot of this.el.abilities.querySelectorAll<HTMLElement>('[data-ability]')) {
       const id = slot.dataset.ability as AbilityId;
       const a = ABILITY_BY_ID.get(id)!;
       // Rampage runs as the 'fever' buff, and charges instead of cooling down.
@@ -2439,6 +2451,7 @@ export class Ui {
   private tipHtml(key: string): string {
     const g = this.game;
     const [kind, id] = key.split(':');
+    if (kind === 'fullGame') return `<p class="tt-d">${t('ui.party.fullGame')}</p>`;
     if (kind === 'comp') {
       const i = Number(id);
       const def = COMPS[i];
