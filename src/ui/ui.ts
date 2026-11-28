@@ -397,7 +397,7 @@ export class Ui {
       <button class="ui-back" data-act="showUi" hidden><kbd>H</kbd><span>${t('ui.hud.showUi')}</span></button>
       <nav class="dock">
         <button class="btn dock-b" data-open="trophies" data-tip="dock:trophies">${G.trophy(3)}<span>${t('ui.dock.collection')}</span><em class="badge new" hidden></em></button>
-        <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span>${t('ui.dock.ascend')}</span><em class="badge" hidden></em></button>
+        <button class="btn dock-b" data-open="abyss" data-tip="dock:abyss">${G.soul(3)}<span class="dock-souls">${t('ui.dock.ascend')}</span><em class="badge" hidden></em></button>
         <button class="btn dock-b dock-heart" data-open="heart" data-tip="dock:heart" hidden>${G.heart(3)}<span>${t('ui.dock.heart')}</span><em class="badge bound" hidden></em></button>
         <button class="btn dock-b dock-keep" data-act="keep" data-tip="dock:keep" hidden></button>
         <button class="btn dock-b" data-open="stats" data-tip="dock:stats">${G.stats(3)}<span>${t('ui.dock.stats')}</span></button>
@@ -430,7 +430,7 @@ export class Ui {
       fever: q('.fever'), feverBar: q('.fever > i'), feverLabel: q('.fever > span'), buffs: q('.buffs'), bars: q('.bars'), hint: q('.hint'), vaultPick: q('.vault-pick'), vaultLeave: q('.vault-leave'), vaultFaces: q('.vp-faces'), heroMark: q('.hero-mark'), raid: q('.raid-mark'), exitMark: q('.exit-mark'),
       banner: q('.banner'), ticker: q('.ticker span'), shop: q('.shop'),
       autoUpg: q('.auto-upg:not(.auto-hire)'), autoHire: q('.auto-hire'), autoLbl: q('.auto-lbl'), gens: q('.gens'), toasts: q('.toasts'), pops: q('.pops'), tip: q('.tip'),
-      blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), heartBtn: q('.dock-heart'), heartBadge: q('.dock-heart .badge'), keepBtn: q('[data-act=keep]'), keepLabels: q('.keep-labels'),
+      blade: q('.blade'), bladeIn: q('.blade-in'), modalWrap: q('.modal-wrap'), modal: q('.modal'), curtain: q('.curtain'), mute: q('.mute'), abyssBadge: q('[data-open=abyss] .badge'), soulsLabel: q('.dock-souls'), heartBtn: q('.dock-heart'), heartBadge: q('.dock-heart .badge'), keepBtn: q('[data-act=keep]'), keepLabels: q('.keep-labels'),
       cardBadge: q('[data-open=trophies] .badge'), dock: q('.dock'), abilities: q('.abilities'), drops: q('.drops'),
     };
 
@@ -1791,6 +1791,9 @@ export class Ui {
       if (Math.abs(Math.round(hud.bottom + 4) - this.hudTop) > 6) this.layout();
     }
 
+    // Ascend until the first ascent opens the Spirits; Souls from then on (the window holds them and the Heartmarks).
+    const soulsOpen = !DEMO && g.legendsOpen();
+    setText(this.el.soulsLabel, t(soulsOpen ? 'ui.dock.souls' : 'ui.dock.ascend'));
     const pending = g.pendingSouls();
     const ab = this.el.abyssBadge;
     // (Only once you can ascend: the window says nothing of souls before.)
@@ -2838,7 +2841,7 @@ export class Ui {
       html = head(t('ui.spirits.title'), this.soulsSub()) + this.legendsHtml();
     } else if (!DEMO && (name === 'abyss' || name === 'marks')) {
       const sub = g.s.descents ? this.soulsSub() : '';
-      html = head(t('ui.ascend.title'), sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
+      html = head(t(g.legendsOpen() ? 'ui.souls.title' : 'ui.ascend.title'), sub) + this.ascendHtml() + this.tabs(name) + (name === 'abyss' ? this.legendsHtml() : this.marksHtml());
     } else if (!DEMO && name === 'bound' && this.boundFocus) {
       const b = BOUND.find((x) => x.id === this.boundFocus)!;
       html = head(esc(boundName(b)), boundPrice(g.boundFree(), 2)) + `<div class="lcards one">${this.boundCard(b)}</div>
