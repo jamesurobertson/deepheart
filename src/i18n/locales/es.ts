@@ -240,6 +240,7 @@ export default {
     'ui.hint.champBoss': '¡Un jefe campeón!',
     'ui.hint.champBossSouls': { one: 'Derrótalo y gana {count} alma. Puede soltar una carta dorada.', many: 'Derrótalo y gana {count} almas. Puede soltar una carta dorada.', other: 'Derrótalo y gana {count} almas. Puede soltar una carta dorada.' },
     'ui.hint.champ': '¡Un campeón!',
+    'ui.hint.bossMod': '¡Jefe: {mod}!',
     'ui.hint.champSub': 'Más duro, y puede soltar una carta dorada',
     'ui.unlockedBy': 'Se desbloquea con: {name}',
     'ui.unlockedBy.sentence': 'Se desbloquea con: {name}.',

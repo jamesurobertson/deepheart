@@ -239,6 +239,7 @@ export default {
     'ui.hint.champBoss': 'Ein Champion-Boss!',
     'ui.hint.champBossSouls': { one: 'Besiege ihn für {count} Seele. Vielleicht lässt er eine Goldkarte fallen.', other: 'Besiege ihn für {count} Seelen. Vielleicht lässt er eine Goldkarte fallen.' },
     'ui.hint.champ': 'Ein Champion!',
+    'ui.hint.bossMod': 'Boss: {mod}!',
     'ui.hint.champSub': 'Zäher, und vielleicht lässt er eine Goldkarte fallen',
     'ui.unlockedBy': 'Freigeschaltet durch: {name}',
     'ui.unlockedBy.sentence': 'Freigeschaltet durch: {name}.',

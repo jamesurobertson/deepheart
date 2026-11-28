@@ -54,6 +54,7 @@ const STAR_WAIT_MS = 1000;
 /** How long your first Heartmark is pointed out. */
 const MARK_TIP_MS = 8000;
 const FALL_BACK_TIP_MS = 30_000;
+const MOD_TIP_MS = 8000;
 /** How long a new skill is pointed out once it unlocks (one you press goes as soon as it's used). */
 const SKILL_TIP_MS = 6000;
 /** How close your hero or the cursor has to come to a coin to pick it up (px). */
@@ -2187,6 +2188,13 @@ export class Ui {
     const starOpen = g.s.heroTips === 1 && g.s.owned.filter((n) => n > 0).length >= 2;
     // A skill just unlocked, not yet pointed out (in the column's order).
     const newSkill = ABILITIES.find((a) => g.abilityUnlocked(a.id) && !this.skillSeen(a.id));
+    // Counted as seen as soon as it shows, and kept up a while even if the boss dies at once.
+    const metMod = DEMO || !g.monsters.some((m) => m.boss) ? undefined : g.bossMods().find((id) => !g.s.modsSeen.includes(id));
+    if (metMod) {
+      g.s.modsSeen.push(metMod);
+      this.modTip = { id: metMod, until: performance.now() + MOD_TIP_MS };
+    }
+    const newMod = this.modTip && performance.now() < this.modTip.until ? this.modTip.id : undefined;
     this.starFrom = starOpen ? this.starFrom || performance.now() : 0;
     if (g.s.clicks < 6) state = 'click';
     else if (g.s.owned.every((n) => n === 0) && g.s.gold.gte(g.compCost(0))) state = firstRun ? 'hire' : 'nudge';
@@ -2197,6 +2205,8 @@ export class Ui {
     else if (g.s.champions === 0 && g.monsters.some((m) => m.champ)) state = 'champ';
     // The first champion boss that pays souls, too: by then you've usually met a champion, but not this.
     else if (!g.s.soulBossDone && g.s.floor >= TUNE.goldBossFrom && g.monsters.some((m) => m.champ && m.boss)) state = 'champ';
+    // A boss trait met for the first time: what it does, under the floor's name (pointing at it lists them all).
+    else if (newMod) state = `mod:${newMod}`;
     // Your first Heartmark: pointed out on its companion's row for a few seconds.
     else if (!g.s.markTipSeen && g.marksTotal() > 0) state = 'mark';
     // After your first ascent: the Auto button that buys back the traits you had.
@@ -2238,6 +2248,10 @@ export class Ui {
       this.el.hint.style.transform = `translate(${rect.left + rect.width / 2}px, ${rect.bottom + 14}px)`;
       this.el.hint.style.visibility = 'visible';
       if (g.s.auto || g.s.floor >= g.s.maxFloor || shown > FALL_BACK_TIP_MS) g.s.fallBackTipSeen = true;
+    } else if (state.startsWith('mod:')) {
+      const rect = this.el.floorBox.getBoundingClientRect();
+      this.el.hint.style.transform = `translate(${rect.left + rect.width / 2}px, ${rect.bottom + 14}px)`;
+      this.el.hint.style.visibility = 'visible';
     } else if (state === 'auto') {
       this.pointAt(this.el.autoUpg);
       if (this.hintState === 'auto' && performance.now() - this.tourAt > MARK_TIP_MS) g.s.autoTipSeen = true;
@@ -2259,7 +2273,7 @@ export class Ui {
       if (comp >= 0) padPick(comp);
     }
     const pointing = state.startsWith('skill:') || ['star', 'hire', 'level', 'upgrade', 'shop', 'rampage', 'mark', 'auto', 'autohire'].includes(state);
-    this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ' && state !== 'fallback' && !(state === 'raid' && padFamily());
+    this.el.hint.hidden = !pointing && state !== 'click' && state !== 'hero' && state !== 'champ' && state !== 'fallback' && !state.startsWith('mod:') && !(state === 'raid' && padFamily());
     if (!pointing) this.el.hint.classList.remove('point-right', 'point-down');
     this.el.hint.classList.toggle('still', state === 'hero' || state === 'raid');
     this.el.shop.classList.toggle('show-stars', state === 'star');
@@ -2274,6 +2288,7 @@ export class Ui {
             : state === 'upgrade' ? hint(t('ui.hint.upgrade'), this.firstUpgradeHint(upgradeRow))
             : state === 'shop' ? hint(t('ui.hint.shop'), this.byInput('ui.hint.shopPad', 'ui.hint.shopTouch', 'ui.hint.shopClick', { button: padGlyph('x', 18) }))
               : state === 'champ' ? this.champHint()
+              : state.startsWith('mod:') ? this.modHint(state.slice(4) as ModId)
               : state === 'raid' ? hint(t('ui.hint.raid'), t('ui.hint.raidSub', { stick: padGlyph('ls', 18) }))
               : state === 'fallback' ? hint(t('ui.hint.fallback'), padFamily() ? t('ui.hint.fallbackPad', { buttons: padCombo(['lt', 'down'], 18) }) : t('ui.hint.fallbackMouse'))
               : state === 'auto' ? hint(t('ui.hint.auto'), t('ui.hint.autoSub'))
@@ -2284,6 +2299,14 @@ export class Ui {
     this.el.raid.classList.toggle('first', state === 'raid');
   }
 
+
+  private modTip: { id: ModId; until: number } | null = null;
+
+  /** A boss trait met for the first time: its name, and what it does (as a hint's second line, without the full stop). */
+  private modHint(id: ModId) {
+    const mod = MOD_BY_ID.get(id)!;
+    return `<b>${t('ui.hint.bossMod', { mod: esc(mod.name) })}<small>${esc(mod.desc.replace(/[.。]$/, ''))}</small></b>`;
+  }
 
   /** The words for how you play: a controller's, a touch screen's or a mouse's. */
   private byInput(pad: UiKey, touch: UiKey, mouse: UiKey, params?: Params) {

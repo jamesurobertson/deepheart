@@ -254,6 +254,7 @@ export default {
     'ui.hint.champBoss': 'Um chefe campeão!',
     'ui.hint.champBossSouls': { one: 'Vale {count} alma. Pode soltar uma carta dourada.', many: 'Vale {count} almas. Pode soltar uma carta dourada.', other: 'Vale {count} almas. Pode soltar uma carta dourada.' },
     'ui.hint.champ': 'Um campeão!',
+    'ui.hint.bossMod': 'Chefe: {mod}!',
     'ui.hint.champSub': 'Mais duro, e pode soltar uma carta dourada',
     'ui.unlockedBy': 'Desbloqueado por: {name}',
     'ui.unlockedBy.sentence': 'Desbloqueado por: {name}.',

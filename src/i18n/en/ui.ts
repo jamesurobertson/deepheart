@@ -208,6 +208,7 @@ export const UI = {
   'ui.hint.champBoss': 'A champion boss!',
   'ui.hint.champBossSouls': { one: 'Beat it for {count} soul. It might drop a gold card.', other: 'Beat it for {count} souls. It might drop a gold card.' },
   'ui.hint.champ': 'A champion!',
+  'ui.hint.bossMod': 'A {mod} boss!',
   'ui.hint.champSub': 'Tougher, and it might drop a gold card',
   'ui.unlockedBy': 'Unlocked by the {name}',
   'ui.unlockedBy.sentence': 'Unlocked by the {name}.',

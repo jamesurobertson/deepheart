@@ -228,6 +228,7 @@ export default {
     'ui.hint.champBoss': '精英首领！',
     'ui.hint.champBossSouls': { other: '击败它可得{count}个灵魂。还可能掉金卡。' },
     'ui.hint.champ': '一只精英！',
+    'ui.hint.bossMod': '首领：{mod}！',
     'ui.hint.champSub': '更硬，还可能掉金卡',
     'ui.unlockedBy': '由{name}解锁',
     'ui.unlockedBy.sentence': '由{name}解锁。',

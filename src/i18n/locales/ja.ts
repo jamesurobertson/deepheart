@@ -228,6 +228,7 @@ export default {
     'ui.hint.champBoss': 'チャンピオンボスです！',
     'ui.hint.champBossSouls': { other: '倒すと魂{count}。金カードを落とすかもしれません。' },
     'ui.hint.champ': 'チャンピオンです！',
+    'ui.hint.bossMod': 'ボス：{mod}！',
     'ui.hint.champSub': '手強く、金カードを落とすかもしれません',
     'ui.unlockedBy': '解放：{name}',
     'ui.unlockedBy.sentence': '{name}によって解放されます。',

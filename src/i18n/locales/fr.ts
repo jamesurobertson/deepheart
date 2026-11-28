@@ -253,6 +253,7 @@ export default {
     "ui.hint.champBoss": "Un boss champion !",
     "ui.hint.champBossSouls": { one: "Battez-le pour {count} âme. Il peut lâcher une carte dorée.", many: "Battez-le pour {count} âmes. Il peut lâcher une carte dorée.", other: "Battez-le pour {count} âmes. Il peut lâcher une carte dorée." },
     "ui.hint.champ": "Un champion !",
+    "ui.hint.bossMod": "Boss : {mod} !",
     "ui.hint.champSub": "Plus coriace, et il peut lâcher une carte dorée",
     "ui.unlockedBy": "Débloqué par : {name}",
     "ui.unlockedBy.sentence": "Débloqué par : {name}.",

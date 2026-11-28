@@ -230,6 +230,7 @@ export default {
     'ui.hint.champBoss': '챔피언 보스!',
     'ui.hint.champBossSouls': { other: '처치하면 영혼 {count}. 황금 카드를 떨굴지도 몰라요.' },
     'ui.hint.champ': '챔피언!',
+    'ui.hint.bossMod': '보스: {mod}!',
     'ui.hint.champSub': '더 강하고, 황금 카드를 떨굴지도 몰라요',
     'ui.unlockedBy': '해금: {name}',
     'ui.unlockedBy.sentence': '해금: {name}.',

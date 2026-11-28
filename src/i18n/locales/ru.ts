@@ -256,6 +256,7 @@ export default {
       other: 'Награда: {count} души. Может выпасть золотая карта.',
     },
     'ui.hint.champ': 'Чемпион!',
+    'ui.hint.bossMod': 'Босс: {mod}!',
     'ui.hint.champSub': 'Крепче обычного и может оставить золотую карту',
     'ui.unlockedBy': 'Открывает соратник: {name}',
     'ui.unlockedBy.sentence': 'Открывает соратник: {name}.',
