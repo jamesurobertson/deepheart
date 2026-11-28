@@ -65,7 +65,8 @@ export class Dazzle {
     const nStars = big ? 22 : 12;
     this.aura = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), glowMat(tex.aura, 0xffc850, 1));
     this.aura.scale.set(width * 2.2, height * 1.5, 1);
-    this.aura.position.set(0, height * 0.5, -0.05);
+    // Its bottom edge at the feet, where the glow has faded to nothing: lower, the floor (or a stair) cut it off in a line.
+    this.aura.position.set(0, height * 0.75, -0.05);
     this.motes = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), glowMat(tex.mote, 0xffd36a, 1.8), nMotes);
     this.stars = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), glowMat(tex.star, 0xfff0b0, 2.4), nStars);
     for (const mesh of [this.motes, this.stars]) {
