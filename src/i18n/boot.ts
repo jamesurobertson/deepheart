@@ -13,6 +13,11 @@ declare global {
       log?(text: string): void;
       /** Steam's game language (an API code such as "schinese") when Steam is running, and the OS locale. */
       languages?: { steam: string | null; os: string | null };
+      /** Unlock these trophies' Steam achievements (when Steam is running). */
+      achieve?(trophyIds: string[]): void;
+      /** The save file Steam Cloud carries (null: none), and writing it (null removes it). */
+      readSave?(name: string): string | null;
+      writeSave?(name: string, text: string | null): void;
     };
   }
 }

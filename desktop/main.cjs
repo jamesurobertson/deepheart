@@ -1,7 +1,9 @@
 /**
  * Deepheart as a desktop app. The built web game (../dist, copied into the app as resources/game) is served from a
  * private app:// origin rather than file://, because the game fetches its sprites and sounds and Chromium won't fetch
- * file:// URLs. Saves live in the app's own storage, separate from the browser's.
+ * file:// URLs. Saves live in the app's own storage, separate from the browser's, and in a file Steam Cloud can carry:
+ * saves/deepheart-save.json (the demo's deepheart-save-demo.json) in the app's data folder (Steamworks Auto-Cloud roots: WinAppDataRoaming, MacAppSupport and
+ * LinuxXdgConfig, each with the path Deepheart/saves and the pattern *.json).
  */
 const { app, BrowserWindow, Menu, ipcMain, net, protocol, shell } = require('electron');
 const fs = require('node:fs');
@@ -12,25 +14,76 @@ const RELEASES = 'https://api.github.com/repos/jamesurobertson/deepheart/release
 /** How often a running game checks for a newer release (it also checks on launch). */
 const CHECK_EVERY = 6 * 60 * 60 * 1000;
 
-/** The Steam client, when the game was started from Steam (steamworks.js; achievements will go through it too). */
-let steam = null;
+/** The Steam client (steamworks.js) when the game was started from Steam, else null. Steam sets SteamAppId for the
+ *  games it starts; a steam_appid.txt beside the app does the same in development (480, Spacewar, until ours exists). */
+const steam = (() => {
+  const appId = Number(process.env.SteamAppId) || undefined;
+  if (!appId && !fs.existsSync(path.join(process.cwd(), 'steam_appid.txt'))) return null;
+  try {
+    const steamworks = require('steamworks.js');
+    const client = steamworks.init(appId);
+    // The overlay (Shift+Tab, achievement pop-ups) draws into the window only with these switches, set before it opens.
+    steamworks.electronEnableSteamOverlay();
+    return client;
+  } catch {
+    // Steam isn't running (or the module isn't there): the game runs without it.
+    return null;
+  }
+})();
 
 /** Steam's game language, an API code such as "schinese" (partner.steamgames.com/doc/store/localization/languages).
  *  --steam-language=<code> or DEEPHEART_STEAM_LANGUAGE stands in for Steam when testing. */
 function steamLanguage() {
   const forced = process.argv.find((arg) => arg.startsWith('--steam-language='))?.split('=')[1] ?? process.env.DEEPHEART_STEAM_LANGUAGE;
   if (forced) return forced;
-  // Steam sets SteamAppId for the games it starts; a steam_appid.txt beside the app does the same in development.
-  const appId = Number(process.env.SteamAppId) || undefined;
-  if (!appId && !fs.existsSync(path.join(process.cwd(), 'steam_appid.txt'))) return null;
   try {
-    steam = require('steamworks.js').init(appId);
-    return steam.apps.currentGameLanguage() || null;
+    return steam?.apps.currentGameLanguage() || null;
   } catch {
-    // Steam isn't running (or the module isn't there): the system's language is used instead.
     return null;
   }
 }
+
+/** A trophy's Steam achievement: "kill-1000" is KILL_1000 (as scripts/achievements.ts names them for Steamworks). */
+const achievementName = (trophyId) => String(trophyId).toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+
+/** Unlock these trophies on Steam (the ones already unlocked there are skipped). */
+ipcMain.on('steam:achieve', (_e, trophyIds) => {
+  if (!steam || !Array.isArray(trophyIds)) return;
+  for (const id of trophyIds) {
+    const name = achievementName(id);
+    try {
+      if (!steam.achievement.isActivated(name)) steam.achievement.activate(name);
+    } catch { /* not defined in Steamworks yet: nothing to unlock */ }
+  }
+});
+
+const SAVE_DIR = path.join(app.getPath('userData'), 'saves');
+/** The file for a save: "deepheart-save" (or the demo's "deepheart-save-demo"), and nothing else. */
+const saveFile = (name) => (/^deepheart-save(-[a-z]+)?$/.test(name) ? path.join(SAVE_DIR, `${name}.json`) : null);
+
+/** The save in the file (what Steam Cloud brought down, if it's newer than this computer's), or null. */
+ipcMain.on('save:read', (e, name) => {
+  try {
+    e.returnValue = fs.readFileSync(saveFile(name), 'utf8');
+  } catch {
+    e.returnValue = null;
+  }
+});
+
+/** Keep the file in step with the game's own save. Written whole, then renamed over the old one, so a crash mid-write
+ *  never leaves Steam Cloud half a save. */
+ipcMain.on('save:write', (e, name, text) => {
+  const file = saveFile(name);
+  try {
+    fs.mkdirSync(SAVE_DIR, { recursive: true });
+    if (text === null) fs.rmSync(file, { force: true });
+    else {
+      fs.writeFileSync(`${file}.tmp`, String(text));
+      fs.renameSync(`${file}.tmp`, file);
+    }
+  } catch { /* the next save tries again */ }
+  e.returnValue = true;
+});
 
 const ROOT = app.isPackaged ? path.join(process.resourcesPath, 'game') : path.join(__dirname, '..', 'dist');
 

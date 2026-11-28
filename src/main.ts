@@ -71,9 +71,34 @@ const SPEED = import.meta.env.DEV ? Math.max(1, Number(params.get('speed')) || 1
 // ?fps shows frame rate and frame cost in a corner (dev build only).
 const SHOW_FPS = import.meta.env.DEV && params.has('fps');
 
+/** In the desktop app the save is also kept in a file Steam Cloud can carry between computers (the player's own save
+ *  and the demo's, never a test slot's). */
+const SAVE_FILE = window.deepheart?.writeSave && (!SLOT || SLOT === 'demo') ? SAVE_KEY.replace(':', '-') : null;
+
+/** Keep the save (null: delete it) in the page's storage and, in the desktop app, its file. */
+function storeSave(text: string | null) {
+  if (text === null) localStorage.removeItem(SAVE_KEY);
+  else localStorage.setItem(SAVE_KEY, text);
+  if (SAVE_FILE) window.deepheart!.writeSave!(SAVE_FILE, text);
+}
+
+/** The newer of this computer's save and the file's (Steam Cloud's, when it brought one from another computer). */
+function storedSave(): string | null {
+  const here = localStorage.getItem(SAVE_KEY);
+  const file = SAVE_FILE ? window.deepheart!.readSave!(SAVE_FILE) : null;
+  const savedAt = (text: string | null) => {
+    try {
+      return (JSON.parse(text ?? 'null') as SaveState | null)?.lastSave ?? -1;
+    } catch {
+      return -1;
+    }
+  };
+  return savedAt(file) > savedAt(here) ? file : here;
+}
+
 function load(): SaveState | null {
   try {
-    const s = JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null') as SaveState | null;
+    const s = JSON.parse(storedSave() ?? 'null') as SaveState | null;
     // A save from an earlier minor version starts over.
     if (s && olderVersion(s.version)) return null;
     return s?.v === SAVE_VERSION ? s : null;
@@ -132,7 +157,7 @@ async function boot() {
     if (resetting || atMenu) return;
     try {
       game.s.lastSave = Date.now();
-      localStorage.setItem(SAVE_KEY, JSON.stringify(game.saveState()));
+      storeSave(JSON.stringify(game.saveState()));
     } catch { /* storage unavailable: play continues unsaved */ }
   };
 
@@ -152,7 +177,9 @@ async function boot() {
         const s = JSON.parse(decodeURIComponent(escape(atob(text)))) as SaveState;
         if (s?.v !== SAVE_VERSION || !Array.isArray(s.owned)) return false;
         resetting = true;
-        localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+        // (Stamped now, so it wins over the file's older copy on the way back in.)
+        s.lastSave = Date.now();
+        storeSave(JSON.stringify(s));
         location.reload();
         return true;
       } catch {
@@ -177,7 +204,7 @@ async function boot() {
     reset: () => {
       resetting = true;
       try {
-        localStorage.removeItem(SAVE_KEY);
+        storeSave(null);
       } catch { /* ignore */ }
       location.reload();
     },
@@ -438,7 +465,7 @@ async function boot() {
       newGame: () => {
         resetting = true;
         try {
-          localStorage.removeItem(SAVE_KEY);
+          storeSave(null);
           sessionStorage.setItem(IN_GAME, '1');
         } catch { /* ignore */ }
         location.reload();
@@ -473,6 +500,16 @@ async function boot() {
   }, 50);
   setInterval(save, 5000);
   addEventListener('beforeunload', save);
+  // Trophies are Steam achievements in the desktop app: all of them once at the start (earned before Steam was there,
+  // or on another computer), then each as it's earned.
+  if (window.deepheart?.achieve && !SLOT?.startsWith('state-')) {
+    let reported = 0;
+    setInterval(() => {
+      if (game.s.trophies.length === reported) return;
+      window.deepheart!.achieve!(game.s.trophies.slice(reported));
+      reported = game.s.trophies.length;
+    }, 1000);
+  }
   // The play log (see record.ts): your own sessions on the dev server and in the desktop app, never test runs.
   const recording = (import.meta.env.DEV && !navigator.webdriver && !TEST_STATE && !SIM_FLOOR && !SIM_ASCEND && !QUICK) || !!window.deepheart?.log;
   recorder = recording
