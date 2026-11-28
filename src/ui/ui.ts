@@ -2211,7 +2211,7 @@ export class Ui {
     }
     const newMod = this.modTip && performance.now() < this.modTip.until ? this.modTip.id : undefined;
     this.starFrom = starOpen ? this.starFrom || performance.now() : 0;
-    if (g.s.clicks < 6) state = 'click';
+    if (g.s.kills < 2) state = 'click';
     else if (g.s.owned.every((n) => n === 0) && g.s.gold.gte(g.compCost(0))) state = firstRun ? 'hire' : 'nudge';
     else if (newSkill) state = `skill:${newSkill.id}`;
     // The first time a boss sends you back: Auto is off now, and the party stays put until it's back on.
