@@ -565,7 +565,6 @@ export default {
     'ui.trips.kills': { other: '{n}体撃破' },
     'ui.trips.cards': { other: 'カード{n}枚' },
     'ui.trips.callHome': '呼び戻す',
-    'ui.trips.rate': '{rate}体/秒',
     'ui.trips.floor': '階',
     'ui.trips.send': '派遣',
     'ui.trips.none': 'レベル{level}の仲間が行けます',

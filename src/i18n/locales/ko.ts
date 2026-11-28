@@ -570,7 +570,6 @@ export default {
     'ui.trips.kills': { other: '처치 {n}' },
     'ui.trips.cards': { other: '카드 {n}장' },
     'ui.trips.callHome': '귀환',
-    'ui.trips.rate': '처치 {rate}/초',
     'ui.trips.floor': '층',
     'ui.trips.send': '파견',
     'ui.trips.none': '레벨 {level} 동료부터 갈 수 있어요',

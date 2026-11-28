@@ -576,7 +576,6 @@ export default {
     'ui.trips.kills': { one: '{n} Kill', other: '{n} Kills' },
     'ui.trips.cards': { one: '{n} Karte', other: '{n} Karten' },
     'ui.trips.callHome': 'Zurückrufen',
-    'ui.trips.rate': '{rate} Kills/s',
     'ui.trips.floor': 'Ebene',
     'ui.trips.send': 'Schicken',
     'ui.trips.none': 'Gefährten ab Stufe {level} können los',

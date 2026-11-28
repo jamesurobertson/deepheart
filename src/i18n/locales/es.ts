@@ -577,7 +577,6 @@ export default {
     'ui.trips.kills': { one: '{n} baja', many: '{n} bajas', other: '{n} bajas' },
     'ui.trips.cards': { one: '{n} carta', many: '{n} cartas', other: '{n} cartas' },
     'ui.trips.callHome': 'Hacer volver',
-    'ui.trips.rate': '{rate} bajas/s',
     'ui.trips.floor': 'Piso',
     'ui.trips.send': 'Enviar',
     'ui.trips.none': 'Pueden ir los compañeros de nivel {level}',

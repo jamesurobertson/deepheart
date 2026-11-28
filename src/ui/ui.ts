@@ -3550,7 +3550,6 @@ export class Ui {
   private tripsHtml(): string {
     if (DEMO) return '';
     const g = this.game;
-    const rate = (r: number) => (r >= 10 ? fmt(Math.round(r)) : fixed(r, r >= 1 ? 1 : 2));
     const rows = COMPS.map((c, i) => {
       const trip = g.s.expeditions.find((e) => e.comp === i);
       if (trip) {
@@ -3562,10 +3561,8 @@ export class Ui {
       }
       if (g.s.owned[i] < EXPEDITION_LEVEL) return '';
       const floor = Math.min(g.s.bestFloor, this.tripPick[i] ?? g.tripFloor(i));
-      const dps = g.compDps(i);
       return `<div class="trip" data-hunter="${i}"><span class="trip-ico">${charFit(c.sprite, 34)}</span>
-        <span class="trip-mid"><b>${esc(c.name)} <small>${t('ui.party.lv', { level: g.s.owned[i] })}</small></b>
-        <small>${t('ui.trips.rate', { rate: rate(g.tripRate(floor, dps)) })}</small></span>
+        <span class="trip-mid"><b>${esc(c.name)} <small>${t('ui.party.lv', { level: g.s.owned[i] })}</small></b></span>
         <label class="trip-floor">${t('ui.trips.floor')} <input type="number" id="trip-floor-${i}" min="1" max="${g.s.bestFloor}" value="${floor}" data-trip="${i}"></label>
         <button class="btn small primary" data-act="tripGo">${t('ui.trips.send')}</button></div>`;
     }).join('');

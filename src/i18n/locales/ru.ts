@@ -623,7 +623,6 @@ export default {
     'ui.trips.kills': { one: '{n} убийство', few: '{n} убийства', many: '{n} убийств', other: '{n} убийства' },
     'ui.trips.cards': { one: '{n} карта', few: '{n} карты', many: '{n} карт', other: '{n} карты' },
     'ui.trips.callHome': 'Отозвать',
-    'ui.trips.rate': '{rate} убийств/с',
     'ui.trips.floor': 'Этаж',
     'ui.trips.send': 'Отправить',
     'ui.trips.none': 'Идти могут соратники от уровня {level}',

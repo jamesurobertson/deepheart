@@ -591,7 +591,6 @@ export default {
     'ui.trips.kills': { one: '{n} abate', many: '{n} abates', other: '{n} abates' },
     'ui.trips.cards': { one: '{n} carta', many: '{n} cartas', other: '{n} cartas' },
     'ui.trips.callHome': 'Chamar de volta',
-    'ui.trips.rate': '{rate} abates/s',
     'ui.trips.floor': 'Andar',
     'ui.trips.send': 'Enviar',
     'ui.trips.none': 'Companheiros no nível {level} podem ir',

@@ -548,7 +548,6 @@ export const UI = {
   'ui.trips.kills': { one: '{n} kill', other: '{n} kills' },
   'ui.trips.cards': { one: '{n} card', other: '{n} cards' },
   'ui.trips.callHome': 'Call home',
-  'ui.trips.rate': '{rate} kills/s',
   'ui.trips.floor': 'Floor',
   'ui.trips.send': 'Send',
   'ui.trips.none': 'Companions at level {level} can go',

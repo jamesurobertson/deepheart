@@ -590,7 +590,6 @@ export default {
     "ui.trips.kills": { one: "{n} élimination", many: "{n} éliminations", other: "{n} éliminations" },
     "ui.trips.cards": { one: "{n} carte", many: "{n} cartes", other: "{n} cartes" },
     "ui.trips.callHome": "Rappeler",
-    "ui.trips.rate": "{rate} élim./s",
     "ui.trips.floor": "Étage",
     "ui.trips.send": "Envoyer",
     "ui.trips.none": "Les compagnons de niveau {level} peuvent partir",

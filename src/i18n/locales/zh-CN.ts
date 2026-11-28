@@ -565,7 +565,6 @@ export default {
     'ui.trips.kills': { other: '击杀{n}' },
     'ui.trips.cards': { other: '{n}张卡牌' },
     'ui.trips.callHome': '召回',
-    'ui.trips.rate': '{rate}击杀/秒',
     'ui.trips.floor': '楼层',
     'ui.trips.send': '派遣',
     'ui.trips.none': '{level}级的同伴可以出发',
